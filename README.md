@@ -1,4 +1,4 @@
-﻿# News Collector (MVP)
+# News Collector (MVP)
 
 This project starts from data ingestion for international finance breaking news.
 
@@ -15,8 +15,8 @@ This project starts from data ingestion for international finance breaking news.
 3. Benzinga News REST (API key required)
 - Real-time market news feed
 
-4. X account polling (Bearer token required)
-- Poll selected accounts and ingest new posts by `since_id`
+4. X account stream (Bearer token required)
+- Track selected accounts with X filtered stream (near real-time)
 
 ## API key requirements
 
@@ -28,8 +28,8 @@ This project starts from data ingestion for international finance breaking news.
 - `X_BEARER_TOKEN` (required only when `X_ENABLED=true`)
 - `X_BEARER_TOKEN_FILE` (optional; encrypted local token file, default `.secrets/x_bearer_token.dpapi`)
 - `X_ACCOUNTS` (comma-separated usernames or profile URLs)
-- `X_MAX_RESULTS_PER_ACCOUNT` (per polling cycle)
-- `X_STOP_ON_429` (stop X polling after first 429 in current process)
+- `X_MAX_RESULTS_PER_ACCOUNT` (used by one-shot/poll mode only)
+- `X_STOP_ON_429` (stop X stream after first 429 in current process)
 - `X_INCLUDE_REPLIES` / `X_INCLUDE_RETWEETS` (default `false`)
 - No key required for RSS and GDELT
 
@@ -69,9 +69,13 @@ GDELT 429 switch:
 
 This repo now includes a standalone relay service:
 - Receive incoming events via HTTP `POST /events`
+- Receive LINE platform webhook via `POST /line/webhook` (HMAC signature verification)
+- Receive direct push via `POST /push/direct` (bypass `t_relay_events` queue)
 - Persist events in MySQL event queue table (auto create DB/table)
 - Every 5 minutes, poll latest unpushed events (`is_pushed=0`) and dispatch
 - Current default is dry-run: print push logs only (no real LINE push)
+- `LINE_RELAY_DISPATCH_DRY_RUN` also applies to `/push/direct`
+- LINE push message format is now strictly: `title` + `url`
 - Auto-create LINE bot metadata tables (daily-kanji style):
   - `t_bot_group_info`
   - `t_bot_user_info`
@@ -85,17 +89,21 @@ pip install -e .
 powershell -ExecutionPolicy Bypass -File .\scripts\run_line_event_relay.ps1
 ```
 
-Bridge all source links to relay (`BENZINGA + GDELT + RSS + X`):
+Bridge all source links to relay (`BENZINGA stream + X stream + GDELT + RSS + US index direct push`):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_source_bridge.ps1 -PollIntervalSeconds 300 -Limit 5
+powershell -ExecutionPolicy Bypass -File .\scripts\run_source_bridge.ps1 -PollIntervalSeconds 300 -Limit 5 -UsIndexPollIntervalSeconds 30
 ```
 
 Default bridge language filter for Benzinga stream is `en,cn` (internally maps `cn -> zh`).
-X source is polled in the same bridge cycle and tracks only newly seen posts per account.
+X source is now consumed by filtered stream (near real-time) with auto reconnect/backoff.
+US index chain tracks DJIA and S&P 500 open/close and sends direct push via `/push/direct` (no insert into `t_relay_events`).
 
 Required `.env` values:
 - `LINE_CHANNEL_ACCESS_TOKEN` (required only when `LINE_RELAY_DISPATCH_DRY_RUN=false`)
+- `LINE_CHANNEL_SECRET` (required for `/line/webhook` signature verification)
+- `LINE_WEBHOOK_PATH=/line/webhook` (optional, defaults to this path)
+- `LINE_DIRECT_TARGET_USER_IDS=Uxxxxxxxx,...` (direct push target users; if empty, fallback to active `test_account=1` users)
 
 MySQL defaults (editable in `.env`):
 - `LINE_RELAY_MYSQL_ENABLED=true`
@@ -109,8 +117,14 @@ MySQL defaults (editable in `.env`):
 - `LINE_RELAY_MYSQL_USER_TABLE=t_bot_user_info`
 - `LINE_RELAY_MYSQL_X_TABLE=t_x_posts`
 - `LINE_RELAY_DISPATCH_INTERVAL_SECONDS=300`
-- `LINE_RELAY_DISPATCH_BATCH_SIZE=100`
+- `LINE_RELAY_DISPATCH_BATCH_SIZE=1`
 - `LINE_RELAY_DISPATCH_DRY_RUN=true`
+
+Heroku deploy notes:
+- `Procfile` already runs web dyno: `python -m line_event_relay.main`
+- Relay port supports Heroku `PORT` automatically (fallback from `LINE_RELAY_PORT`)
+- Recommended LINE webhook URL:
+  - `https://<your-heroku-app>.herokuapp.com/callback`
 
 Health check:
 
@@ -129,6 +143,38 @@ Post sample event:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\post_event_sample.ps1
 ```
+
+Post sample LINE webhook (with valid signature):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\post_line_webhook_sample.ps1
+```
+
+Post sample direct push (bypass queue table):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\post_direct_push_sample.ps1
+```
+
+Webhook local test (collector and LINE bot as separate services):
+
+1. Start relay service only:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_line_event_relay.ps1
+```
+
+2. Expose local webhook with ngrok (if installed):
+
+```powershell
+ngrok http 18090
+```
+
+3. In LINE Developers Console, set Webhook URL to:
+- `https://<your-ngrok-domain>/line/webhook`
+
+4. Keep webhook verification enabled in LINE console. This service validates `x-line-signature` using `LINE_CHANNEL_SECRET`.
+5. When bot is invited into a group, relay logs `[LINE_GROUP_JOIN] ... group_id=...` for quick copy.
 
 Note:
 - Payload with `test_only=true` (or `source=manual_test*`) is log-only and will not be inserted into MySQL tables.
@@ -208,7 +254,7 @@ Security notes:
 - If set to `true`, stream will stop immediately after first 429 response.
 - This applies only when `BENZINGA_ENABLED=true`.
 
-## X account polling
+## X account stream
 
 Save X Bearer token in encrypted local file (Windows DPAPI):
 
@@ -222,7 +268,7 @@ Or pass token directly:
 powershell -ExecutionPolicy Bypass -File .\scripts\save_x_token.ps1 -BearerToken "YOUR_X_BEARER_TOKEN"
 ```
 
-One-shot fetch:
+One-shot fetch (debug/poll mode, optional):
 
 ```powershell
 $env:PYTHONPATH='src'; python -m news_collector.main fetch --source x --limit 10 --pretty

@@ -1,8 +1,10 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
+import hmac
 import html
 import json
 import logging
@@ -95,6 +97,50 @@ class MySqlEventStore:
         self._create_database_if_needed()
         self._connect_database()
         self._create_tables_if_needed()
+        self.repair_queue_state()
+
+    def repair_queue_state(self) -> dict[str, int]:
+        if self._conn is None:
+            return {"fixed_pushed_flag": 0, "fixed_missing_pushed_at": 0}
+
+        fix_pushed_flag_sql = (
+            f"UPDATE {self._event_table} "
+            "SET is_pushed=1, "
+            "line_push_status=CASE "
+            "WHEN line_push_status IS NULL OR line_push_status='queued' THEN 'repaired_pushed' "
+            "ELSE line_push_status END "
+            "WHERE is_pushed=0 AND line_pushed_at IS NOT NULL"
+        )
+        fix_missing_pushed_at_sql = (
+            f"UPDATE {self._event_table} "
+            "SET line_pushed_at=DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ'), "
+            "line_push_status=CASE "
+            "WHEN line_push_status IS NULL OR line_push_status='queued' THEN 'repaired_pushed' "
+            "ELSE line_push_status END "
+            "WHERE is_pushed=1 AND (line_pushed_at IS NULL OR line_pushed_at='')"
+        )
+
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(fix_pushed_flag_sql)
+                fixed_pushed_flag = int(cur.rowcount or 0)
+                cur.execute(fix_missing_pushed_at_sql)
+                fixed_missing_pushed_at = int(cur.rowcount or 0)
+                self._conn.commit()
+            finally:
+                cur.close()
+
+        if fixed_pushed_flag or fixed_missing_pushed_at:
+            logger.warning(
+                "Queue state repaired: fixed_pushed_flag=%d fixed_missing_pushed_at=%d",
+                fixed_pushed_flag,
+                fixed_missing_pushed_at,
+            )
+        return {
+            "fixed_pushed_flag": fixed_pushed_flag,
+            "fixed_missing_pushed_at": fixed_missing_pushed_at,
+        }
 
     def enqueue_event_if_new(self, event: RelayEvent) -> bool:
         if self._conn is None:
@@ -139,7 +185,7 @@ class MySqlEventStore:
             f"SELECT id, source, title, url, summary, published_at "
             f"FROM {self._event_table} "
             "WHERE is_pushed=0 AND line_pushed_at IS NULL "
-            "ORDER BY created_at DESC "
+            "ORDER BY created_at ASC, id ASC "
             "LIMIT %s"
         )
         with self._lock:
@@ -169,6 +215,69 @@ class MySqlEventStore:
 
     def list_active_user_ids(self) -> list[str]:
         return self._list_active_ids(self._user_table, "user_id")
+
+    def list_active_test_user_ids(self) -> list[str]:
+        if self._conn is None:
+            return []
+
+        sql = f"SELECT user_id FROM {self._user_table} WHERE active=1 AND test_account=1"
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql)
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        return [str(row[0]) for row in rows if row and row[0]]
+
+    def upsert_group(self, group_id: str, test_account: bool = False, active: bool = True) -> None:
+        if self._conn is None:
+            return
+
+        value = (group_id or "").strip()
+        if not value:
+            return
+
+        sql = (
+            f"INSERT INTO {self._group_table} (group_id, test_account, active) "
+            "VALUES (%s, %s, %s) "
+            "ON DUPLICATE KEY UPDATE "
+            "test_account=GREATEST(test_account, VALUES(test_account)), "
+            "active=VALUES(active), "
+            "updated_at=CURRENT_TIMESTAMP"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, (value, 1 if test_account else 0, 1 if active else 0))
+                self._conn.commit()
+            finally:
+                cur.close()
+
+    def upsert_user(self, user_id: str, test_account: bool = False, active: bool = True) -> None:
+        if self._conn is None:
+            return
+
+        value = (user_id or "").strip()
+        if not value:
+            return
+
+        sql = (
+            f"INSERT INTO {self._user_table} (user_id, test_account, active) "
+            "VALUES (%s, %s, %s) "
+            "ON DUPLICATE KEY UPDATE "
+            "test_account=GREATEST(test_account, VALUES(test_account)), "
+            "active=VALUES(active), "
+            "updated_at=CURRENT_TIMESTAMP"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, (value, 1 if test_account else 0, 1 if active else 0))
+                self._conn.commit()
+            finally:
+                cur.close()
 
     def mark_event_dispatched(self, row_id: int, status: str, error: str | None = None) -> None:
         if self._conn is None:
@@ -439,6 +548,186 @@ class RelayProcessor:
 
         self._start_dispatch_scheduler()
 
+    def process_line_webhook(self, raw_body: bytes, signature: str | None) -> dict[str, Any]:
+        # ?? LINE ???????HMAC-SHA256(raw body) + base64?
+        self._verify_line_signature(raw_body, signature)
+        try:
+            payload = json.loads(raw_body.decode("utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"invalid json: {exc}") from exc
+
+        raw_events = payload.get("events") if isinstance(payload, dict) else None
+        if raw_events is None:
+            raw_events = []
+        if not isinstance(raw_events, list):
+            raise ValueError("invalid LINE webhook payload: events should be a list")
+
+        user_states: dict[str, bool] = {}
+        group_states: dict[str, bool] = {}
+        group_ids: set[str] = set()
+
+        for event in raw_events:
+            if not isinstance(event, dict):
+                continue
+            source = event.get("source")
+            if not isinstance(source, dict):
+                continue
+
+            event_type = str(event.get("type") or "").strip().lower()
+            source_type = str(source.get("type") or "").strip().lower()
+            user_id = str(source.get("userId") or "").strip()
+            group_id = str(source.get("groupId") or "").strip()
+            room_id = str(source.get("roomId") or "").strip()
+
+            if user_id and user_id not in user_states:
+                user_states[user_id] = True
+
+            group_or_room_id = ""
+            if group_id:
+                group_or_room_id = group_id
+            elif room_id:
+                group_or_room_id = room_id
+            if group_or_room_id:
+                group_ids.add(group_or_room_id)
+                if group_or_room_id not in group_states:
+                    group_states[group_or_room_id] = True
+
+            joined_user_ids: list[str] = []
+            if event_type == "memberjoined":
+                joined_obj = event.get("joined")
+                if isinstance(joined_obj, dict):
+                    members = joined_obj.get("members")
+                    if isinstance(members, list):
+                        for member in members:
+                            if not isinstance(member, dict):
+                                continue
+                            joined_user_id = str(member.get("userId") or "").strip()
+                            if not joined_user_id:
+                                continue
+                            joined_user_ids.append(joined_user_id)
+                            user_states[joined_user_id] = True
+
+            # Log group invite/join signals for fast group_id discovery.
+            if event_type in {"join", "memberjoined"}:
+                joined_id = group_id or room_id
+                if joined_id:
+                    group_states[joined_id] = True
+                logger.info(
+                    "[LINE_GROUP_JOIN] event_type=%s source_type=%s group_id=%s user_id=%s joined_user_ids=%s",
+                    event_type or "-",
+                    source_type or "-",
+                    joined_id or "-",
+                    user_id or "-",
+                    ",".join(sorted(set(joined_user_ids))) if joined_user_ids else "-",
+                )
+            elif event_type == "leave":
+                left_id = group_id or room_id
+                if left_id:
+                    group_states[left_id] = False
+                logger.info(
+                    "[LINE_GROUP_LEAVE] source_type=%s group_id=%s user_id=%s",
+                    source_type or "-",
+                    left_id or "-",
+                    user_id or "-",
+                )
+            elif event_type == "unfollow":
+                if user_id:
+                    user_states[user_id] = False
+                logger.info("[LINE_USER_UNFOLLOW] user_id=%s", user_id or "-")
+            elif event_type == "follow":
+                if user_id:
+                    user_states[user_id] = True
+                logger.info("[LINE_USER_FOLLOW] user_id=%s", user_id or "-")
+
+        active_users = 0
+        inactive_users = 0
+        active_groups = 0
+        inactive_groups = 0
+        if self._store is None:
+            logger.warning("LINE webhook received but MySQL store is disabled")
+        else:
+            for uid in sorted(user_states):
+                is_active = bool(user_states[uid])
+                self._store.upsert_user(uid, test_account=False, active=is_active)
+                if is_active:
+                    active_users += 1
+                else:
+                    inactive_users += 1
+
+            for gid in sorted(group_states):
+                is_active = bool(group_states[gid])
+                self._store.upsert_group(gid, test_account=False, active=is_active)
+                if is_active:
+                    active_groups += 1
+                else:
+                    inactive_groups += 1
+
+        logger.info(
+            "LINE webhook processed: events=%d users=%d groups=%d active_users=%d inactive_users=%d active_groups=%d inactive_groups=%d",
+            len(raw_events),
+            len(user_states),
+            len(group_ids),
+            active_users,
+            inactive_users,
+            active_groups,
+            inactive_groups,
+        )
+        return {
+            "ok": True,
+            "received": len(raw_events),
+            "active_users": active_users,
+            "inactive_users": inactive_users,
+            "active_groups": active_groups,
+            "inactive_groups": inactive_groups,
+            "group_ids": sorted(group_ids),
+        }
+
+    def process_direct_push(self, payload: Any) -> dict[str, Any]:
+        events = self._extract_direct_events(payload)
+        if not events:
+            raise ValueError("direct push payload has no valid events")
+
+        target_users = self._resolve_direct_target_users()
+        if not target_users:
+            raise ValueError(
+                "No direct user targets configured. Set LINE_DIRECT_TARGET_USER_IDS or mark test_account=1 users active."
+            )
+
+        sent = 0
+        for event in events:
+            text = self._build_direct_text(event)
+            if not text:
+                continue
+
+            if self._settings.dispatch_dry_run:
+                for user_id in target_users:
+                    logger.info(
+                        "[DRY_RUN_DIRECT_PUSH] user_id=%s source=%s title=%s",
+                        user_id,
+                        event.get("source", "direct"),
+                        event.get("title", "-"),
+                    )
+                sent += len(target_users)
+                continue
+
+            for user_id in target_users:
+                self._line_client.push_text(user_id, text)
+                sent += 1
+
+            logger.info(
+                "[DIRECT_PUSH_SENT] users=%d source=%s title=%s",
+                len(target_users),
+                event.get("source", "direct"),
+                event.get("title", "-"),
+            )
+
+        return {
+            "received": len(events),
+            "target_users": len(target_users),
+            "pushed": sent,
+            "dry_run": self._settings.dispatch_dry_run,
+        }
+
     def process_payload(self, payload: Any) -> dict[str, Any]:
         events = self._extract_events(payload)
         queued = 0
@@ -512,6 +801,8 @@ class RelayProcessor:
         if self._store is None:
             return
 
+        self._store.repair_queue_state()
+
         # Poll only unpushed rows from queue table.
         pending = self._store.fetch_unpushed_events(self._settings.dispatch_batch_size)
         if not pending:
@@ -529,6 +820,16 @@ class RelayProcessor:
             return
 
         for event in pending:
+            if self._is_test_source(event.source):
+                self._store.mark_event_dispatched(event.row_id, status="skipped_test_source", error=None)
+                logger.info(
+                    "Dispatch skip test source: event_id=%s source=%s title=%s",
+                    event.row_id,
+                    event.source,
+                    event.title,
+                )
+                continue
+
             message = self._build_push_text(event)
             try:
                 if self._settings.dispatch_dry_run:
@@ -599,25 +900,80 @@ class RelayProcessor:
         return events
 
     @staticmethod
+    def _extract_direct_events(payload: Any) -> list[dict[str, Any]]:
+        if isinstance(payload, list):
+            raw_events = payload
+        elif isinstance(payload, dict) and isinstance(payload.get("events"), list):
+            raw_events = payload["events"]
+        elif isinstance(payload, dict):
+            raw_events = [payload]
+        else:
+            raise ValueError("Unsupported payload: expected object, list, or {events:[...]} for direct push")
+
+        return [obj for obj in raw_events if isinstance(obj, dict)]
+
+    def _resolve_direct_target_users(self) -> list[str]:
+        from_env = [x.strip() for x in self._settings.line_direct_target_user_ids if x.strip()]
+        if from_env:
+            return sorted(set(from_env))
+
+        if self._store is not None:
+            test_users = self._store.list_active_test_user_ids()
+            if test_users:
+                return sorted(set(test_users))
+
+        return []
+
+    @staticmethod
+    def _build_direct_text(event: dict[str, Any]) -> str:
+        # direct push 允許多行格式，避免壓平成單行。
+        text = str(event.get("text") or "").strip()
+        if text:
+            return text[:4500]
+
+        title = " ".join(str(event.get("title") or "").split()).strip()
+        url = str(event.get("url") or "").strip()
+        if title and url:
+            return f"{title}\n{url}"[:4500]
+        if title:
+            return title[:4500]
+        return ""
+
+    @staticmethod
     def _normalize_summary(value: str) -> str:
         text = html.unescape(value)
         text = re.sub(r"<[^>]+>", " ", text)
         text = " ".join(text.split())
         return text[:1200]
 
+    def _verify_line_signature(self, raw_body: bytes, signature: str | None) -> None:
+        secret = self._settings.line_channel_secret
+        if not secret:
+            raise ValueError("LINE_CHANNEL_SECRET is required for webhook verification")
+
+        expected = base64.b64encode(hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).digest()).decode(
+            "utf-8"
+        )
+        incoming = (signature or "").strip()
+        if not incoming or not hmac.compare_digest(expected, incoming):
+            raise PermissionError("invalid LINE signature")
+
     @staticmethod
     def _build_push_text(event: QueuedEvent) -> str:
-        lines = [f"[{event.source}] {event.title}", event.url]
-        if event.summary:
-            lines.append(f"summary: {event.summary}")
-        if event.published_at:
-            lines.append(f"published_at: {event.published_at}")
-        return "\n".join(lines).strip()[:4500]
+        # 依需求僅保留 title + url，避免把 summary/published_at 推進 LINE。
+        title = " ".join((event.title or "").split()).strip()
+        url = (event.url or "").strip()
+        return f"{title}\n{url}".strip()[:4500]
 
     @staticmethod
     def _allow_benzinga_url(url: str) -> bool:
         check = (url or "").strip().lower()
         return any(check.startswith(prefix.lower()) for prefix in BENZINGA_ALLOWED_URL_PREFIXES)
+
+    @staticmethod
+    def _is_test_source(source: str | None) -> bool:
+        value = (source or "").strip().lower()
+        return value == "local_live_test" or value.startswith("manual_test")
 
     @staticmethod
     def _allow_event_date(published_at: str | None) -> bool:
@@ -642,5 +998,3 @@ class RelayProcessor:
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone()
-
-

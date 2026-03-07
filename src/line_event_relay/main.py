@@ -39,7 +39,7 @@ def main() -> int:
     try:
         settings = load_settings(args.env_file)
         processor = RelayProcessor(settings)
-        server = RelayHttpServer((settings.host, settings.port), processor)
+        server = RelayHttpServer((settings.host, settings.port), processor, settings.line_webhook_path)
         logging.info("LINE relay listening on http://%s:%d", settings.host, settings.port)
         server.serve_forever()
         return 0

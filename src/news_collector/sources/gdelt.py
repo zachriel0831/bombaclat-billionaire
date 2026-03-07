@@ -1,9 +1,10 @@
 ﻿from __future__ import annotations
 
+import json
 import logging
 import time
 
-from news_collector.http_client import http_get_json
+from news_collector.http_client import http_get_text
 from news_collector.models import NewsItem
 from news_collector.sources.base import NewsSource
 from news_collector.utils import parse_datetime, stable_id
@@ -198,10 +199,12 @@ class GdeltSource(NewsSource):
         for attempt in range(3):
             try:
                 _throttle_gdelt_requests()
-                payload = http_get_json(self.endpoint, params=params, timeout=self.timeout_seconds)
+                raw_text = http_get_text(self.endpoint, params=params, timeout=self.timeout_seconds)
+                payload = _parse_gdelt_payload(raw_text)
                 break
             except Exception as exc:
-                if "429" in str(exc):
+                message = str(exc)
+                if "429" in message:
                     if self.cooldown_on_429:
                         _set_gdelt_cooldown(float(self.cooldown_seconds))
                         logger.warning(
@@ -214,7 +217,7 @@ class GdeltSource(NewsSource):
 
                 if attempt < 2:
                     sleep_seconds = GDELT_MIN_REQUEST_INTERVAL_SECONDS * (attempt + 1)
-                    logger.warning("GDELT request failed, retry in %.1fs: %s", sleep_seconds, exc)
+                    logger.warning("GDELT request failed, retry in %.1fs: %s", sleep_seconds, message)
                     time.sleep(sleep_seconds)
                     continue
                 raise
@@ -265,6 +268,27 @@ class GdeltSource(NewsSource):
             len(items[:limit]),
         )
         return items[:limit]
+
+
+def _parse_gdelt_payload(raw_text: str) -> dict:
+    text = (raw_text or "").strip()
+    if not text:
+        raise RuntimeError("GDELT returned empty response body")
+
+    lower = text.lower()
+    # GDELT 常見限頻文字回覆（非 JSON）。
+    if "please limit requests to one every 5 seconds" in lower or "too many requests" in lower:
+        raise RuntimeError("HTTP Error 429: Too Many Requests")
+
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        snippet = " ".join(text.split())[:200]
+        raise RuntimeError(f"GDELT returned non-JSON body: {snippet}") from exc
+
+    if isinstance(payload, dict):
+        return payload
+    raise RuntimeError("GDELT returned non-object JSON payload")
 
 
 def _is_allowed_language(article: dict) -> bool:

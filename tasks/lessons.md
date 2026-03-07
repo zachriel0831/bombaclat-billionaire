@@ -1,4 +1,4 @@
-# Lessons Log
+﻿# Lessons Log
 
 This file is append-only. Add a new entry after any user correction to prevent repeated mistakes.
 
@@ -20,6 +20,7 @@ This file is append-only. Add a new entry after any user correction to prevent r
 - Verification evidence:
   - command/output summary
 - Status: active
+
 ```
 
 ## Active Lessons
@@ -110,4 +111,27 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `python -m compileall src tests` passed
   - `python -m unittest discover -s tests -p \"test_*.py\" -v` passed
   - runtime config shows `gdelt_cooldown_on_429=False`
+- Status: active
+
+
+## LESSON-20260307-01
+- Date: 2026-03-07
+- Trigger (User correction): User asked to replace X polling with stream listening.
+- What was wrong: Bridge still handled X by polling cycle, not continuous stream.
+- Root cause: Earlier implementation prioritized simpler API flow over fastest-delivery requirement.
+- New rule (always/never): Always prioritize streaming ingestion when user asks for latest/fastest social feed.
+- Prevention checklist (before final response):
+  - [ ] Confirm requirement is stream vs polling
+  - [ ] Split polling sources and streaming sources in bridge threads
+  - [ ] Add reconnect/backoff and 429 stop behavior for stream sources
+- Repo updates made:
+  - `src/news_collector/x_stream.py`
+  - `src/news_collector/relay_bridge.py`
+  - `scripts/run_source_bridge.ps1`
+  - `README.md`
+  - `tests/test_x_stream.py`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest discover -s tests -p "test_*.py" -v` passed (16 tests)
+  - `python -m news_collector.relay_bridge --help` shows X stream args
 - Status: active

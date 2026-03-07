@@ -13,7 +13,9 @@ from urllib.request import Request, urlopen
 
 from news_collector.benzinga_stream import BenzingaNewsStreamer, StreamConfig
 from news_collector.collector import build_sources, fetch_news
-from news_collector.config import load_settings, resolve_benzinga_api_key
+from news_collector.config import load_settings, resolve_benzinga_api_key, resolve_x_bearer_token
+from news_collector.us_index_tracker import UsIndexTracker
+from news_collector.x_stream import XFilteredStreamer, XStreamConfig
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +136,7 @@ TOPIC_EXCLUDE_KEYWORDS = (
 @dataclass(frozen=True)
 class BridgeConfig:
     relay_url: str
+    relay_direct_push_url: str
     env_file: str
     poll_interval_seconds: int
     limit_per_source: int
@@ -141,6 +144,10 @@ class BridgeConfig:
     benzinga_tickers: list[str]
     benzinga_channels: list[str]
     benzinga_languages: list[str]
+    x_stream_timeout_seconds: int
+    x_stream_reconnect_max_seconds: int
+    us_index_enabled: bool
+    us_index_poll_interval_seconds: int
 
 
 def _normalize_benzinga_language(lang: str) -> str:
@@ -228,8 +235,32 @@ def _post_event(relay_url: str, event: dict[str, Any], timeout_seconds: int = 8)
         return False
 
 
+def _post_direct_push(relay_url: str, payload: dict[str, Any], timeout_seconds: int = 8) -> bool:
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = Request(relay_url, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urlopen(req, timeout=timeout_seconds) as resp:
+            code = int(getattr(resp, "status", 0))
+            if code != 200:
+                logger.warning("Relay direct push rejected status=%s source=%s", code, payload.get("source"))
+                return False
+            return True
+    except HTTPError as exc:
+        logger.warning("Relay direct push HTTPError status=%s source=%s", exc.code, payload.get("source"))
+        return False
+    except URLError as exc:
+        logger.warning("Relay direct push URLError source=%s error=%s", payload.get("source"), exc)
+        return False
+    except Exception as exc:  # pragma: no cover - runtime guard
+        logger.warning("Relay direct push failed source=%s error=%s", payload.get("source"), exc)
+        return False
+
+
 def _poll_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
-    source_names = ["rss", "gdelt", "x"]
+    # 輪巡僅保留 RSS/GDELT；X 改由串流執行緒近即時監聽。
+    source_names = ["rss", "gdelt"]
 
     while not stop_event.is_set():
         settings = load_settings(config.env_file)
@@ -328,15 +359,131 @@ def _stream_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
     streamer.run(on_event=on_event, max_messages=None, duration_seconds=None)
 
 
+def _x_stream_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
+    settings = load_settings(config.env_file)
+    if not settings.x_enabled:
+        logger.info("X stream bridge skipped: X_ENABLED=false")
+        return
+
+    token = resolve_x_bearer_token(settings)
+    if not token:
+        logger.warning("X stream bridge skipped: missing X bearer token")
+        return
+
+    if not settings.x_accounts:
+        logger.warning("X stream bridge skipped: X_ACCOUNTS is empty")
+        return
+
+    streamer = XFilteredStreamer(
+        XStreamConfig(
+            bearer_token=token,
+            accounts=settings.x_accounts,
+            include_replies=settings.x_include_replies,
+            include_retweets=settings.x_include_retweets,
+            timeout_seconds=config.x_stream_timeout_seconds,
+            reconnect_max_seconds=config.x_stream_reconnect_max_seconds,
+            stop_on_429=settings.x_stop_on_429,
+        )
+    )
+
+    def on_item(item: Any) -> None:
+        if stop_event.is_set():
+            return
+        event = item.to_dict()
+
+        if not _allow_event_date(event):
+            return
+        if not _allow_event_topic(event):
+            return
+
+        ok = _post_event(config.relay_url, event)
+        if ok:
+            logger.info(
+                "[BRIDGE_X_STREAM_SENT] id=%s source=%s url=%s",
+                event.get("id", "-"),
+                event.get("source", "-"),
+                event.get("url", "-"),
+            )
+
+    logger.info("Starting X account stream accounts=%s", ",".join(settings.x_accounts))
+    streamer.run(on_item=on_item, stop_event=stop_event)
+
+
+def _us_index_direct_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
+    if not config.us_index_enabled:
+        logger.info("US index direct push skipped: disabled")
+        return
+
+    tracker = UsIndexTracker(timeout_seconds=12)
+    open_sent_dates: set[str] = set()
+    close_sent_dates: set[str] = set()
+
+    while not stop_event.is_set():
+        try:
+            trade_date, quotes = tracker.fetch_snapshot()
+            if trade_date is not None and quotes:
+                trade_day = trade_date.isoformat()
+                now_epoch = int(datetime.now(timezone.utc).timestamp())
+
+                start_epoch = min(q.regular_start_epoch for q in quotes.values())
+                end_epoch = max(q.regular_end_epoch for q in quotes.values())
+
+                # 僅在本交易日時間窗內發送，避免服務重啟時補推過期交易日。
+                open_window = 0 <= now_epoch - start_epoch <= 8 * 3600
+                close_window = 0 <= now_epoch - end_epoch <= 8 * 3600
+
+                if open_window and trade_day not in open_sent_dates:
+                    message = tracker.format_open_message(trade_date, quotes)
+                    payload = {
+                        "source": "us_index_tracker",
+                        "title": f"US index open {trade_day}",
+                        "text": message,
+                        "event_id": f"us_index_open_{trade_day}",
+                    }
+                    if _post_direct_push(config.relay_direct_push_url, payload):
+                        open_sent_dates.add(trade_day)
+                        logger.info("[US_INDEX_OPEN_PUSHED] trade_date=%s", trade_day)
+
+                if close_window and trade_day not in close_sent_dates:
+                    message = tracker.format_close_message(trade_date, quotes)
+                    payload = {
+                        "source": "us_index_tracker",
+                        "title": f"US index close {trade_day}",
+                        "text": message,
+                        "event_id": f"us_index_close_{trade_day}",
+                    }
+                    if _post_direct_push(config.relay_direct_push_url, payload):
+                        close_sent_dates.add(trade_day)
+                        logger.info("[US_INDEX_CLOSE_PUSHED] trade_date=%s", trade_day)
+        except Exception as exc:
+            logger.warning("US index tracking failed: %s", exc)
+
+        stop_event.wait(max(config.us_index_poll_interval_seconds, 5))
+
+
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Bridge all news sources to LINE relay /events")
+    parser = argparse.ArgumentParser(description="Bridge all news sources to LINE relay")
     parser.add_argument("--relay-url", default="http://127.0.0.1:18090/events", help="LINE relay /events endpoint")
+    parser.add_argument(
+        "--relay-direct-push-url",
+        default="http://127.0.0.1:18090/push/direct",
+        help="LINE relay direct push endpoint",
+    )
     parser.add_argument("--env-file", default=".env", help="Path to env file")
-    parser.add_argument("--poll-interval-seconds", type=int, default=300, help="Polling interval for RSS/GDELT")
+    parser.add_argument("--poll-interval-seconds", type=int, default=300, help="Polling interval for RSS/GDELT only")
     parser.add_argument("--limit", type=int, default=5, help="Per-source fetch limit for RSS/GDELT")
     parser.add_argument("--tickers", default="", help="Benzinga stream tickers filter, comma-separated")
     parser.add_argument("--channels", default="", help="Benzinga stream channels filter, comma-separated")
     parser.add_argument("--languages", default="", help="Benzinga stream language filter, comma-separated")
+    parser.add_argument("--x-stream-timeout-seconds", type=int, default=90, help="X stream read timeout seconds")
+    parser.add_argument(
+        "--x-stream-reconnect-max-seconds",
+        type=int,
+        default=120,
+        help="Max reconnect backoff for X stream",
+    )
+    parser.add_argument("--us-index-poll-interval-seconds", type=int, default=30, help="US index polling cadence")
+    parser.add_argument("--disable-us-index", action="store_true", help="Disable US index direct push chain")
     parser.add_argument(
         "--log-level",
         default="INFO",
@@ -362,6 +509,7 @@ def main() -> int:
 
     config = BridgeConfig(
         relay_url=args.relay_url,
+        relay_direct_push_url=args.relay_direct_push_url,
         env_file=args.env_file,
         poll_interval_seconds=max(args.poll_interval_seconds, 1),
         limit_per_source=max(args.limit, 1),
@@ -369,20 +517,35 @@ def main() -> int:
         benzinga_tickers=[x.strip() for x in args.tickers.split(",") if x.strip()],
         benzinga_channels=[x.strip() for x in args.channels.split(",") if x.strip()],
         benzinga_languages=[_normalize_benzinga_language(x) for x in args.languages.split(",") if x.strip()],
+        x_stream_timeout_seconds=max(args.x_stream_timeout_seconds, 15),
+        x_stream_reconnect_max_seconds=max(args.x_stream_reconnect_max_seconds, 5),
+        us_index_enabled=not args.disable_us_index,
+        us_index_poll_interval_seconds=max(args.us_index_poll_interval_seconds, 5),
     )
 
     stop_event = threading.Event()
 
     poll_thread = threading.Thread(target=_poll_loop, args=(config, stop_event), daemon=True, name="bridge-poll")
-    stream_thread = threading.Thread(target=_stream_loop, args=(config, stop_event), daemon=True, name="bridge-stream")
+    benzinga_thread = threading.Thread(target=_stream_loop, args=(config, stop_event), daemon=True, name="bridge-benzinga")
+    x_stream_thread = threading.Thread(target=_x_stream_loop, args=(config, stop_event), daemon=True, name="bridge-x-stream")
+    us_index_thread = threading.Thread(
+        target=_us_index_direct_loop,
+        args=(config, stop_event),
+        daemon=True,
+        name="bridge-us-index",
+    )
 
     poll_thread.start()
-    stream_thread.start()
-    logger.info("Bridge started relay_url=%s", config.relay_url)
+    benzinga_thread.start()
+    x_stream_thread.start()
+    us_index_thread.start()
+    logger.info("Bridge started relay_url=%s direct_push_url=%s", config.relay_url, config.relay_direct_push_url)
 
     try:
         poll_thread.join()
-        stream_thread.join()
+        benzinga_thread.join()
+        x_stream_thread.join()
+        us_index_thread.join()
         return 0
     except KeyboardInterrupt:
         logger.info("Bridge interrupted by user")

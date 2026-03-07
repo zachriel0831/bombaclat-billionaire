@@ -1,4 +1,4 @@
-﻿﻿# 啟動 LINE relay 服務。
+# Start LINE relay service.
 param(
   [string]$EnvFile = ".env",
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]

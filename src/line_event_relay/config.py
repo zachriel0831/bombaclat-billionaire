@@ -24,7 +24,10 @@ class RelaySettings:
     host: str
     port: int
     line_channel_access_token: str
+    line_channel_secret: str
     line_target_group_id: str
+    line_webhook_path: str
+    line_direct_target_user_ids: list[str]
     dispatch_interval_seconds: int
     dispatch_batch_size: int
     dispatch_dry_run: bool
@@ -52,16 +55,25 @@ def load_settings(env_file: str = ".env") -> RelaySettings:
 
     dry_run = parse_bool(os.getenv("LINE_RELAY_DISPATCH_DRY_RUN", "true"), default=True)
     token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "").strip()
+    secret = os.getenv("LINE_CHANNEL_SECRET", "").strip()
     group_id = os.getenv("LINE_TARGET_GROUP_ID", "").strip()
+    direct_user_ids = [
+        x.strip()
+        for x in os.getenv("LINE_DIRECT_TARGET_USER_IDS", "").split(",")
+        if x.strip()
+    ]
 
     if not dry_run and not token:
         raise ValueError("LINE_CHANNEL_ACCESS_TOKEN is required when LINE_RELAY_DISPATCH_DRY_RUN=false")
 
     return RelaySettings(
         host=os.getenv("LINE_RELAY_HOST", "0.0.0.0"),
-        port=int(os.getenv("LINE_RELAY_PORT", "18090")),
+        port=int(os.getenv("LINE_RELAY_PORT") or os.getenv("PORT", "18090")),
         line_channel_access_token=token,
+        line_channel_secret=secret,
         line_target_group_id=group_id,
+        line_webhook_path=os.getenv("LINE_WEBHOOK_PATH", "/line/webhook").strip() or "/line/webhook",
+        line_direct_target_user_ids=direct_user_ids,
         dispatch_interval_seconds=int(os.getenv("LINE_RELAY_DISPATCH_INTERVAL_SECONDS", "300")),
         dispatch_batch_size=int(os.getenv("LINE_RELAY_DISPATCH_BATCH_SIZE", "100")),
         dispatch_dry_run=dry_run,
