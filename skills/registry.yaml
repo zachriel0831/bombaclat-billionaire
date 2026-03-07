@@ -1,0 +1,11 @@
+version: 1
+skills:
+  - name: news-ingestion-skill
+    owner: data-platform
+    status: draft
+    version: 0.1.0
+    path: skills/news-ingestion-skill/SKILL.md
+    evals: skills/news-ingestion-skill/EVALS.md
+    changelog: skills/news-ingestion-skill/CHANGELOG.md
+    risk_tier: medium
+    last_reviewed: 2026-03-05

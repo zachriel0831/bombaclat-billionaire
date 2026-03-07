@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "news-collector"
+version = "0.1.0"
+description = "Fast ingestion for international finance breaking news"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "mysql-connector-python>=9.0.0",
+  "websocket-client>=1.8.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
