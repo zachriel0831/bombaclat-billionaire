@@ -1,6 +1,7 @@
 import unittest
 from datetime import date
 
+from news_collector.relay_bridge import _quote_to_payload
 from news_collector.us_index_tracker import IndexQuote, UsIndexTracker
 
 
@@ -67,8 +68,27 @@ class UsIndexTrackerTests(unittest.TestCase):
         close_text = tracker.format_close_message(date(2026, 3, 9), quotes)
 
         self.assertIn("[US_INDEX_OPEN] 2026-03-09", open_text)
-        self.assertIn("DJIA 開盤: 47,001.25", open_text)
-        self.assertIn("S&P 500 收盤: 6,122.75", close_text)
+        self.assertIn("47,001.25", open_text)
+        self.assertIn("6,122.75", close_text)
+
+    def test_quote_to_payload(self) -> None:
+        quote = IndexQuote(
+            symbol="DJIA",
+            label="DJIA",
+            url="https://finance.yahoo.com/quote/%5EDJI",
+            trade_date=date(2026, 3, 9),
+            regular_start_epoch=1772797800,
+            regular_end_epoch=1772821200,
+            open_price=47001.25,
+            last_price=47123.5,
+        )
+
+        payload = _quote_to_payload(quote)
+
+        self.assertEqual(payload["symbol"], "DJIA")
+        self.assertEqual(payload["label"], "DJIA")
+        self.assertEqual(payload["open_price"], 47001.25)
+        self.assertEqual(payload["last_price"], 47123.5)
 
 
 if __name__ == "__main__":

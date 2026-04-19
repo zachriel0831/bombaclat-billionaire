@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 # X Filtered Stream 封裝：追蹤指定帳號推文，提供近即時事件。
 from collections import deque
@@ -30,6 +30,8 @@ class XStreamConfig:
     timeout_seconds: int = 90
     reconnect_max_seconds: int = 120
     stop_on_429: bool = True
+    auto_heal_too_many_connections: bool = True
+    heal_cooldown_seconds: int = 45
 
 
 class _StopStream(RuntimeError):
@@ -39,6 +41,8 @@ class _StopStream(RuntimeError):
 class XFilteredStreamer:
     rules_endpoint = "https://api.x.com/2/tweets/search/stream/rules"
     stream_endpoint = "https://api.x.com/2/tweets/search/stream"
+    connections_endpoint = "https://api.x.com/2/connections"
+    terminate_all_connections_endpoint = "https://api.x.com/2/connections/all"
     rule_tag_prefix = "news_collector_x_stream"
 
     def __init__(self, config: XStreamConfig) -> None:
@@ -46,6 +50,7 @@ class XFilteredStreamer:
         self._seen_limit = 5000
         self._seen_ids: deque[str] = deque()
         self._seen_set: set[str] = set()
+        self._last_connection_heal_at = 0.0
 
     def run(self, on_item: Callable[[NewsItem], None], stop_event: threading.Event) -> None:
         accounts = [name for name in (_normalize_account(x) for x in self.config.accounts) if name]
@@ -118,15 +123,52 @@ class XFilteredStreamer:
 
                     on_item(item)
         except HTTPError as exc:
-            if int(exc.code) == 429 and self.config.stop_on_429:
-                logger.warning("X stream got 429 and X_STOP_ON_429=true, stop stream until restart")
-                raise _StopStream("x stream stopped on 429") from exc
-            if int(exc.code) == 429:
-                raise RuntimeError("X stream rate-limited (429)") from exc
             body_text = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            if int(exc.code) == 429:
+                healed = self._auto_heal_too_many_connections(body_text)
+                if healed:
+                    raise RuntimeError("X stream auto-healed TooManyConnections, retrying") from exc
+                if self.config.stop_on_429:
+                    logger.warning("X stream got 429 and X_STOP_ON_429=true, stop stream until restart body=%s", body_text[:280])
+                    raise _StopStream("x stream stopped on 429") from exc
+                raise RuntimeError(f"X stream rate-limited (429) body={body_text}") from exc
             raise RuntimeError(f"X stream HTTPError status={exc.code} body={body_text}") from exc
         except URLError as exc:
             raise RuntimeError(f"X stream URLError: {exc}") from exc
+
+    def _auto_heal_too_many_connections(self, body_text: str) -> bool:
+        if not self.config.auto_heal_too_many_connections:
+            return False
+        if not self._is_too_many_connections_429(body_text):
+            return False
+
+        now = time.time()
+        if now - self._last_connection_heal_at < max(self.config.heal_cooldown_seconds, 5):
+            logger.warning("X stream auto-heal skipped by cooldown (%.1fs)", now - self._last_connection_heal_at)
+            return False
+
+        try:
+            logger.warning("X stream auto-heal triggered: terminate stale stream connections")
+            result = self._request_json(self.terminate_all_connections_endpoint, method="DELETE")
+            success, failed = self._parse_connection_kill_stats(result)
+            self._last_connection_heal_at = now
+            logger.info("X stream auto-heal completed: successful_kills=%d failed_kills=%d", success, failed)
+            return success > 0 and failed == 0
+        except Exception as exc:
+            logger.warning("X stream auto-heal failed: %s", exc)
+            return False
+
+    @staticmethod
+    def _is_too_many_connections_429(body_text: str) -> bool:
+        text = (body_text or "").lower()
+        return "toomanyconnections" in text or "maximum allowed connection limit" in text
+
+    @staticmethod
+    def _parse_connection_kill_stats(result: dict[str, Any]) -> tuple[int, int]:
+        data = result.get("data") if isinstance(result, dict) else None
+        if not isinstance(data, dict):
+            return 0, 0
+        return int(data.get("successful_kills") or 0), int(data.get("failed_kills") or 0)
 
     def _sync_rules(self, query: str) -> None:
         self._clear_owned_rules()

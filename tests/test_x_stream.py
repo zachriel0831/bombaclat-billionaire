@@ -60,6 +60,18 @@ class XStreamTests(unittest.TestCase):
         self.assertTrue(streamer._remember_tweet("x-1"))
         self.assertFalse(streamer._remember_tweet("x-1"))
 
+    def test_is_too_many_connections_429(self) -> None:
+        body = '{"title":"ConnectionException","connection_issue":"TooManyConnections"}'
+        self.assertTrue(XFilteredStreamer._is_too_many_connections_429(body))
+        self.assertFalse(XFilteredStreamer._is_too_many_connections_429('{"title":"RateLimited"}'))
+
+    def test_parse_connection_kill_stats(self) -> None:
+        success, failed = XFilteredStreamer._parse_connection_kill_stats(
+            {"data": {"successful_kills": 2, "failed_kills": 1}}
+        )
+        self.assertEqual(success, 2)
+        self.assertEqual(failed, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

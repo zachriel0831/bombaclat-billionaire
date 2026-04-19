@@ -41,6 +41,7 @@ class RelaySettings:
     mysql_group_table: str
     mysql_user_table: str
     mysql_x_table: str
+    mysql_market_table: str
     mysql_connect_timeout_seconds: int
 
 
@@ -87,5 +88,6 @@ def load_settings(env_file: str = ".env") -> RelaySettings:
         mysql_group_table=os.getenv("LINE_RELAY_MYSQL_GROUP_TABLE", "t_bot_group_info"),
         mysql_user_table=os.getenv("LINE_RELAY_MYSQL_USER_TABLE", "t_bot_user_info"),
         mysql_x_table=os.getenv("LINE_RELAY_MYSQL_X_TABLE", "t_x_posts"),
+        mysql_market_table=os.getenv("LINE_RELAY_MYSQL_MARKET_TABLE", "t_market_index_snapshots"),
         mysql_connect_timeout_seconds=int(os.getenv("LINE_RELAY_MYSQL_CONNECT_TIMEOUT", "5")),
     )

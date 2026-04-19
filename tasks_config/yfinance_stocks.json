@@ -1,0 +1,10 @@
+{
+  "id": "yfinance_stocks",
+  "name": "Yahoo Finance Stocks",
+  "workflow": "scraper",
+  "scraper_module": "scrapers.yfinance_stocks",
+  "scraper_file": "scrapers/yfinance_stocks.py",
+  "rules": { "priority": 2, "timeout_sec": 60, "retry": 3, "rate_limit_sec": 0 },
+  "schedule": { "every_minutes": 10 },
+  "description": "抓取台股/美股/加密/指數即時報價"
+}

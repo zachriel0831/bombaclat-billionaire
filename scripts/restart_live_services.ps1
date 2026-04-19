@@ -1,4 +1,4 @@
-﻿﻿# 一鍵重啟 relay 與 source bridge 服務視窗。
+# Restart relay and source bridge in two visible PowerShell windows.
 param(
   [string]$EnvFile = ".env",
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]
@@ -20,10 +20,11 @@ if ($targets) {
   $targets | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 }
 
-$relayCmd = "Set-Location '$ProjectRoot'; powershell -ExecutionPolicy Bypass -File '.\\scripts\\run_line_event_relay.ps1' -EnvFile '$EnvFile' -LogLevel '$LogLevel'"
-$bridgeCmd = "Set-Location '$ProjectRoot'; powershell -ExecutionPolicy Bypass -File '.\\scripts\\run_source_bridge.ps1' -EnvFile '$EnvFile' -LogLevel '$LogLevel'"
+# Run scripts directly in each opened window so logs stream live there.
+$relayCmd = "Set-Location '$ProjectRoot'; & '.\scripts\run_line_event_relay.ps1' -EnvFile '$EnvFile' -LogLevel '$LogLevel'"
+$bridgeCmd = "Set-Location '$ProjectRoot'; & '.\scripts\run_source_bridge.ps1' -EnvFile '$EnvFile' -LogLevel '$LogLevel'"
 
-Start-Process powershell -ArgumentList @('-NoExit', '-Command', $relayCmd) -WindowStyle Normal
-Start-Process powershell -ArgumentList @('-NoExit', '-Command', $bridgeCmd) -WindowStyle Normal
+Start-Process powershell -ArgumentList @('-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', $relayCmd) -WindowStyle Normal
+Start-Process powershell -ArgumentList @('-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', $bridgeCmd) -WindowStyle Normal
 
 Write-Host "Live service windows started (relay + source bridge)." -ForegroundColor Green

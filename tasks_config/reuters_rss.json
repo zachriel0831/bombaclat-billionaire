@@ -1,0 +1,10 @@
+{
+  "id": "reuters_rss",
+  "name": "Reuters RSS News",
+  "workflow": "scraper",
+  "scraper_module": "scrapers.reuters_rss",
+  "scraper_file": "scrapers/reuters_rss.py",
+  "rules": { "priority": 1, "timeout_sec": 30, "retry": 2, "rate_limit_sec": 0 },
+  "schedule": { "every_minutes": 10 },
+  "description": "抓取 Reuters RSS 國際財經新聞"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "bbc_business",
+  "name": "BBC Business News",
+  "workflow": "scraper",
+  "scraper_module": "scrapers.bbc_business",
+  "scraper_file": "scrapers/bbc_business.py",
+  "rules": { "priority": 1, "timeout_sec": 30, "retry": 2, "rate_limit_sec": 0 },
+  "schedule": { "every_minutes": 10 },
+  "description": "抓取 BBC Business 財經頭條"
+}
