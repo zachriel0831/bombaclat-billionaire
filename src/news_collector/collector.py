@@ -4,11 +4,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 import time
 
-from news_collector.config import Settings, resolve_benzinga_api_key, resolve_x_bearer_token
+from news_collector.config import Settings, resolve_x_bearer_token
 from news_collector.models import NewsItem
 from news_collector.sources.base import NewsSource
-from news_collector.sources.benzinga import BenzingaSource
-from news_collector.sources.gdelt import GdeltSource
 from news_collector.sources.rss import OfficialRssSource
 from news_collector.sources.x_accounts import XAccountSource
 from news_collector.utils import sort_timestamp
@@ -30,32 +28,6 @@ def build_sources(settings: Settings, source_name: str) -> list[NewsSource]:
                 first_per_feed=settings.official_rss_first_per_feed,
             )
         )
-
-    if selected in ("all", "gdelt"):
-        sources.append(
-            GdeltSource(
-                settings.gdelt_query,
-                settings.gdelt_max_records,
-                settings.http_timeout_seconds,
-                cooldown_on_429=settings.gdelt_cooldown_on_429,
-                cooldown_seconds=settings.gdelt_cooldown_seconds,
-            )
-        )
-
-    if selected in ("all", "benzinga"):
-        if not settings.benzinga_enabled:
-            if selected == "benzinga":
-                raise ValueError("Benzinga source is disabled. Set BENZINGA_ENABLED=true to enable.")
-            logger.info("Skip source=benzinga because BENZINGA_ENABLED=false")
-        else:
-            benzinga_key = resolve_benzinga_api_key(settings)
-            if not benzinga_key:
-                if selected == "benzinga":
-                    raise ValueError(
-                        "BENZINGA_API_KEY is missing. Set env or store encrypted key in BENZINGA_API_KEY_FILE."
-                    )
-            else:
-                sources.append(BenzingaSource(benzinga_key, settings.http_timeout_seconds))
 
     if selected in ("all", "x"):
         if not settings.x_enabled:

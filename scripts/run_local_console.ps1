@@ -1,6 +1,6 @@
 ﻿﻿# 本地輪巡抓取入口（單次/Watch 模式）。
 param(
-  [ValidateSet("rss", "gdelt", "benzinga", "x", "all")]
+  [ValidateSet("rss", "x", "all")]
   [string]$Source = "rss",
   [int]$Limit = 3,
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]

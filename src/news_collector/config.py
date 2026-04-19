@@ -22,22 +22,18 @@ def _load_env_file(path: Path) -> None:
 
 @dataclass(frozen=True)
 class Settings:
-    benzinga_enabled: bool
-    benzinga_api_key: str | None
-    benzinga_api_key_file: str
-    benzinga_stop_on_429: bool
     x_enabled: bool
     x_bearer_token: str | None
     x_bearer_token_file: str
     x_accounts: list[str]
     x_max_results_per_account: int
     x_stop_on_429: bool
+    x_auto_heal_too_many_connections: bool
+    x_heal_cooldown_seconds: int
     x_include_replies: bool
     x_include_retweets: bool
-    gdelt_query: str
-    gdelt_max_records: int
-    gdelt_cooldown_on_429: bool
-    gdelt_cooldown_seconds: int
+    x_backfill_enabled: bool
+    x_backfill_max_results_per_account: int
     official_rss_feeds: list[str]
     official_rss_first_per_feed: bool
     http_timeout_seconds: int
@@ -58,34 +54,22 @@ def load_settings(env_file: str = ".env") -> Settings:
     x_accounts = [s.strip() for s in os.getenv("X_ACCOUNTS", "").split(",") if s.strip()]
 
     return Settings(
-        benzinga_enabled=_parse_bool(os.getenv("BENZINGA_ENABLED", "false")),
-        benzinga_api_key=os.getenv("BENZINGA_API_KEY") or None,
-        benzinga_api_key_file=os.getenv("BENZINGA_API_KEY_FILE", ".secrets/benzinga_api_key.dpapi"),
-        benzinga_stop_on_429=_parse_bool(os.getenv("BENZINGA_STOP_ON_429", "false")),
         x_enabled=_parse_bool(os.getenv("X_ENABLED", "false")),
         x_bearer_token=os.getenv("X_BEARER_TOKEN") or None,
         x_bearer_token_file=os.getenv("X_BEARER_TOKEN_FILE", ".secrets/x_bearer_token.dpapi"),
         x_accounts=x_accounts,
         x_max_results_per_account=max(1, int(os.getenv("X_MAX_RESULTS_PER_ACCOUNT", "5"))),
         x_stop_on_429=_parse_bool(os.getenv("X_STOP_ON_429", "true")),
+        x_auto_heal_too_many_connections=_parse_bool(os.getenv("X_AUTO_HEAL_TOO_MANY_CONNECTIONS", "true")),
+        x_heal_cooldown_seconds=max(5, int(os.getenv("X_HEAL_COOLDOWN_SECONDS", "45"))),
         x_include_replies=_parse_bool(os.getenv("X_INCLUDE_REPLIES", "false")),
         x_include_retweets=_parse_bool(os.getenv("X_INCLUDE_RETWEETS", "false")),
-        gdelt_query=os.getenv("GDELT_QUERY", "(finance OR economy OR inflation OR \"central bank\")"),
-        gdelt_max_records=int(os.getenv("GDELT_MAX_RECORDS", "50")),
-        gdelt_cooldown_on_429=_parse_bool(os.getenv("GDELT_COOLDOWN_ON_429", "false")),
-        gdelt_cooldown_seconds=int(os.getenv("GDELT_COOLDOWN_SECONDS", "600")),
+        x_backfill_enabled=_parse_bool(os.getenv("X_BACKFILL_ENABLED", "true")),
+        x_backfill_max_results_per_account=max(1, min(100, int(os.getenv("X_BACKFILL_MAX_RESULTS_PER_ACCOUNT", "10")))),
         official_rss_feeds=feed_list,
         official_rss_first_per_feed=_parse_bool(os.getenv("OFFICIAL_RSS_FIRST_PER_FEED", "false")),
         http_timeout_seconds=int(os.getenv("HTTP_TIMEOUT_SECONDS", "15")),
     )
-
-
-def resolve_benzinga_api_key(settings: Settings) -> str | None:
-    # 優先使用環境變數；若未提供，再嘗試讀取本機加密檔。
-    if settings.benzinga_api_key:
-        return settings.benzinga_api_key
-
-    return _load_secret_from_dpapi_file(settings.benzinga_api_key_file)
 
 
 def resolve_x_bearer_token(settings: Settings) -> str | None:

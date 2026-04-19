@@ -8,54 +8,33 @@ from news_collector.config import Settings
 class CollectorTests(unittest.TestCase):
     def _settings(
         self,
-        benzinga_enabled: bool = False,
-        benzinga_api_key: str | None = None,
         x_enabled: bool = False,
         x_bearer_token: str | None = None,
         x_accounts: list[str] | None = None,
     ) -> Settings:
         return Settings(
-            benzinga_enabled=benzinga_enabled,
-            benzinga_api_key=benzinga_api_key,
-            benzinga_api_key_file=".secrets/does_not_exist_for_test.dpapi",
-            benzinga_stop_on_429=False,
             x_enabled=x_enabled,
             x_bearer_token=x_bearer_token,
             x_bearer_token_file=".secrets/does_not_exist_for_x_test.dpapi",
             x_accounts=x_accounts or ["https://x.com/elonmusk", "https://x.com/realdonaldtrump"],
             x_max_results_per_account=5,
             x_stop_on_429=True,
+            x_auto_heal_too_many_connections=True,
+            x_heal_cooldown_seconds=45,
             x_include_replies=False,
             x_include_retweets=False,
-            gdelt_query="finance",
-            gdelt_max_records=10,
-            gdelt_cooldown_on_429=False,
-            gdelt_cooldown_seconds=600,
+            x_backfill_enabled=True,
+            x_backfill_max_results_per_account=10,
             official_rss_feeds=["https://example.com/rss.xml"],
             official_rss_first_per_feed=False,
             http_timeout_seconds=3,
         )
 
-    def test_build_sources_all_without_benzinga_key(self) -> None:
-        sources = build_sources(self._settings(benzinga_enabled=False, benzinga_api_key=None), "all")
+    def test_build_sources_all_without_x(self) -> None:
+        sources = build_sources(self._settings(x_enabled=False, x_bearer_token=None), "all")
         names = [s.name for s in sources]
         self.assertIn("official_rss", names)
-        self.assertIn("gdelt", names)
-        self.assertNotIn("benzinga", names)
         self.assertNotIn("x_accounts", names)
-
-    def test_build_sources_benzinga_disabled(self) -> None:
-        with self.assertRaises(ValueError):
-            build_sources(self._settings(benzinga_enabled=False, benzinga_api_key="abc"), "benzinga")
-
-    def test_build_sources_requires_key_for_benzinga_only_when_enabled(self) -> None:
-        with self.assertRaises(ValueError):
-            build_sources(self._settings(benzinga_enabled=True, benzinga_api_key=None), "benzinga")
-
-    def test_build_sources_enables_benzinga_with_key(self) -> None:
-        sources = build_sources(self._settings(benzinga_enabled=True, benzinga_api_key="abc"), "benzinga")
-        self.assertEqual(len(sources), 1)
-        self.assertEqual(sources[0].name, "benzinga")
 
     def test_build_sources_x_disabled(self) -> None:
         with self.assertRaises(ValueError):

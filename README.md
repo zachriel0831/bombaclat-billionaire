@@ -5,39 +5,31 @@ This project starts from data ingestion for international finance breaking news.
 ## Current data sources
 
 1. Official RSS (no API key)
-- Federal Reserve press releases
-- ECB press releases
-- BIS announcements
+- BBC / Reuters / Fox / NPR feeds from `OFFICIAL_RSS_FEEDS`
 
-2. GDELT DOC 2.0 (no API key)
-- Global news coverage, near real-time batches
-
-3. Benzinga News REST (API key required)
-- Real-time market news feed
-
-4. X account stream (Bearer token required)
+2. X account stream (Bearer token required)
 - Track selected accounts with X filtered stream (near real-time)
 
 ## API key requirements
 
-- `BENZINGA_ENABLED` (master switch; default `false`)
-- `BENZINGA_API_KEY` (required only when `BENZINGA_ENABLED=true`)
-- `BENZINGA_API_KEY_FILE` (optional; encrypted local key file, default `.secrets/benzinga_api_key.dpapi`)
-- `BENZINGA_STOP_ON_429` (only effective when `BENZINGA_ENABLED=true`)
 - `X_ENABLED` (master switch for X source; default `false`)
 - `X_BEARER_TOKEN` (required only when `X_ENABLED=true`)
 - `X_BEARER_TOKEN_FILE` (optional; encrypted local token file, default `.secrets/x_bearer_token.dpapi`)
 - `X_ACCOUNTS` (comma-separated usernames or profile URLs)
 - `X_MAX_RESULTS_PER_ACCOUNT` (used by one-shot/poll mode only)
 - `X_STOP_ON_429` (stop X stream after first 429 in current process)
+- `X_AUTO_HEAL_TOO_MANY_CONNECTIONS` (default `true`; when 429 is `TooManyConnections`, auto call `DELETE /2/connections/all` then retry)
+- `X_HEAL_COOLDOWN_SECONDS` (default `45`; cooldown between auto-heal actions)
 - `X_INCLUDE_REPLIES` / `X_INCLUDE_RETWEETS` (default `false`)
-- No key required for RSS and GDELT
+- `X_BACKFILL_ENABLED` (default `true`; replay recent tracked-account tweets into `/events` once when bridge starts)
+- `X_BACKFILL_MAX_RESULTS_PER_ACCOUNT` (default `10`; startup backfill size per tracked account)
+- No key required for RSS
 
 ## Quick start
 
 ```bash
 PYTHONPATH=src python -m news_collector.main fetch --source rss --limit 20
-PYTHONPATH=src python -m news_collector.main fetch --source gdelt --limit 20
+PYTHONPATH=src python -m news_collector.main fetch --source x --limit 20
 PYTHONPATH=src python -m news_collector.main fetch --source all --limit 20 --pretty
 ```
 
@@ -53,27 +45,15 @@ Safe first run (recommended):
 $env:PYTHONPATH='src'; python -m news_collector.main fetch --source rss --limit 3 --log-level INFO --pretty
 ```
 
-GDELT one-shot API (English + Chinese, title/url only):
-
-```powershell
-$env:PYTHONPATH='src'; python -m news_collector.main fetch --source gdelt --limit 10 --languages "en,zh" --title-url-only --log-level ERROR
-```
-
-GDELT 429 switch:
-- `GDELT_COOLDOWN_ON_429=false` (default): no cooldown window, just skip current cycle on 429.
-- `GDELT_COOLDOWN_ON_429=true`: enter cooldown window after 429.
-- `GDELT_COOLDOWN_SECONDS=600`: cooldown duration when switch is on.
-- GDELT source now enforces local filtering: only `English/Chinese`, and topic keywords focused on international politics, finance/economy, and technology (with entertainment/sports exclusions).
-
 ## LINE Event Relay Service
 
 This repo now includes a standalone relay service:
 - Receive incoming events via HTTP `POST /events`
 - Receive LINE platform webhook via `POST /line/webhook` (HMAC signature verification)
-- Receive direct push via `POST /push/direct` (bypass `t_relay_events` queue)
+- Receive direct push via `POST /push/direct` (manual bypass path; US index no longer uses it)
 - Persist events in MySQL event queue table (auto create DB/table)
 - Every 5 minutes, poll latest unpushed events (`is_pushed=0`) and dispatch
-- Current default is dry-run: print push logs only (no real LINE push)
+- Code default is dry-run; if `.env` sets `LINE_RELAY_DISPATCH_DRY_RUN=false`, it will push to real LINE targets
 - `LINE_RELAY_DISPATCH_DRY_RUN` also applies to `/push/direct`
 - LINE push message format is now strictly: `title` + `url`
 - Auto-create LINE bot metadata tables (daily-kanji style):
@@ -81,6 +61,8 @@ This repo now includes a standalone relay service:
   - `t_bot_user_info`
 - Auto-create X post table:
   - `t_x_posts`
+- Auto-create market snapshot table for US index analysis:
+  - `t_market_index_snapshots`
 
 Run:
 
@@ -89,15 +71,17 @@ pip install -e .
 powershell -ExecutionPolicy Bypass -File .\scripts\run_line_event_relay.ps1
 ```
 
-Bridge all source links to relay (`BENZINGA stream + X stream + GDELT + RSS + US index direct push`):
+Bridge all source links to relay (`X stream + RSS + US index tracker`):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_source_bridge.ps1 -PollIntervalSeconds 300 -Limit 5 -UsIndexPollIntervalSeconds 30
 ```
 
-Default bridge language filter for Benzinga stream is `en,cn` (internally maps `cn -> zh`).
 X source is now consumed by filtered stream (near real-time) with auto reconnect/backoff.
-US index chain tracks DJIA and S&P 500 open/close and sends direct push via `/push/direct` (no insert into `t_relay_events`).
+Bridge startup also runs a one-shot X backfill before connecting the filtered stream, so tweets published while the bridge was down can be replayed into `/events` and `t_x_posts`.
+When X returns `429` with `connection_issue=TooManyConnections`, bridge will auto-heal by terminating stale stream connections and retrying (configurable by `X_AUTO_HEAL_TOO_MANY_CONNECTIONS`).
+US index chain tracks DJIA and S&P 500 open/close, posts normalized events to relay `/events`, writes `t_relay_events`, and stores structured quote rows in `t_market_index_snapshots` for same-day analysis.
+Relay dispatch marks `source=us_index_tracker` rows as `stored_only_market`, so they stay queryable in MySQL but are not pushed to LINE.
 
 Required `.env` values:
 - `LINE_CHANNEL_ACCESS_TOKEN` (required only when `LINE_RELAY_DISPATCH_DRY_RUN=false`)
@@ -116,6 +100,7 @@ MySQL defaults (editable in `.env`):
 - `LINE_RELAY_MYSQL_GROUP_TABLE=t_bot_group_info`
 - `LINE_RELAY_MYSQL_USER_TABLE=t_bot_user_info`
 - `LINE_RELAY_MYSQL_X_TABLE=t_x_posts`
+- `LINE_RELAY_MYSQL_MARKET_TABLE=t_market_index_snapshots`
 - `LINE_RELAY_DISPATCH_INTERVAL_SECONDS=300`
 - `LINE_RELAY_DISPATCH_BATCH_SIZE=1`
 - `LINE_RELAY_DISPATCH_DRY_RUN=true`
@@ -196,64 +181,6 @@ Notes:
 - Combined output is saved to `runtime/logs/`.
 - Keep `LINE_RELAY_DISPATCH_DRY_RUN=true` for local test mode (no real push).
 
-## Benzinga Stream (latest/fastest)
-
-1. Install dependencies:
-
-```powershell
-pip install -e .
-```
-
-2. Save API key in encrypted local file (Windows DPAPI):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\save_benzinga_key.ps1
-```
-
-You can also pass key directly:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\save_benzinga_key.ps1 -ApiKey "YOUR_KEY"
-```
-
-3. Run stream:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_benzinga_stream.ps1 -Tickers "AAPL,TSLA" -MaxMessages 20
-```
-
-Language filter:
-- Script default is all languages (no filter)
-- Example for Japanese only:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_benzinga_stream.ps1 -Languages "ja"
-```
-
-- Example for multiple languages:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_benzinga_stream.ps1 -Languages "en,ja"
-```
-
-Top-level URL only output:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_benzinga_stream.ps1 -UrlOnly
-```
-
-Security notes:
-- Key is stored in `.secrets/benzinga_api_key.dpapi` (gitignored).
-- Logs and output never print API key.
-- Stream has retry with exponential backoff to reduce lockout risk.
-- Stream output event is emitted only when URL check returns HTTP 200 (timeout 3s).
-- If you see `429 Too Many Requests`, reduce retries/polling and confirm your Benzinga plan quota.
-
-429 stop switch:
-- Default is off: `BENZINGA_STOP_ON_429=false`
-- If set to `true`, stream will stop immediately after first 429 response.
-- This applies only when `BENZINGA_ENABLED=true`.
-
 ## X account stream
 
 Save X Bearer token in encrypted local file (Windows DPAPI):
@@ -278,8 +205,53 @@ Required `.env` keys for X:
 - `X_ENABLED=true`
 - `X_BEARER_TOKEN_FILE=.secrets/x_bearer_token.dpapi` (or `X_BEARER_TOKEN`)
 - `X_ACCOUNTS=https://x.com/elonmusk,https://x.com/realDonaldTrump`
+- `X_AUTO_HEAL_TOO_MANY_CONNECTIONS=true` (recommended)
+- `X_HEAL_COOLDOWN_SECONDS=45`
+- `X_BACKFILL_ENABLED=true`
+- `X_BACKFILL_MAX_RESULTS_PER_ACCOUNT=10`
 
 If you get `HTTP 402 Payment Required`, your X developer project/app does not currently have the required paid access for these read endpoints.
+
+## Weekly macro summary (AI + LINE)
+
+Generate one weekly summary from `t_relay_events` and push to active LINE targets:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_weekly_summary.ps1 -Force -DryRun
+```
+
+Prompt pipeline:
+- Read skill docs:
+  - `skills/macro-weekly-summary-skill/SKILLS.md`
+  - `skills/line-brief-format-skill/line-weekly-brief.md`
+- Compile as:
+  - `runtime/prompts/weekly_summary_system_prompt.txt`
+  - `runtime/prompts/weekly_summary_reusable_prompt.txt`
+- Send to OpenAI Responses API and push generated text to LINE.
+
+Weekly summary env keys:
+- `WEEKLY_SUMMARY_OPENAI_API_KEY` (optional; fallback to `OPENAI_API_KEY`)
+- `WEEKLY_SUMMARY__FILE` (default `.secrets/openai_api_key.dpapi`, Windows DPAPI encrypted key)
+- `WEEKLY_SUMMARY_MODEL` (default `gpt-4.1-mini`)
+- `WEEKLY_SUMMARY_LOOKBACK_DAYS` (default `7`)
+- `WEEKLY_SUMMARY_MAX_EVENTS` (default `120`)
+- `WEEKLY_SUMMARY_WEEKDAY` (0=Mon ... 6=Sun, default `6`)
+- `WEEKLY_SUMMARY_HOUR` (default `10`)
+- `WEEKLY_SUMMARY_MINUTE` (default `0`)
+- `WEEKLY_SUMMARY_WINDOW_MINUTES` (default `20`)
+- `WEEKLY_SUMMARY_DRY_RUN` (default follows `LINE_RELAY_DISPATCH_DRY_RUN`)
+
+Weekly schedule helper (Windows Task Scheduler):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\register_weekly_summary_task.ps1 -TaskName "NewsCollector-WeeklySummary" -At "18:00" -Force
+```
+
+Save OpenAI key to encrypted local file (recommended):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\save_openai_key.ps1
+```
 
 ## Environment
 
@@ -304,7 +276,6 @@ MCP server config is in `.mcp.json`.
 Possible credentials you may need:
 - `GITHUB_TOKEN` for GitHub MCP server
 - No key required for filesystem/fetch/playwright servers
-- `BENZINGA_API_KEY` for Benzinga news source
 
 ## CI and tests
 

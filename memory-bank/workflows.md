@@ -94,8 +94,7 @@
 2. Validate required env vars and secret naming
 3. Smoke check local commands:
 - rss fetch
-- gdelt fetch
-- benzinga fetch (if key available)
+- x fetch
 4. Confirm docs are aligned with behavior
 
 ## Workflow 4: Incident Handling (Source Outage / Rate Limit)
@@ -107,6 +106,33 @@
 - reduce query breadth
 - temporary source disable switch
 5. Record decision in `memory-bank/09-decisions/`
+
+## Workflow 4A: X Stream Recovery / Gap Backfill
+1. Confirm bridge startup state
+- Check bridge log for `X token preflight: resolved`, `Starting X account stream`, and `X filtered stream connected`
+2. Confirm whether the gap is pre-connect only
+- Compare missing tweet timestamps against the latest bridge start/connect time
+3. Let startup backfill replay recent tracked-account tweets
+- Bridge runs one-shot X backfill before attaching the live filtered stream
+- Backfill replays into relay `/events`, so both `t_relay_events` and `t_x_posts` are updated through the normal path
+4. Verify DB evidence
+- Query `t_relay_events` by `event_id='x-<tweet_id>'`
+- Query `t_x_posts` by `tweet_id`
+5. If startup still says `missing X bearer token`
+- run bridge through `scripts/run_source_bridge.ps1` so PowerShell preflight resolves DPAPI token into process env before Python starts
+
+## Workflow 4B: US Index Stored-Only Event Flow
+1. Send normalized relay events
+- Post DJIA / S&P 500 open-close snapshots to relay `/events`
+2. Attach structured market payload
+- Include trade date, session (`open`/`close`), and per-index quote fields in `market_snapshot`
+3. Persist on enqueue
+- Relay writes the queue row into `t_relay_events` and snapshot rows into `t_market_index_snapshots`
+4. Suppress user push
+- Relay dispatch marks `source=us_index_tracker` as `stored_only_market`
+5. Verify
+- POST an `/events` payload with `market_snapshot`
+- Query both `t_relay_events` and `t_market_index_snapshots` by `event_id`
 
 ## Workflow 5: Build a New Skill (Enterprise)
 1. Create skill folder from templates:

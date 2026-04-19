@@ -15,7 +15,7 @@ def parse_datetime(value: str | None) -> datetime | None:
         return None
 
     if text.isdigit() and len(text) == 14:
-        # GDELT seendate, e.g. 20260305123045
+        # Support compact UTC timestamps such as 20260305123045.
         dt = datetime.strptime(text, "%Y%m%d%H%M%S")
         return dt.replace(tzinfo=timezone.utc)
 

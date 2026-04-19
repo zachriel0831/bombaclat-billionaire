@@ -1,8 +1,14 @@
-﻿__pycache__/
+__pycache__/
 *.py[cod]
 .env
 .venv/
 .vscode/
 .idea/
 .secrets/
+*.egg-info/
 runtime/logs/
+runtime/prompts/
+runtime/state/
+daily_analysis_*.md
+query_output.txt
+data/stocks/*.json

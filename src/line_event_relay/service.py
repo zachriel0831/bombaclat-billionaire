@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import html
@@ -18,13 +18,6 @@ from line_event_relay.config import RelaySettings
 
 
 logger = logging.getLogger(__name__)
-
-BENZINGA_ALLOWED_URL_PREFIXES = (
-    "https://www.benzinga.com/crypto/cryptocurrency/",
-    "https://www.benzinga.com/news/topics/",
-    "https://www.benzinga.com/markets/",
-    "https://www.benzinga.com/news/politics",
-)
 
 
 @dataclass
@@ -47,6 +40,28 @@ class QueuedEvent:
     url: str
     summary: str
     published_at: str | None
+
+
+@dataclass
+class SummaryEvent:
+    row_id: int
+    source: str
+    title: str
+    url: str
+    summary: str
+    published_at: str | None
+    created_at: str
+
+
+@dataclass
+class FailedEvent:
+    row_id: int
+    source: str
+    title: str
+    url: str
+    summary: str
+    published_at: str | None
+    last_error: str
 
 
 class LinePushClient:
@@ -89,6 +104,7 @@ class MySqlEventStore:
         self._group_table = settings.mysql_group_table
         self._user_table = settings.mysql_user_table
         self._x_table = settings.mysql_x_table
+        self._market_table = settings.mysql_market_table
         self._connector = self._import_mysql_connector()
         self._conn = None
         self._lock = threading.RLock()
@@ -169,6 +185,8 @@ class MySqlEventStore:
                 cur.execute(sql, values)
                 if event.source.lower().startswith("x:"):
                     self._upsert_x_post(cur, event)
+                if self._has_market_snapshot(event):
+                    self._upsert_market_snapshot_from_event(cur, event)
                 self._conn.commit()
                 return True
             except self._connector.IntegrityError:
@@ -185,6 +203,7 @@ class MySqlEventStore:
             f"SELECT id, source, title, url, summary, published_at "
             f"FROM {self._event_table} "
             "WHERE is_pushed=0 AND line_pushed_at IS NULL "
+            "AND (line_push_status IS NULL OR line_push_status='queued') "
             "ORDER BY created_at ASC, id ASC "
             "LIMIT %s"
         )
@@ -209,6 +228,77 @@ class MySqlEventStore:
                 )
             )
         return events
+
+    def fetch_recent_summary_events(self, days: int, limit: int) -> list[SummaryEvent]:
+        if self._conn is None:
+            return []
+
+        safe_days = max(int(days), 1)
+        safe_limit = max(int(limit), 1)
+        sql = (
+            f"SELECT id, source, title, url, summary, published_at, created_at "
+            f"FROM {self._event_table} "
+            "WHERE created_at >= (NOW() - INTERVAL %s DAY) "
+            "AND source NOT REGEXP '^(local_live_test|manual_test)' "
+            "ORDER BY created_at DESC, id DESC "
+            "LIMIT %s"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, (safe_days, safe_limit))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        result: list[SummaryEvent] = []
+        for row in rows:
+            result.append(
+                SummaryEvent(
+                    row_id=int(row[0]),
+                    source=str(row[1]),
+                    title=str(row[2]),
+                    url=str(row[3]),
+                    summary=str(row[4] or ""),
+                    published_at=str(row[5]) if row[5] is not None else None,
+                    created_at=str(row[6]),
+                )
+            )
+        return result
+
+    def fetch_failed_event_for_retry(self) -> FailedEvent | None:
+        if self._conn is None:
+            return None
+
+        sql = (
+            f"SELECT id, source, title, url, summary, published_at, line_push_error "
+            f"FROM {self._event_table} "
+            "WHERE is_pushed=0 AND line_pushed_at IS NULL "
+            "AND line_push_status='failed' "
+            "AND line_push_error IS NOT NULL AND line_push_error<>'' "
+            "ORDER BY created_at ASC, id ASC "
+            "LIMIT 1"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql)
+                row = cur.fetchone()
+            finally:
+                cur.close()
+
+        if not row:
+            return None
+
+        return FailedEvent(
+            row_id=int(row[0]),
+            source=str(row[1]),
+            title=str(row[2]),
+            url=str(row[3]),
+            summary=str(row[4] or ""),
+            published_at=str(row[5]) if row[5] is not None else None,
+            last_error=str(row[6] or ""),
+        )
 
     def list_active_group_ids(self) -> list[str]:
         return self._list_active_ids(self._group_table, "group_id")
@@ -318,6 +408,48 @@ class MySqlEventStore:
             try:
                 cur.execute(sql, ("failed", error, int(row_id)))
                 self._conn.commit()
+            finally:
+                cur.close()
+
+    def mark_unpushed_older_than_hours_as_dispatched(self, hours: int, status: str) -> int:
+        if self._conn is None:
+            return 0
+
+        safe_hours = max(int(hours), 1)
+        now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        sql = (
+            f"UPDATE {self._event_table} "
+            "SET is_pushed=1, line_pushed_at=%s, line_push_status=%s, line_push_error=NULL "
+            "WHERE is_pushed=0 AND line_pushed_at IS NULL "
+            "AND created_at < (NOW() - INTERVAL %s HOUR)"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, (now_utc, status, safe_hours))
+                affected = int(cur.rowcount or 0)
+                self._conn.commit()
+                return affected
+            finally:
+                cur.close()
+
+    def delete_events_older_than_days(self, keep_days: int) -> int:
+        if self._conn is None:
+            return 0
+
+        safe_days = max(int(keep_days), 1)
+        threshold_date = (datetime.now().astimezone().date() - timedelta(days=safe_days)).isoformat()
+        sql = (
+            f"DELETE FROM {self._event_table} "
+            "WHERE DATE(created_at) <= %s"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, (threshold_date,))
+                affected = int(cur.rowcount or 0)
+                self._conn.commit()
+                return affected
             finally:
                 cur.close()
 
@@ -435,6 +567,29 @@ class MySqlEventStore:
           KEY idx_x_username_posted (username, posted_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
+        ddl_market = f"""
+        CREATE TABLE IF NOT EXISTS `{self._market_table}` (
+          id BIGINT NOT NULL AUTO_INCREMENT,
+          event_id VARCHAR(128) NOT NULL,
+          source VARCHAR(64) NOT NULL,
+          trade_date VARCHAR(16) NOT NULL,
+          market_session VARCHAR(16) NOT NULL,
+          symbol VARCHAR(32) NOT NULL,
+          label VARCHAR(64) NOT NULL,
+          quote_url VARCHAR(512) NULL,
+          open_price DECIMAL(18,4) NULL,
+          last_price DECIMAL(18,4) NULL,
+          recorded_price DECIMAL(18,4) NULL,
+          regular_start_epoch BIGINT NULL,
+          regular_end_epoch BIGINT NULL,
+          payload_json JSON NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_market_event_symbol (event_id, symbol),
+          KEY idx_market_trade_date (trade_date, market_session, symbol, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
 
         cur = self._conn.cursor()
         try:
@@ -442,12 +597,13 @@ class MySqlEventStore:
             cur.execute(ddl_group)
             cur.execute(ddl_user)
             cur.execute(ddl_x)
+            cur.execute(ddl_market)
             self._conn.commit()
         finally:
             cur.close()
-
+        # 將 X 貼文資料同步到 t_x_posts，方便後續查詢與分析。
     def _upsert_x_post(self, cur: Any, event: RelayEvent) -> None:
-        # 將 X 貼文資料落地到專用表，便於後續做帳號/推文分析。
+        # 解析 relay event 內的 X raw payload，取出 tweet 主要欄位。
         tweet_obj = {}
         if isinstance(event.raw, dict):
             raw_tweet = event.raw.get("raw")
@@ -508,10 +664,161 @@ class MySqlEventStore:
             ),
         )
 
+    def upsert_market_snapshot(self, payload: dict[str, Any]) -> int:
+        if self._conn is None:
+            return 0
+
+        snapshot = payload.get("market_snapshot") if isinstance(payload, dict) else None
+        if not isinstance(snapshot, dict):
+            return 0
+
+        trade_date = str(snapshot.get("trade_date") or "").strip()
+        market_session = str(snapshot.get("session") or "").strip().lower()
+        indexes = snapshot.get("indexes")
+        if not trade_date or market_session not in {"open", "close"} or not isinstance(indexes, list):
+            return 0
+
+        event_id = str(payload.get("event_id") or "").strip()
+        source = str(payload.get("source") or "us_index_tracker").strip() or "us_index_tracker"
+        if not event_id:
+            event_id = f"{source}_{market_session}_{trade_date}"
+
+        affected = 0
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                affected = self._upsert_market_rows(
+                    cur=cur,
+                    event_id=event_id,
+                    source=source,
+                    trade_date=trade_date,
+                    market_session=market_session,
+                    indexes=indexes,
+                )
+                self._conn.commit()
+            finally:
+                cur.close()
+
+        return affected
+
+    def _upsert_market_snapshot_from_event(self, cur: Any, event: RelayEvent) -> int:
+        snapshot = event.raw.get("market_snapshot") if isinstance(event.raw, dict) else None
+        if not isinstance(snapshot, dict):
+            return 0
+
+        trade_date = str(snapshot.get("trade_date") or "").strip()
+        market_session = str(snapshot.get("session") or "").strip().lower()
+        indexes = snapshot.get("indexes")
+        if not trade_date or market_session not in {"open", "close"} or not isinstance(indexes, list):
+            return 0
+
+        event_id = event.event_id or f"{event.source}_{market_session}_{trade_date}"
+        return self._upsert_market_rows(
+            cur=cur,
+            event_id=event_id,
+            source=event.source,
+            trade_date=trade_date,
+            market_session=market_session,
+            indexes=indexes,
+        )
+
+    def _upsert_market_rows(
+        self,
+        cur: Any,
+        event_id: str,
+        source: str,
+        trade_date: str,
+        market_session: str,
+        indexes: list[Any],
+    ) -> int:
+        sql = (
+            f"INSERT INTO {self._market_table} "
+            "(event_id, source, trade_date, market_session, symbol, label, quote_url, open_price, last_price, recorded_price, "
+            "regular_start_epoch, regular_end_epoch, payload_json) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "ON DUPLICATE KEY UPDATE "
+            "quote_url=VALUES(quote_url), "
+            "open_price=VALUES(open_price), "
+            "last_price=VALUES(last_price), "
+            "recorded_price=VALUES(recorded_price), "
+            "regular_start_epoch=VALUES(regular_start_epoch), "
+            "regular_end_epoch=VALUES(regular_end_epoch), "
+            "payload_json=VALUES(payload_json)"
+        )
+
+        affected = 0
+        for entry in indexes:
+            if not isinstance(entry, dict):
+                continue
+
+            symbol = str(entry.get("symbol") or "").strip()
+            label = str(entry.get("label") or symbol).strip() or symbol
+            if not symbol:
+                continue
+
+            open_price = self._to_decimal_value(entry.get("open_price"))
+            last_price = self._to_decimal_value(entry.get("last_price"))
+            recorded_price = open_price if market_session == "open" else last_price
+
+            cur.execute(
+                sql,
+                (
+                    event_id,
+                    source,
+                    trade_date,
+                    market_session,
+                    symbol,
+                    label,
+                    str(entry.get("url") or "").strip() or None,
+                    open_price,
+                    last_price,
+                    recorded_price,
+                    self._to_int_value(entry.get("regular_start_epoch")),
+                    self._to_int_value(entry.get("regular_end_epoch")),
+                    json.dumps(entry, ensure_ascii=False),
+                ),
+            )
+            affected += 1
+        return affected
+
+    @staticmethod
+    def _has_market_snapshot(event: RelayEvent) -> bool:
+        if not isinstance(event.raw, dict):
+            return False
+        return isinstance(event.raw.get("market_snapshot"), dict)
+
     @staticmethod
     def _event_hash(title: str, url: str) -> str:
         key = f"{' '.join(title.split()).lower()}::{url.strip().lower()}"
         return hashlib.sha1(key.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _to_decimal_value(value: Any) -> float | None:
+        if isinstance(value, (int, float)):
+            return float(value)
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _to_int_value(value: Any) -> int | None:
+        if isinstance(value, int):
+            return value
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return int(text)
+        except ValueError:
+            return None
 
     @staticmethod
     def _import_mysql_connector():
@@ -529,12 +836,15 @@ class RelayProcessor:
         self._store = None
         self._stop_event = threading.Event()
         self._dispatch_thread = None
+        self._daily_cleanup_ran_for_date = None
+        self._failed_retry_interval_seconds = 360
+        self._last_failed_retry_at = None
 
         if settings.mysql_enabled:
             self._store = MySqlEventStore(settings)
             self._store.initialize()
             logger.info(
-                "MySQL ready: %s:%s/%s event_table=%s group_table=%s user_table=%s x_table=%s",
+                "MySQL ready: %s:%s/%s event_table=%s group_table=%s user_table=%s x_table=%s market_table=%s",
                 settings.mysql_host,
                 settings.mysql_port,
                 settings.mysql_database,
@@ -542,6 +852,7 @@ class RelayProcessor:
                 settings.mysql_group_table,
                 settings.mysql_user_table,
                 settings.mysql_x_table,
+                settings.mysql_market_table,
             )
         else:
             logger.warning("MySQL storage disabled (LINE_RELAY_MYSQL_ENABLED=false)")
@@ -694,7 +1005,10 @@ class RelayProcessor:
             )
 
         sent = 0
+        recorded_market_rows = 0
         for event in events:
+            if self._store is not None:
+                recorded_market_rows += self._store.upsert_market_snapshot(event)
             text = self._build_direct_text(event)
             if not text:
                 continue
@@ -725,6 +1039,7 @@ class RelayProcessor:
             "received": len(events),
             "target_users": len(target_users),
             "pushed": sent,
+            "recorded_market_rows": recorded_market_rows,
             "dry_run": self._settings.dispatch_dry_run,
         }
 
@@ -802,6 +1117,8 @@ class RelayProcessor:
             return
 
         self._store.repair_queue_state()
+        self._run_daily_retention_cleanup_if_due()
+        self._retry_one_failed_if_due()
 
         # Poll only unpushed rows from queue table.
         pending = self._store.fetch_unpushed_events(self._settings.dispatch_batch_size)
@@ -829,6 +1146,24 @@ class RelayProcessor:
                     event.title,
                 )
                 continue
+            if event.source == "us_index_tracker":
+                self._store.mark_event_dispatched(event.row_id, status="stored_only_market", error=None)
+                logger.info(
+                    "Dispatch skip market snapshot push: event_id=%s source=%s title=%s",
+                    event.row_id,
+                    event.source,
+                    event.title,
+                )
+                continue
+            if self._is_older_than_days(event.published_at, days=2):
+                self._store.mark_event_dispatched(event.row_id, status="skipped_older_than_2_days_marked_sent", error=None)
+                logger.info(
+                    "Dispatch skip old event(>2d): event_id=%s source=%s published_at=%s",
+                    event.row_id,
+                    event.source,
+                    event.published_at or "-",
+                )
+                continue
 
             message = self._build_push_text(event)
             try:
@@ -850,6 +1185,75 @@ class RelayProcessor:
             except Exception as exc:
                 self._store.mark_event_failed(event.row_id, error=str(exc))
                 logger.exception("Dispatch failed event_id=%s", event.row_id)
+
+    def _retry_one_failed_if_due(self) -> None:
+        if self._store is None:
+            return
+
+        now_local = datetime.now().astimezone()
+        if self._last_failed_retry_at is not None:
+            delta = (now_local - self._last_failed_retry_at).total_seconds()
+            if delta < self._failed_retry_interval_seconds:
+                return
+
+        failed = self._store.fetch_failed_event_for_retry()
+        if failed is None:
+            self._last_failed_retry_at = now_local
+            return
+
+        groups = self._store.list_active_group_ids()
+        users = self._store.list_active_user_ids()
+        targets = [("group", gid) for gid in groups] + [("user", uid) for uid in users]
+        if not targets and self._settings.line_target_group_id:
+            targets.append(("group", self._settings.line_target_group_id))
+        if not targets:
+            logger.warning("Failed retry tick: no active groups/users")
+            self._last_failed_retry_at = now_local
+            return
+
+        message = f"{' '.join((failed.title or '').split()).strip()}\n{(failed.url or '').strip()}".strip()[:4500]
+        try:
+            if self._settings.dispatch_dry_run:
+                for target_type, target_id in targets:
+                    logger.info(
+                        "[DRY_RUN_FAILED_RETRY] target_type=%s target_id=%s event_id=%s source=%s",
+                        target_type,
+                        target_id,
+                        failed.row_id,
+                        failed.source,
+                    )
+                self._store.mark_event_dispatched(failed.row_id, status="failed_retry_dry_run", error=None)
+            else:
+                for _, target_id in targets:
+                    self._line_client.push_text(target_id, message)
+                self._store.mark_event_dispatched(failed.row_id, status="pushed_retry", error=None)
+            logger.info(
+                "Failed retry success: event_id=%s source=%s prev_error=%s",
+                failed.row_id,
+                failed.source,
+                failed.last_error,
+            )
+        except Exception as exc:
+            self._store.mark_event_failed(failed.row_id, error=f"retry_failed: {exc}")
+            logger.warning("Failed retry failed: event_id=%s error=%s", failed.row_id, exc)
+        finally:
+            self._last_failed_retry_at = now_local
+
+    def _run_daily_retention_cleanup_if_due(self) -> None:
+        if self._store is None:
+            return
+
+        now_local = datetime.now().astimezone()
+        if now_local.hour == 0 and now_local.minute < 3:
+            return
+
+        today_local = now_local.date()
+        if self._daily_cleanup_ran_for_date == today_local:
+            return
+
+        affected = self._store.delete_events_older_than_days(keep_days=3)
+        self._daily_cleanup_ran_for_date = today_local
+        logger.info("Daily retention cleanup executed at %s: deleted=%d (<= local_date-3d)", now_local.isoformat(), affected)
 
     def _extract_events(self, payload: Any) -> list[RelayEvent]:
         if isinstance(payload, list):
@@ -880,10 +1284,6 @@ class RelayProcessor:
                     published_at,
                 )
                 continue
-            if source.lower().startswith("benzinga") and not self._allow_benzinga_url(url):
-                logger.debug("Drop benzinga event by url rule id=%s url=%s", obj.get("id", "-"), url)
-                continue
-
             events.append(
                 RelayEvent(
                     event_id=str(obj.get("id") or ""),
@@ -966,25 +1366,31 @@ class RelayProcessor:
         return f"{title}\n{url}".strip()[:4500]
 
     @staticmethod
-    def _allow_benzinga_url(url: str) -> bool:
-        check = (url or "").strip().lower()
-        return any(check.startswith(prefix.lower()) for prefix in BENZINGA_ALLOWED_URL_PREFIXES)
-
-    @staticmethod
     def _is_test_source(source: str | None) -> bool:
         value = (source or "").strip().lower()
         return value == "local_live_test" or value.startswith("manual_test")
 
     @staticmethod
-    def _allow_event_date(published_at: str | None) -> bool:
-        # Only keep events published today (local timezone) or future.
+    def _is_older_than_days(published_at: str | None, days: int, now_local: datetime | None = None) -> bool:
         if not published_at:
             return False
         parsed = RelayProcessor._parse_published_at(published_at)
         if parsed is None:
             return False
-        today_local = datetime.now().astimezone().date()
-        return parsed.date() >= today_local
+        ref_now = now_local or datetime.now().astimezone()
+        return parsed.date() <= (ref_now.date() - timedelta(days=max(int(days), 0) + 1))
+
+    @staticmethod
+    def _allow_event_date(published_at: str | None) -> bool:
+        # Keep events within recent 2 days + today (local timezone).
+        if not published_at:
+            return False
+        parsed = RelayProcessor._parse_published_at(published_at)
+        if parsed is None:
+            return False
+        now_local = datetime.now().astimezone().date()
+        earliest_allowed = now_local - timedelta(days=2)
+        return parsed.date() >= earliest_allowed
 
     @staticmethod
     def _parse_published_at(value: str) -> datetime | None:

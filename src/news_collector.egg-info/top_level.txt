@@ -1,2 +1,0 @@
-line_event_relay
-news_collector
