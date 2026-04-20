@@ -1,0 +1,182 @@
+version: 1
+project: D:\work_space\stock\data-collecting
+
+# ── 任務狀態機 ────────────────────────────────────────────
+# pending   → 等待依賴滿足或人工觸發
+# ready     → 依賴已滿足，可派出
+# running   → Code session 已啟動，執行中
+# review    → 完成，等待人工審核（或自動驗收）
+# done      → 驗收通過，關閉
+# failed    → 執行失敗，等待 retry 或人工介入
+# blocked   → 手動暫停，不自動派出
+
+# ── 觸發條件（trigger） ──────────────────────────────────
+# manual      → 只有你說「跑這個」才執行
+# auto        → 依賴滿足後立即自動派出
+# schedule    → 排程觸發（搭配 cron）
+# on_merge    → 指定 branch/PR 合入後觸發（需 webhook 或輪詢 git log）
+# on_data     → MySQL / 檔案出現新資料後觸發
+
+tasks:
+  - id: REQ-001
+    title: 修正 yfinance 股價抓取
+    status: review
+    trigger: manual
+    priority: high
+    description: |
+      yfinance_stocks.py 目前 total_symbols 回傳 0。
+      改用 yf.download() 或確認 fast_info 正常運作，
+      確保每次執行後 data/stocks/ 有非空 JSON 且 MySQL t_relay_events 有新增 yfinance_ 紀錄。
+    depends_on: []
+    acceptance:
+      - data/stocks/ 最新 JSON 的 total_symbols > 0                        # done (2026-04-20 實測 17)
+      - MySQL t_relay_events 有 source LIKE 'yfinance_%' 且 created_at >= TODAY  # pending：需 relay 服務在 127.0.0.1:18090 啟動後重跑
+    notes: |
+      2026-04-20 修復完成並通過單元測試 + 端對端 JSON 驗證：
+        根因：原 fetch_quote 依賴 fast_info.last_price/previous_close，
+              近期 yfinance 版本在此 endpoint 經常回 None → 每檔 return None → total_symbols=0。
+        修法：改用 yf.download(period='5d', group_by='column') 批次抓，
+              新增 pure _extract_quote_from_download() 從 DataFrame 萃 Close/Volume。
+        驗證：PYTHONPATH=src .venv/Scripts/python.exe -m unittest tests.test_yfinance_stocks -v  (4/4 pass)
+              執行 scraper 產出 stocks_20260420_093536.json, total_symbols=17
+        附帶：requirements.txt 補齊 yfinance、pandas；Python 環境改為 .venv (Python 3.13)。
+      DB 驗收待 relay 服務啟動後重跑一次 scraper 即可。
+
+  - id: REQ-003
+    title: 每日自動摘要報告
+    status: pending
+    trigger: auto           # REQ-001 done 後自動派出
+    priority: low
+    description: |
+      每天 08:00 執行 src/query_recent_events.py，
+      產出 daily_report_YYYYMMDD.md 存到 data/reports/。
+      可透過 Windows Task Scheduler 或 start_bridge.bat 擴充。
+    depends_on: [REQ-001]
+    acceptance:
+      - data/reports/ 每天有新的 daily_report_*.md
+    notes: ""
+
+  - id: REQ-004
+    title: "[範本] on_merge 觸發範例"
+    status: blocked
+    trigger: on_merge
+    trigger_config:
+      watch_branch: main
+      poll_interval_seconds: 60   # 每 60 秒查一次 git log
+    priority: low
+    description: |
+      當 main branch 有新的 commit 合入時，自動執行此任務。
+      適合用於：部署後驗證、資料庫 migration 後測試等。
+    depends_on: []
+    acceptance: []
+    notes: "範本示意，status=blocked 不會自動派出"
+
+  # ── LINE 模組 Java 化遷移（四階段）──────────────────────
+  # 目標：Python 專職爬蟲/監聽/AI 分析 → 寫 MySQL；
+  #       Java (Spring Boot 3 / Java 21) 專職 LINE 社群管理與推送。
+  # 兩邊透過共用 MySQL 解耦，不走 HTTP。
+  # 新專案路徑：D:\work_space\claude-box\workspace\line-relay-service (獨立 repo)
+  # 部署：Python 與 Java service 位於不同機器。
+
+  - id: REQ-005
+    title: "[Java 遷移 Phase 1] 骨架 + webhook 接收 + push client"
+    status: done
+    trigger: manual
+    priority: high
+    description: |
+      建立獨立 Spring Boot 3.3.x / Java 21 專案 (Maven + mvnw)。
+      套件：com.zack.linerelay
+      功能：
+        1. GET /health - healthcheck
+        2. POST /webhook - LINE webhook 接收，驗 X-Line-Signature (HMAC-SHA256)，
+           解析 join/leave/message/follow/unfollow 事件，先只 log 不寫 DB
+        3. LinePushClient service - push(targetId, text) / multicast(targetIds, text)
+        4. 設定走環境變數 (LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN)
+        5. README + .env.example + .gitignore
+      此階段不含 DB 連線、dispatcher、queue 表。
+    depends_on: []
+    acceptance:
+      - 專案位於 D:\work_space\claude-box\workspace\line-relay-service 且為獨立 git repo  # done (commit fcdfc93)
+      - ./mvnw spring-boot:run 可啟動服務                                                   # pending：需先裝 JDK 21
+      - /health 回 200                                                                      # pending：需先啟動服務
+      - ngrok/cloudflared 暴露後，LINE Console webhook 測試成功（log 顯示事件）              # pending：需先啟動服務
+      - 手動呼叫 LinePushClient.push() 能成功推送訊息到指定 LINE 用戶/群組                   # pending：需先啟動服務
+    notes: |
+      2026-04-20 Phase 1 程式骨架 + 單元測試已完成並 commit (fcdfc93)。
+      交付物：
+        - Spring Boot 3.3.5 / Java 21 / Maven wrapper (3.9.9)
+        - HealthController, SignatureVerifier, WebhookController, LinePushClient
+        - 單元測試 16 個（SignatureVerifier 5、WebhookController 4、LinePushClient 7）
+        - README.md, .env.example, .gitignore
+      待人工完成的驗收前置：
+        1. 安裝 Amazon Corretto 21，設定 JAVA_HOME
+        2. ./mvnw test 驗證單元測試
+        3. 設 LINE_CHANNEL_SECRET / LINE_CHANNEL_ACCESS_TOKEN 後 ./mvnw spring-boot:run
+        4. ngrok 暴露 → LINE Console 切 webhook → 觀察事件 log
+        5. 呼叫 push 驗證推送成功後 → 可將 status 改 done 並啟動 REQ-006
+
+  - id: REQ-006
+    title: "[Java 遷移 Phase 2] 切換 LINE webhook + 接管群組/用戶註冊"
+    status: pending
+    trigger: manual
+    priority: high
+    description: |
+      Java service 接上共用 MySQL，接管群組與用戶狀態管理：
+        1. 新增 JDBC / JPA 設定 (連到 Python 共用的 MySQL，跨機器)
+        2. Repository：t_bot_group_info、t_bot_user_info
+        3. Webhook handler 寫入/更新群組/用戶資料 (join → active, leave → inactive)
+        4. 在 LINE Developer Console 切換 webhook URL 從 Python 指到 Java
+        5. Python 端的 webhook service 保留做 backup，暫不關閉
+    depends_on: [REQ-005]
+    acceptance:
+      - Java service 能從遠端 MySQL 讀寫 t_bot_group_info / t_bot_user_info
+      - LINE webhook URL 已切換到 Java 端
+      - 新群組加 bot / 新用戶 follow 後，DB 狀態由 Java 正確寫入
+      - 原 Python webhook 不再收到 LINE 事件（或視情況保留 backup）
+    notes: "跨機器 MySQL 連線需確認防火牆與 bind-address 設定"
+
+  - id: REQ-007
+    title: "[Java 遷移 Phase 3] 建立 push queue + Java dispatcher + Python 停直接 push"
+    status: pending
+    trigger: manual
+    priority: high
+    description: |
+      以共用 MySQL 做 Python ↔ Java 的推送佇列解耦：
+        1. 新增 t_push_queue 表，欄位 (id, payload_text, target_type, target_id,
+           status[pending|sent|failed], created_at, pushed_at, error_msg, retry_count)
+        2. Java 實作 Dispatcher：每 5 秒輪詢 status=pending，推送後標記 sent/failed
+        3. Python 端移除直接呼叫 LinePushClient 的邏輯：
+           - src/line_event_relay/weekly_summary.py
+           - src/line_event_relay/market_analysis.py
+           - src/line_event_relay/service.py 中的 dispatch 邏輯
+           改為寫入 t_push_queue。
+        4. 既有 t_relay_events 的 dispatcher 流程一併遷到 Java 端處理。
+    depends_on: [REQ-006]
+    acceptance:
+      - t_push_queue schema 建立完成，Python/Java 雙方皆能讀寫
+      - Python weekly_summary / market_analysis 不再出現 LINE API 呼叫
+      - Java dispatcher 能正確輪詢 pending 訊息並推送
+      - 失敗訊息會進入 failed 狀態並記錄 error_msg
+      - 整合測試：Python 寫一筆 pending → Java 推送成功 → status=sent
+    notes: ""
+
+  - id: REQ-008
+    title: "[Java 遷移 Phase 4] 移除 Python webhook 與 LinePushClient"
+    status: pending
+    trigger: manual
+    priority: medium
+    description: |
+      確認 Java 端穩定運作後，清理 Python 端殘留：
+        1. 移除 src/line_event_relay/service.py 中的 LinePushClient 類別
+        2. 移除 Python webhook 服務與相關排程（保留事件儲存邏輯）
+        3. 更新 README / memory-bank / PROJECT_DOCUMENTATION.md 描述新架構
+        4. 刪除 scripts/register_weekly_summary_task.ps1 等僅服務舊流程的腳本
+           （保留仍需要的 AI 分析觸發腳本）
+        5. 確認 .env 仍保留 DB 連線與 AI provider 設定，移除 LINE 相關變數
+    depends_on: [REQ-007]
+    acceptance:
+      - Python codebase 不再 import linebot 或呼叫 LINE Messaging API
+      - 所有 LINE 相關推送/接收皆由 Java service 負責
+      - 文件已更新，README 反映新架構
+      - 所有測試仍通過
+    notes: "觀察 Phase 3 穩定跑 1-2 週再執行，避免過早拆除 backup"

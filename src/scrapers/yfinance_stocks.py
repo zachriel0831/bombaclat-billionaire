@@ -27,6 +27,12 @@ except ImportError:
     print("[ERROR] yfinance 未安裝，執行: pip install yfinance")
     sys.exit(1)
 
+try:
+    import pandas as pd  # yfinance 自帶依賴
+except ImportError:
+    print("[ERROR] pandas 未安裝（yfinance 依賴），執行: pip install pandas")
+    sys.exit(1)
+
 # ── 監控清單 ────────────────────────────────────────────
 WATCHLIST = {
     "taiwan": [
@@ -59,40 +65,58 @@ WATCHLIST = {
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "stocks")
 
 
-# ── 抓取單支股票 ─────────────────────────────────────────
-def fetch_quote(symbol: str, name: str) -> dict | None:
+# ── 從 yf.download() 批次結果萃取單支 quote ───────────────
+def _extract_quote_from_download(df, symbol: str, name: str) -> dict | None:
+    """從 yf.download() 回傳的 DataFrame 萃取 symbol 的最新 quote。
+
+    多 symbol 下載時 columns 為 MultiIndex (field, symbol)；
+    單 symbol 下載時 columns 為單層。
+    """
     try:
-        ticker = yf.Ticker(symbol)
-        info   = ticker.fast_info  # 輕量版，不需要完整 info
-
-        price       = getattr(info, "last_price",          None)
-        prev_close  = getattr(info, "previous_close",      None)
-        market_cap  = getattr(info, "market_cap",          None)
-        volume      = getattr(info, "three_month_average_volume", None)
-        currency    = getattr(info, "currency",            "")
-        exchange    = getattr(info, "exchange",            "")
-
-        if price is None:
-            print(f"  [SKIP] {symbol}: no price data")
+        if df is None or len(df) == 0:
             return None
+
+        # 取出該 symbol 的 Close / Open / Volume 欄位
+        if isinstance(df.columns, pd.MultiIndex):
+            try:
+                close_series  = df["Close"][symbol].dropna()
+                volume_series = df["Volume"][symbol].dropna() if "Volume" in df.columns.get_level_values(0) else None
+            except KeyError:
+                return None
+        else:
+            # 單 symbol 情境
+            close_series  = df["Close"].dropna() if "Close" in df.columns else None
+            volume_series = df["Volume"].dropna() if "Volume" in df.columns else None
+
+        if close_series is None or len(close_series) == 0:
+            return None
+
+        price       = float(close_series.iloc[-1])
+        prev_close  = float(close_series.iloc[-2]) if len(close_series) >= 2 else None
+        volume_val  = None
+        if volume_series is not None and len(volume_series) > 0:
+            try:
+                volume_val = int(volume_series.iloc[-1])
+            except (ValueError, TypeError):
+                volume_val = None
 
         change     = (price - prev_close) if prev_close else 0
         change_pct = round((change / prev_close * 100) if prev_close else 0, 2)
 
         return {
-            "symbol":       symbol,
-            "name":         name,
-            "currency":     currency,
-            "price":        round(float(price), 4),
-            "prev_close":   round(float(prev_close), 4) if prev_close else None,
-            "change":       round(float(change), 4),
-            "change_pct":   change_pct,
-            "volume":       int(volume) if volume else None,
-            "market_cap":   int(market_cap) if market_cap else None,
-            "exchange":     exchange,
+            "symbol":     symbol,
+            "name":       name,
+            "currency":   "",
+            "price":      round(price, 4),
+            "prev_close": round(prev_close, 4) if prev_close is not None else None,
+            "change":     round(float(change), 4),
+            "change_pct": change_pct,
+            "volume":     volume_val,
+            "market_cap": None,
+            "exchange":   "",
         }
     except Exception as e:
-        print(f"  [ERROR] {symbol}: {e}")
+        print(f"  [ERROR] {symbol}: extract failed: {e}")
         return None
 
 
@@ -103,12 +127,21 @@ def fetch_all(watchlist: dict) -> dict:
     name_map    = {s["symbol"]: s["name"] for stocks in watchlist.values() for s in stocks}
     cat_map     = {s["symbol"]: cat for cat, stocks in watchlist.items() for s in stocks}
 
-    print(f"  批次下載 {len(all_symbols)} 支標的...")
+    print(f"  批次下載 {len(all_symbols)} 支標的 (yf.download, period=5d)...")
+    df = None
     try:
-        tickers = yf.Tickers(" ".join(all_symbols))
+        df = yf.download(
+            tickers=" ".join(all_symbols),
+            period="5d",
+            interval="1d",
+            group_by="column",
+            auto_adjust=False,
+            progress=False,
+            threads=True,
+        )
     except Exception as e:
         print(f"  [ERROR] 批次下載失敗: {e}")
-        tickers = None
+        df = None
 
     result = {cat: [] for cat in watchlist}
 
@@ -116,13 +149,16 @@ def fetch_all(watchlist: dict) -> dict:
         name = name_map[symbol]
         cat  = cat_map[symbol]
 
-        quote = fetch_quote(symbol, name)
-        if quote:
-            result[cat].append(quote)
-            price = quote["price"]
-            pct   = quote["change_pct"]
-            sign  = "▲" if pct >= 0 else "▼"
-            print(f"    {name:10s} ({symbol:10s})  {price:>10.2f}  {sign}{abs(pct):.2f}%")
+        quote = _extract_quote_from_download(df, symbol, name) if df is not None else None
+        if quote is None:
+            print(f"  [SKIP] {symbol}: no price data")
+            continue
+
+        result[cat].append(quote)
+        price = quote["price"]
+        pct   = quote["change_pct"]
+        sign  = "▲" if pct >= 0 else "▼"
+        print(f"    {name:10s} ({symbol:10s})  {price:>10.2f}  {sign}{abs(pct):.2f}%")
 
     return result
 
