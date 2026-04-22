@@ -1,11 +1,11 @@
 """
 Relay Client
-向 data-collecting 的 LINE Event Relay 服務推送新聞事件
+向 data-collecting 的 Event Relay 服務送入新聞事件
 
 服務端點: POST http://localhost:18090/events
 格式: [{"source":"...","title":"...","url":"...","summary":"...","published_at":"..."}]
 
-如果 relay 服務未啟動，push 會印警告後跳過（不拋例外）。
+如果 relay 服務未啟動，會印警告後跳過（不拋例外）。
 """
 
 import json
@@ -15,8 +15,8 @@ from datetime import datetime, timezone
 
 import requests
 
-RELAY_HOST = os.environ.get("LINE_RELAY_HOST", "localhost")
-RELAY_PORT = int(os.environ.get("LINE_RELAY_PORT", "18090"))
+RELAY_HOST = os.environ.get("RELAY_HOST", "localhost")
+RELAY_PORT = int(os.environ.get("RELAY_PORT", "18090"))
 RELAY_URL  = f"http://{RELAY_HOST}:{RELAY_PORT}/events"
 TIMEOUT    = 10
 

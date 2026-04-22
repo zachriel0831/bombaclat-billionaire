@@ -8,7 +8,7 @@ $body = @{
   source = "manual_test"
   title = "Sample event from local script"
   url = "https://example.com/news/sample"
-  summary = "This is a local test event for LINE relay push service."
+  summary = "This is a local test event for the event relay service."
   published_at = (Get-Date).ToString("o")
   test_only = $true
 }

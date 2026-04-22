@@ -3,19 +3,69 @@
 Use this file for non-trivial tasks (3+ steps or architecture decisions).
 
 ## Current Task
-- Task: Remove Benzinga and GDELT sources and simplify ingestion to RSS + X + US index only
+- Task: Correct REQ-009/010/011 event-vs-analysis boundary
 - Requested by: User
-- Start date: 2026-04-19
-- Scope: collector, bridge, scripts, config, tests, docs, runtime startup
+- Start date: 2026-04-22
+- Scope: confirm that source/context facts for REQ-009, REQ-010, and REQ-011 all write to `t_relay_events` first, and that `t_market_analyses` is only written by model analysis jobs after aggregating event windows.
 
 ## Plan (checkable)
-- [x] Remove Benzinga and GDELT code paths from collector and CLI
-- [x] Remove Benzinga and GDELT bridge/runtime script logic
-- [x] Delete obsolete source modules/scripts/tests and update config/dependencies
-- [x] Update README and memory-bank docs to reflect simplified sources
-- [x] Verify tests and live services still work with RSS + X + US index only
+- [x] Confirm existing project docs define `t_relay_events` as event/fact storage and `t_market_analyses` as generated analysis output.
+- [x] Update `requirements.yml` so REQ-011 explicitly uses same-day `t_relay_events` as the source for `tw_close` analysis.
+- [x] Add a correction lesson to prevent confusing source/context event writes with model analysis writes.
+- [x] Run formatting checks and record verification evidence.
 
 ## Progress Notes
+- 2026-04-22 - user corrected the boundary: REQ-009, REQ-010, and REQ-011 source/context events must all write to `t_relay_events`; `t_market_analyses` should only be produced after aggregating relay events and asking the model.
+- 2026-04-22 - updated `requirements.yml` REQ-011, `memory-bank/PROJECT_DOCUMENTATION.md`, and `tasks/lessons.md`; `git diff --check` passed with CRLF warnings only.
+- 2026-04-22 - started docs/skills review after Python LINE touch removal; current boundary is Python data collection, event storage, and analysis only.
+- 2026-04-22 - updated weekly/market prompts so local event rows are primary evidence but not exhaustive; OpenAI calls now request `web_search` by default with fallback retry when unavailable.
+- 2026-04-22 - reviewed skills and kept macro/mobile-chat prompt assets; clarified they format stored analyses only and do not implement Python LINE delivery.
+- 2026-04-22 - validation passed: readiness gate, compileall, targeted analysis/relay tests, full unittest discovery (72 tests, 4 expected pandas/yfinance skips), `git diff --check`, no mojibake replacement chars in reviewed docs/skills.
+- 2026-04-22 - restarted crawler bridge; latest log `runtime/logs/source-bridge-20260422-015334.out.log` shows direct DB sink, RSS/SEC/TWSE polling, X backfill, and `X filtered stream connected`; DB check found 10 recent `x:elonmusk` rows in `t_relay_events` and latest `t_x_posts`.
+- 2026-04-21 20:55 - user requested removing all LINE push/contact logic from this repo after clarifying Python is only data collection and analysis.
+- 2026-04-21 20:56 - found LINE contact paths in `/line/webhook`, `/push/direct`, `LinePushClient`, `analysis_push`, `t_line_push_jobs`, sample scripts, and scheduled push task registration.
+- 2026-04-21 21:05 - removed Python LINE webhook/direct-push endpoints, LINE API client, `analysis_push`, push sample/verification scripts, summary sender, and push-job scheduled tasks.
+- 2026-04-21 21:06 - weekly summary and market analysis now store only into `t_market_analyses`; no target lookup or LINE API call remains.
+- 2026-04-21 21:07 - unregistered `NewsCollector-AnalysisPush-UsClose` and `NewsCollector-AnalysisPush-PreTwOpen`; remaining scheduled tasks are source/context/analysis/retention only.
+- 2026-04-21 21:08 - verification passed: static grep has no current source/script/test/doc LINE contact paths, `compileall` passed, targeted tests passed, full unittest discovery passed with 69 tests and 4 yfinance/pandas skips, and `git diff --check` passed after cleaning skill trailing whitespace.
+- 2026-04-20 09:24 - user requested adding missing data sources and writing them directly to `t_market_analyses`, not `t_relay_events`.
+- 2026-04-20 09:28 - added `event_relay.market_context` to collect Yahoo chart market factors, U.S. Treasury official daily yield curve XML, and TWSE official OpenAPI index/stock/margin data.
+- 2026-04-20 09:29 - added `scripts/run_market_context.ps1`; context writes `analysis_slot=market_context_pre_tw_open`, `model=data-collector`, `prompt_version=market-context-v1`, and `raw_json.dimension=market_context`.
+- 2026-04-20 09:29 - updated `market_analysis.py` so generated market-analysis prompts include the latest `market_context_pre_tw_open` row from `t_market_analyses`.
+- 2026-04-20 09:30 - ran `scripts/run_market_context.ps1`; MySQL row inserted/updated for `2026-04-20`, `market_context_pre_tw_open`, with 32 data points and 0 source failures.
+- 2026-04-20 09:31 - registered scheduled task `NewsCollector-MarketContext-PreTwOpen`; next run is `2026-04-21 07:20:00`, before `NewsCollector-MarketAnalysis-PreTwOpen` at `07:30:00`.
+- 2026-04-20 09:31 - targeted tests passed: `python -m unittest tests.test_market_context tests.test_market_analysis -v`; `compileall` passed.
+- 2026-04-20 09:31 - full unittest discovery currently fails on unrelated untracked `tests/test_yfinance_stocks.py` because local `yfinance` is not installed and `src/scrapers/yfinance_stocks.py` exits during import.
+- 2026-04-20 09:37 - restarted source bridge; log `runtime/logs/source-bridge-20260420-093640.out.log` confirms `Bridge event sink: direct DB`, no `Relay URLError`, X backfill duplicates, RSS/SEC/TWSE poll, and `X filtered stream connected`.
+- 2026-04-20 09:38 - reran market context collector; updated `market_context_pre_tw_open` with 32 points and 0 failures.
+- 2026-04-20 09:38 - first forced `pre_tw_open` analysis exposed OpenAI `gpt-5` incompatibility with `temperature`; updated shared OpenAI Responses caller to omit `temperature` for `gpt-5` family.
+- 2026-04-20 09:39 - reran `pre_tw_open`; analysis succeeded with `model=gpt-5`, `events_used=36`, `market_rows_used=4`, `push_enabled=0`, `context_loaded=true`.
+- 2026-04-20 09:45 - user requested changing the design: market context source data should first write into `t_relay_events`, market analysis should derive from the event window and write `t_market_analyses`, and LINE delivery should be tracked through a separate push-record table.
+- 2026-04-20 10:05 - runtime `pre_tw_open` analysis timed out after the first refactor because the prompt included full raw JSON for every event; re-plan is to compact event raw payloads and only include reduced `market_context:*` facts in analysis prompts.
+- 2026-04-20 10:08 - compacted analysis prompt raw payloads, added configurable `LLM_TIMEOUT_SECONDS=120`, and reran `pre_tw_open` successfully with `model=gpt-5`, `events_used=69`, `market_rows_used=4`, `push_enabled=0`.
+- 2026-04-20 10:09 - dry-run push runner confirmed `t_line_push_jobs` idempotency: existing 5 target jobs stayed `dry_run_logged`, no LINE push occurred.
+- 2026-04-20 10:10 - re-registered daily market tasks: context at 07:20, analysis at 07:30, and analysis push dry-run at 07:40; all next runs are 2026-04-21 local time.
+- 2026-04-21 09:05 - follow-up review found two gaps: live push could not pick up previous `dry_run_logged` jobs, and `us_close` had no push-job dry-run schedule.
+- 2026-04-21 09:08 - updated push-job fetching so live runs process `queued`, `dry_run_logged`, and `failed` jobs; added `NewsCollector-AnalysisPush-UsClose` at 05:10.
+- 2026-04-21 13:24 - DB review found market context dedupe was still based on `title+url`, so unchanged Treasury values could suppress new-day facts; changed `market_context:*` event hashes to use stable event ids.
+- 2026-04-21 13:27 - reran targeted tests (44 tests), registered updated schedule for 05:10/07:40 push dry-runs, and created today's `us_close` dry-run push jobs.
+- 2026-04-21 13:35 - cleaned trailing whitespace in `skills/macro-weekly-summary-skill/SKILLS.md` and made `src/scrapers/yfinance_stocks.py` safe to import when optional `yfinance`/`pandas` dependencies are missing.
+- 2026-04-21 13:38 - `git diff --check` passed with only CRLF warnings; full unittest discovery passed with 83 tests and 4 expected yfinance/pandas skips.
+- 2026-04-20 09:02 - user requested moving `/events` storage behavior into crawler service so LINE relay is not required for ingestion writes.
+- 2026-04-20 09:08 - added `DirectDbEventSink` to `news_collector.relay_bridge`, defaulted `scripts/run_source_bridge.ps1` to `--event-sink direct-db`, and kept `--event-sink relay` as a compatibility fallback.
+- 2026-04-20 09:09 - updated README, project documentation, workflows, and decision note `2026-04-20-crawler-direct-db-ingestion.md` to describe crawler-owned storage.
+- 2026-04-20 09:10 - `python -m compileall src tests`, `python -m unittest tests.test_relay_bridge -v`, and full unit suite passed with 66 tests.
+- 2026-04-20 09:11 - started crawler bridge only with `scripts/run_source_bridge.ps1`; process command line shows `--event-sink direct-db` and no `event_relay.main` process is running.
+- 2026-04-20 09:12 - live log `runtime/logs/source-bridge-20260420-091110.out.log` shows `Bridge event sink: direct DB`, no `Relay URLError`, X stream connected, X backfill stored 5 new rows, and RSS stored 3 rows.
+- 2026-04-20 09:12 - MySQL verification since `2026-04-20 09:11:09`: `t_relay_events` has 8 new rows (`x:elonmusk` 5, `BBC News` 2, `Latest World News on Fox News` 1); `t_x_posts` has 5 new `elonmusk` rows.
+- 2026-04-20 08:41 - confirmed current implementation only deletes `t_relay_events` with hardcoded `keep_days=3` inside relay dispatch; `t_x_posts` has no cleanup and currently contains 59 rows older than 7 days.
+- 2026-04-20 08:43 - added `RELAY_RETENTION_ENABLED` and `RELAY_RETENTION_KEEP_DAYS`; relay daily cleanup now calls the shared retention cleanup with a 7-day default.
+- 2026-04-20 08:43 - added `event_relay.retention_cleanup`, `scripts/run_retention_cleanup.ps1`, and `scripts/register_retention_cleanup_task.ps1`.
+- 2026-04-20 08:43 - updated README, project documentation, workflows, and decision note `2026-04-20-unify-retention-cleanup.md`.
+- 2026-04-20 08:43 - `python -m compileall src tests` and full unit suite passed with 63 tests.
+- 2026-04-20 08:43 - dry-run cleanup reported `keep_days=7`; pre-cleanup DB counts were `t_relay_events older_7d=0`, `t_x_posts older_7d=59`.
+- 2026-04-20 08:43 - executed cleanup; result `events_deleted=0`, `x_posts_deleted=59`; post-cleanup both tables have `older_7d=0`.
+- 2026-04-20 08:44 - registered and manually triggered `NewsCollector-RetentionCleanup`; Task Scheduler reports `LastTaskResult=0` and next run `2026-04-21 00:10:00`.
 - 2026-04-19 15:30 - read AGENTS and required memory-bank docs, then confirmed current `.env` RSS feed list and RSS parser behavior.
 - 2026-04-19 15:31 - ran `python -m news_collector.main fetch --source rss --env-file .env --log-level INFO --pretty`; BBC/Fox/NPR and Reuters-via-Google-News responded, CNN feeds returned stale items.
 - 2026-04-19 15:33 - started tracing relay write path from `news_collector.relay_bridge` to `/events` and `t_relay_events`.
@@ -45,6 +95,32 @@ Use this file for non-trivial tasks (3+ steps or architecture decisions).
 - 2026-04-19 16:45 - removed Benzinga/GDELT from `config.py`, `collector.py`, `main.py`, `relay_bridge.py`, runtime scripts, dependency list, and deleted obsolete source modules/scripts/tests.
 - 2026-04-19 16:47 - updated `.env`, README, project documentation, workflows, and added decision note `2026-04-19-remove-benzinga-gdelt.md`.
 - 2026-04-19 16:48 - restarted live relay/bridge; latest bridge log shows RSS polling, X startup backfill, and no Benzinga/GDELT startup path.
+- 2026-04-19 17:00 - switched active task to twice-daily market analysis design: 05:00 US close summary and 07:30 Taiwan pre-open summary, with analysis persisted to MySQL and LINE push disabled.
+- 2026-04-19 20:22 - added `event_relay.market_analysis`, `scripts/run_market_analysis.ps1`, and `scripts/register_market_analysis_tasks.ps1`; documented new stored-only flow in README and memory-bank docs.
+- 2026-04-19 20:24 - added unit coverage for market-analysis slot resolution/config and updated relay config test fixtures for `mysql_analysis_table`.
+- 2026-04-19 20:25 - forced `us_close` run succeeded with model `gpt-4.1-mini`; row inserted into `t_market_analyses` with `analysis_date=2026-04-19`, `analysis_slot=us_close`, `push_enabled=0`, `pushed=0`.
+- 2026-04-19 20:26 - forced `pre_tw_open` run succeeded with model `gpt-4.1-mini`; second row inserted into `t_market_analyses` with `analysis_slot=pre_tw_open`.
+- 2026-04-19 20:26 - registered Windows scheduled tasks `NewsCollector-MarketAnalysis-UsClose` and `NewsCollector-MarketAnalysis-PreTwOpen`; next run times are `2026-04-20 05:00:00` and `2026-04-20 07:30:00`.
+- 2026-04-19 20:26 - confirmed runner resolves OpenAI credentials from `.secrets/openai_api_key.dpapi`; config reports `api_key_resolved=True` and `MARKET_ANALYSIS_PUSH_ENABLED=false`.
+- 2026-04-19 20:34 - switched weekly-summary recommendation to Monday 07:30 for Taiwan pre-open usage and updated weekly scheduler defaults / `.env`.
+- 2026-04-19 20:35 - updated `weekly_summary.py` so the generated weekly brief also upserts into `t_market_analyses` with `analysis_date=YYYY-Www` and `analysis_slot=weekly_tw_preopen`.
+- 2026-04-19 21:02 - forced weekly-summary dry run succeeded with `analysis_date=2026-W16`; MySQL row inserted into `t_market_analyses` as `weekly_tw_preopen` with `raw_json.dimension=weekly`.
+- 2026-04-19 21:02 - re-registered `NewsCollector-WeeklySummary`; next run is `2026-04-20 07:30:00`.
+- 2026-04-19 21:12 - switched active task to official-source expansion; implementation backlog will prioritize SEC EDGAR first, then Taiwan official announcements, then Fed/BLS/FRED class sources.
+- 2026-04-19 22:18 - implemented `src/news_collector/sources/sec_filings.py` using official SEC ticker mapping and submissions APIs, with allowlisted ticker/form filtering.
+- 2026-04-19 22:19 - wired SEC source into `collector.py`, `main.py`, and `relay_bridge.py`; bridge polling now includes `sec` when `SEC_ENABLED=true`.
+- 2026-04-19 22:20 - updated `.env` starter universe to `NVDA,TSM,AAPL,MSFT,AMD,TSLA` and documented the SEC source in README / memory-bank docs.
+- 2026-04-19 22:24 - live `fetch --source sec --limit 10` succeeded and returned official filings for `TSM`, `TSLA`, `NVDA`, and `AAPL`.
+- 2026-04-19 22:25 - implementation backlog recorded for next sources: `MOPS/TWSE` official disclosures, then `Fed/FOMC`, then `BLS/FRED` macro datasets.
+- 2026-04-19 22:25 - restarted live relay/source services; latest bridge log shows `Enabled sources: sec_filings` and `Polling source=sec fetched=5`.
+- 2026-04-19 22:26 - queried MySQL and confirmed new SEC filing event row in `t_relay_events`, e.g. `id=2624`, `source=sec:TSM`, `title=TSM filed 6-K`.
+- 2026-04-19 22:35 - switched active task to TWSE/MOPS official announcements; official TWSE swagger confirms `/opendata/t187ap04_L` is `上市公司每日重大訊息`.
+- 2026-04-19 22:36 - implemented `src/news_collector/sources/twse_mops_announcements.py`, normalized official fields (`公司代號`, `公司名稱`, `主旨 `, `符合條款`, `說明`), and wired `twse` into collector CLI plus bridge polling.
+- 2026-04-19 22:38 - added config/test/doc coverage for TWSE source, including retry-once behavior and topic-filter bypass for `source=twse_mops:*`.
+- 2026-04-19 22:42 - reproduced TWSE TLS failure only under local `Python 3.13`; updated `scripts/run_source_bridge.ps1` to prefer the available Windows `Python 3.12` runtime for bridge startup on this host.
+- 2026-04-19 22:42 - restarted live services; `runtime/logs/source-bridge-20260419-224219.out.log` now shows `Polling source=twse fetched=0` with no TLS error, which is expected because the default tracked codes had no same-day announcements.
+- 2026-04-19 22:42 - ran live TWSE smoke fetch with temporary `TWSE_MOPS_TRACKED_CODES=1463,3432`; official fetch returned 2 rows (`twse_mops:3432`, `twse_mops:1463`).
+- 2026-04-19 22:42 - replayed the two official TWSE rows into relay `/events`; queried MySQL and confirmed `t_relay_events` rows `2687` and `2688` were inserted with `line_push_status=queued`.
 
 ## Verification
 - [x] Tests passed
@@ -52,11 +128,23 @@ Use this file for non-trivial tasks (3+ steps or architecture decisions).
 - [x] Docs/config updated when behavior changed
 
 ## Review Summary
-- Outcome: Benzinga and GDELT were fully removed; active ingestion is now RSS + X + US index only.
+- Outcome: completed
 - Evidence:
   - `python -m compileall src tests`
-  - `$env:PYTHONPATH='src'; python -m unittest discover -s tests -p "test_*.py" -v`
-  - `runtime/logs/source-bridge-20260419-164802.out.log` shows bridge startup with RSS polling and X backfill only
-  - `Invoke-RestMethod http://127.0.0.1:18090/healthz`
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_market_context tests.test_market_analysis tests.test_analysis_push tests.test_event_relay tests.test_weekly_summary -v`
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env`
+  - MySQL query confirmed 33 recent `market_context:*` rows in `t_relay_events` with `line_push_status=stored_only_context`
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -EnvFile .env -Slot pre_tw_open -Force` succeeded after compacting raw prompt payloads and extending LLM timeout
+  - MySQL query confirmed `t_market_analyses.analysis_slot=pre_tw_open`, `model=gpt-5`, `events_used=69`, `market_rows_used=4`, `push_enabled=0`, `pushed=0`, and `raw_json.event_context_sources` includes all `market_context:*` source families
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_analysis_push.ps1 -EnvFile .env -Slot pre_tw_open -DryRun`
+  - MySQL query confirmed `t_line_push_jobs` has 5 `dry_run_logged` jobs with total attempts 5 for `market_analysis:2026-04-20:pre_tw_open`
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\register_market_analysis_tasks.ps1 -EnvFile .env -Force` registered `NewsCollector-AnalysisPush-PreTwOpen` at `07:40`
+  - Follow-up review on 2026-04-21: `$env:PYTHONPATH='src'; python -m unittest tests.test_event_relay tests.test_analysis_push tests.test_market_context tests.test_market_analysis tests.test_weekly_summary -v` passed with 44 tests
+  - Follow-up DB query confirmed 2026-04-21 has `pre_tw_open` and `us_close` analyses, `pre_tw_open` push jobs are `dry_run_logged`, and manual `us_close` push dry-run created 5 `dry_run_logged` jobs
+  - Task Scheduler query confirmed next runs on 2026-04-22: `us_close` 05:00, `us_close` push 05:10, context 07:20, `pre_tw_open` 07:30, pre-open push 07:40
+  - `git diff --check` passed; remaining output is CRLF normalization warnings only
+  - `$env:PYTHONPATH='src'; python -m unittest discover -s tests -p "test_*.py" -v` passed: 83 tests, 4 skipped because local pandas is unavailable for yfinance extraction tests
+  - Restored `skills/macro-weekly-summary-skill/SKILLS.md` from the last readable Git version after a whitespace cleanup preserved mojibake; verified the file renders as readable UTF-8 again
+  - Re-ran `python -m compileall src tests` and full unittest discovery after the restore; both passed
 - Open risks:
-  - Reuters still depends on Google News RSS fallback instead of a direct Reuters-owned feed.
+  - The market-context dedupe fix changes future event hashing; it intentionally avoids losing unchanged same-URL market facts, but existing rows written before the fix keep their old hash.

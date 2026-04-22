@@ -3,6 +3,8 @@
 ## Objective
 讓輸出更像「投資決策摘要」，而不是「新聞整理」。
 
+This rubric is for mobile-chat readability only. It does not imply Python owns LINE push, webhook, or user delivery.
+
 ## Scoring dimensions
 
 ### 1. 主線清晰度
@@ -21,7 +23,7 @@
 - 是否能讓讀者看完後知道應偏防守、偏中性，或逢回布局
 - 是否避免只有空泛判斷
 
-### 5. LINE 可讀性
+### 5. 手機聊天可讀性
 - 是否分段清楚
 - 是否句子不過長
 - 是否適合手機閱讀與轉發

@@ -16,6 +16,14 @@ class ConfigTests(unittest.TestCase):
             settings = load_settings(str(env_path))
 
         self.assertFalse(settings.x_enabled)
+        self.assertFalse(settings.sec_enabled)
+        self.assertEqual(settings.sec_user_agent, "news-collector/0.1 local-admin@example.com")
+        self.assertEqual(settings.sec_tracked_tickers, [])
+        self.assertEqual(settings.sec_allowed_forms, ["8-K", "8-K/A", "10-Q", "10-Q/A", "10-K", "10-K/A", "6-K", "6-K/A", "20-F", "20-F/A"])
+        self.assertEqual(settings.sec_max_filings_per_company, 5)
+        self.assertFalse(settings.twse_mops_enabled)
+        self.assertEqual(settings.twse_mops_tracked_codes, [])
+        self.assertEqual(settings.twse_mops_max_items_per_company, 5)
         self.assertIsNone(settings.x_bearer_token)
         self.assertEqual(settings.x_bearer_token_file, ".secrets/x_bearer_token.dpapi")
         self.assertEqual(settings.x_accounts, [])
@@ -36,6 +44,14 @@ class ConfigTests(unittest.TestCase):
                 "\n".join(
                     [
                         "X_ENABLED=true",
+                        "SEC_ENABLED=true",
+                        "SEC_USER_AGENT=test-agent contact@example.com",
+                        "SEC_TRACKED_TICKERS=NVDA,TSM",
+                        "SEC_ALLOWED_FORMS=8-K,6-K",
+                        "SEC_MAX_FILINGS_PER_COMPANY=3",
+                        "TWSE_MOPS_ENABLED=true",
+                        "TWSE_MOPS_TRACKED_CODES=2330,2317",
+                        "TWSE_MOPS_MAX_ITEMS_PER_COMPANY=2",
                         "X_BEARER_TOKEN=x-token",
                         "X_BEARER_TOKEN_FILE=.secrets/x.dpapi",
                         "X_ACCOUNTS=https://x.com/elonmusk,@realDonaldTrump",
@@ -56,6 +72,14 @@ class ConfigTests(unittest.TestCase):
             # Avoid leakage from external shell environment.
             to_cleanup = [
                 "X_ENABLED",
+                "SEC_ENABLED",
+                "SEC_USER_AGENT",
+                "SEC_TRACKED_TICKERS",
+                "SEC_ALLOWED_FORMS",
+                "SEC_MAX_FILINGS_PER_COMPANY",
+                "TWSE_MOPS_ENABLED",
+                "TWSE_MOPS_TRACKED_CODES",
+                "TWSE_MOPS_MAX_ITEMS_PER_COMPANY",
                 "X_BEARER_TOKEN",
                 "X_BEARER_TOKEN_FILE",
                 "X_ACCOUNTS",
@@ -82,6 +106,14 @@ class ConfigTests(unittest.TestCase):
                     os.environ[key] = value
 
         self.assertTrue(settings.x_enabled)
+        self.assertTrue(settings.sec_enabled)
+        self.assertEqual(settings.sec_user_agent, "test-agent contact@example.com")
+        self.assertEqual(settings.sec_tracked_tickers, ["NVDA", "TSM"])
+        self.assertEqual(settings.sec_allowed_forms, ["8-K", "6-K"])
+        self.assertEqual(settings.sec_max_filings_per_company, 3)
+        self.assertTrue(settings.twse_mops_enabled)
+        self.assertEqual(settings.twse_mops_tracked_codes, ["2330", "2317"])
+        self.assertEqual(settings.twse_mops_max_items_per_company, 2)
         self.assertEqual(settings.x_bearer_token, "x-token")
         self.assertEqual(settings.x_bearer_token_file, ".secrets/x.dpapi")
         self.assertEqual(settings.x_accounts, ["https://x.com/elonmusk", "@realDonaldTrump"])

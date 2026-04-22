@@ -23,15 +23,31 @@ from relay_client import push_events
 
 try:
     import yfinance as yf
-except ImportError:
-    print("[ERROR] yfinance 未安裝，執行: pip install yfinance")
-    sys.exit(1)
+except ImportError as exc:
+    yf = None
+    _YFINANCE_IMPORT_ERROR = exc
+else:
+    _YFINANCE_IMPORT_ERROR = None
 
 try:
     import pandas as pd  # yfinance 自帶依賴
-except ImportError:
-    print("[ERROR] pandas 未安裝（yfinance 依賴），執行: pip install pandas")
-    sys.exit(1)
+except ImportError as exc:
+    pd = None
+    _PANDAS_IMPORT_ERROR = exc
+else:
+    _PANDAS_IMPORT_ERROR = None
+
+
+def _require_optional_dependencies() -> None:
+    missing = []
+    if yf is None:
+        missing.append("yfinance")
+    if pd is None:
+        missing.append("pandas")
+    if missing:
+        detail = "; ".join(str(exc) for exc in (_YFINANCE_IMPORT_ERROR, _PANDAS_IMPORT_ERROR) if exc)
+        suffix = f" ({detail})" if detail else ""
+        raise RuntimeError(f"Missing optional dependencies: {', '.join(missing)}. Run: pip install yfinance pandas{suffix}")
 
 # ── 監控清單 ────────────────────────────────────────────
 WATCHLIST = {
@@ -59,6 +75,19 @@ WATCHLIST = {
         {"symbol": "^GSPC",  "name": "S&P 500"},
         {"symbol": "^IXIC",  "name": "Nasdaq"},
         {"symbol": "^DJI",   "name": "Dow Jones"},
+    ],
+    "macro": [
+        {"symbol": "^VIX",   "name": "VIX 恐慌指數"},
+        {"symbol": "^TNX",   "name": "美10Y殖利率"},
+        {"symbol": "^IRX",   "name": "美2Y殖利率"},
+        {"symbol": "NKD=F",  "name": "日經期貨"},
+    ],
+    "forex_commodity": [
+        {"symbol": "TWD=X",  "name": "USD/TWD"},
+        {"symbol": "JPY=X",  "name": "USD/JPY"},
+        {"symbol": "CL=F",   "name": "WTI原油"},
+        {"symbol": "GC=F",   "name": "黃金"},
+        {"symbol": "DX-Y.NYB", "name": "美元指數"},
     ],
 }
 
@@ -122,6 +151,8 @@ def _extract_quote_from_download(df, symbol: str, name: str) -> dict | None:
 
 # ── 抓取所有清單 ─────────────────────────────────────────
 def fetch_all(watchlist: dict) -> dict:
+    _require_optional_dependencies()
+
     # 批次下載（更快，減少 API 請求次數）
     all_symbols = [s["symbol"] for stocks in watchlist.values() for s in stocks]
     name_map    = {s["symbol"]: s["name"] for stocks in watchlist.values() for s in stocks}
@@ -212,6 +243,12 @@ def push_snapshot_to_relay(stocks_data: dict, scraped_at: str):
 # ── 主程式 ─────────────────────────────────────────────
 def main():
     print("[Yahoo Finance] Fetching stock quotes via yfinance...")
+    try:
+        _require_optional_dependencies()
+    except RuntimeError as exc:
+        print(f"[ERROR] {exc}")
+        return 1
+
     scraped_at  = datetime.now(timezone.utc).isoformat()
     stocks_data = fetch_all(WATCHLIST)
     total       = sum(len(v) for v in stocks_data.values())
@@ -228,7 +265,8 @@ def main():
 
     # 2. 推送快照到 Relay → MySQL
     push_snapshot_to_relay(stocks_data, scraped_at)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

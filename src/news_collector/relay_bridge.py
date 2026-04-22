@@ -1,8 +1,10 @@
 ﻿from __future__ import annotations
 
 import argparse
+import html
 import json
 import logging
+import re
 import sys
 import threading
 from dataclasses import dataclass
@@ -11,6 +13,8 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from event_relay.config import load_settings as load_relay_settings
+from event_relay.service import MySqlEventStore, RelayEvent
 from news_collector.collector import build_sources, fetch_news
 from news_collector.config import load_settings, resolve_x_bearer_token
 from news_collector.sources.x_accounts import XAccountSource
@@ -138,6 +142,63 @@ class BridgeConfig:
     x_stream_reconnect_max_seconds: int
     us_index_enabled: bool
     us_index_poll_interval_seconds: int
+    event_sink: str
+
+
+@dataclass(frozen=True)
+class EventSubmitResult:
+    status: str
+    accepted: bool
+    stored: bool = False
+
+
+class DirectDbEventSink:
+    def __init__(self, store: MySqlEventStore) -> None:
+        self._store = store
+
+    def submit(self, event: dict[str, Any]) -> EventSubmitResult:
+        relay_event = _event_to_relay_event(event)
+        if relay_event is None:
+            return EventSubmitResult(status="dropped_invalid", accepted=False)
+
+        if relay_event.log_only:
+            logger.info(
+                "[BRIDGE_LOG_ONLY_EVENT] source=%s id=%s title=%s url=%s",
+                relay_event.source,
+                relay_event.event_id or "-",
+                relay_event.title,
+                relay_event.url,
+            )
+            return EventSubmitResult(status="logged_only", accepted=True)
+
+        try:
+            inserted = self._store.enqueue_event_if_new(relay_event)
+        except Exception as exc:
+            logger.exception(
+                "Bridge DB store failed source=%s id=%s url=%s error=%s",
+                relay_event.source,
+                relay_event.event_id or "-",
+                relay_event.url,
+                exc,
+            )
+            return EventSubmitResult(status="failed", accepted=False)
+
+        if inserted:
+            logger.info(
+                "[BRIDGE_DB_STORED] id=%s source=%s url=%s",
+                relay_event.event_id or "-",
+                relay_event.source,
+                relay_event.url,
+            )
+            return EventSubmitResult(status="stored", accepted=True, stored=True)
+
+        logger.debug(
+            "[BRIDGE_DB_DUPLICATE] id=%s source=%s url=%s",
+            relay_event.event_id or "-",
+            relay_event.source,
+            relay_event.url,
+        )
+        return EventSubmitResult(status="duplicate", accepted=True, stored=False)
 
 
 def _allow_event_topic(event: dict[str, Any]) -> bool:
@@ -145,8 +206,8 @@ def _allow_event_topic(event: dict[str, Any]) -> bool:
     summary = str(event.get("summary") or "")
     url = str(event.get("url") or "")
     source = str(event.get("source") or "")
-    if source.lower().startswith("x:"):
-        # X account tracking is explicit allow-list mode; do not apply topic keyword filter.
+    if source.lower().startswith("x:") or source.lower().startswith("sec:") or source.lower().startswith("twse_mops:"):
+        # X account tracking, SEC filing tracking, and TWSE/MOPS tracked announcements are explicit allow-list modes.
         return True
     text = f"{title} {summary} {url} {source}".lower()
 
@@ -184,6 +245,35 @@ def _allow_event_date(event: dict[str, Any]) -> bool:
     return published.date() >= earliest_allowed
 
 
+def _normalize_summary(value: str) -> str:
+    text = html.unescape(value)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = " ".join(text.split())
+    return text[:1200]
+
+
+def _event_to_relay_event(event: dict[str, Any]) -> RelayEvent | None:
+    title = " ".join(str(event.get("title") or "").split()).strip()
+    url = str(event.get("url") or "").strip()
+    source = str(event.get("source") or "unknown").strip() or "unknown"
+    published_at = str(event.get("published_at") or "").strip() or None
+    if not title or not url:
+        return None
+    if not _allow_event_date(event):
+        return None
+
+    return RelayEvent(
+        event_id=str(event.get("id") or event.get("event_id") or ""),
+        source=source,
+        title=title,
+        url=url,
+        summary=_normalize_summary(str(event.get("summary") or "")),
+        published_at=published_at,
+        log_only=bool(event.get("test_only")) or source.lower().startswith("manual_test"),
+        raw=event,
+    )
+
+
 def _post_event(relay_url: str, event: dict[str, Any], timeout_seconds: int = 8) -> bool:
     body = json.dumps(event, ensure_ascii=False).encode("utf-8")
     req = Request(relay_url, data=body, method="POST")
@@ -207,12 +297,54 @@ def _post_event(relay_url: str, event: dict[str, Any], timeout_seconds: int = 8)
         return False
 
 
-def _poll_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
-    source_names = ["rss"]
+def _submit_event(
+    event_sink: DirectDbEventSink | None,
+    relay_url: str,
+    event: dict[str, Any],
+) -> EventSubmitResult:
+    if event_sink is not None:
+        return event_sink.submit(event)
 
+    if _post_event(relay_url, event):
+        return EventSubmitResult(status="posted", accepted=True)
+    return EventSubmitResult(status="failed", accepted=False)
+
+
+def _build_event_sink(config: BridgeConfig) -> DirectDbEventSink | None:
+    if config.event_sink == "relay":
+        logger.info("Bridge event sink: relay HTTP endpoint=%s", config.relay_url)
+        return None
+
+    relay_settings = load_relay_settings(config.env_file)
+    if not relay_settings.mysql_enabled:
+        raise RuntimeError("direct-db event sink requires RELAY_MYSQL_ENABLED=true")
+
+    store = MySqlEventStore(relay_settings)
+    store.initialize()
+    logger.info(
+        "Bridge event sink: direct DB %s:%s/%s event_table=%s x_table=%s market_table=%s",
+        relay_settings.mysql_host,
+        relay_settings.mysql_port,
+        relay_settings.mysql_database,
+        relay_settings.mysql_event_table,
+        relay_settings.mysql_x_table,
+        relay_settings.mysql_market_table,
+    )
+    return DirectDbEventSink(store)
+
+
+def _poll_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, stop_event: threading.Event) -> None:
     while not stop_event.is_set():
         settings = load_settings(config.env_file)
-        pushed = 0
+        source_names = ["rss"]
+        if settings.sec_enabled and settings.sec_tracked_tickers:
+            source_names.append("sec")
+        if settings.twse_mops_enabled and settings.twse_mops_tracked_codes:
+            source_names.append("twse")
+        accepted = 0
+        stored = 0
+        duplicates = 0
+        failed = 0
         dropped_by_topic = 0
         dropped_by_date = 0
 
@@ -237,15 +369,24 @@ def _poll_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
                         dropped_by_topic += 1
                         continue
 
-                    ok = _post_event(config.relay_url, event)
-                    if ok:
-                        pushed += 1
+                    result = _submit_event(event_sink, config.relay_url, event)
+                    if result.accepted:
+                        accepted += 1
+                    if result.stored:
+                        stored += 1
+                    elif result.status == "duplicate":
+                        duplicates += 1
+                    elif result.status == "failed":
+                        failed += 1
             except Exception as exc:
                 logger.exception("Polling failed source=%s error=%s", source_name, exc)
 
         logger.info(
-            "Polling cycle complete pushed=%d dropped_by_date=%d dropped_by_topic=%d next_in=%ss",
-            pushed,
+            "Polling cycle complete accepted=%d stored=%d duplicates=%d failed=%d dropped_by_date=%d dropped_by_topic=%d next_in=%ss",
+            accepted,
+            stored,
+            duplicates,
+            failed,
             dropped_by_date,
             dropped_by_topic,
             config.poll_interval_seconds,
@@ -253,7 +394,7 @@ def _poll_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
         stop_event.wait(max(config.poll_interval_seconds, 1))
 
 
-def _x_stream_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
+def _x_stream_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, stop_event: threading.Event) -> None:
     try:
         settings = load_settings(config.env_file)
         if not settings.x_enabled:
@@ -269,7 +410,7 @@ def _x_stream_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
             logger.warning("X stream bridge skipped: X_ACCOUNTS is empty")
             return
 
-        _run_x_backfill(config.relay_url, settings, token)
+        _run_x_backfill(config.relay_url, settings, token, event_sink=event_sink)
 
         streamer = XFilteredStreamer(
             XStreamConfig(
@@ -295,13 +436,14 @@ def _x_stream_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
             if not _allow_event_topic(event):
                 return
 
-            ok = _post_event(config.relay_url, event)
-            if ok:
+            result = _submit_event(event_sink, config.relay_url, event)
+            if result.accepted:
                 logger.info(
-                    "[BRIDGE_X_STREAM_SENT] id=%s source=%s url=%s",
+                    "[BRIDGE_X_STREAM_SUBMITTED] id=%s source=%s url=%s status=%s",
                     event.get("id", "-"),
                     event.get("source", "-"),
                     event.get("url", "-"),
+                    result.status,
                 )
 
         logger.info("Starting X account stream accounts=%s", ",".join(settings.x_accounts))
@@ -310,10 +452,15 @@ def _x_stream_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
         logger.warning("X stream bridge stopped: %s", exc)
 
 
-def _run_x_backfill(relay_url: str, settings: Any, bearer_token: str) -> dict[str, int]:
+def _run_x_backfill(
+    relay_url: str,
+    settings: Any,
+    bearer_token: str,
+    event_sink: DirectDbEventSink | None = None,
+) -> dict[str, int]:
     if not getattr(settings, "x_backfill_enabled", True):
         logger.info("X startup backfill skipped: X_BACKFILL_ENABLED=false")
-        return {"fetched": 0, "pushed": 0, "dropped_by_date": 0, "dropped_by_topic": 0}
+        return {"fetched": 0, "pushed": 0, "stored": 0, "duplicates": 0, "failed": 0, "dropped_by_date": 0, "dropped_by_topic": 0}
 
     source = XAccountSource(
         bearer_token=bearer_token,
@@ -327,9 +474,12 @@ def _run_x_backfill(relay_url: str, settings: Any, bearer_token: str) -> dict[st
     items = source.fetch(limit=settings.x_backfill_max_results_per_account)
     if not items:
         logger.info("X startup backfill fetched=0")
-        return {"fetched": 0, "pushed": 0, "dropped_by_date": 0, "dropped_by_topic": 0}
+        return {"fetched": 0, "pushed": 0, "stored": 0, "duplicates": 0, "failed": 0, "dropped_by_date": 0, "dropped_by_topic": 0}
 
     pushed = 0
+    stored = 0
+    duplicates = 0
+    failed = 0
     dropped_by_date = 0
     dropped_by_topic = 0
 
@@ -344,25 +494,39 @@ def _run_x_backfill(relay_url: str, settings: Any, bearer_token: str) -> dict[st
             dropped_by_topic += 1
             continue
 
-        if _post_event(relay_url, event):
+        result = _submit_event(event_sink, relay_url, event)
+        if result.accepted:
             pushed += 1
+            if result.stored:
+                stored += 1
+            elif result.status == "duplicate":
+                duplicates += 1
             logger.info(
-                "[BRIDGE_X_BACKFILL_SENT] id=%s source=%s url=%s",
+                "[BRIDGE_X_BACKFILL_SUBMITTED] id=%s source=%s url=%s status=%s",
                 event.get("id", "-"),
                 event.get("source", "-"),
                 event.get("url", "-"),
+                result.status,
             )
+        elif result.status == "failed":
+            failed += 1
 
     logger.info(
-        "X startup backfill complete fetched=%d pushed=%d dropped_by_date=%d dropped_by_topic=%d",
+        "X startup backfill complete fetched=%d pushed=%d stored=%d duplicates=%d failed=%d dropped_by_date=%d dropped_by_topic=%d",
         len(items),
         pushed,
+        stored,
+        duplicates,
+        failed,
         dropped_by_date,
         dropped_by_topic,
     )
     return {
         "fetched": len(items),
         "pushed": pushed,
+        "stored": stored,
+        "duplicates": duplicates,
+        "failed": failed,
         "dropped_by_date": dropped_by_date,
         "dropped_by_topic": dropped_by_topic,
     }
@@ -393,7 +557,7 @@ def _build_us_index_event(session: str, trade_day: str, message: str, quotes: di
     }
 
 
-def _us_index_direct_loop(config: BridgeConfig, stop_event: threading.Event) -> None:
+def _us_index_direct_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, stop_event: threading.Event) -> None:
     if not config.us_index_enabled:
         logger.info("US index event bridge skipped: disabled")
         return
@@ -419,16 +583,18 @@ def _us_index_direct_loop(config: BridgeConfig, stop_event: threading.Event) -> 
                 if open_window and trade_day not in open_sent_dates:
                     message = tracker.format_open_message(trade_date, quotes)
                     payload = _build_us_index_event("open", trade_day, message, quotes)
-                    if _post_event(config.relay_url, payload):
+                    result = _submit_event(event_sink, config.relay_url, payload)
+                    if result.accepted:
                         open_sent_dates.add(trade_day)
-                        logger.info("[US_INDEX_OPEN_QUEUED] trade_date=%s", trade_day)
+                        logger.info("[US_INDEX_OPEN_STORED] trade_date=%s status=%s", trade_day, result.status)
 
                 if close_window and trade_day not in close_sent_dates:
                     message = tracker.format_close_message(trade_date, quotes)
                     payload = _build_us_index_event("close", trade_day, message, quotes)
-                    if _post_event(config.relay_url, payload):
+                    result = _submit_event(event_sink, config.relay_url, payload)
+                    if result.accepted:
                         close_sent_dates.add(trade_day)
-                        logger.info("[US_INDEX_CLOSE_QUEUED] trade_date=%s", trade_day)
+                        logger.info("[US_INDEX_CLOSE_STORED] trade_date=%s status=%s", trade_day, result.status)
         except Exception as exc:
             logger.warning("US index tracking failed: %s", exc)
 
@@ -448,8 +614,14 @@ def _quote_to_payload(quote: Any) -> dict[str, Any]:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Bridge all news sources to LINE relay")
-    parser.add_argument("--relay-url", default="http://127.0.0.1:18090/events", help="LINE relay /events endpoint")
+    parser = argparse.ArgumentParser(description="Bridge all news sources into the crawler-owned event store")
+    parser.add_argument("--relay-url", default="http://127.0.0.1:18090/events", help="Compatibility event relay /events endpoint")
+    parser.add_argument(
+        "--event-sink",
+        default="direct-db",
+        choices=["direct-db", "relay"],
+        help="Where normalized events are written. Default direct-db writes MySQL without the event relay API.",
+    )
     parser.add_argument("--env-file", default=".env", help="Path to env file")
     parser.add_argument("--poll-interval-seconds", type=int, default=300, help="Polling interval for RSS only")
     parser.add_argument("--limit", type=int, default=5, help="Per-source fetch limit for RSS")
@@ -461,7 +633,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Max reconnect backoff for X stream",
     )
     parser.add_argument("--us-index-poll-interval-seconds", type=int, default=30, help="US index polling cadence")
-    parser.add_argument("--disable-us-index", action="store_true", help="Disable US index direct push chain")
+    parser.add_argument("--disable-us-index", action="store_true", help="Disable US index stored-only event chain")
     parser.add_argument(
         "--log-level",
         default="INFO",
@@ -495,15 +667,22 @@ def main() -> int:
         x_stream_reconnect_max_seconds=max(args.x_stream_reconnect_max_seconds, 5),
         us_index_enabled=not args.disable_us_index,
         us_index_poll_interval_seconds=max(args.us_index_poll_interval_seconds, 5),
+        event_sink=args.event_sink,
     )
 
     stop_event = threading.Event()
+    event_sink = _build_event_sink(config)
 
-    poll_thread = threading.Thread(target=_poll_loop, args=(config, stop_event), daemon=True, name="bridge-poll")
-    x_stream_thread = threading.Thread(target=_x_stream_loop, args=(config, stop_event), daemon=True, name="bridge-x-stream")
+    poll_thread = threading.Thread(target=_poll_loop, args=(config, event_sink, stop_event), daemon=True, name="bridge-poll")
+    x_stream_thread = threading.Thread(
+        target=_x_stream_loop,
+        args=(config, event_sink, stop_event),
+        daemon=True,
+        name="bridge-x-stream",
+    )
     us_index_thread = threading.Thread(
         target=_us_index_direct_loop,
-        args=(config, stop_event),
+        args=(config, event_sink, stop_event),
         daemon=True,
         name="bridge-us-index",
     )
@@ -511,7 +690,7 @@ def main() -> int:
     poll_thread.start()
     x_stream_thread.start()
     us_index_thread.start()
-    logger.info("Bridge started relay_url=%s", config.relay_url)
+    logger.info("Bridge started event_sink=%s relay_url=%s", config.event_sink, config.relay_url)
 
     try:
         poll_thread.join()

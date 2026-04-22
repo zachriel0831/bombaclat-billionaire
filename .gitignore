@@ -4,7 +4,9 @@ __pycache__/
 .venv/
 .vscode/
 .idea/
+.claude/
 .secrets/
+.trigger_state.json
 *.egg-info/
 runtime/logs/
 runtime/prompts/

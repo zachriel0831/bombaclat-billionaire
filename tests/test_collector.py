@@ -13,6 +13,14 @@ class CollectorTests(unittest.TestCase):
         x_accounts: list[str] | None = None,
     ) -> Settings:
         return Settings(
+            sec_enabled=False,
+            sec_user_agent="news-collector/0.1 local-admin@example.com",
+            sec_tracked_tickers=["NVDA", "TSM"],
+            sec_allowed_forms=["8-K", "10-Q", "10-K", "6-K", "20-F"],
+            sec_max_filings_per_company=5,
+            twse_mops_enabled=False,
+            twse_mops_tracked_codes=["2330", "2317", "2454"],
+            twse_mops_max_items_per_company=5,
             x_enabled=x_enabled,
             x_bearer_token=x_bearer_token,
             x_bearer_token_file=".secrets/does_not_exist_for_x_test.dpapi",
@@ -34,6 +42,8 @@ class CollectorTests(unittest.TestCase):
         sources = build_sources(self._settings(x_enabled=False, x_bearer_token=None), "all")
         names = [s.name for s in sources]
         self.assertIn("official_rss", names)
+        self.assertNotIn("sec_filings", names)
+        self.assertNotIn("twse_mops_announcements", names)
         self.assertNotIn("x_accounts", names)
 
     def test_build_sources_x_disabled(self) -> None:
@@ -55,6 +65,63 @@ class CollectorTests(unittest.TestCase):
         )
         self.assertEqual(len(sources), 1)
         self.assertEqual(sources[0].name, "x_accounts")
+
+    def test_build_sources_sec_enabled(self) -> None:
+        settings = self._settings(x_enabled=False, x_bearer_token=None)
+        settings = Settings(
+            **{
+                **settings.__dict__,
+                "sec_enabled": True,
+                "sec_user_agent": "news-collector/0.1 local-admin@example.com",
+                "sec_tracked_tickers": ["NVDA", "TSM"],
+            }
+        )
+
+        sources = build_sources(settings, "sec")
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].name, "sec_filings")
+
+    def test_build_sources_sec_requires_tickers(self) -> None:
+        settings = self._settings(x_enabled=False, x_bearer_token=None)
+        settings = Settings(
+            **{
+                **settings.__dict__,
+                "sec_enabled": True,
+                "sec_tracked_tickers": [],
+            }
+        )
+
+        with self.assertRaises(ValueError):
+            build_sources(settings, "sec")
+
+    def test_build_sources_twse_enabled(self) -> None:
+        settings = self._settings(x_enabled=False, x_bearer_token=None)
+        settings = Settings(
+            **{
+                **settings.__dict__,
+                "twse_mops_enabled": True,
+                "twse_mops_tracked_codes": ["2330", "2317"],
+            }
+        )
+
+        sources = build_sources(settings, "twse")
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].name, "twse_mops_announcements")
+
+    def test_build_sources_twse_requires_codes(self) -> None:
+        settings = self._settings(x_enabled=False, x_bearer_token=None)
+        settings = Settings(
+            **{
+                **settings.__dict__,
+                "twse_mops_enabled": True,
+                "twse_mops_tracked_codes": [],
+            }
+        )
+
+        with self.assertRaises(ValueError):
+            build_sources(settings, "twse")
 
 
 if __name__ == "__main__":

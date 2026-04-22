@@ -36,17 +36,17 @@ def _load_env(env_file: str = ".env") -> None:
 # ── MySQL 連線設定（從環境變數讀取）──────────────────────
 def _get_db_config() -> dict:
     return {
-        "host":             os.environ.get("LINE_RELAY_MYSQL_HOST",     "127.0.0.1"),
-        "port":             int(os.environ.get("LINE_RELAY_MYSQL_PORT", "3306")),
-        "user":             os.environ.get("LINE_RELAY_MYSQL_USER",     "root"),
-        "password":         os.environ.get("LINE_RELAY_MYSQL_PASSWORD", "root"),
-        "database":         os.environ.get("LINE_RELAY_MYSQL_DATABASE", "news_relay"),
-        "connection_timeout": int(os.environ.get("LINE_RELAY_MYSQL_CONNECT_TIMEOUT", "5")),
+        "host":             os.environ.get("RELAY_MYSQL_HOST",     "127.0.0.1"),
+        "port":             int(os.environ.get("RELAY_MYSQL_PORT", "3306")),
+        "user":             os.environ.get("RELAY_MYSQL_USER",     "root"),
+        "password":         os.environ.get("RELAY_MYSQL_PASSWORD", "root"),
+        "database":         os.environ.get("RELAY_MYSQL_DATABASE", "news_relay"),
+        "connection_timeout": int(os.environ.get("RELAY_MYSQL_CONNECT_TIMEOUT", "5")),
         "charset":          "utf8mb4",
     }
 
 
-TABLE = os.environ.get("LINE_RELAY_MYSQL_EVENT_TABLE", "t_relay_events")
+TABLE = os.environ.get("RELAY_MYSQL_EVENT_TABLE", "t_relay_events")
 
 
 def query_events(hours: int = 3, event_type: str = "all") -> dict:

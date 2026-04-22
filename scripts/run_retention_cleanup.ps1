@@ -1,7 +1,7 @@
-# Run weekly macro summary generator (single-shot).
+# Run MySQL retention cleanup for relay event and X post tables.
 param(
   [string]$EnvFile = ".env",
-  [switch]$Force,
+  [int]$KeepDays = 0,
   [switch]$DryRun,
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]
   [string]$LogLevel = "INFO"
@@ -13,20 +13,17 @@ Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
 
-Write-Host "Running weekly macro summary..." -ForegroundColor Cyan
-
-$cmdArgs = @(
-  "-m", "event_relay.weekly_summary",
+$argsList = @(
+  "-m", "event_relay.retention_cleanup",
   "--env-file", $EnvFile,
   "--log-level", $LogLevel
 )
-
-if ($Force) {
-  $cmdArgs += "--force"
+if ($KeepDays -gt 0) {
+  $argsList += @("--keep-days", "$KeepDays")
 }
 if ($DryRun) {
-  $cmdArgs += "--dry-run"
+  $argsList += "--dry-run"
 }
 
-& python @cmdArgs
-
+& python @argsList
+exit $LASTEXITCODE

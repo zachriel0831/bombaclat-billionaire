@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-# 提供 relay HTTP 入口：/events 給資料橋接、/line/webhook 給 LINE 平台回呼。
+# Event relay HTTP entrypoints for data ingestion.
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import logging
 from typing import Any
 from urllib.parse import urlsplit
 
-from line_event_relay.service import RelayProcessor
+from event_relay.service import RelayProcessor
 
 
 logger = logging.getLogger(__name__)
@@ -18,13 +18,8 @@ class RelayHttpServer(ThreadingHTTPServer):
         self,
         server_address: tuple[str, int],
         processor: RelayProcessor,
-        webhook_path: str = "/line/webhook",
     ) -> None:
         self.processor = processor
-        normalized = (webhook_path or "/line/webhook").strip()
-        if not normalized.startswith("/"):
-            normalized = f"/{normalized}"
-        self.webhook_path = normalized
         super().__init__(server_address, RelayRequestHandler)
 
 
@@ -44,14 +39,6 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
             self._handle_events_post()
             return
 
-        if path == self.server.webhook_path or path == "/callback":
-            self._handle_line_webhook_post()
-            return
-
-        if path == "/push/direct":
-            self._handle_direct_push_post()
-            return
-
         self._json_response(404, {"error": "not_found"})
 
     def _handle_events_post(self) -> None:
@@ -63,31 +50,6 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
             self._json_response(400, {"error": str(exc)})
         except Exception as exc:
             logger.exception("Unhandled error while processing /events")
-            self._json_response(500, {"error": str(exc)})
-
-    def _handle_line_webhook_post(self) -> None:
-        try:
-            raw_body = self._read_raw_body()
-            signature = self.headers.get("x-line-signature", "")
-            result = self.server.processor.process_line_webhook(raw_body, signature)
-            self._json_response(200, result)
-        except PermissionError as exc:
-            self._json_response(401, {"error": str(exc)})
-        except ValueError as exc:
-            self._json_response(400, {"error": str(exc)})
-        except Exception as exc:
-            logger.exception("Unhandled error while processing LINE webhook")
-            self._json_response(500, {"error": str(exc)})
-
-    def _handle_direct_push_post(self) -> None:
-        try:
-            payload = self._read_json_body()
-            result = self.server.processor.process_direct_push(payload)
-            self._json_response(200, result)
-        except ValueError as exc:
-            self._json_response(400, {"error": str(exc)})
-        except Exception as exc:
-            logger.exception("Unhandled error while processing direct push")
             self._json_response(500, {"error": str(exc)})
 
     def log_message(self, fmt: str, *args: Any) -> None:

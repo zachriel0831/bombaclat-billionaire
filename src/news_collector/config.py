@@ -22,6 +22,14 @@ def _load_env_file(path: Path) -> None:
 
 @dataclass(frozen=True)
 class Settings:
+    sec_enabled: bool
+    sec_user_agent: str
+    sec_tracked_tickers: list[str]
+    sec_allowed_forms: list[str]
+    sec_max_filings_per_company: int
+    twse_mops_enabled: bool
+    twse_mops_tracked_codes: list[str]
+    twse_mops_max_items_per_company: int
     x_enabled: bool
     x_bearer_token: str | None
     x_bearer_token_file: str
@@ -52,8 +60,23 @@ def load_settings(env_file: str = ".env") -> Settings:
     feeds = os.getenv("OFFICIAL_RSS_FEEDS", "")
     feed_list = [s.strip() for s in feeds.split(",") if s.strip()] or DEFAULT_RSS_FEEDS
     x_accounts = [s.strip() for s in os.getenv("X_ACCOUNTS", "").split(",") if s.strip()]
+    sec_tracked_tickers = [s.strip() for s in os.getenv("SEC_TRACKED_TICKERS", "").split(",") if s.strip()]
+    twse_mops_tracked_codes = [s.strip() for s in os.getenv("TWSE_MOPS_TRACKED_CODES", "").split(",") if s.strip()]
+    sec_allowed_forms = [
+        s.strip().upper()
+        for s in os.getenv("SEC_ALLOWED_FORMS", "8-K,8-K/A,10-Q,10-Q/A,10-K,10-K/A,6-K,6-K/A,20-F,20-F/A").split(",")
+        if s.strip()
+    ]
 
     return Settings(
+        sec_enabled=_parse_bool(os.getenv("SEC_ENABLED", "false")),
+        sec_user_agent=(os.getenv("SEC_USER_AGENT", "news-collector/0.1 local-admin@example.com") or "").strip(),
+        sec_tracked_tickers=sec_tracked_tickers,
+        sec_allowed_forms=sec_allowed_forms,
+        sec_max_filings_per_company=max(1, min(20, int(os.getenv("SEC_MAX_FILINGS_PER_COMPANY", "5")))),
+        twse_mops_enabled=_parse_bool(os.getenv("TWSE_MOPS_ENABLED", "false")),
+        twse_mops_tracked_codes=twse_mops_tracked_codes,
+        twse_mops_max_items_per_company=max(1, min(20, int(os.getenv("TWSE_MOPS_MAX_ITEMS_PER_COMPANY", "5")))),
         x_enabled=_parse_bool(os.getenv("X_ENABLED", "false")),
         x_bearer_token=os.getenv("X_BEARER_TOKEN") or None,
         x_bearer_token_file=os.getenv("X_BEARER_TOKEN_FILE", ".secrets/x_bearer_token.dpapi"),

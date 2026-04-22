@@ -1,4 +1,4 @@
-# LINE relay 套件匯出清單。
+# Event relay package exports.
 __all__ = [
     "config",
     "http_server",

@@ -11,5 +11,5 @@ echo  POST /events  → store to MySQL only
 echo ============================================
 echo.
 
-python -m line_event_relay.main --env-file .env
+python -m event_relay.main --env-file .env
 pause

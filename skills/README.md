@@ -6,8 +6,10 @@ This folder is the canonical location for skill assets in this repository.
 - `skills/registry.yaml`: global skill registry and ownership
 - `skills/templates/`: templates for new skills
 - `skills/<skill-name>/`: concrete skill implementation docs and assets
+- `skills/macro-weekly-summary-skill/` and `skills/line-brief-format-skill/`: prompt assets consumed by analysis jobs; they are not registered enterprise skills and do not own delivery behavior
 
 ## Required files per skill
+Registered enterprise skills must include:
 - `SKILL.md`
 - `EVALS.md`
 - `CHANGELOG.md`

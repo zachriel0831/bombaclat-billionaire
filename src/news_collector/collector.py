@@ -8,6 +8,8 @@ from news_collector.config import Settings, resolve_x_bearer_token
 from news_collector.models import NewsItem
 from news_collector.sources.base import NewsSource
 from news_collector.sources.rss import OfficialRssSource
+from news_collector.sources.sec_filings import SecFilingsSource
+from news_collector.sources.twse_mops_announcements import TwseMopsAnnouncementsSource
 from news_collector.sources.x_accounts import XAccountSource
 from news_collector.utils import sort_timestamp
 
@@ -28,6 +30,48 @@ def build_sources(settings: Settings, source_name: str) -> list[NewsSource]:
                 first_per_feed=settings.official_rss_first_per_feed,
             )
         )
+
+    if selected in ("all", "sec"):
+        if not settings.sec_enabled:
+            if selected == "sec":
+                raise ValueError("SEC source is disabled. Set SEC_ENABLED=true to enable.")
+            logger.info("Skip source=sec because SEC_ENABLED=false")
+        elif not settings.sec_user_agent:
+            if selected == "sec":
+                raise ValueError("SEC_USER_AGENT is required for SEC EDGAR access.")
+            logger.info("Skip source=sec because SEC_USER_AGENT is empty")
+        elif not settings.sec_tracked_tickers:
+            if selected == "sec":
+                raise ValueError("SEC_TRACKED_TICKERS is empty. Add ticker symbols such as NVDA,TSM.")
+            logger.info("Skip source=sec because SEC_TRACKED_TICKERS is empty")
+        else:
+            sources.append(
+                SecFilingsSource(
+                    user_agent=settings.sec_user_agent,
+                    tracked_tickers=settings.sec_tracked_tickers,
+                    allowed_forms=settings.sec_allowed_forms,
+                    timeout_seconds=settings.http_timeout_seconds,
+                    max_filings_per_company=settings.sec_max_filings_per_company,
+                )
+            )
+
+    if selected in ("all", "twse"):
+        if not settings.twse_mops_enabled:
+            if selected == "twse":
+                raise ValueError("TWSE/MOPS source is disabled. Set TWSE_MOPS_ENABLED=true to enable.")
+            logger.info("Skip source=twse because TWSE_MOPS_ENABLED=false")
+        elif not settings.twse_mops_tracked_codes:
+            if selected == "twse":
+                raise ValueError("TWSE_MOPS_TRACKED_CODES is empty. Add TWSE listed company codes such as 2330,2317.")
+            logger.info("Skip source=twse because TWSE_MOPS_TRACKED_CODES is empty")
+        else:
+            sources.append(
+                TwseMopsAnnouncementsSource(
+                    tracked_codes=settings.twse_mops_tracked_codes,
+                    timeout_seconds=settings.http_timeout_seconds,
+                    max_items_per_company=settings.twse_mops_max_items_per_company,
+                )
+            )
 
     if selected in ("all", "x"):
         if not settings.x_enabled:

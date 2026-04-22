@@ -117,7 +117,7 @@ tasks:
 
   - id: REQ-006
     title: "[Java 遷移 Phase 2] 切換 LINE webhook + 接管群組/用戶註冊"
-    status: pending
+    status: done
     trigger: manual
     priority: high
     description: |
@@ -129,36 +129,46 @@ tasks:
         5. Python 端的 webhook service 保留做 backup，暫不關閉
     depends_on: [REQ-005]
     acceptance:
-      - Java service 能從遠端 MySQL 讀寫 t_bot_group_info / t_bot_user_info
-      - LINE webhook URL 已切換到 Java 端
-      - 新群組加 bot / 新用戶 follow 後，DB 狀態由 Java 正確寫入
-      - 原 Python webhook 不再收到 LINE 事件（或視情況保留 backup）
-    notes: "跨機器 MySQL 連線需確認防火牆與 bind-address 設定"
+      - Java service 能從遠端 MySQL 讀寫 t_bot_group_info / t_bot_user_info   # done
+      - LINE webhook URL 已切換到 Java 端                                     # done
+      - 新群組加 bot / 新用戶 follow 後，DB 狀態由 Java 正確寫入              # done
+      - 原 Python webhook 不再收到 LINE 事件（或視情況保留 backup）          # done
+    notes: |
+      2026-04-22 完成並實測：服務已起、推送正常、67/67 單元測試通過。
+      交付物（line-relay-service repo）：
+        - BotTargetRepository：t_bot_group_info / t_bot_user_info upsert + active/test_account 過濾
+        - WebhookEventProcessor：follow/unfollow/join/leave/memberJoined 直接寫 DB
+        - AdminController：/admin/list-targets、/admin/poll-market-analysis
+        - LINE Console webhook URL 已切到 Java /webhook，Python 端不再收 LINE 事件
 
   - id: REQ-007
-    title: "[Java 遷移 Phase 3] 建立 push queue + Java dispatcher + Python 停直接 push"
-    status: pending
+    title: "[Java 遷移 Phase 3] Java 直讀 t_market_analyses 排程推送，Python 專注爬取與寫庫"
+    status: done
     trigger: manual
     priority: high
     description: |
-      以共用 MySQL 做 Python ↔ Java 的推送佇列解耦：
-        1. 新增 t_push_queue 表，欄位 (id, payload_text, target_type, target_id,
-           status[pending|sent|failed], created_at, pushed_at, error_msg, retry_count)
-        2. Java 實作 Dispatcher：每 5 秒輪詢 status=pending，推送後標記 sent/failed
-        3. Python 端移除直接呼叫 LinePushClient 的邏輯：
-           - src/line_event_relay/weekly_summary.py
-           - src/line_event_relay/market_analysis.py
-           - src/line_event_relay/service.py 中的 dispatch 邏輯
-           改為寫入 t_push_queue。
-        4. 既有 t_relay_events 的 dispatcher 流程一併遷到 Java 端處理。
+      2026-04-22 架構調整：**捨棄 t_push_queue 佇列設計**。改由 Python 端單純爬取
+      資料 + AI 分析後寫入共用 MySQL，Java 端 scheduler 直接讀表並推送，不再雙向排隊。
+
+      分工：
+        - Python (data-collecting)：負責爬取各類行情/新聞資料，做 AI 分析後寫入
+          t_market_analyses（含 analysis_date / analysis_slot / summary_text / push_enabled 等）。
+          **不得**呼叫任何 LINE API、不得保留 LINE webhook handler。
+        - Java (line-relay-service)：負責 LINE webhook 接收、群組/用戶狀態、
+          直接讀 t_market_analyses 後在 Asia/Taipei 排程推送：
+            * 05:10 us_close（週一改 weekly_tw_preopen）
+            * 07:40 pre_tw_open
+            * 00:00 設 push_enabled=0 清理昨天之前未推送的 row
+          另支援 LINE 指令 `測試西卡卡` / `關閉西卡卡` / `西卡卡推送`。
     depends_on: [REQ-006]
     acceptance:
-      - t_push_queue schema 建立完成，Python/Java 雙方皆能讀寫
-      - Python weekly_summary / market_analysis 不再出現 LINE API 呼叫
-      - Java dispatcher 能正確輪詢 pending 訊息並推送
-      - 失敗訊息會進入 failed 狀態並記錄 error_msg
-      - 整合測試：Python 寫一筆 pending → Java 推送成功 → status=sent
-    notes: ""
+      - Java MarketAnalysisPoller + MarketAnalysisScheduler 能按排程讀 t_market_analyses 並推送  # done
+      - Python 端不再呼叫 LINE Messaging API（linebot、push 等）                                   # 驗收中：見 REQ-008 清理項目
+      - Java 單元測試覆蓋 no_analysis / no_targets / push_enabled 過濾 / 排程 slot 選擇             # done (67/67 pass)
+    notes: |
+      原規格的 t_push_queue + dispatcher 模型因「實際只有 market_analysis 一路需要推播、
+      再加通用佇列反而增加兩端協調成本」而捨棄。後續若需要多個 Python 模組各自觸發 LINE，
+      走「各模組寫自己的專用表 + Java 各自排程讀」模式，不重啟通用 queue。
 
   - id: REQ-008
     title: "[Java 遷移 Phase 4] 移除 Python webhook 與 LinePushClient"
@@ -167,7 +177,7 @@ tasks:
     priority: medium
     description: |
       確認 Java 端穩定運作後，清理 Python 端殘留：
-        1. 移除 src/line_event_relay/service.py 中的 LinePushClient 類別
+        1. 移除 src/event_relay/service.py 中的 LinePushClient 類別
         2. 移除 Python webhook 服務與相關排程（保留事件儲存邏輯）
         3. 更新 README / memory-bank / PROJECT_DOCUMENTATION.md 描述新架構
         4. 刪除 scripts/register_weekly_summary_task.ps1 等僅服務舊流程的腳本
@@ -180,3 +190,113 @@ tasks:
       - 文件已更新，README 反映新架構
       - 所有測試仍通過
     notes: "觀察 Phase 3 穩定跑 1-2 週再執行，避免過早拆除 backup"
+
+  - id: REQ-009
+    title: "[台股資金流] 官方資料源標準化寫入 t_relay_events"
+    status: pending
+    trigger: manual
+    priority: high
+    description: |
+      下一迭代補上台股早盤資金流資料包。所有資料先以 stored-only event 形式寫入
+      t_relay_events，不直接寫入 t_market_analyses；早盤分析再從事件窗彙整後產出
+      t_market_analyses。
+
+      資料源以官方來源為主：
+        1. TWSE：三大法人買賣超、外資持股、融資融券、借券/SBL、大盤/類股/跨市場行情。
+        2. TPEx：上櫃三大法人、外資持股、融資融券、融券借券賣出餘額、OTC 指數/類股。
+        3. TAIFEX：台指期/小台/選擇權未平倉、外資期貨淨部位、put/call 結構、大額交易人。
+
+      事件設計方向：
+        - source 使用 market_context:twse_flow / market_context:tpex_flow / market_context:taifex_flow。
+        - raw_json 保留官方原始欄位、trade_date、normalized metrics、stored_only=true。
+        - dedupe key 應包含 source family、trade_date、dataset、symbol 或 contract。
+        - 不做 LINE 推送；Python 僅負責資料蒐集、事件寫庫與 AI 分析寫庫。
+    depends_on: []
+    acceptance:
+      - 官方來源 endpoint 與欄位 mapping 已確認並記錄在 memory-bank 文件
+      - TWSE / TPEx / TAIFEX adapters 可分別單獨執行並回傳 normalized event payload
+      - 事件會寫入 t_relay_events，source 以 market_context: 開頭且 raw_json.stored_only=true
+      - pre_tw_open 分析會讀取最近台股資金流事件，並在 prompt snapshot 中可追溯
+      - 新增非網路 unit tests 覆蓋解析、dedupe key、空資料/錯誤處理
+    notes: |
+      2026-04-22 先列入下一迭代需求，暫不實作。這批資料比國際新聞更直接，
+      可用來判斷外資現貨/期貨是否同向、上櫃是否跟上上市、融資是否追價、
+      借券是否升高，以及選擇權 put/call 結構是否偏防守。
+
+  - id: REQ-010
+    title: "[美國總經] BLS 官方數據標準化寫入 t_relay_events"
+    status: pending
+    trigger: manual
+    priority: high
+    description: |
+      下一迭代補上美國總經官方資料包，優先使用 U.S. Bureau of Labor Statistics
+      Public Data API 取得 JSON time series。資料先以 stored-only event 形式寫入
+      t_relay_events，不直接寫入 t_market_analyses；美股收盤與台股早盤分析再從
+      事件窗彙整後產出 t_market_analyses。
+
+      第一批指標：
+        1. CPI：headline CPI、core CPI。
+        2. PPI：headline PPI、core / final demand 相關序列。
+        3. 就業：非農就業、失業率、勞動參與率。
+        4. 薪資：平均時薪、平均週工時、薪資年增/月增。
+
+      API 設計方向：
+        - endpoint 使用 https://api.bls.gov/publicAPI/v2/timeseries/data/。
+        - 支援 BLS_API_KEY；未設定 key 時保留 no-key / 低頻 fallback，避免配額與限制問題。
+        - series id mapping 應集中設定，實作前需再次對照 BLS catalog / 官方文件。
+        - source 使用 market_context:bls_macro。
+        - raw_json 保留 series_id、period、periodName、year、value、footnotes、release metadata、
+          normalized metrics、stored_only=true。
+        - dedupe key 應包含 source family、series_id、year、period。
+    depends_on: []
+    acceptance:
+      - BLS endpoint、series id mapping、發布頻率與修正註記已記錄在 memory-bank 文件
+      - BLS adapter 可單獨執行並回傳 normalized event payload
+      - 事件會寫入 t_relay_events，source=market_context:bls_macro 且 raw_json.stored_only=true
+      - us_close / pre_tw_open 分析會讀取最近 BLS macro events，並在 prompt snapshot 中可追溯
+      - 新增非網路 unit tests 覆蓋解析、dedupe key、缺 key、空資料、BLS API error message 處理
+    notes: |
+      2026-04-22 先列入下一迭代需求，暫不實作。BLS 是官方總經資料源，
+      對利率預期、通膨再加速、就業強弱、薪資黏性與台股風險偏好判斷有直接價值。
+
+  - id: REQ-011
+    title: "[台股收盤] 收盤事件寫入 t_relay_events 並產出 tw_close 分析"
+    status: pending
+    trigger: schedule
+    priority: high
+    description: |
+      下一迭代新增台股收盤資料包與 tw_close 分析。所有台股收盤相關資料必須先以
+      stored-only event 形式寫入 t_relay_events，不得由來源 collector 直接寫入
+      t_market_analyses。tw_close 分析流程再統合當日 t_relay_events 內的台股市場事件、
+      market_context:* stored-only events、MOPS 重大訊息、國際新聞與 X 事件，問模型後
+      才寫入 t_market_analyses。
+
+      分析重點：
+        1. 加權 / 櫃買指數收盤表現、成交量、強弱類股。
+        2. 法人資金流與期權籌碼是否支持當日行情。
+        3. 融資融券、借券/SBL 是否顯示散戶追價或空方壓力。
+        4. 權值股、半導體、AI 供應鏈、金融與中小型股輪動。
+        5. 對隔日早盤的觀察清單與風險提醒。
+
+      排程設計方向：
+        - 收盤資料包事件 source 使用 market_context:tw_close / market_context:tw_close_flow。
+        - 收盤資料包建議台股交易日 15:20 Asia/Taipei 寫入 t_relay_events。
+        - analysis_slot 使用 tw_close。
+        - tw_close 分析建議台股交易日 15:30 Asia/Taipei 執行，等待收盤資料包事件入庫。
+        - analysis_date 使用台股交易日 YYYY-MM-DD。
+        - raw_json.dimension 使用 daily_tw_close。
+        - push_enabled 預設維持 0；Java 是否推送由 Java repo 另行決定。
+    depends_on: [REQ-009]
+    acceptance:
+      - 台股收盤報告的 slot、排程時間與資料窗口已記錄在 memory-bank 文件
+      - 台股收盤資料包事件會先寫入 t_relay_events，source 以 market_context:tw_close 開頭且 raw_json.stored_only=true
+      - market_analysis 支援 Slot=tw_close，讀取當日 t_relay_events 後才寫入 t_market_analyses
+      - prompt snapshot 會落在 runtime/prompts/market_analysis_tw_close_*.txt
+      - 報告可讀取當日 market_context:twse_flow / tpex_flow / taifex_flow 事件
+      - 無 LINE push / webhook / direct push 邏輯
+      - 新增 unit tests 覆蓋 slot routing、analysis_date、raw_json.dimension、push_enabled 預設值
+    notes: |
+      2026-04-22 先列入下一迭代需求，暫不實作。重要邊界：REQ-009、REQ-010、REQ-011
+      都是先把來源/情境事實寫入 t_relay_events；t_market_analyses 僅保存模型統合事件後
+      產出的分析文字。此報告用來補足早盤前分析之外的收盤復盤，重點是整理當日台股
+      內部資金與類股輪動，作為隔日早盤推薦的基礎資料。

@@ -114,7 +114,7 @@
 - Compare missing tweet timestamps against the latest bridge start/connect time
 3. Let startup backfill replay recent tracked-account tweets
 - Bridge runs one-shot X backfill before attaching the live filtered stream
-- Backfill replays into relay `/events`, so both `t_relay_events` and `t_x_posts` are updated through the normal path
+- Backfill writes through the crawler bridge direct DB sink, so both `t_relay_events` and `t_x_posts` are updated without requiring the event relay API
 4. Verify DB evidence
 - Query `t_relay_events` by `event_id='x-<tweet_id>'`
 - Query `t_x_posts` by `tweet_id`
@@ -122,17 +122,119 @@
 - run bridge through `scripts/run_source_bridge.ps1` so PowerShell preflight resolves DPAPI token into process env before Python starts
 
 ## Workflow 4B: US Index Stored-Only Event Flow
-1. Send normalized relay events
-- Post DJIA / S&P 500 open-close snapshots to relay `/events`
+1. Write normalized stored-only events
+- Let the crawler bridge write DJIA / S&P 500 open-close snapshots directly to MySQL
 2. Attach structured market payload
 - Include trade date, session (`open`/`close`), and per-index quote fields in `market_snapshot`
-3. Persist on enqueue
-- Relay writes the queue row into `t_relay_events` and snapshot rows into `t_market_index_snapshots`
-4. Suppress user push
-- Relay dispatch marks `source=us_index_tracker` as `stored_only_market`
+3. Persist through the bridge DB sink
+- The bridge writes the queue row into `t_relay_events` and snapshot rows into `t_market_index_snapshots`
+4. Suppress user delivery
+- Event storage marks `source=us_index_tracker` as `stored_only_market`
+- Java owns user-facing LINE delivery; Python keeps the data stored for analysis
 5. Verify
-- POST an `/events` payload with `market_snapshot`
+- Confirm the bridge logs `[US_INDEX_OPEN_STORED]` or `[US_INDEX_CLOSE_STORED]`
 - Query both `t_relay_events` and `t_market_index_snapshots` by `event_id`
+
+## Workflow 4C: Twice-daily Market Analysis Storage
+1. Keep source inputs current
+- Ensure RSS, X, and US index tracker are writing to `t_relay_events` / `t_market_index_snapshots`
+- Run `scripts/run_market_context.ps1` before the Taiwan pre-open analysis window so `market_context:*` event facts are fresh
+2. Run the single-shot analysis generator
+- Use `scripts/run_market_analysis.ps1 -Slot us_close` at `05:00`
+- Use `scripts/run_market_analysis.ps1 -Slot pre_tw_open` at `07:30`
+- Treat `t_relay_events` as primary local evidence, not exhaustive truth
+- OpenAI runs request web search by default; if unavailable, the prompt must label missing context instead of fabricating
+3. Persist analysis output
+- Generated text is upserted into `t_market_analyses` by `(analysis_date, analysis_slot)`
+4. Keep Python storage-only
+- `market_analysis` does not push directly or create delivery jobs
+- Java owns user-facing delivery
+5. Verify
+- Check prompt snapshots under `runtime/prompts/`
+- Query `t_market_analyses` for the current `analysis_date`
+- Query `t_relay_events` for recent `source LIKE 'market_context:%'`
+- Confirm `push_enabled=0` and `pushed=0`
+
+## Workflow 4D: Weekly Summary Storage
+1. Schedule for Taiwan pre-open usage
+- Run `weekly_summary` every Sunday `23:00` local time (Java pushes it at Monday `05:10`)
+2. Generate the weekly brief
+- Read the last 7 days from `t_relay_events`
+- Call OpenAI Responses API with weekly summary prompts and web search enabled by default for current-fact verification
+- If local events or web verification are insufficient, explicitly mark the data gap in the stored analysis
+3. Store for downstream delivery
+- Upsert into `t_market_analyses`
+- Java owns user-facing LINE delivery
+4. Mark the row as weekly scope
+- Use `analysis_date=YYYY-Www`
+- Use `analysis_slot=weekly_tw_preopen`
+- Put `dimension=weekly` in `raw_json`
+5. Verify
+- Check scheduled task next run
+- Query `t_market_analyses` by `analysis_date='YYYY-Www'`
+
+## Workflow 4E: SEC Tracked Filings Flow
+1. Define tracked universe
+- Set `SEC_TRACKED_TICKERS` to the companies you care about
+2. Respect SEC access rules
+- Use declared `SEC_USER_AGENT`
+- Keep polling modest; current bridge cadence is already conservative
+3. Resolve ticker to CIK
+- Fetch official SEC ticker mapping from `company_tickers.json`
+4. Pull recent filings
+- Query `data.sec.gov/submissions/CIK##########.json`
+- Filter to `SEC_ALLOWED_FORMS`
+5. Write normalized events
+- Build filing index URL under `sec.gov/Archives/edgar/data/...`
+- Let the crawler bridge direct DB sink write the event
+6. Verify
+- Run `python -m news_collector.main fetch --source sec --limit 10 --pretty`
+- Confirm `source=sec:<TICKER>` rows enter `t_relay_events`
+
+## Workflow 4F: TWSE / MOPS Major Announcements Flow
+1. Define tracked universe
+- Set `TWSE_MOPS_TRACKED_CODES` to the listed companies you care about
+2. Pull official announcement feed
+- Query TWSE openapi dataset `t187ap04_L` (`上市公司每日重大訊息`)
+3. Filter and normalize
+- Keep only tracked company codes
+- Convert ROC date/time into timezone-aware timestamps
+4. Write normalized events
+- Let the crawler bridge direct DB sink write rows with `source=twse_mops:<CODE>`
+5. Verify
+- Run `python -m news_collector.main fetch --source twse --limit 10 --pretty`
+- Confirm `source=twse_mops:<CODE>` rows enter `t_relay_events`
+- If the default tracked list has no same-day disclosures, temporarily override `TWSE_MOPS_TRACKED_CODES` with codes that appear in the current official feed for a controlled smoke test
+
+## Workflow 4G: MySQL Retention Cleanup
+1. Keep the retention window explicit
+- Default `RELAY_RETENTION_KEEP_DAYS=7`
+- Keep `RELAY_RETENTION_ENABLED=true` unless investigating a cleanup issue
+2. Use the shared cleanup path
+- Relay dispatch runs cleanup once per local day
+- `scripts/run_retention_cleanup.ps1` runs the same cleanup on demand
+3. Register a fixed daily window
+- Use `scripts/register_retention_cleanup_task.ps1 -At "00:10" -Force`
+4. Verify
+- Query `t_relay_events` and `t_x_posts` for rows older than 7 days before and after cleanup
+- Confirm task `NewsCollector-RetentionCleanup` has a valid `NextRunTime`
+
+## Workflow 4H: Pre-open Market Context Pack
+1. Collect market/macro context
+- Run `scripts/run_market_context.ps1 -EnvFile .env`
+2. Source families
+- Yahoo chart snapshots: NASDAQ Composite, NASDAQ 100, SOX, VIX, DXY, WTI, Gold, and key semiconductor ADR/stocks
+- U.S. Treasury official daily yield curve XML: 2Y, 10Y, 30Y, and 10Y-2Y spread
+- TWSE official OpenAPI: index groups, tracked stocks, and margin balances
+3. Persist as event-only facts
+- Insert one stored-only event per context point into `t_relay_events`
+- Add one `market_context:collector` summary event for point/failure counts
+- Keep `raw_json.stored_only=true`, `raw_json.dimension=market_context`, and `raw_json.event_type` for traceability
+4. Schedule before the AI brief
+- Register through `scripts/register_market_analysis_tasks.ps1`; default is `07:20`, before `pre_tw_open` at `07:30`
+5. Verify
+- Query `t_relay_events` for today's `source LIKE 'market_context:%'`
+- Confirm rows are marked `stored_only_context` / stored-only and inspect `raw_json.failures` on the collector event
 
 ## Workflow 5: Build a New Skill (Enterprise)
 1. Create skill folder from templates:

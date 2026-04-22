@@ -1,4 +1,6 @@
-# LINE Weekly Brief Template
+# Mobile Chat Weekly Brief Template
+
+Format-only asset. Python stores generated text in `t_market_analyses`; downstream Java owns any LINE delivery or webhook behavior.
 
 本週主線：
 {用 1–2 句講清楚本週最重要的全球局勢與市場主因。}

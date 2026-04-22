@@ -135,3 +135,42 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `python -m unittest discover -s tests -p "test_*.py" -v` passed (16 tests)
   - `python -m news_collector.relay_bridge --help` shows X stream args
 - Status: active
+
+## LESSON-20260421-01
+- Date: 2026-04-21
+- Trigger (User correction): User clarified that LINE service has migrated to the Java system and Python is now purely the data collection and analysis service.
+- What was wrong: I initially framed the local Python relay as a LINE service and moved toward webhook/ngrok setup before separating the current Python-vs-Java responsibilities.
+- Root cause: Legacy script/module names still include `event_relay`, and I mirrored those names in user-facing language instead of describing the current operational boundary.
+- New rule (always/never): Always refer to this Python repository as the data collection and analysis service; Java owns LINE delivery/webhook behavior.
+- Prevention checklist (before final response):
+  - [ ] Distinguish Python data ingestion/analysis from Java-owned LINE delivery/webhook behavior
+  - [ ] Avoid starting ngrok, LINE webhook, or LINE push paths from this repo unless explicitly requested as legacy compatibility work
+  - [ ] When using legacy-named scripts/modules, explain the current runtime role rather than repeating outdated service names
+- Repo updates made:
+  - `tasks/lessons.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+- Verification evidence:
+  - Started `python -m event_relay.main --env-file .env --log-level INFO`
+  - Verified `http://127.0.0.1:18090/healthz` returned `{"ok": true}`
+- Status: active
+
+## LESSON-20260422-01
+- Date: 2026-04-22
+- Trigger (User correction): User clarified that `t_market_analyses` should be written only after aggregating same-day `t_relay_events` and asking the model; REQ-009, REQ-010, and REQ-011 source/context events should all write to `t_relay_events`.
+- What was wrong: I described REQ-011 too much like a direct analysis write and did not emphasize that its source/context facts must first become relay events.
+- Root cause: I collapsed the source/event layer and the model-analysis layer when discussing the task dependency graph.
+- New rule (always/never): Always keep source/context ingestion and model analysis as separate layers: source collectors write `t_relay_events`; analysis jobs read event windows and write `t_market_analyses`.
+- Prevention checklist (before final response):
+  - [ ] Confirm whether the task is collecting facts/events or generating analysis text
+  - [ ] If it is collecting facts/events, ensure the destination is `t_relay_events`
+  - [ ] If it writes `t_market_analyses`, confirm it is a model analysis job that reads `t_relay_events`
+- Repo updates made:
+  - `requirements.yml`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `git diff --check -- requirements.yml memory-bank/PROJECT_DOCUMENTATION.md tasks/todo.md tasks/lessons.md` passed with CRLF warnings only
+  - `rg` confirmed REQ-009, REQ-010, and REQ-011 describe source/context events writing to `t_relay_events`
+- Status: active

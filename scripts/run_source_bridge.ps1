@@ -1,6 +1,8 @@
-# Start multi-source bridge and forward events to relay.
+# Start multi-source bridge and write normalized events to MySQL.
 param(
   [string]$RelayUrl = "http://127.0.0.1:18090/events",
+  [ValidateSet("direct-db", "relay")]
+  [string]$EventSink = "direct-db",
   [int]$PollIntervalSeconds = 300,
   [int]$Limit = 5,
   [int]$XStreamTimeoutSeconds = 90,
@@ -28,8 +30,9 @@ function Resolve-PythonExe {
   }
 
   $candidates = @(
-    "C:\Users\Zack Ou\AppData\Local\Programs\Python\Python313\python.exe",
     "C:\Users\Zack Ou\AppData\Local\Programs\Python\Python312\python.exe",
+    "C:\Users\Zack Ou\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\python.exe",
+    "C:\Users\Zack Ou\AppData\Local\Programs\Python\Python313\python.exe",
     "C:\Users\Zack Ou\AppData\Local\Programs\Python\Python311\python.exe"
   )
 
@@ -135,16 +138,18 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedXToken)) {
   $env:X_BEARER_TOKEN = $resolvedXToken
 }
 
-Write-Host "Starting source bridge (X stream + RSS polling + US index stored-only events -> LINE relay)..." -ForegroundColor Cyan
+Write-Host "Starting source bridge (X stream + RSS polling + US index stored-only events -> $EventSink)..." -ForegroundColor Cyan
 Write-Host "Python executable: $ResolvedPythonExe" -ForegroundColor DarkGray
 Write-Host "Env file: $ResolvedEnvFile" -ForegroundColor DarkGray
 Write-Host ("X token preflight: " + $(if ([string]::IsNullOrWhiteSpace($resolvedXToken)) { "missing" } else { "resolved" })) -ForegroundColor DarkGray
+Write-Host "Event sink: $EventSink" -ForegroundColor DarkGray
 Write-Host "Output log: $OutLogFile" -ForegroundColor DarkGray
 Write-Host "Error log: $ErrLogFile" -ForegroundColor DarkGray
 
 $cmdArgs = @(
   "-m", "news_collector.relay_bridge",
   "--relay-url", $RelayUrl,
+  "--event-sink", $EventSink,
   "--poll-interval-seconds", "$PollIntervalSeconds",
   "--limit", "$Limit",
   "--env-file", $ResolvedEnvFile,

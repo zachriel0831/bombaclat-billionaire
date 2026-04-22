@@ -1,4 +1,4 @@
-# Start LINE relay service.
+# Start the legacy-named event relay service.
 param(
   [string]$EnvFile = ".env",
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]
@@ -11,5 +11,5 @@ Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
 
-Write-Host "Starting LINE event relay..." -ForegroundColor Cyan
-& python -m line_event_relay.main --env-file $EnvFile --log-level $LogLevel
+Write-Host "Starting event relay..." -ForegroundColor Cyan
+& python -m event_relay.main --env-file $EnvFile --log-level $LogLevel
