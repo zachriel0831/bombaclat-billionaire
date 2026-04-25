@@ -153,6 +153,7 @@ def _should_run_now(config: WeeklySummaryConfig, now_local: datetime) -> bool:
         return True
     if now_local.weekday() != config.weekday:
         return False
+    # weekly summary 用時間窗而不是精準分鐘觸發，讓 Task Scheduler 晚幾分鐘啟動也能補跑。
     target = now_local.replace(hour=config.hour, minute=config.minute, second=0, microsecond=0)
     delta_minutes = abs((now_local - target).total_seconds()) / 60.0
     return delta_minutes <= float(config.window_minutes)
@@ -303,6 +304,8 @@ def _call_openai_response(api_base: str, api_key: str, model: str, system_prompt
     try:
         body = _send_openai_response_request(url=url, api_key=api_key, payload=payload)
     except RuntimeError as exc:
+        # 某些帳號/模型不支援 web_search tool；遇到這類錯誤時會自動退成純文字 call，
+        # 目標是保住摘要產出，而不是因工具不可用整次失敗。
         if payload.get("tools") and _should_retry_openai_without_web_search(str(exc)):
             logger.warning("OpenAI web_search tool unavailable; retrying response without web search")
             fallback_payload = dict(payload)
@@ -431,6 +434,8 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
     run_key = _week_key(now_local)
     state_file = Path(config.state_file)
 
+    # 每週排程有兩道保護：先檢查是否在允許時間窗，再檢查這個 iso week 是否已寫過。
+    # 這樣手動重啟服務或排程重試時，不會同一週重複寫多筆。
     if not _should_run_now(config, now_local):
         logger.info(
             "Weekly summary skipped by schedule now=%s target_weekday=%d target_time=%02d:%02d",
@@ -477,6 +482,8 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
         }
         for event in events
     ]
+    # weekly_summary 直接帶最近 N 天事件摘要，不再重放完整 raw_json，
+    # 目的是保留主線資訊，同時控制 prompt 體積。
     week_range = f"{config.lookback_days} days ending {now_local.strftime('%Y-%m-%d %H:%M %Z')}"
     user_prompt = reusable_prompt.format(week_range=week_range, events_json=json.dumps(events_payload, ensure_ascii=False))
 

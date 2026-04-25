@@ -347,6 +347,8 @@ def _score_importance(
     summary: str,
     category: str,
 ) -> float:
+    # importance 只做便宜且可預期的 heuristic，故意不要太聰明；
+    # 真正的因果與權重交給 stage pipeline，這裡只提供穩定先驗。
     score = 0.3
     text = f"{title}\n{summary}"
     lower = text.lower()
@@ -412,6 +414,8 @@ def annotate(
     """Rule-based annotation. Deterministic and cheap to run in-process."""
     title_str = title or ""
     summary_str = summary or ""
+    # market_context 類事件很多重要訊號藏在 raw_json，不在 title/summary；
+    # 先抽一小段可讀 hint 併進規則判斷，避免 context 類資料全部被打成 other。
     extra_text = _extract_market_context_hint(raw_json)
     text = "\n".join(filter(None, [title_str, summary_str, extra_text]))
 

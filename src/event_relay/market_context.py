@@ -199,6 +199,8 @@ def _parse_treasury_yield_curve_xml(text: str) -> list[MarketContextPoint]:
         "d": "http://schemas.microsoft.com/ado/2007/08/dataservices",
     }
     latest: dict[str, str] | None = None
+    # Treasury XML 會帶整年的多筆 entry，這裡只挑日期最新的一筆，
+    # 再拆成 2Y / 10Y / 30Y / 10Y-2Y spread 四種 context point。
     for entry in root.findall("atom:entry", ns):
         props = entry.find("atom:content/m:properties", ns)
         if props is None:
@@ -362,6 +364,7 @@ def fetch_twse_points(timeout_seconds: int, tracked_codes: list[str]) -> tuple[l
     failures: list[SourceFailure] = []
     tracked = {code.strip() for code in tracked_codes if code.strip()}
 
+    # 指數資料固定會抓；個股收盤與融資券則只抓追蹤名單，避免把整包 TWSE 明細都灌進 context。
     try:
         payload = http_get_json("https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX", timeout=timeout_seconds)
         for row in payload.get("data") or []:
@@ -532,6 +535,8 @@ def build_market_context_events(
     now_local: datetime,
 ) -> list[RelayEvent]:
     generated_at = now_local.isoformat()
+    # collector summary event 是整包 context 的索引入口：
+    # 單點資料看細節，summary event 看本輪抓了多少點、哪幾個來源失敗。
     events = [_point_to_event(point, config, generated_at) for point in points]
     events.append(
         RelayEvent(

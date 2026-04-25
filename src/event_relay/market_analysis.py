@@ -254,6 +254,8 @@ def _compact_event_raw_json(source: str, value: str | None) -> Any:
     if not isinstance(parsed, dict):
         return None
 
+    # market_context 原始 payload 可能很大，這裡只保留 stage 推理真正需要的骨幹欄位，
+    # 避免每次分析都把整包官方資料重新塞回 prompt。
     compact: dict[str, Any] = {}
     for key in (
         "event_type",
@@ -320,6 +322,8 @@ def _build_events_payload(store: MySqlEventStore, recent_events: list) -> list[d
     for event in recent_events:
         annotation = annotation_index.get(int(event.row_id))
         if annotation is None:
+            # annotation 表是加速層，不是硬依賴；缺資料時即時用 rule-based 補，
+            # 讓分析流程不會因 enrichment worker 沒跑而整條失效。
             annotation = _inline_annotation(event)
             inline_count += 1
         else:
@@ -395,6 +399,8 @@ def _run_multi_stage_pipeline(
         len(market_payload),
     )
 
+    # 多階段流程採「任何 stage 失敗就整體回退」策略，
+    # 但每段 telemetry 仍保留下來，方便日後知道到底是在哪一層斷掉。
     stage1 = stage1_digest.run(
         context=ctx,
         events_payload=events_payload,
@@ -600,6 +606,8 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
     used_multi_stage = summary_text is not None
 
     if summary_text is None:
+        # legacy path 是最後保底：就算多階段 schema / stage 其中一段爆掉，
+        # 仍嘗試用舊式單次 prompt 產出可閱讀報告，避免排程整天空白。
         system_prompt, user_prompt = _build_prompts(
             config=config,
             slot=slot,
@@ -642,6 +650,8 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         pushed=False,
         raw_json=json.dumps(
             {
+                # raw_json 保留的是「這次分析如何產生」的審計資訊：
+                # 用了哪些上下文來源、走哪種 pipeline、是否有 structured 結果。
                 "dimension": raw_dimension,
                 "slot": slot,
                 "generated_at": now_local.isoformat(),

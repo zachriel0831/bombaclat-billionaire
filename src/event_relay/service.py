@@ -124,6 +124,8 @@ class MySqlEventStore:
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
 
+        # 事件表是整條資料鏈的主表；若來源是 X 或帶市場快照，會在同一個 transaction
+        # 內順手同步到附屬表，避免主表/副表只寫成功一半。
         event_hash = self._event_hash_for_event(event)
         sql = (
             f"INSERT INTO {self._event_table} "
@@ -362,6 +364,8 @@ class MySqlEventStore:
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
 
+        # 分析結果以 (analysis_date, analysis_slot) 為唯一鍵覆寫，讓排程重跑時會更新同一筆，
+        # 而不是每天堆出多份同 slot 報告。
         sql = (
             f"INSERT INTO {self._analysis_table} "
             "(analysis_date, analysis_slot, scheduled_time_local, model, prompt_version, summary_text, "
@@ -543,6 +547,8 @@ class MySqlEventStore:
 
         safe_days = max(int(keep_days), 1)
         threshold_date = (datetime.now().astimezone().date() - timedelta(days=safe_days)).isoformat()
+        # t_relay_events 與 t_x_posts 必須一起清，否則事件被刪掉但原始貼文還留著，
+        # 後續查 gap 或做分析時會出現時間窗不一致。
         delete_events_sql = (
             f"DELETE FROM {self._event_table} "
             "WHERE DATE(created_at) <= %s"
@@ -837,6 +843,8 @@ class MySqlEventStore:
         if not isinstance(snapshot, dict):
             return 0
 
+        # 市場快照不是獨立 API 寫入，而是夾在 relay event.raw 裡一起進來；
+        # 這裡把事件層的 payload 再拆成 index-level rows，方便分析直接查結構化行情。
         trade_date = str(snapshot.get("trade_date") or "").strip()
         market_session = str(snapshot.get("session") or "").strip().lower()
         indexes = snapshot.get("indexes")
@@ -882,6 +890,8 @@ class MySqlEventStore:
             if not isinstance(entry, dict):
                 continue
 
+            # open session 記錄當時開盤價，close session 記錄收盤/最新價；
+            # recorded_price 會依 session 選擇對應欄位，讓下游少做判斷。
             symbol = str(entry.get("symbol") or "").strip()
             label = str(entry.get("label") or symbol).strip() or symbol
             if not symbol:
@@ -926,6 +936,8 @@ class MySqlEventStore:
     @staticmethod
     def _event_hash_for_event(event: RelayEvent) -> str:
         source = (event.source or "").strip().lower()
+        # market_context 類事件常常 url/title 長得很像；若仍只靠 title+url 去重，
+        # 同一天不同資料點可能互相吃掉，所以改用 event_id 做穩定去重。
         if source.startswith("market_context:") and event.event_id:
             return hashlib.sha1(f"{source}::{event.event_id}".encode("utf-8")).hexdigest()
         return MySqlEventStore._event_hash(event.title, event.url)
@@ -994,6 +1006,8 @@ class RelayProcessor:
         self._start_maintenance_scheduler()
 
     def process_payload(self, payload: Any) -> dict[str, Any]:
+        # /events 相容入口允許單筆、批次、或 {events:[...]} 三種格式；
+        # 這裡統一轉成 RelayEvent 後再做寫庫，讓上游 crawler 不必知道底層細節。
         events = self._extract_events(payload)
         queued = 0
         logged_only = 0
@@ -1165,6 +1179,7 @@ class RelayProcessor:
             return
 
         now_local = datetime.now().astimezone()
+        # 避開 00:00 剛過的幾分鐘，減少和外部固定排程、跨日寫入同時搶表的機率。
         if now_local.hour == 0 and now_local.minute < 3:
             return
 
@@ -1203,6 +1218,7 @@ class RelayProcessor:
             log_only = bool(obj.get("test_only")) or source.lower().startswith("manual_test")
             if not title or not url:
                 continue
+            # 入口層先做基本時效過濾，避免過舊事件進到去重與寫庫流程後才被發現。
             if not self._allow_event_date(published_at):
                 logger.debug(
                     "Drop stale event id=%s source=%s published_at=%s",

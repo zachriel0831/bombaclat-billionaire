@@ -62,6 +62,8 @@ def call_llm_json(
     prompt = user_prompt
     last_error: str | None = None
 
+    # JSON mode 先讓模型生成，再做本地 schema 驗證。
+    # 驗證失敗時不是立刻放棄，而是把 validator error 回灌給模型重試一次。
     for attempt in range(max_retries + 1):
         if provider_key == "anthropic":
             raw_text = _call_anthropic_tool(
@@ -138,6 +140,8 @@ def _post_json(url: str, headers: dict[str, str], payload: dict[str, Any], provi
             return resp.read().decode("utf-8", errors="replace")
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+        # 400/403/404 常是「這模型/帳號不接受這種 json-mode 參數」，
+        # 往上拋專門例外，讓 orchestrator 有機會改走 fallback，而不是誤判成暫時性網路錯誤。
         if exc.code in (400, 403, 404):
             raise JsonModeUnavailable(
                 f"{provider_label} rejected json-mode payload: status={exc.code} body={body[:400]}"
@@ -224,6 +228,8 @@ def _call_anthropic_tool(
     body = _post_json(url=url, headers=headers, payload=payload, provider_label="Anthropic")
     parsed = json.loads(body)
 
+    # Anthropic 理想情況會走 tool_use；若模型回成一般文字，仍嘗試把 text 當 JSON 解析，
+    # 讓上層統一走同一套 schema 驗證與 retry。
     for block in parsed.get("content") or []:
         if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == schema_name:
             tool_input = block.get("input")

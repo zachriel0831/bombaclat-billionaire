@@ -259,6 +259,7 @@ def _event_to_relay_event(event: dict[str, Any]) -> RelayEvent | None:
     published_at = str(event.get("published_at") or "").strip() or None
     if not title or not url:
         return None
+    # bridge 入口先做一次時間窗過濾，避免 stale event 進 DB 後再靠 downstream 清掉。
     if not _allow_event_date(event):
         return None
 
@@ -336,6 +337,7 @@ def _build_event_sink(config: BridgeConfig) -> DirectDbEventSink | None:
 def _poll_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, stop_event: threading.Event) -> None:
     while not stop_event.is_set():
         settings = load_settings(config.env_file)
+        # 依當前 .env 即時決定要不要帶上 SEC / TWSE，讓 operator 調設定後不用重改程式。
         source_names = ["rss"]
         if settings.sec_enabled and settings.sec_tracked_tickers:
             source_names.append("sec")
@@ -362,6 +364,8 @@ def _poll_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, stop_
                         continue
                     event = item.to_dict()
 
+                    # poll sources 會先做日期/主題兩層過濾，再決定是否真的寫庫；
+                    # 這樣 RSS 雜訊不會進到 relay_event 去重與分析上下文。
                     if not _allow_event_date(event):
                         dropped_by_date += 1
                         continue
@@ -410,6 +414,7 @@ def _x_stream_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, s
             logger.warning("X stream bridge skipped: X_ACCOUNTS is empty")
             return
 
+        # 先補洞、再接 live stream；這樣 bridge 掛掉再啟動時，比較不會漏掉重啟空窗期貼文。
         _run_x_backfill(config.relay_url, settings, token, event_sink=event_sink)
 
         streamer = XFilteredStreamer(
@@ -431,6 +436,8 @@ def _x_stream_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, s
                 return
             event = item.to_dict()
 
+            # stream 也沿用和 polling 一樣的日期/主題過濾，避免 live 路徑與 poll 路徑
+            # 在資料品質上出現兩套規則。
             if not _allow_event_date(event):
                 return
             if not _allow_event_topic(event):
@@ -483,7 +490,7 @@ def _run_x_backfill(
     dropped_by_date = 0
     dropped_by_topic = 0
 
-    # Replay oldest-first so relay queue preserves a more natural timeline on recovery.
+    # 補洞時刻意用 oldest-first 回放，讓恢復期間寫入 DB 的順序更接近真實發文順序。
     replay_items = sorted(items, key=lambda item: sort_timestamp(item.published_at))
     for item in replay_items:
         event = item.to_dict()
@@ -576,7 +583,7 @@ def _us_index_direct_loop(config: BridgeConfig, event_sink: DirectDbEventSink | 
                 start_epoch = min(q.regular_start_epoch for q in quotes.values())
                 end_epoch = max(q.regular_end_epoch for q in quotes.values())
 
-                # Keep the open/close notices within the same trade-day window after session start/end.
+                # 只在開盤/收盤後的有限時間窗內各送一次，避免 bridge 長駐時同一交易日重複寫很多筆。
                 open_window = 0 <= now_epoch - start_epoch <= 8 * 3600
                 close_window = 0 <= now_epoch - end_epoch <= 8 * 3600
 

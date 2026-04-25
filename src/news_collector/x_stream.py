@@ -65,6 +65,8 @@ class XFilteredStreamer:
             self._sync_rules(query)
 
             backoff_seconds = 1.0
+            # stream 長連線一定會遇到網路斷線 / timeout / 429；
+            # 這裡用指數退避重連，並在 finally 清掉自己建立的規則。
             while not stop_event.is_set():
                 try:
                     self._consume_stream(on_item=on_item, stop_event=stop_event)
@@ -125,6 +127,8 @@ class XFilteredStreamer:
         except HTTPError as exc:
             body_text = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
             if int(exc.code) == 429:
+                # X 最麻煩的是 TooManyConnections；若可自癒就先清掉舊連線再重試，
+                # 不行才依設定停流或交給外層 backoff。
                 healed = self._auto_heal_too_many_connections(body_text)
                 if healed:
                     raise RuntimeError("X stream auto-healed TooManyConnections, retrying") from exc
@@ -216,6 +220,7 @@ class XFilteredStreamer:
 
         payload = {"delete": {"ids": owned_ids}}
         try:
+            # 只刪本服務 tag 過的規則，避免把同帳號下其他工具的 stream rule 一起清掉。
             self._request_json(self.rules_endpoint, method="POST", payload=payload)
             logger.info("X stream cleaned old rules count=%d", len(owned_ids))
         except Exception as exc:
@@ -307,6 +312,8 @@ class XFilteredStreamer:
         if item_id in self._seen_set:
             return False
 
+        # stream reconnect 時常會再收到剛才那幾筆，這裡用小型 in-memory LRU 先擋一次，
+        # 減少 bridge 在短時間內重複送同 tweet。
         self._seen_ids.append(item_id)
         self._seen_set.add(item_id)
         while len(self._seen_ids) > self._seen_limit:

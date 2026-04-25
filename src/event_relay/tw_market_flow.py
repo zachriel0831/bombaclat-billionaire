@@ -367,6 +367,8 @@ def _extract_rows(payload: Any) -> list[dict[str, Any]]:
         if isinstance(row, dict):
             rows.append(dict(row))
         elif fields and isinstance(row, (list, tuple)):
+            # 有些官方 API 會回 fields + data[list]，這裡統一轉成 dict，
+            # 後面的 trade_date / metrics 邏輯才能用同一套欄位存取。
             rows.append({str(fields[index]): row[index] for index in range(min(len(fields), len(row)))})
     return rows
 
@@ -435,6 +437,8 @@ def _resolve_trade_date(
     payload: Any | None = None,
 ) -> str:
     dates: list[str] = []
+    # 各資料集日期欄位格式不一致，先從 row-level 指定欄位抓；
+    # 若抓不到，再退回 payload 頂層日期，最後才用當地今天保底。
     for row in rows:
         for field in dataset.date_fields:
             parsed = _normalize_trade_date(_row_value(row, field))
@@ -457,6 +461,8 @@ def _display_number(value: float) -> int | float:
 def _normalize_metrics(rows: list[dict[str, Any]], metric_fields: tuple[str, ...]) -> dict[str, Any]:
     totals: dict[str, int | float] = {}
     counts: dict[str, int] = {}
+    # 這裡不試圖做金融語意推理，只做 dataset-level totals/counts，
+    # 讓後續分析能先快速看到這包官方資料大概在講什麼。
     for field in metric_fields:
         total = 0.0
         count = 0
@@ -484,6 +490,8 @@ def _build_snapshot(
 ) -> DatasetSnapshot:
     rows = _extract_rows(payload)
     generated_at = now_local.astimezone(TAIPEI_TZ).isoformat()
+    # snapshot 是 event 化之前的中繼層：保留原始 rows + 壓縮過的 totals，
+    # 後面可以同時兼顧審計追溯與 prompt 瘦身。
     trade_date = _resolve_trade_date(rows, dataset, now_local, payload)
     metrics = _normalize_metrics(rows, dataset.metric_fields)
     metrics["trade_date"] = trade_date
@@ -516,6 +524,7 @@ def collect_tw_market_flow(
             continue
         official_url = _dataset_url(dataset, now_local)
         try:
+            # 每個 dataset 單獨抓、單獨記錄失敗，避免單一官方端點掛掉就讓整批資料中斷。
             payload = http_get_json(official_url, timeout=config.timeout_seconds)
             snapshot = _build_snapshot(
                 dataset=dataset,

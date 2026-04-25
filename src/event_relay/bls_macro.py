@@ -243,6 +243,8 @@ def parse_bls_response(payload: dict[str, Any], specs: dict[str, BlsSeriesSpec] 
     _raise_for_bls_error(payload)
     spec_map = specs or BLS_SERIES_BY_ID
     points: list[BlsMacroPoint] = []
+    # BLS 一次回多條 series；每條先挑最新月資料，再回推上月與去年同月，
+    # 把分析最常用的 MoM / YoY 指標先算好。
     for series in _extract_series(payload):
         series_id = str(series.get("seriesID") or series.get("series_id") or "").strip().upper()
         if not series_id:
@@ -328,6 +330,8 @@ def select_latest_observation(observations: list[BlsObservation]) -> BlsObservat
     valid = [obs for obs in observations if _period_sort_key(obs) is not None]
     if not valid:
         return None
+    # BLS 有時會標 latest=true，有時沒有；先優先吃 latest 標記，
+    # 沒標記時再退回按年月排序最大的那筆。
     flagged = [obs for obs in valid if obs.latest]
     candidates = flagged or valid
     return max(candidates, key=lambda obs: _period_sort_key(obs) or (0, 0))
@@ -362,6 +366,8 @@ def _normalized_metrics(
     year_ago: BlsObservation | None,
     spec: BlsSeriesSpec,
 ) -> dict[str, Any]:
+    # 這裡把 period / year-over-year 指標預先算成結構化欄位，
+    # 後面 market_analysis 就不必再用 prompt 重新做數學。
     value = latest.value_float
     previous_value = previous.value_float if previous else None
     year_ago_value = year_ago.value_float if year_ago else None

@@ -3,17 +3,21 @@
 Use this file for non-trivial tasks (3+ steps or architecture decisions).
 
 ## Current Task
-- Task: Audit token-heavy workflow/skill paths
+- Task: Add Traditional Chinese comments to complex code paths
 - Requested by: User
 - Start date: 2026-04-25
-- Scope: inspect the current LLM workflows and skill assets, identify the most token-expensive prompt paths, and note whether token usage is already recorded anywhere.
+- Scope: scan the current repo, identify complex logic that is hard to read or easy to misinterpret later, and add concise Traditional Chinese comments without changing behavior.
 
 ## Plan (checkable)
-- [x] Trace which workflows actually call the model.
-- [x] Inspect the prompt/skill assets used by weekly summary and market analysis.
-- [x] Identify the largest fixed and dynamic prompt components and whether usage is stored.
+- [x] Scan core source files and pick the highest-complexity logic paths worth annotating.
+- [x] Add concise Traditional Chinese comments to those complex logic sections only.
+- [x] Run formatting / compile verification to confirm comments did not break runtime.
 
 ## Progress Notes
+- 2026-04-25 - user requested scanning the code package and adding Chinese comments to complex logic for future readability.
+- 2026-04-25 - this pass will focus on core runtime paths rather than noisy line-by-line comments: event store, relay bridge, market analysis pipeline, official source normalization, and X stream recovery logic.
+- 2026-04-25 - added Traditional Chinese comments to the most complex runtime paths in `event_relay/service.py`, `market_analysis.py`, `weekly_summary.py`, `market_context.py`, `tw_market_flow.py`, `bls_macro.py`, `event_enrichment.py`, `analysis_stages/llm_json.py`, `news_collector/relay_bridge.py`, and `news_collector/x_stream.py`.
+- 2026-04-25 - verification passed: `.venv\\Scripts\\python.exe -m compileall src` completed successfully, and `git diff --check -- src tasks/todo.md` reported only existing CRLF warnings.
 - 2026-04-25 - user asked to inspect workflows and skills for unusually token-heavy areas.
 - 2026-04-25 - traced the active LLM paths to weekly_summary and market_analysis (multi-stage).
 - 2026-04-25 - confirmed the fixed heavy asset is `skills/macro-weekly-summary-skill/SKILLS.md` (~15 KB) while `skills/line-brief-format-skill/line-weekly-brief.md` is small (~574 B).
