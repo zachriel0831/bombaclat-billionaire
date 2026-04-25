@@ -22,14 +22,14 @@ class OfficialRssSource(NewsSource):
 
     def fetch(self, limit: int = 20) -> list[NewsItem]:
         items: list[NewsItem] = []
+        per_feed_limit = 1 if self.first_per_feed else max(int(limit), 1)
         for url in self.feed_urls:
             try:
                 # 單一 feed 的請求與解析結果都會寫日誌，方便查來源是否失效。
                 logger.info("RSS request feed=%s", url)
                 xml_text = http_get_text(url, timeout=self.timeout_seconds)
                 parsed = self._parse_feed(xml_text, url)
-                if self.first_per_feed:
-                    parsed = parsed[:1]
+                parsed = parsed[:per_feed_limit]
                 logger.info("RSS parsed feed=%s items=%d", url, len(parsed))
                 items.extend(parsed)
             except Exception as exc:  # pragma: no cover - network path
@@ -49,7 +49,7 @@ class OfficialRssSource(NewsSource):
 
         deduped = self._dedupe(items)
         deduped.sort(key=lambda x: sort_timestamp(x.published_at), reverse=True)
-        return deduped[:limit]
+        return deduped
 
     def _parse_feed(self, xml_text: str, feed_url: str) -> list[NewsItem]:
         root = ET.fromstring(xml_text)

@@ -3,18 +3,51 @@
 Use this file for non-trivial tasks (3+ steps or architecture decisions).
 
 ## Current Task
-- Task: Correct REQ-009/010/011 event-vs-analysis boundary
+- Task: Reclassify REQ-018+ by module in requirements.yml
 - Requested by: User
-- Start date: 2026-04-22
-- Scope: confirm that source/context facts for REQ-009, REQ-010, and REQ-011 all write to `t_relay_events` first, and that `t_market_analyses` is only written by model analysis jobs after aggregating event windows.
+- Start date: 2026-04-25
+- Scope: reorganize the new auto-trading REQs into explicit module groups, add module classification above and inside each requirement, and keep the Python/Java boundary clear.
 
 ## Plan (checkable)
-- [x] Confirm existing project docs define `t_relay_events` as event/fact storage and `t_market_analyses` as generated analysis output.
-- [x] Update `requirements.yml` so REQ-011 explicitly uses same-day `t_relay_events` as the source for `tw_close` analysis.
-- [x] Add a correction lesson to prevent confusing source/context event writes with model analysis writes.
-- [x] Run formatting checks and record verification evidence.
+- [x] Reconfirm the intended module boundaries for REQ-018+.
+- [x] Reorganize REQ-018+ under module comment headers and add a `module` field to each REQ.
+- [x] Verify the reorganized requirements file for formatting/integrity.
 
 ## Progress Notes
+- 2026-04-25 - user asked to reclassify REQ-018 onward with module grouping above the requirements and place each REQ into its proper module.
+- 2026-04-25 - planned module split: architecture foundation, data ingestion, analysis engine, Java delivery, Taiwan watchlist monitoring, decision engine, order execution, and operations/evaluation.
+- 2026-04-25 - updated requirements so REQ-018..029 now sit under explicit module headers and each REQ includes a stable `module` field for future filtering and automation.
+- 2026-04-25 - verification passed via `rg` scan over all module headers/fields and `git diff --check`; only existing CRLF warnings remain.
+- 2026-04-25 - user requested turning the newly discussed auto-trading project into follow-on REQs in `requirements.yml`.
+- 2026-04-25 - rechecked current repo boundary from README / memory-bank: Python owns data collection, event storage, and AI analysis; Java owns LINE webhook, group/user management, and delivery.
+- 2026-04-25 - preparing a new requirement block after REQ-017 that covers market data expansion, trading-oriented analysis output, Java push management, Taiwan stock watchlist monitoring, decision/risk layers, and broker order execution.
+- 2026-04-25 - appended REQ-018 through REQ-029, covering system boundary, market quote data, news impact annotation, key-person monitoring, trading-oriented analysis output, Java delivery management, Taiwan watchlist monitoring, strategy KB, decision/risk gate, order middleware, broker integration, and replay/observability.
+- 2026-04-25 - integrity check passed via `rg` location scan for REQ-018..029 and `git diff --check`; `.venv` lacked `PyYAML`, so no YAML parser verification was added to the environment for this doc-only change.
+- 2026-04-25 - user pointed out REQ-008 should already be executed and asked for REQ-009 completion confirmation with direct implementation only if a real gap remained.
+- 2026-04-25 - REQ-008 verification confirmed the Python repo no longer contains active LINE webhook/push paths; scheduler scan showed only source/context/analysis/retention tasks; full unittest discovery passed with 140 tests.
+- 2026-04-25 - REQ-009 verification confirmed repo coverage across implementation (`src/event_relay/tw_market_flow.py`), runner script, tests, README/memory-bank docs, and decision note.
+- 2026-04-25 - live `run_tw_market_flow.ps1 -EnvFile .env` stored 14 dataset events with 0 failures; MySQL query confirmed new rows `19634-19647` in `t_relay_events` for `market_context:twse_flow`, `market_context:tpex_flow`, and `market_context:taifex_flow`.
+- 2026-04-25 - `requirements.yml` synced to reality: REQ-008 marked done, REQ-007 acceptance note updated, and REQ-009 marked done with current verification evidence.
+- 2026-04-25 - user pointed out REQ-001 should likely already be complete; reopened the requirement against current acceptance criteria instead of relying on the old pending comment.
+- 2026-04-25 - verified repo `.venv` contains `yfinance` and `pandas`; the global `python` interpreter does not, so runtime verification must use `.venv\\Scripts\\python.exe`.
+- 2026-04-25 - initial MySQL check showed today's `yfinance%` rows were still `0`; reran `src/scrapers/yfinance_stocks.py` with the repo `.venv`.
+- 2026-04-25 - rerun fetched 26 symbols and wrote `data/stocks/stocks_20260425_025225.json`, but the script then hit a Windows `cp950` `UnicodeEncodeError` on the success log line after the relay write completed.
+- 2026-04-25 - replaced the relay success/failure console messages with ASCII-safe output so successful runs no longer exit non-zero only because of terminal encoding.
+- 2026-04-25 - verification passed: `.venv\\Scripts\\python.exe -m unittest tests.test_yfinance_stocks -v` (4/4), latest JSON `total_symbols=26`, and MySQL query confirmed 26 same-day `t_relay_events` rows with `source LIKE 'yfinance%'`.
+- 2026-04-23 - started REQ-008 closure verification after user noted the Python LINE paths should already be removed.
+- 2026-04-23 - static grep found no Python `linebot`, `LinePushClient`, `LINE_CHANNEL_*`, `/line/webhook`, `/push/direct`, `analysis_push`, `run_analysis_push`, `t_line_push_jobs`, or LINE Messaging API calls in active code/scripts/tests/docs except historical requirement/decision text.
+- 2026-04-23 - found and removed the last tracked legacy launcher `start_summary_sender.bat`, which still referenced a `Summary Sender - LINE Dispatcher` and an obsolete `src/workflows/summary_sender.py` entrypoint.
+- 2026-04-23 - scheduled task scan showed only source/context/analysis/retention tasks; no `AnalysisPush`, `LINE`, or `SummarySender` task remains.
+- 2026-04-22 - started RSS per-feed limit change after confirming bridge runs with `--limit 5` and 12 configured RSS feeds.
+- 2026-04-22 - changed `OfficialRssSource.fetch(limit)` so limit is applied per feed before merge/dedupe/sort; with 12 feeds and bridge `--limit 5`, RSS can now return up to 60 items before bridge filters.
+- 2026-04-22 - added `tests/test_rss_source.py` coverage for per-feed limiting and `OFFICIAL_RSS_FIRST_PER_FEED`.
+- 2026-04-22 - RSS smoke confirmed 12 configured feeds and `fetch_news(..., limit=5)` returned 12 RSS items, not the previous global cap of 5.
+- 2026-04-22 - restarted live Python data services; latest bridge log shows `Polling source=rss fetched=12`, `Polling cycle complete accepted=17 stored=1 duplicates=16`, and `X filtered stream connected`.
+- 2026-04-22 - verification passed: targeted RSS/config/collector tests (12), `python -m compileall src tests`, full unittest discovery (95 tests, 4 pandas/yfinance skips), readiness gate, and `git diff --check` with CRLF warnings only.
+- 2026-04-22 - Worker 2 started REQ-010 BLS macro implementation; scope limited to `event_relay.bls_macro`, `run_bls_macro.ps1`, focused tests, and required memory-bank documentation. Confirmed BLS facts must be stored-only `t_relay_events` rows with `source=market_context:bls_macro`.
+- 2026-04-22 - Worker 2 implemented BLS macro stored-only relay events with centralized first-batch series mapping, optional `BLS_API_KEY`, no-key POST payload support, normalized metrics, and event ids containing `bls_macro`, `series_id`, `year`, and `period`.
+- 2026-04-22 - Worker 2 verification passed: `python -m unittest tests.test_bls_macro -v` (7 tests), `python -m compileall src tests`, `python -m event_relay.bls_macro --help`, full unittest discovery (92 tests, 4 pandas/yfinance skips), and `git diff --check` with CRLF warnings only.
+- 2026-04-22 - started parallel implementation for REQ-009/010/011 with three workers: Taiwan flow, BLS macro, and Taiwan close / `tw_close` analysis integration.
 - 2026-04-22 - user corrected the boundary: REQ-009, REQ-010, and REQ-011 source/context events must all write to `t_relay_events`; `t_market_analyses` should only be produced after aggregating relay events and asking the model.
 - 2026-04-22 - updated `requirements.yml` REQ-011, `memory-bank/PROJECT_DOCUMENTATION.md`, and `tasks/lessons.md`; `git diff --check` passed with CRLF warnings only.
 - 2026-04-22 - started docs/skills review after Python LINE touch removal; current boundary is Python data collection, event storage, and analysis only.
@@ -22,6 +55,20 @@ Use this file for non-trivial tasks (3+ steps or architecture decisions).
 - 2026-04-22 - reviewed skills and kept macro/mobile-chat prompt assets; clarified they format stored analyses only and do not implement Python LINE delivery.
 - 2026-04-22 - validation passed: readiness gate, compileall, targeted analysis/relay tests, full unittest discovery (72 tests, 4 expected pandas/yfinance skips), `git diff --check`, no mojibake replacement chars in reviewed docs/skills.
 - 2026-04-22 - restarted crawler bridge; latest log `runtime/logs/source-bridge-20260422-015334.out.log` shows direct DB sink, RSS/SEC/TWSE polling, X backfill, and `X filtered stream connected`; DB check found 10 recent `x:elonmusk` rows in `t_relay_events` and latest `t_x_posts`.
+- 2026-04-22 - Worker 1 started REQ-009 implementation for TWSE / TPEx / TAIFEX official fund-flow stored-only events; scope is limited to `src/event_relay/tw_market_flow.py`, `scripts/run_tw_market_flow.ps1`, `tests/test_tw_market_flow.py`, and this task progress note.
+- 2026-04-22 - Worker 1 confirmed official swagger sources and selected dataset-level event design: source families `market_context:twse_flow`, `market_context:tpex_flow`, and `market_context:taifex_flow`; events write `t_relay_events` only through `MySqlEventStore`.
+- 2026-04-22 - Worker 1 implemented `event_relay.tw_market_flow`, `scripts/run_tw_market_flow.ps1`, non-network tests, and minimal memory-bank docs/decision note for REQ-009.
+- 2026-04-22 - Worker 1 verification passed: `python -m unittest tests.test_tw_market_flow -v` (5 tests), `python -m compileall src tests`, live official fetch smoke without DB writes (10 snapshots, 0 failures), full unittest discovery (92 tests, 4 pandas/yfinance skips), and `git diff --check` with CRLF warnings only.
+- 2026-04-22 - Worker 3 started REQ-011 implementation; scope is limited to Taiwan close context events, `market_analysis` slot `tw_close`, scheduler/script wiring, and unit tests. Per user instruction, Worker 3 will not update README or memory-bank docs in this pass.
+- 2026-04-22 - Worker 3 implemented `event_relay.tw_close_context`, `scripts/run_tw_close_context.ps1`, `tw_close` market-analysis slot/prompt/raw_json dimension, and 15:20/15:30 scheduler registration.
+- 2026-04-22 - Worker 3 verification passed: `python -m unittest tests.test_tw_close_context tests.test_market_analysis -v` (15 tests), `python -m compileall src tests`, `python -m event_relay.tw_close_context --help`, PowerShell script parse check, full unittest discovery (92 tests, 4 pandas/yfinance skips), and `git diff --check` with CRLF warnings only.
+- 2026-04-22 - main integration added missing TWSE T86 three-major-institution dataset, TWSE SBL availability, TPEx three-major-institution daily/summary datasets, dry-run support, and compact `normalized_metrics` into analysis prompts.
+- 2026-04-22 - scheduler registration now includes BLS macro at 04:50, pre-open context at 07:20, Taiwan official market-flow at 15:10, Taiwan close context at 15:20, and `tw_close` analysis at 15:30.
+- 2026-04-22 - verification passed after integration: targeted REQ-009/010/011 tests (28 tests), official dry-runs (`tw_market_flow` 14 datasets / 0 failures; `bls_macro` 10 series / 0 missing), `python -m compileall src tests`, full unittest discovery (93 tests, 4 pandas/yfinance skips), `python scripts/validate_readiness.py`, PowerShell parse check, and `git diff --check` with CRLF warnings only.
+- 2026-04-22 - restarted live Python data services and verified `event_relay.main` health plus source bridge direct DB sink, RSS/SEC/TWSE polling, X backfill, and X filtered stream connection.
+- 2026-04-22 - runtime smoke wrote new events into `t_relay_events`: `twse_flow=5`, `tpex_flow=6`, `taifex_flow=3`, `bls_macro=10`, `tw_close=1`, and `x:elonmusk=1`; `t_x_posts` also received 1 Elon row.
+- 2026-04-22 - fixed MySQL `Out of sort memory` in recent event fetch by ordering recent summaries by auto-increment `id DESC`, then reran `tw_close_context` successfully with `events_used=15`.
+- 2026-04-22 - repaired the same-day TWSE `T86_ALLBUT0999` event and regenerated `market_context:tw_close`; both now show `T86` row count `1305`.
 - 2026-04-21 20:55 - user requested removing all LINE push/contact logic from this repo after clarifying Python is only data collection and analysis.
 - 2026-04-21 20:56 - found LINE contact paths in `/line/webhook`, `/push/direct`, `LinePushClient`, `analysis_push`, `t_line_push_jobs`, sample scripts, and scheduled push task registration.
 - 2026-04-21 21:05 - removed Python LINE webhook/direct-push endpoints, LINE API client, `analysis_push`, push sample/verification scripts, summary sender, and push-job scheduled tasks.

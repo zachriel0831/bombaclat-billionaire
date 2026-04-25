@@ -6,6 +6,7 @@ This project starts from data ingestion for international finance breaking news.
 
 1. Official RSS (no API key)
 - BBC / Reuters / Fox / NPR feeds from `OFFICIAL_RSS_FEEDS`
+- RSS `--limit` is applied per feed, not globally. For example, 12 feeds with `-Limit 5` can return up to 60 RSS items before URL dedupe and topic/date filters.
 
 2. SEC EDGAR tracked filings (no API key, declared User-Agent required)
 - Track selected tickers through official SEC ticker mapping + submissions API
@@ -89,6 +90,8 @@ Run crawler bridge (`RSS + SEC + TWSE/MOPS + X stream + US index tracker`) and w
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_source_bridge.ps1 -PollIntervalSeconds 300 -Limit 5 -UsIndexPollIntervalSeconds 30
 ```
+
+For RSS, `-Limit 5` means up to 5 items per configured feed. SEC/TWSE/X keep their existing per-source or per-account limit behavior.
 
 X source is now consumed by filtered stream (near real-time) with auto reconnect/backoff.
 Bridge startup also runs a one-shot X backfill before connecting the filtered stream, so tweets published while the bridge was down can be replayed into `t_relay_events` and `t_x_posts` without the event relay API running.
@@ -273,11 +276,12 @@ Weekly schedule helper (Windows Task Scheduler):
 powershell -ExecutionPolicy Bypass -File .\scripts\register_weekly_summary_task.ps1 -TaskName "NewsCollector-WeeklySummary" -DayOfWeek "Sunday" -At "23:00" -Force
 ```
 
-## Twice-daily market analysis (AI, stored only)
+## Scheduled market analysis (AI, stored only)
 
-Generate one market analysis at two Taiwan-local checkpoints:
+Generate market analysis at Taiwan-local checkpoints:
 - `05:00` for U.S. close context
 - `07:30` for Taiwan pre-open context
+- `15:30` for Taiwan close review context
 
 Current behavior:
 - Reads recent events from `t_relay_events`
@@ -296,10 +300,26 @@ Pre-open market context collector:
   - U.S. Treasury official daily yield curve XML for 2Y / 10Y / 30Y and 10Y-2Y spread
   - TWSE official OpenAPI for Taiwan index groups, tracked stocks, and margin balances
 
+Official Taiwan market-flow collector:
+- Module: `event_relay.tw_market_flow`
+- Writes stored-only source facts into `t_relay_events`
+- Sources currently included:
+  - TWSE official/RWD datasets for three major institutional trading, margin trading, foreign ownership, and SBL availability
+  - TPEx official OpenAPI datasets for margin/SBL, institutional trading, and institutional summaries
+  - TAIFEX official OpenAPI datasets for major institutional futures/options positioning and open interest
+
+BLS macro collector:
+- Module: `event_relay.bls_macro`
+- Writes one stored-only source fact per latest monthly observation into `t_relay_events`
+- Uses BLS Public Data API v2 with optional `BLS_API_KEY`
+
 Run context collection once:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_market_flow.ps1 -EnvFile .env
+powershell -ExecutionPolicy Bypass -File .\scripts\run_bls_macro.ps1 -EnvFile .env
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_close_context.ps1 -EnvFile .env
 ```
 
 Run once manually:
@@ -307,6 +327,7 @@ Run once manually:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot us_close -Force
 powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force
+powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot tw_close -Force
 ```
 
 Prompt snapshots:
@@ -314,6 +335,8 @@ Prompt snapshots:
 - `runtime/prompts/market_analysis_us_close_user_prompt.txt`
 - `runtime/prompts/market_analysis_pre_tw_open_system_prompt.txt`
 - `runtime/prompts/market_analysis_pre_tw_open_user_prompt.txt`
+- `runtime/prompts/market_analysis_tw_close_system_prompt.txt`
+- `runtime/prompts/market_analysis_tw_close_user_prompt.txt`
 
 Market analysis env keys:
 - `MARKET_ANALYSIS_MODEL` (default `gpt-5`)
@@ -327,6 +350,12 @@ Market analysis env keys:
 - `MARKET_CONTEXT_ANALYSIS_SLOT` (default `market_context_pre_tw_open`)
 - `MARKET_CONTEXT_SCHEDULED_TIME` (default `07:20`)
 - `MARKET_CONTEXT_TIMEOUT_SECONDS` (default `15`)
+- `BLS_API_KEY` (optional)
+- `BLS_SERIES_IDS` (optional comma-separated subset of the built-in BLS mapping)
+- `BLS_TIMEOUT_SECONDS` (default inherited by script as `30`)
+- `TW_CLOSE_CONTEXT_SOURCE_PREFIXES` (optional comma-separated source prefixes)
+- `TW_CLOSE_CONTEXT_LOOKBACK_DAYS` (default `2`)
+- `TW_CLOSE_CONTEXT_MAX_EVENTS` (default `200`)
 - `WEEKLY_SUMMARY_OPENAI_API_KEY_FILE` / `MARKET_ANALYSIS_OPENAI_API_KEY_FILE` for DPAPI secret fallback
 
 Register daily tasks:

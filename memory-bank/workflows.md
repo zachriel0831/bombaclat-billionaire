@@ -97,6 +97,19 @@
 - x fetch
 4. Confirm docs are aligned with behavior
 
+## Workflow 3A: RSS Feed Coverage Check
+1. Confirm active feeds
+- Inspect `OFFICIAL_RSS_FEEDS` in `.env`
+2. Understand fetch limits
+- `news_collector.sources.rss.OfficialRssSource` applies `--limit` per feed, not globally
+- Example: 12 feeds with `--limit 5` can produce up to 60 RSS items before URL dedupe and bridge filters
+3. Smoke fetch
+- Run `python -m news_collector.main fetch --source rss --limit 5 --pretty`
+4. Verify storage path
+- Restart or wait for `news_collector.relay_bridge`
+- Check bridge log for `Polling source=rss fetched=<count>`
+- Query `t_relay_events` for recent RSS source rows
+
 ## Workflow 4: Incident Handling (Source Outage / Rate Limit)
 1. Confirm outage scope (single source vs all)
 2. Keep collector running for healthy sources
@@ -135,13 +148,16 @@
 - Confirm the bridge logs `[US_INDEX_OPEN_STORED]` or `[US_INDEX_CLOSE_STORED]`
 - Query both `t_relay_events` and `t_market_index_snapshots` by `event_id`
 
-## Workflow 4C: Twice-daily Market Analysis Storage
+## Workflow 4C: Scheduled Market Analysis Storage
 1. Keep source inputs current
 - Ensure RSS, X, and US index tracker are writing to `t_relay_events` / `t_market_index_snapshots`
+- Run `scripts/run_bls_macro.ps1` before the U.S. close analysis window when refreshing official U.S. macro facts
 - Run `scripts/run_market_context.ps1` before the Taiwan pre-open analysis window so `market_context:*` event facts are fresh
+- Run `scripts/run_tw_market_flow.ps1` and `scripts/run_tw_close_context.ps1` before the Taiwan close analysis window
 2. Run the single-shot analysis generator
 - Use `scripts/run_market_analysis.ps1 -Slot us_close` at `05:00`
 - Use `scripts/run_market_analysis.ps1 -Slot pre_tw_open` at `07:30`
+- Use `scripts/run_market_analysis.ps1 -Slot tw_close` at `15:30`
 - Treat `t_relay_events` as primary local evidence, not exhaustive truth
 - OpenAI runs request web search by default; if unavailable, the prompt must label missing context instead of fabricating
 3. Persist analysis output
@@ -153,7 +169,7 @@
 - Check prompt snapshots under `runtime/prompts/`
 - Query `t_market_analyses` for the current `analysis_date`
 - Query `t_relay_events` for recent `source LIKE 'market_context:%'`
-- Confirm `push_enabled=0` and `pushed=0`
+- Confirm `pushed=0`; Python does not contact LINE or create delivery jobs
 
 ## Workflow 4D: Weekly Summary Storage
 1. Schedule for Taiwan pre-open usage
@@ -235,6 +251,53 @@
 5. Verify
 - Query `t_relay_events` for today's `source LIKE 'market_context:%'`
 - Confirm rows are marked `stored_only_context` / stored-only and inspect `raw_json.failures` on the collector event
+
+## Workflow 4I: Taiwan Official Market-Flow Context
+1. Collect official Taiwan flow datasets
+- Run `scripts/run_tw_market_flow.ps1 -EnvFile .env`
+2. Source families
+- TWSE official/RWD: `T86_ALLBUT0999`, `MI_MARGN`, `MI_QFIIS_cat`, `MI_QFIIS_sort_20`, and `SBL_TWT96U`
+- TPEx OpenAPI: margin balance, margin/SBL short-sale balance, three-major-institution daily/summary, foreign investor trading, and dealer trading datasets
+- TAIFEX OpenAPI: major institutional trader general, futures/options split, and futures contract detail datasets
+3. Persist as event-only facts
+- Insert one stored-only dataset event into `t_relay_events` for each collected dataset
+- Use `source=market_context:twse_flow`, `source=market_context:tpex_flow`, or `source=market_context:taifex_flow`
+- Keep `raw_json.stored_only=true`, `raw_json.dimension=market_context`, `raw_json.event_type=tw_market_flow_dataset`, `raw_json.trade_date`, `raw_json.dataset`, official rows, and normalized metrics
+4. Verify
+- Run `python -m unittest tests.test_tw_market_flow -v`
+- Query `t_relay_events` by `source IN ('market_context:twse_flow','market_context:tpex_flow','market_context:taifex_flow')`
+
+## Workflow 4J: BLS Macro Stored-Only Event Flow
+1. Collect BLS official macro series
+- Run `scripts/run_bls_macro.ps1 -EnvFile .env`
+- Optionally set `BLS_API_KEY`; without it, the collector sends the same low-frequency JSON POST without `registrationkey`
+2. Source families
+- BLS Public Data API v2 endpoint: `https://api.bls.gov/publicAPI/v2/timeseries/data/`
+- First batch: CPI headline/core, PPI headline/final demand/core, nonfarm payrolls, unemployment rate, labor force participation, average hourly earnings, and average weekly hours
+3. Persist as event-only facts
+- Insert one stored-only relay event per latest monthly observation into `t_relay_events`
+- Use `source=market_context:bls_macro`
+- Keep `raw_json.stored_only=true`, `raw_json.dimension=market_context`, `raw_json.event_type=market_context_point`, `raw_json.series_id`, `raw_json.year`, `raw_json.period`, `raw_json.value`, `raw_json.footnotes`, and normalized metrics
+- Dedupe by event hash derived from `event_id`, where `event_id` includes `bls_macro`, `series_id`, `year`, and `period`
+4. Verify
+- Run `python -m unittest tests.test_bls_macro -v`
+- Query `t_relay_events` by `source='market_context:bls_macro'`
+
+## Workflow 4K: Taiwan Close Context and Analysis
+1. Build close context from relay events
+- Run `scripts/run_tw_market_flow.ps1 -EnvFile .env` after Taiwan close data is available
+- Run `scripts/run_tw_close_context.ps1 -EnvFile .env` to aggregate same-day Taiwan flow/disclosure events into one `market_context:tw_close` stored-only event
+2. Generate the close report
+- Run `scripts/run_market_analysis.ps1 -Slot tw_close -Force`
+- The analysis job reads `t_relay_events` and writes model output to `t_market_analyses`
+3. Persist boundaries
+- Source/context facts remain in `t_relay_events`
+- `t_market_analyses.raw_json.dimension=daily_tw_close`
+- Python does not push or create LINE delivery jobs
+4. Verify
+- Check `runtime/prompts/market_analysis_tw_close_*`
+- Query `t_relay_events` for `source='market_context:tw_close'`
+- Query `t_market_analyses` for `analysis_slot='tw_close'`
 
 ## Workflow 5: Build a New Skill (Enterprise)
 1. Create skill folder from templates:

@@ -235,9 +235,9 @@ def push_snapshot_to_relay(stocks_data: dict, scraped_at: str):
 
     result = push_events(events)
     if result["ok"]:
-        print(f"  [relay] ✅ 股價快照 {len(events)} 筆 → MySQL")
+        print(f"  [relay] stored {len(events)} stock snapshot rows to MySQL")
     else:
-        print(f"  [relay] ⚠️  {result.get('error')} — 略過股價快照推送")
+        print(f"  [relay] skipped stock snapshot push: {result.get('error')}")
 
 
 # ── 主程式 ─────────────────────────────────────────────
@@ -261,7 +261,7 @@ def main():
 
     # 1. 寫入 JSON（alert_workflow 使用）
     filepath = save_json(output, OUTPUT_DIR)
-    print(f"\n[OK] {total} symbols saved → {filepath}")
+    print(f"\n[OK] {total} symbols saved to {filepath}")
 
     # 2. 推送快照到 Relay → MySQL
     push_snapshot_to_relay(stocks_data, scraped_at)

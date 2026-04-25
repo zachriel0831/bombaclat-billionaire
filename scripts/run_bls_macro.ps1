@@ -1,9 +1,9 @@
-# Run scheduled market analysis generator (single-shot).
+# Run BLS macro collector and write stored-only events to t_relay_events.
 param(
   [string]$EnvFile = ".env",
-  [ValidateSet("auto", "us_close", "pre_tw_open", "tw_close")]
-  [string]$Slot = "auto",
-  [switch]$Force,
+  [string]$Series = "",
+  [int]$TimeoutSeconds = 30,
+  [switch]$DryRun,
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]
   [string]$LogLevel = "INFO"
 )
@@ -14,17 +14,21 @@ Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
 
-Write-Host "Running market analysis slot=$Slot ..." -ForegroundColor Cyan
+Write-Host "Running BLS macro collector..." -ForegroundColor Cyan
 
 $cmdArgs = @(
-  "-m", "event_relay.market_analysis",
+  "-m", "event_relay.bls_macro",
   "--env-file", $EnvFile,
-  "--slot", $Slot,
+  "--timeout-seconds", "$TimeoutSeconds",
   "--log-level", $LogLevel
 )
 
-if ($Force) {
-  $cmdArgs += "--force"
+if ($Series) {
+  $cmdArgs += @("--series", $Series)
+}
+if ($DryRun) {
+  $cmdArgs += "--dry-run"
 }
 
 & python @cmdArgs
+exit $LASTEXITCODE

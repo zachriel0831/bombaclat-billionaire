@@ -14,7 +14,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   1. `news_collector.relay_bridge`
   2. `event_relay.main` (event relay API for `/events`)
   3. `event_relay.weekly_summary` (single-shot, usually triggered by scheduler)
-  4. `event_relay.market_analysis` (single-shot, usually triggered twice daily by scheduler)
+  4. `event_relay.market_analysis` (single-shot, usually triggered by scheduler)
 
 ## Ingestion Sources
 1. X filtered stream
@@ -25,6 +25,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 
 2. RSS polling
 - BBC / Reuters / Fox / NPR feeds from `OFFICIAL_RSS_FEEDS`
+- RSS bridge `--limit` is applied per configured feed, then all feed items are merged, deduped, and sorted. With 12 active feeds and `--limit 5`, one polling cycle can consider up to 60 RSS items before filters.
 - Reuters currently uses Google News RSS search as fallback because legacy Reuters RSS endpoints are unavailable from this environment
 - CNN RSS is configurable in code, but the previously tested CNN feeds were removed from the active `.env` set after returning stale items from 2016-2024 during the 2026-04-19 verification
 
@@ -44,6 +45,27 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Writes normalized stored-only events directly into `t_relay_events`
 - Marks rows as `stored_only_market`
 - Stores structured quote rows in MySQL table `t_market_index_snapshots` for same-day analysis
+
+6. Taiwan official market-flow data
+- Uses TWSE official/RWD datasets for three major institutional trading, margin trading, foreign ownership, and SBL availability
+- Uses TPEx official OpenAPI datasets for margin/SBL, institutional trading, and institutional summaries
+- Uses TAIFEX official OpenAPI datasets for major institutional futures/options positioning and open interest
+- Writes one stored-only dataset event per official dataset directly into `t_relay_events`
+- Uses `source=market_context:twse_flow`, `source=market_context:tpex_flow`, or `source=market_context:taifex_flow`
+- Raw event JSON keeps `trade_date`, `dataset`, official rows, and compact normalized metrics for downstream analysis
+
+7. BLS official U.S. macro data
+- Uses BLS Public Data API v2 endpoint `https://api.bls.gov/publicAPI/v2/timeseries/data/`
+- Supports optional `BLS_API_KEY`; without a key it still sends a low-frequency JSON POST without `registrationkey`
+- Writes one stored-only relay event per latest monthly observation directly into `t_relay_events`
+- Uses `source=market_context:bls_macro`
+- First-batch monthly series mapping:
+  - CPI headline `CUSR0000SA0`, CPI core `CUSR0000SA0L1E`
+  - PPI headline all commodities `WPU00000000`, PPI final demand `WPSFD4`, PPI core final demand `WPSFD49116`
+  - Nonfarm payrolls `CES0000000001`, unemployment rate `LNS14000000`, labor force participation `LNS11300000`
+  - Average hourly earnings `CES0500000003`, average weekly hours `CES0500000002`
+- Raw event JSON keeps `series_id`, `year`, `period`, `periodName`, `value`, `footnotes`, and normalized period / year-over-year metrics for traceability
+- BLS data is monthly and may be preliminary or revised; footnote codes are preserved in `raw_json.footnotes` and `raw_json.normalized_metrics.footnote_codes`
 
 ## Event Storage & Analysis Boundary
 - HTTP endpoints:
@@ -68,7 +90,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `scripts/register_retention_cleanup_task.ps1` can register the same cleanup as a fixed daily Windows task
 
 ## Analysis Context Policy
-- `t_relay_events` is the primary local event/fact context for weekly and twice-daily analyses, but it is not treated as the complete universe of relevant market information.
+- `t_relay_events` is the primary local event/fact context for weekly and scheduled daily analyses, but it is not treated as the complete universe of relevant market information.
 - OpenAI analysis calls request the Responses API `web_search` tool by default so the model can verify missing, stale, or fast-moving facts beyond local rows.
 - If web search is unavailable or returns insufficient evidence, prompts require the model to label the data gap and lower confidence instead of fabricating certainty.
 - Skill docs are retained as prompt assets for macro reasoning and mobile-chat readability; they do not create any Python-owned LINE delivery behavior.
@@ -92,13 +114,17 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Prefer env var `WEEKLY_SUMMARY_OPENAI_API_KEY` / `OPENAI_API_KEY`
   - Fallback to DPAPI file `WEEKLY_SUMMARY_OPENAI_API_KEY_FILE`
 
-## Twice-daily Market Analysis
+## Scheduled Market Analysis
 - Module: `src/event_relay/market_analysis.py`
 - Pre-open context module: `src/event_relay/market_context.py`
 - Schedule intent:
+  - `04:50` Asia/Taipei: collect BLS official macro facts as stored-only events into `t_relay_events`
   - `05:00` Asia/Taipei: U.S. close summary for Taiwan next-session context
   - `07:20` Asia/Taipei: collect pre-open market context as stored-only events into `t_relay_events`
   - `07:30` Asia/Taipei: Taiwan pre-open summary
+  - `15:10` Asia/Taipei: collect Taiwan official market-flow facts as stored-only events into `t_relay_events`
+  - `15:20` Asia/Taipei: collect Taiwan close context from same-day relay events into `t_relay_events`
+  - `15:30` Asia/Taipei: Taiwan close review analysis
 - Flow:
   1. Read latest event context from `t_relay_events`
   2. Read latest DJIA / S&P 500 rows from `t_market_index_snapshots`
@@ -110,8 +136,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `source` starts with `market_context:`
   - `raw_json.stored_only=true`
   - `raw_json.dimension=market_context`
-  - `raw_json.event_type` is `market_context_point` or `market_context_collection`
-  - current source families: Yahoo chart market snapshots, U.S. Treasury official yield curve XML, TWSE official OpenAPI index/stock/margin data
+  - `raw_json.event_type` is `market_context_point`, `market_context_collection`, or `tw_market_flow_dataset`
+  - current source families: Yahoo chart market snapshots, U.S. Treasury official yield curve XML, TWSE official OpenAPI index/stock/margin data, Taiwan official flow datasets from TWSE / TPEx / TAIFEX, and BLS official macro series
 - Prompt snapshots:
   - `runtime/prompts/market_analysis_<slot>_system_prompt.txt`
   - `runtime/prompts/market_analysis_<slot>_user_prompt.txt`
@@ -123,8 +149,11 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `scripts/register_retention_cleanup_task.ps1`
 - Current target schedule requirement:
   - Every Sunday 23:00 (Asia/Taipei, local machine timezone) for weekly summary (Java pushes it at Monday 05:10)
-  - Every day 05:00 and 07:30 (Asia/Taipei, local machine timezone) for market analysis
+  - Every day 05:00, 07:30, and 15:30 (Asia/Taipei, local machine timezone) for market analysis
+  - Every day 04:50 (Asia/Taipei, local machine timezone) for BLS macro event collection
   - Every day 07:20 (Asia/Taipei, local machine timezone) for pre-open market context collection
+  - Every day 15:10 (Asia/Taipei, local machine timezone) for Taiwan official market-flow collection
+  - Every day 15:20 (Asia/Taipei, local machine timezone) for Taiwan close context collection
   - Every day 00:10 (Asia/Taipei, local machine timezone) for retention cleanup
 
 ## Source Expansion Backlog
@@ -134,7 +163,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - started 2026-04-19 with TWSE `t187ap04_L` daily major information
 - next likely additions: shareholder meeting / board meeting / investor conference datasets
 3. Fed / macro official releases
-- FOMC / Federal Reserve, then BLS / FRED class datasets
+- BLS macro official data started 2026-04-22
+- next likely additions: FOMC / Federal Reserve and FRED class datasets
 
 ## Security & Secrets
 - Secrets are stored locally with Windows DPAPI:
@@ -155,8 +185,15 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Run market analysis once:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot us_close -Force`
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force`
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot tw_close -Force`
 - Run market context once:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env`
+- Run Taiwan official market-flow context once:
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_market_flow.ps1 -EnvFile .env`
+- Run BLS macro context once:
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_bls_macro.ps1 -EnvFile .env`
+- Run Taiwan close context once:
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_close_context.ps1 -EnvFile .env`
 - Run retention cleanup once:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_retention_cleanup.ps1 -EnvFile .env`
 

@@ -11,6 +11,7 @@ __pycache__/
 runtime/logs/
 runtime/prompts/
 runtime/state/
+runtime/*.log
 daily_analysis_*.md
 query_output.txt
 data/stocks/*.json

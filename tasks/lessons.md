@@ -174,3 +174,46 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `git diff --check -- requirements.yml memory-bank/PROJECT_DOCUMENTATION.md tasks/todo.md tasks/lessons.md` passed with CRLF warnings only
   - `rg` confirmed REQ-009, REQ-010, and REQ-011 describe source/context events writing to `t_relay_events`
 - Status: active
+
+## LESSON-20260425-01
+- Date: 2026-04-25
+- Trigger (User correction): User pointed out `REQ-001` should already be complete and asked to verify it before leaving it non-done.
+- What was wrong: The requirement was left in `review` based on an old pending DB note instead of being re-verified against the current live environment.
+- Root cause: I relied on stale task comments and the global interpreter first, instead of checking the repo's intended `.venv` runtime and rerunning the blocked acceptance step.
+- New rule (always/never): Always verify requirement status against current acceptance criteria using the repo's intended runtime environment before leaving a task in `review` or `pending`.
+- Prevention checklist (before final response):
+  - [ ] Re-run any acceptance item whose blocker was previously "needs runtime recheck" instead of trusting old notes
+  - [ ] Confirm whether the repo expects `.venv` rather than the global interpreter for optional dependencies
+  - [ ] If runtime success is followed by a console-encoding-only crash, separate data-path success from logging-path failure and fix the logging bug
+- Repo updates made:
+  - `src/scrapers/yfinance_stocks.py`
+  - `requirements.yml`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `.venv\\Scripts\\python.exe -m unittest tests.test_yfinance_stocks -v` passed (4/4)
+  - `.venv\\Scripts\\python.exe src\\scrapers\\yfinance_stocks.py` fetched 26 symbols and wrote `data/stocks/stocks_20260425_025225.json`
+  - MySQL query confirmed 26 same-day `t_relay_events` rows with `source LIKE 'yfinance%'`
+- Status: active
+
+## LESSON-20260425-02
+- Date: 2026-04-25
+- Trigger (User correction): User pointed out `REQ-008` should already be executed and asked for REQ-009 to be implemented only if it was truly incomplete.
+- What was wrong: Requirement status in `requirements.yml` lagged behind actual implementation and verification state, which made already-finished work still look pending/review.
+- Root cause: I relied too much on stale requirement statuses instead of re-verifying the live code, tests, scheduler state, and database writes before deciding whether work was incomplete.
+- New rule (always/never): Always verify a requirement's real completion state from code + runtime evidence before assuming a pending/review status is still accurate.
+- Prevention checklist (before final response):
+  - [ ] Re-check whether the requirement file status is stale relative to the current repo state
+  - [ ] Use both static evidence and runtime evidence before saying a feature is incomplete
+  - [ ] If implementation already exists, sync requirement status instead of re-implementing blindly
+- Repo updates made:
+  - `requirements.yml`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - Static grep confirmed REQ-008 Python LINE touch paths are absent from active code
+  - Task Scheduler scan confirmed no AnalysisPush / LINE / SummarySender jobs remain
+  - `.venv\\Scripts\\python.exe -m unittest discover -s tests -p "test_*.py" -v` passed (140 tests)
+  - `scripts/run_tw_market_flow.ps1 -EnvFile .env` stored 14 REQ-009 dataset events with 0 failures
+  - MySQL query confirmed new REQ-009 rows `19634-19647` in `t_relay_events`
+- Status: active

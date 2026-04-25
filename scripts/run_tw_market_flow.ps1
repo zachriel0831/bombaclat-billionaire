@@ -1,9 +1,8 @@
-# Run scheduled market analysis generator (single-shot).
 param(
   [string]$EnvFile = ".env",
-  [ValidateSet("auto", "us_close", "pre_tw_open", "tw_close")]
-  [string]$Slot = "auto",
-  [switch]$Force,
+  [string]$Families = "all",
+  [int]$TimeoutSeconds = 20,
+  [switch]$DryRun,
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]
   [string]$LogLevel = "INFO"
 )
@@ -14,17 +13,19 @@ Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
 
-Write-Host "Running market analysis slot=$Slot ..." -ForegroundColor Cyan
+Write-Host "Running Taiwan market-flow collector families=$Families ..." -ForegroundColor Cyan
 
 $cmdArgs = @(
-  "-m", "event_relay.market_analysis",
+  "-m", "event_relay.tw_market_flow",
   "--env-file", $EnvFile,
-  "--slot", $Slot,
+  "--families", $Families,
+  "--timeout-seconds", "$TimeoutSeconds",
   "--log-level", $LogLevel
 )
 
-if ($Force) {
-  $cmdArgs += "--force"
+if ($DryRun) {
+  $cmdArgs += "--dry-run"
 }
 
 & python @cmdArgs
+exit $LASTEXITCODE

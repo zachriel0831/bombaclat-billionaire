@@ -130,9 +130,9 @@ def _load_weekly_config(args: argparse.Namespace) -> WeeklySummaryConfig:
         ).strip(),
         lookback_days=max(1, int(os.getenv("WEEKLY_SUMMARY_LOOKBACK_DAYS", "7"))),
         max_events=max(10, int(os.getenv("WEEKLY_SUMMARY_MAX_EVENTS", "120"))),
-        weekday=max(0, min(6, int(os.getenv("WEEKLY_SUMMARY_WEEKDAY", "0")))),
-        hour=max(0, min(23, int(os.getenv("WEEKLY_SUMMARY_HOUR", "7")))),
-        minute=max(0, min(59, int(os.getenv("WEEKLY_SUMMARY_MINUTE", "30")))),
+        weekday=max(0, min(6, int(os.getenv("WEEKLY_SUMMARY_WEEKDAY", "5")))),
+        hour=max(0, min(23, int(os.getenv("WEEKLY_SUMMARY_HOUR", "23")))),
+        minute=max(0, min(59, int(os.getenv("WEEKLY_SUMMARY_MINUTE", "0")))),
         window_minutes=max(1, int(os.getenv("WEEKLY_SUMMARY_WINDOW_MINUTES", "20"))),
         state_file=(
             os.getenv("WEEKLY_SUMMARY_STATE_FILE", "runtime/state/weekly-summary-last-week.txt")

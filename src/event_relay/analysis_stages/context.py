@@ -1,0 +1,30 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+
+
+@dataclass(frozen=True)
+class StageContext:
+    provider: str
+    api_base: str
+    api_key: str
+    model: str
+    slot: str
+    now_local: datetime
+
+
+@dataclass
+class StageResult:
+    name: str
+    model: str
+    output: Any
+    tokens_prompt: int = 0
+    tokens_completion: int = 0
+    error: str | None = None
+    raw_text: str | None = None
+    extras: dict[str, Any] = field(default_factory=dict)
+
+    def ok(self) -> bool:
+        return self.error is None and self.output is not None

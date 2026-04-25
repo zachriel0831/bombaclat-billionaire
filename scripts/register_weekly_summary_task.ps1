@@ -3,7 +3,7 @@ param(
   [string]$EnvFile = ".env",
   [string]$At = "23:00",
   [ValidateSet("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")]
-  [string]$DayOfWeek = "Sunday",
+  [string]$DayOfWeek = "Saturday",
   [switch]$Force
 )
 
@@ -24,7 +24,7 @@ if ($Force) {
   $null = Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 }
 
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Description "Generate weekly Taiwan pre-open summary and store it in t_market_analyses every Sunday 23:00 local time (Java pushes it at Monday 05:10)." -Force | Out-Null
+Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Description "Generate weekly Taiwan pre-open summary and store it in t_market_analyses every Saturday 23:00 local time (Java pushes it Sunday 05:10)." -Force | Out-Null
 
 $task = Get-ScheduledTask -TaskName $TaskName
 $info = Get-ScheduledTaskInfo -TaskName $TaskName

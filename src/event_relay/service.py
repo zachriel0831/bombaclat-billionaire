@@ -68,6 +68,7 @@ class MarketAnalysisRecord:
     push_enabled: bool
     pushed: bool
     raw_json: str | None = None
+    structured_json: str | None = None
 
 
 @dataclass
@@ -90,6 +91,7 @@ class MySqlEventStore:
         self._x_table = settings.mysql_x_table
         self._market_table = settings.mysql_market_table
         self._analysis_table = settings.mysql_analysis_table
+        self._annotation_table = settings.mysql_annotation_table
         self._connector = self._import_mysql_connector()
         self._conn = None
         self._lock = threading.RLock()
@@ -143,12 +145,15 @@ class MySqlEventStore:
 
         safe_days = max(int(days), 1)
         safe_limit = max(int(limit), 1)
+        # Use the auto-increment primary key as the recency order. Recent
+        # market-context rows can carry large official payloads, and filesort
+        # over created_at/raw_json can exceed MySQL's sort buffer on small DBs.
         sql = (
             f"SELECT id, source, title, url, summary, published_at, created_at, raw_json "
             f"FROM {self._event_table} "
             "WHERE created_at >= (NOW() - INTERVAL %s DAY) "
             "AND source NOT REGEXP '^(local_live_test|manual_test)' "
-            "ORDER BY created_at DESC, id DESC "
+            "ORDER BY id DESC "
             "LIMIT %s"
         )
         with self._lock:
@@ -174,6 +179,98 @@ class MySqlEventStore:
                 )
             )
         return result
+
+    def fetch_event_annotations(self, event_row_ids: list[int]) -> dict[int, dict[str, Any]]:
+        """Return stored annotations for the given event primary keys.
+
+        Keys in the returned mapping match ``t_relay_events.id``. Rows without
+        an annotation are simply absent — callers decide whether to fall back
+        to an in-memory rule-based annotation.
+        """
+        if self._conn is None or not event_row_ids:
+            return {}
+
+        unique_ids = sorted({int(row_id) for row_id in event_row_ids if row_id is not None})
+        if not unique_ids:
+            return {}
+
+        placeholders = ",".join(["%s"] * len(unique_ids))
+        sql = (
+            f"SELECT event_row_id, entities, category, importance, sentiment, "
+            f"annotator, annotator_version, annotated_at "
+            f"FROM {self._annotation_table} "
+            f"WHERE event_row_id IN ({placeholders})"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, tuple(unique_ids))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        result: dict[int, dict[str, Any]] = {}
+        for row in rows:
+            entities_raw = row[1]
+            try:
+                entities = json.loads(entities_raw) if isinstance(entities_raw, str) else entities_raw
+            except (ValueError, TypeError):
+                entities = []
+            if not isinstance(entities, list):
+                entities = []
+            result[int(row[0])] = {
+                "entities": entities,
+                "category": str(row[2] or "other"),
+                "importance": float(row[3] or 0.0),
+                "sentiment": str(row[4] or "neutral"),
+                "annotator": str(row[5] or ""),
+                "annotator_version": str(row[6] or ""),
+                "annotated_at": str(row[7]) if row[7] is not None else "",
+            }
+        return result
+
+    def upsert_event_annotation(
+        self,
+        event_row_id: int,
+        *,
+        entities: list[dict[str, str]],
+        category: str,
+        importance: float,
+        sentiment: str,
+        annotator: str,
+        annotator_version: str,
+    ) -> None:
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+
+        sql = (
+            f"INSERT INTO {self._annotation_table} "
+            "(event_row_id, entities, category, importance, sentiment, annotator, annotator_version) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s) "
+            "ON DUPLICATE KEY UPDATE "
+            "entities=VALUES(entities), "
+            "category=VALUES(category), "
+            "importance=VALUES(importance), "
+            "sentiment=VALUES(sentiment), "
+            "annotator=VALUES(annotator), "
+            "annotator_version=VALUES(annotator_version)"
+        )
+        values = (
+            int(event_row_id),
+            json.dumps(list(entities), ensure_ascii=False),
+            str(category),
+            float(importance),
+            str(sentiment),
+            str(annotator),
+            str(annotator_version),
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, values)
+                self._conn.commit()
+            finally:
+                cur.close()
 
     def fetch_recent_market_snapshots(self, hours: int, limit: int) -> list[MarketSnapshotRow]:
         if self._conn is None:
@@ -216,6 +313,32 @@ class MySqlEventStore:
             )
         return result
 
+    def _migrate_analysis_structured_json(self, cur: Any) -> None:
+        """Add structured_json column on existing deployments where DDL was already applied.
+
+        Idempotent: silently skips when the column already exists.
+        """
+        if self._conn is None:
+            return
+        try:
+            cur.execute(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = DATABASE() AND table_name = %s AND column_name = 'structured_json' "
+                "LIMIT 1",
+                (self._analysis_table,),
+            )
+            exists = cur.fetchone() is not None
+        except Exception:  # noqa: BLE001
+            return
+        if exists:
+            return
+        try:
+            cur.execute(f"ALTER TABLE `{self._analysis_table}` ADD COLUMN structured_json JSON NULL AFTER raw_json")
+            self._conn.commit()
+        except Exception:  # noqa: BLE001
+            # Column may have been added between our check and the ALTER; do not fail init.
+            self._conn.rollback()
+
     def upsert_market_analysis(self, record: MarketAnalysisRecord) -> None:
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
@@ -223,8 +346,8 @@ class MySqlEventStore:
         sql = (
             f"INSERT INTO {self._analysis_table} "
             "(analysis_date, analysis_slot, scheduled_time_local, model, prompt_version, summary_text, "
-            "events_used, market_rows_used, push_enabled, pushed, raw_json) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "events_used, market_rows_used, push_enabled, pushed, raw_json, structured_json) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
             "ON DUPLICATE KEY UPDATE "
             "scheduled_time_local=VALUES(scheduled_time_local), "
             "model=VALUES(model), "
@@ -235,6 +358,7 @@ class MySqlEventStore:
             "push_enabled=VALUES(push_enabled), "
             "pushed=VALUES(pushed), "
             "raw_json=VALUES(raw_json), "
+            "structured_json=VALUES(structured_json), "
             "updated_at=CURRENT_TIMESTAMP"
         )
 
@@ -255,6 +379,7 @@ class MySqlEventStore:
                         1 if record.push_enabled else 0,
                         1 if record.pushed else 0,
                         record.raw_json,
+                        record.structured_json,
                     ),
                 )
                 self._conn.commit()
@@ -482,11 +607,28 @@ class MySqlEventStore:
           push_enabled TINYINT(1) NOT NULL DEFAULT 0,
           pushed TINYINT(1) NOT NULL DEFAULT 0,
           raw_json JSON NULL,
+          structured_json JSON NULL,
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY (id),
           UNIQUE KEY uq_analysis_slot_date (analysis_date, analysis_slot),
           KEY idx_analysis_created (created_at, analysis_slot)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+        ddl_annotation = f"""
+        CREATE TABLE IF NOT EXISTS `{self._annotation_table}` (
+          event_row_id BIGINT NOT NULL,
+          entities JSON NOT NULL,
+          category VARCHAR(32) NOT NULL,
+          importance DECIMAL(4,3) NOT NULL,
+          sentiment VARCHAR(8) NOT NULL,
+          annotator VARCHAR(16) NOT NULL,
+          annotator_version VARCHAR(32) NOT NULL,
+          annotated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (event_row_id),
+          KEY idx_annotation_category (category, importance),
+          KEY idx_annotation_annotated_at (annotated_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
         cur = self._conn.cursor()
@@ -495,7 +637,9 @@ class MySqlEventStore:
             cur.execute(ddl_x)
             cur.execute(ddl_market)
             cur.execute(ddl_analysis)
+            cur.execute(ddl_annotation)
             self._conn.commit()
+            self._migrate_analysis_structured_json(cur)
         finally:
             cur.close()
         # 將 X 貼文資料同步到 t_x_posts，方便後續查詢與分析。

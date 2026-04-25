@@ -34,6 +34,7 @@ class RelaySettings:
     mysql_x_table: str
     mysql_market_table: str
     mysql_analysis_table: str
+    mysql_annotation_table: str
     mysql_connect_timeout_seconds: int
     retention_enabled: bool
     retention_keep_days: int
@@ -62,6 +63,9 @@ def load_settings(env_file: str = ".env") -> RelaySettings:
         mysql_x_table=os.getenv("RELAY_MYSQL_X_TABLE", "t_x_posts"),
         mysql_market_table=os.getenv("RELAY_MYSQL_MARKET_TABLE", "t_market_index_snapshots"),
         mysql_analysis_table=os.getenv("RELAY_MYSQL_ANALYSIS_TABLE", "t_market_analyses"),
+        mysql_annotation_table=os.getenv(
+            "RELAY_MYSQL_ANNOTATION_TABLE", "t_relay_event_annotations"
+        ),
         mysql_connect_timeout_seconds=int(os.getenv("RELAY_MYSQL_CONNECT_TIMEOUT", "5")),
         retention_enabled=parse_bool(os.getenv("RELAY_RETENTION_ENABLED", "true"), default=True),
         retention_keep_days=max(1, min(365, int(os.getenv("RELAY_RETENTION_KEEP_DAYS", "7")))),

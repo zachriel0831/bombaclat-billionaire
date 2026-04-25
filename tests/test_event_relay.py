@@ -46,6 +46,7 @@ def _build_settings() -> RelaySettings:
         mysql_x_table="t_x_posts",
         mysql_market_table="t_market_index_snapshots",
         mysql_analysis_table="t_market_analyses",
+        mysql_annotation_table="t_relay_event_annotations",
         mysql_connect_timeout_seconds=5,
         retention_enabled=True,
         retention_keep_days=7,
