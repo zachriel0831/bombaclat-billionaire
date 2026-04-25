@@ -3,17 +3,22 @@
 Use this file for non-trivial tasks (3+ steps or architecture decisions).
 
 ## Current Task
-- Task: Reclassify REQ-018+ by module in requirements.yml
+- Task: Audit token-heavy workflow/skill paths
 - Requested by: User
 - Start date: 2026-04-25
-- Scope: reorganize the new auto-trading REQs into explicit module groups, add module classification above and inside each requirement, and keep the Python/Java boundary clear.
+- Scope: inspect the current LLM workflows and skill assets, identify the most token-expensive prompt paths, and note whether token usage is already recorded anywhere.
 
 ## Plan (checkable)
-- [x] Reconfirm the intended module boundaries for REQ-018+.
-- [x] Reorganize REQ-018+ under module comment headers and add a `module` field to each REQ.
-- [x] Verify the reorganized requirements file for formatting/integrity.
+- [x] Trace which workflows actually call the model.
+- [x] Inspect the prompt/skill assets used by weekly summary and market analysis.
+- [x] Identify the largest fixed and dynamic prompt components and whether usage is stored.
 
 ## Progress Notes
+- 2026-04-25 - user asked to inspect workflows and skills for unusually token-heavy areas.
+- 2026-04-25 - traced the active LLM paths to weekly_summary and market_analysis (multi-stage).
+- 2026-04-25 - confirmed the fixed heavy asset is `skills/macro-weekly-summary-skill/SKILLS.md` (~15 KB) while `skills/line-brief-format-skill/line-weekly-brief.md` is small (~574 B).
+- 2026-04-25 - runtime prompt snapshots show the largest dynamic prompt is `market_analysis_*_stage1_digest_user.txt` (~95-106 KB), followed by stage4 synthesis user prompt (~25-27 KB) and stage4 synthesis system prompt (~16.5 KB).
+- 2026-04-25 - confirmed current code does not persist OpenAI/Anthropic response usage; `StageResult` already has token fields but they are not populated, and `requirements.yml` still treats token_usage persistence as pending future work.
 - 2026-04-25 - user asked to reclassify REQ-018 onward with module grouping above the requirements and place each REQ into its proper module.
 - 2026-04-25 - planned module split: architecture foundation, data ingestion, analysis engine, Java delivery, Taiwan watchlist monitoring, decision engine, order execution, and operations/evaluation.
 - 2026-04-25 - updated requirements so REQ-018..029 now sit under explicit module headers and each REQ includes a stable `module` field for future filtering and automation.

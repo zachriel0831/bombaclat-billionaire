@@ -56,6 +56,24 @@ class MarketSnapshotRow:
 
 
 @dataclass
+class MarketQuoteSnapshot:
+    symbol: str
+    market: str
+    session: str
+    ts: str
+    open_price: float | None
+    high_price: float | None
+    low_price: float | None
+    close_price: float | None
+    prev_close: float | None
+    volume: int | None
+    turnover: float | None
+    change_pct: float | None
+    source: str
+    raw_json: str | None = None
+
+
+@dataclass
 class MarketAnalysisRecord:
     analysis_date: str
     analysis_slot: str
@@ -90,6 +108,7 @@ class MySqlEventStore:
         self._event_table = settings.mysql_event_table
         self._x_table = settings.mysql_x_table
         self._market_table = settings.mysql_market_table
+        self._quote_snapshot_table = settings.mysql_quote_snapshot_table
         self._analysis_table = settings.mysql_analysis_table
         self._annotation_table = settings.mysql_annotation_table
         self._connector = self._import_mysql_connector()
@@ -386,6 +405,52 @@ class MySqlEventStore:
             finally:
                 cur.close()
 
+    def upsert_market_quote_snapshot(self, snapshot: MarketQuoteSnapshot) -> None:
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+
+        sql = (
+            f"INSERT INTO {self._quote_snapshot_table} "
+            "(symbol, market, session, ts, open_price, high_price, low_price, close_price, "
+            "prev_close, volume, turnover, change_pct, source, raw_json) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "ON DUPLICATE KEY UPDATE "
+            "open_price=VALUES(open_price), "
+            "high_price=VALUES(high_price), "
+            "low_price=VALUES(low_price), "
+            "close_price=VALUES(close_price), "
+            "prev_close=VALUES(prev_close), "
+            "volume=VALUES(volume), "
+            "turnover=VALUES(turnover), "
+            "change_pct=VALUES(change_pct), "
+            "raw_json=VALUES(raw_json)"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(
+                    sql,
+                    (
+                        snapshot.symbol,
+                        snapshot.market,
+                        snapshot.session,
+                        snapshot.ts,
+                        snapshot.open_price,
+                        snapshot.high_price,
+                        snapshot.low_price,
+                        snapshot.close_price,
+                        snapshot.prev_close,
+                        snapshot.volume,
+                        snapshot.turnover,
+                        snapshot.change_pct,
+                        snapshot.source,
+                        snapshot.raw_json,
+                    ),
+                )
+                self._conn.commit()
+            finally:
+                cur.close()
+
     def fetch_latest_market_analysis(self, analysis_slot: str) -> StoredMarketAnalysisRecord | None:
         if self._conn is None:
             return None
@@ -593,6 +658,30 @@ class MySqlEventStore:
           KEY idx_market_trade_date (trade_date, market_session, symbol, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
+        ddl_quote_snapshot = f"""
+        CREATE TABLE IF NOT EXISTS `{self._quote_snapshot_table}` (
+          id BIGINT NOT NULL AUTO_INCREMENT,
+          symbol VARCHAR(32) NOT NULL,
+          market VARCHAR(16) NOT NULL,
+          session VARCHAR(16) NOT NULL,
+          ts DATETIME NOT NULL,
+          open_price DECIMAL(18,4) NULL,
+          high_price DECIMAL(18,4) NULL,
+          low_price DECIMAL(18,4) NULL,
+          close_price DECIMAL(18,4) NULL,
+          prev_close DECIMAL(18,4) NULL,
+          volume BIGINT NULL,
+          turnover DECIMAL(20,2) NULL,
+          change_pct DECIMAL(10,4) NULL,
+          source VARCHAR(64) NOT NULL,
+          raw_json JSON NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_quote_symbol_ts_source (symbol, ts, source),
+          KEY idx_quote_market_ts (market, ts),
+          KEY idx_quote_symbol_ts (symbol, ts)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
         ddl_analysis = f"""
         CREATE TABLE IF NOT EXISTS `{self._analysis_table}` (
           id BIGINT NOT NULL AUTO_INCREMENT,
@@ -636,6 +725,7 @@ class MySqlEventStore:
             cur.execute(ddl_event)
             cur.execute(ddl_x)
             cur.execute(ddl_market)
+            cur.execute(ddl_quote_snapshot)
             cur.execute(ddl_analysis)
             cur.execute(ddl_annotation)
             self._conn.commit()
@@ -948,6 +1038,97 @@ class RelayProcessor:
             "failed": failed,
             "results": results,
         }
+
+    def process_quote_snapshots(self, payload: Any) -> dict[str, Any]:
+        """Persist a batch of MarketQuoteSnapshot rows. Payload is a list of dicts."""
+        if not isinstance(payload, list):
+            raise ValueError("payload must be a JSON array of snapshot rows")
+
+        stored = 0
+        skipped = 0
+        failed = 0
+        results: list[dict[str, Any]] = []
+
+        for idx, row in enumerate(payload):
+            if not isinstance(row, dict):
+                skipped += 1
+                results.append({"index": idx, "status": "skipped", "reason": "not_object"})
+                continue
+            try:
+                snapshot = self._coerce_quote_snapshot(row)
+            except ValueError as exc:
+                skipped += 1
+                results.append({"index": idx, "status": "skipped", "reason": str(exc)})
+                continue
+
+            if self._store is None:
+                # Dry-run path; useful in tests + when MySQL is disabled.
+                results.append({"index": idx, "status": "dropped", "reason": "mysql_disabled"})
+                continue
+
+            try:
+                self._store.upsert_market_quote_snapshot(snapshot)
+                stored += 1
+                results.append({"index": idx, "status": "stored", "symbol": snapshot.symbol})
+            except Exception as exc:  # noqa: BLE001
+                failed += 1
+                logger.exception("Failed to upsert quote snapshot symbol=%s", snapshot.symbol)
+                results.append({"index": idx, "status": "failed", "error": str(exc)})
+
+        return {
+            "received": len(payload),
+            "stored": stored,
+            "skipped": skipped,
+            "failed": failed,
+            "results": results,
+        }
+
+    @staticmethod
+    def _coerce_quote_snapshot(row: dict[str, Any]) -> "MarketQuoteSnapshot":
+        symbol = str(row.get("symbol") or "").strip()
+        market = str(row.get("market") or "").strip()
+        session = str(row.get("session") or "regular").strip()
+        ts = str(row.get("ts") or "").strip()
+        if not symbol or not market or not ts:
+            raise ValueError("symbol, market, ts are required")
+
+        def _opt_float(v: Any) -> float | None:
+            if v is None:
+                return None
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+
+        def _opt_int(v: Any) -> int | None:
+            if v is None:
+                return None
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                return None
+
+        raw = row.get("raw_json")
+        raw_json_str: str | None = None
+        if raw is not None:
+            raw_json_str = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
+
+        return MarketQuoteSnapshot(
+            symbol=symbol,
+            market=market,
+            session=session,
+            ts=ts,
+            open_price=_opt_float(row.get("open_price") or row.get("open")),
+            high_price=_opt_float(row.get("high_price") or row.get("high")),
+            low_price=_opt_float(row.get("low_price") or row.get("low")),
+            close_price=_opt_float(row.get("close_price") or row.get("close") or row.get("price")),
+            prev_close=_opt_float(row.get("prev_close")),
+            volume=_opt_int(row.get("volume")),
+            turnover=_opt_float(row.get("turnover")),
+            change_pct=_opt_float(row.get("change_pct")),
+            source=str(row.get("source") or "yfinance").strip(),
+            raw_json=raw_json_str,
+        )
 
     def _start_maintenance_scheduler(self) -> None:
         if self._store is None:

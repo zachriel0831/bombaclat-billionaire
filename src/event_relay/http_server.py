@@ -44,6 +44,10 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
             self._handle_events_post()
             return
 
+        if path == "/quote-snapshots":
+            self._handle_quote_snapshots_post()
+            return
+
         if path == "/market-analysis/run":
             self._handle_market_analysis_run()
             return
@@ -59,6 +63,17 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
             self._json_response(400, {"error": str(exc)})
         except Exception as exc:
             logger.exception("Unhandled error while processing /events")
+            self._json_response(500, {"error": str(exc)})
+
+    def _handle_quote_snapshots_post(self) -> None:
+        try:
+            payload = self._read_json_body()
+            result = self.server.processor.process_quote_snapshots(payload)
+            self._json_response(200, result)
+        except ValueError as exc:
+            self._json_response(400, {"error": str(exc)})
+        except Exception as exc:
+            logger.exception("Unhandled error while processing /quote-snapshots")
             self._json_response(500, {"error": str(exc)})
 
     def _handle_market_analysis_run(self) -> None:

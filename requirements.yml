@@ -243,7 +243,7 @@ tasks:
 
   - id: REQ-010
     title: "[美國總經] BLS 官方數據標準化寫入 t_relay_events"
-    status: review
+    status: done
     trigger: manual
     priority: high
     description: |
@@ -276,10 +276,18 @@ tasks:
     notes: |
       2026-04-22 已進入 review。BLS 是官方總經資料源，對利率預期、通膨再加速、
       就業強弱、薪資黏性與台股風險偏好判斷有直接價值。
+      2026-04-25 review 通過，狀態改 done：
+        - bls_macro.py: 9 個 series（CPI/core CPI/PPI/PPI core/PPI core ex-foods/
+          NFP/失業率/勞動參與率/平均時薪 monthly + weekly），SOURCE=market_context:bls_macro
+        - dedupe key: build_event_id(series_id, year, period) at bls_macro.py:428
+        - raw_json.stored_only=true，保留 footnotes 與 normalized metrics
+        - memory-bank/09-decisions/2026-04-22-bls-macro-relay-events.md 記錄端點與設計
+        - tests/test_bls_macro.py 覆蓋解析、dedupe、缺 key、空資料、API error
+        - us_close / pre_tw_open 透過既有 market_context:* 事件窗讀取，無需特例代碼
 
   - id: REQ-011
     title: "[台股收盤] 收盤事件寫入 t_relay_events 並產出 tw_close 分析"
-    status: review
+    status: done
     trigger: schedule
     priority: high
     description: |
@@ -318,6 +326,18 @@ tasks:
       來源/情境事實寫入 t_relay_events；t_market_analyses 僅保存模型統合事件後
       產出的分析文字。tw_close 以 15:20 context event + 15:30 analysis slot 落地，
       用來補足早盤前分析之外的收盤復盤。
+      2026-04-25 review 通過，狀態改 done：
+        - tw_close_context.build_tw_close_context_event 寫入 source=market_context:tw_close
+          + stored_only=True（tw_close_context.py:223-230）
+        - 過濾來源含 twse_flow / tpex_flow / taifex_flow（tw_close_context.py:25-27）；
+          tw_market_flow.py 提供這三類資料的 collector
+        - market_analysis 支援 slot=tw_close，排程窗口 (15, 30)（market_analysis.py:39, 64）
+        - raw_json.dimension="daily_tw_close"、push_enabled=0（market_analysis.py:630-631）
+        - prompt snapshot 路徑由 stage4_synthesis._write_prompt_snapshot 統一處理
+        - memory-bank/09-decisions/2026-04-22-tw-close-event-first-analysis.md +
+          2026-04-22-tw-market-flow-official-datasets.md 記錄資料窗口與資料來源
+        - tests/test_tw_close_context.py + tests/test_tw_market_flow.py 覆蓋 slot routing、
+          analysis_date、dimension、push_enabled、collector 解析；REQ-010+011 共 11 tests 綠
 
   # ── 模型分析品質提升（六項弱點）──────────────────────
   # 目標：在不更動資料蒐集與 Java 推送邊界的前提下，提升 t_market_analyses 產出的
@@ -614,7 +634,7 @@ tasks:
   - id: REQ-019
     title: "[交易資料] 台股 / 美股 / 指數行情快照與異動事件標準化"
     module: data_ingestion
-    status: pending
+    status: done
     trigger: schedule
     priority: high
     description: |
@@ -645,6 +665,26 @@ tasks:
     notes: |
       2026-04-25 新列。高頻價格資料不建議全部塞進 t_relay_events；
       原始快照進專用表、事件摘要進 relay_events，會比單表更可控。
+      2026-04-25 完成並驗收：
+        Phase A（後端基礎）：
+          - service.MarketQuoteSnapshot dataclass + DDL `t_market_quote_snapshots`
+            + upsert_market_quote_snapshot；config 新增 mysql_quote_snapshot_table
+          - quote_movement.py 純函式 detector：gap_up/gap_down (1%)、
+            sharp_up/sharp_down (3%)、volume_spike (2x n_day_avg)；
+            stable event_id `market-quote-{market}-{symbol}-{trade_date}-{event_type}`；
+            可由 MovementThresholds 覆寫
+          - 14 個 quote_movement 單元測試（gap / sharp / volume / 組合 / 契約 / threshold）
+        Phase B（資料流接通）：
+          - HTTP /quote-snapshots 端點 + RelayProcessor.process_quote_snapshots
+            （含欄位 coercion、跳過無效列、MySQL disabled 時回 dropped）
+          - relay_client.push_quote_snapshots
+          - scrapers/yfinance_stocks.py 重構：snapshots → /quote-snapshots，
+            僅顯著異動 → /events；類別 → market 映射 (TW/US/INDEX/CRYPTO/MACRO/FX)
+          - 8 個 endpoint + processor 測試
+        文件：
+          - memory-bank/09-decisions/2026-04-25-market-quote-snapshots-and-moves.md
+            記錄表結構、event contract、source 映射、輪詢 cadence、threshold
+        驗證：全測試 170 綠（148 → 162 → 170）
 
   - id: REQ-020
     title: "[交易資料] 全球重大政治 / 經濟 / 科技新聞強化與交易影響標註"

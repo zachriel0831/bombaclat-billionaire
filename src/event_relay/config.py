@@ -33,6 +33,7 @@ class RelaySettings:
     mysql_event_table: str
     mysql_x_table: str
     mysql_market_table: str
+    mysql_quote_snapshot_table: str
     mysql_analysis_table: str
     mysql_annotation_table: str
     mysql_connect_timeout_seconds: int
@@ -62,6 +63,9 @@ def load_settings(env_file: str = ".env") -> RelaySettings:
         mysql_event_table=os.getenv("RELAY_MYSQL_EVENT_TABLE", "t_relay_events"),
         mysql_x_table=os.getenv("RELAY_MYSQL_X_TABLE", "t_x_posts"),
         mysql_market_table=os.getenv("RELAY_MYSQL_MARKET_TABLE", "t_market_index_snapshots"),
+        mysql_quote_snapshot_table=os.getenv(
+            "RELAY_MYSQL_QUOTE_SNAPSHOT_TABLE", "t_market_quote_snapshots"
+        ),
         mysql_analysis_table=os.getenv("RELAY_MYSQL_ANALYSIS_TABLE", "t_market_analyses"),
         mysql_annotation_table=os.getenv(
             "RELAY_MYSQL_ANNOTATION_TABLE", "t_relay_event_annotations"

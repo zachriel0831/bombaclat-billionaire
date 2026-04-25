@@ -3,7 +3,12 @@ Yahoo Finance Stock Price Scraper
 Source: yfinance Python library (handles auth automatically)
 Output:
   1. data/stocks/stocks_YYYYMMDD_HHMMSS.json  ← alert_workflow 需要此檔案
-  2. POST → http://localhost:18090/events     ← 市場快照推送至 MySQL
+  2. POST → http://localhost:18090/quote-snapshots  ← 高頻報價快照寫專用表
+  3. POST → http://localhost:18090/events           ← 僅顯著異動事件 (gap/sharp/volume_spike)
+
+REQ-019 Phase B: 報價快照不再整批塞 t_relay_events，分流到
+                  t_market_quote_snapshots；事件側只留 detect_movement_events
+                  判定的有意義異動。
 
 安裝依賴:
     pip install yfinance
@@ -19,7 +24,12 @@ from datetime import datetime, timezone
 
 # relay_client 在 src/ 下，確保可 import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from relay_client import push_events
+from relay_client import push_events, push_quote_snapshots
+from event_relay.quote_movement import (
+    MovementThresholds,
+    QuoteContext,
+    detect_movement_events,
+)
 
 try:
     import yfinance as yf
@@ -95,54 +105,73 @@ OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "stocks
 
 
 # ── 從 yf.download() 批次結果萃取單支 quote ───────────────
-def _extract_quote_from_download(df, symbol: str, name: str) -> dict | None:
-    """從 yf.download() 回傳的 DataFrame 萃取 symbol 的最新 quote。
+def _extract_field_series(df, field: str, symbol: str):
+    if isinstance(df.columns, pd.MultiIndex):
+        if field not in df.columns.get_level_values(0):
+            return None
+        try:
+            return df[field][symbol].dropna()
+        except KeyError:
+            return None
+    return df[field].dropna() if field in df.columns else None
 
-    多 symbol 下載時 columns 為 MultiIndex (field, symbol)；
-    單 symbol 下載時 columns 為單層。
-    """
+
+def _extract_quote_from_download(df, symbol: str, name: str) -> dict | None:
+    """Return latest quote dict + history context (n_day_avg_volume)."""
     try:
         if df is None or len(df) == 0:
             return None
 
-        # 取出該 symbol 的 Close / Open / Volume 欄位
-        if isinstance(df.columns, pd.MultiIndex):
-            try:
-                close_series  = df["Close"][symbol].dropna()
-                volume_series = df["Volume"][symbol].dropna() if "Volume" in df.columns.get_level_values(0) else None
-            except KeyError:
-                return None
-        else:
-            # 單 symbol 情境
-            close_series  = df["Close"].dropna() if "Close" in df.columns else None
-            volume_series = df["Volume"].dropna() if "Volume" in df.columns else None
+        close_series  = _extract_field_series(df, "Close", symbol)
+        open_series   = _extract_field_series(df, "Open", symbol)
+        high_series   = _extract_field_series(df, "High", symbol)
+        low_series    = _extract_field_series(df, "Low", symbol)
+        volume_series = _extract_field_series(df, "Volume", symbol)
 
         if close_series is None or len(close_series) == 0:
             return None
 
         price       = float(close_series.iloc[-1])
         prev_close  = float(close_series.iloc[-2]) if len(close_series) >= 2 else None
-        volume_val  = None
+        open_price  = float(open_series.iloc[-1])  if open_series  is not None and len(open_series) > 0 else None
+        high_price  = float(high_series.iloc[-1])  if high_series  is not None and len(high_series) > 0 else None
+        low_price   = float(low_series.iloc[-1])   if low_series   is not None and len(low_series) > 0 else None
+        last_ts     = close_series.index[-1]
+
+        volume_val: int | None = None
+        n_day_avg_volume: float | None = None
         if volume_series is not None and len(volume_series) > 0:
             try:
                 volume_val = int(volume_series.iloc[-1])
             except (ValueError, TypeError):
                 volume_val = None
+            # Average over the prior bars (exclude today to avoid self-comparison).
+            prior = volume_series.iloc[:-1]
+            if len(prior) > 0:
+                try:
+                    n_day_avg_volume = float(prior.mean())
+                except (ValueError, TypeError):
+                    n_day_avg_volume = None
 
         change     = (price - prev_close) if prev_close else 0
         change_pct = round((change / prev_close * 100) if prev_close else 0, 2)
 
         return {
-            "symbol":     symbol,
-            "name":       name,
-            "currency":   "",
-            "price":      round(price, 4),
-            "prev_close": round(prev_close, 4) if prev_close is not None else None,
-            "change":     round(float(change), 4),
-            "change_pct": change_pct,
-            "volume":     volume_val,
-            "market_cap": None,
-            "exchange":   "",
+            "symbol":           symbol,
+            "name":             name,
+            "currency":         "",
+            "price":            round(price, 4),
+            "open":             round(open_price, 4) if open_price is not None else None,
+            "high":             round(high_price, 4) if high_price is not None else None,
+            "low":              round(low_price, 4)  if low_price  is not None else None,
+            "prev_close":       round(prev_close, 4) if prev_close is not None else None,
+            "change":           round(float(change), 4),
+            "change_pct":       change_pct,
+            "volume":           volume_val,
+            "n_day_avg_volume": n_day_avg_volume,
+            "last_ts":          str(last_ts),
+            "market_cap":       None,
+            "exchange":         "",
         }
     except Exception as e:
         print(f"  [ERROR] {symbol}: extract failed: {e}")
@@ -205,39 +234,103 @@ def save_json(data: dict, output_dir: str) -> str:
     return filepath
 
 
-# ── 推送市場快照到 Relay（供查詢 MySQL 使用）─────────────
-def push_snapshot_to_relay(stocks_data: dict, scraped_at: str):
-    events = []
+# ── 類別 → 市場代號 ───────────────────────────────────────
+_CATEGORY_TO_MARKET = {
+    "taiwan":          "TW",
+    "us":              "US",
+    "crypto":          "CRYPTO",
+    "index":           "INDEX",
+    "macro":           "MACRO",
+    "forex_commodity": "FX",
+}
+
+
+def _build_snapshot_row(quote: dict, category: str, scraped_at: str, trade_date: str) -> dict:
+    market = _CATEGORY_TO_MARKET.get(category, category.upper())
+    return {
+        "symbol":     quote["symbol"],
+        "market":     market,
+        "session":    "regular",
+        "ts":         scraped_at[:19].replace("T", " "),
+        "open_price": quote.get("open"),
+        "high_price": quote.get("high"),
+        "low_price":  quote.get("low"),
+        "close_price": quote.get("price"),
+        "prev_close": quote.get("prev_close"),
+        "volume":     quote.get("volume"),
+        "turnover":   None,
+        "change_pct": quote.get("change_pct"),
+        "source":     f"yfinance:{category}",
+        "raw_json":   {
+            "name":             quote.get("name"),
+            "n_day_avg_volume": quote.get("n_day_avg_volume"),
+            "last_ts":          quote.get("last_ts"),
+            "category":         category,
+            "trade_date":       trade_date,
+        },
+    }
+
+
+def _build_movement_events(quote: dict, category: str, trade_date: str, scraped_at: str) -> list[dict]:
+    market = _CATEGORY_TO_MARKET.get(category, category.upper())
+    detected = detect_movement_events(
+        symbol=quote["symbol"],
+        market=market,
+        session="regular",
+        trade_date=trade_date,
+        open_price=quote.get("open"),
+        last_price=quote.get("price"),
+        volume=quote.get("volume"),
+        context=QuoteContext(
+            prev_close=quote.get("prev_close"),
+            n_day_avg_volume=quote.get("n_day_avg_volume"),
+        ),
+    )
+    relay_events = []
+    for evt in detected:
+        url = f"https://finance.yahoo.com/quote/{quote['symbol']}"
+        relay_events.append({
+            "event_id":     evt["event_id"],
+            "source":       evt["source"],
+            "title":        evt["title"],
+            "url":          url,
+            "summary":      evt["summary"],
+            "published_at": scraped_at,
+            "raw_json":     evt["raw_json"],
+        })
+    return relay_events
+
+
+# ── 推送：snapshots → /quote-snapshots；異動 → /events ──
+def push_to_relay(stocks_data: dict, scraped_at: str) -> None:
+    trade_date = scraped_at[:10]
+    snapshots: list[dict] = []
+    move_events: list[dict] = []
+
     for category, quotes in stocks_data.items():
         for q in quotes:
             if not q:
                 continue
-            price = q.get("price")
-            pct   = q.get("change_pct", 0)
-            sign  = "▲" if pct >= 0 else "▼"
-            ts_compact = scraped_at[:16].replace("T", " ")
-            title = (
-                f"[{ts_compact}] {q['name']} ({q['symbol']}) "
-                f"{price:.2f} {sign}{abs(pct):.2f}%"
-            )
-            url = f"https://finance.yahoo.com/quote/{q['symbol']}"
-            events.append({
-                "source":       f"yfinance_{category}",
-                "title":        title,
-                "url":          url,
-                "summary":      json.dumps(q, ensure_ascii=False),
-                "published_at": scraped_at,
-            })
+            snapshots.append(_build_snapshot_row(q, category, scraped_at, trade_date))
+            move_events.extend(_build_movement_events(q, category, trade_date, scraped_at))
 
-    if not events:
-        print("  [relay] 無股價資料可推送")
-        return
-
-    result = push_events(events)
-    if result["ok"]:
-        print(f"  [relay] stored {len(events)} stock snapshot rows to MySQL")
+    if snapshots:
+        snap_result = push_quote_snapshots(snapshots)
+        if snap_result["ok"]:
+            print(f"  [relay] stored {snap_result.get('stored', len(snapshots))} quote snapshots")
+        else:
+            print(f"  [relay] snapshots skipped: {snap_result.get('error')}")
     else:
-        print(f"  [relay] skipped stock snapshot push: {result.get('error')}")
+        print("  [relay] no quote snapshots")
+
+    if move_events:
+        evt_result = push_events(move_events)
+        if evt_result["ok"]:
+            print(f"  [relay] emitted {len(move_events)} movement events (gap/sharp/volume_spike)")
+        else:
+            print(f"  [relay] movement events skipped: {evt_result.get('error')}")
+    else:
+        print("  [relay] no significant moves to emit")
 
 
 # ── 主程式 ─────────────────────────────────────────────
@@ -263,8 +356,8 @@ def main():
     filepath = save_json(output, OUTPUT_DIR)
     print(f"\n[OK] {total} symbols saved to {filepath}")
 
-    # 2. 推送快照到 Relay → MySQL
-    push_snapshot_to_relay(stocks_data, scraped_at)
+    # 2. 推送：snapshots → /quote-snapshots；異動事件 → /events
+    push_to_relay(stocks_data, scraped_at)
     return 0
 
 

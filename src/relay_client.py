@@ -18,6 +18,7 @@ import requests
 RELAY_HOST = os.environ.get("RELAY_HOST", "localhost")
 RELAY_PORT = int(os.environ.get("RELAY_PORT", "18090"))
 RELAY_URL  = f"http://{RELAY_HOST}:{RELAY_PORT}/events"
+QUOTE_SNAPSHOT_URL = f"http://{RELAY_HOST}:{RELAY_PORT}/quote-snapshots"
 TIMEOUT    = 10
 
 
@@ -111,3 +112,27 @@ def push_articles(articles: list[dict], source_override: str = "") -> int:
     else:
         print(f"  [relay] ⚠️  {result['error']} — 略過 MySQL 寫入")
         return 0
+
+
+def push_quote_snapshots(snapshots: list[dict]) -> dict:
+    """Send a batch of quote-snapshot rows to relay /quote-snapshots."""
+    if not snapshots:
+        return {"ok": True, "stored": 0}
+    try:
+        resp = requests.post(
+            QUOTE_SNAPSHOT_URL,
+            json=snapshots,
+            timeout=TIMEOUT,
+            headers={"Content-Type": "application/json"},
+        )
+        resp.raise_for_status()
+        try:
+            return {"ok": True, **resp.json()}
+        except Exception:
+            return {"ok": True, "stored": len(snapshots)}
+    except requests.exceptions.ConnectionError:
+        return {"ok": False, "error": f"Relay 服務未啟動 ({QUOTE_SNAPSHOT_URL})"}
+    except requests.exceptions.HTTPError as e:
+        return {"ok": False, "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
