@@ -689,7 +689,7 @@ tasks:
   - id: REQ-020
     title: "[交易資料] 全球重大政治 / 經濟 / 科技新聞強化與交易影響標註"
     module: data_ingestion
-    status: pending
+    status: done
     trigger: schedule
     priority: high
     description: |
@@ -718,6 +718,25 @@ tasks:
     notes: |
       2026-04-25 新列。這條重點不是盲目再加更多新聞源，而是把現有來源提升成
       更適合交易決策的結構化事件。
+      2026-04-25 完成並驗收：
+        - event_enrichment.py 加 NewsImpact dataclass：
+            topic / impact_region / impact_scope / impact_direction /
+            urgency / confidence / data_gap / cluster_id
+          以及 derive_news_impact() 公開 API、compute_cluster_id() 群聚輔助函式
+        - topic taxonomy 10 值：geopolitics / macro / central_bank / semiconductor /
+          ai / supply_chain / energy / regulation / corporate_action / other
+          （rule order 設計使「半導體領域的法規事件」歸 semiconductor 而非 regulation）
+        - 區分宏觀因子 vs 個股催化：impact_scope 由 ticker/company 實體存在性
+          + topic 推得 → single_name / sector / index
+        - cluster_id：去 wire prefix → token + sort + sha1 → 12 字 hex；
+          同題多來源（BBC/Reuters/AP）落同一 cluster
+        - market_analysis._build_events_payload 新增 impact 欄位，
+          stage1 prompt 自動可見 impact_region/scope/direction 等標註，
+          無需動 stage prompt 文字
+        - memory-bank/09-decisions/2026-04-25-news-impact-and-clustering.md
+          記錄 taxonomy、derivation 規則、cluster 語意、deferred 工作
+        - 26 個新單元測試（topic / region / scope / direction / urgency /
+          confidence / contract / cluster_id），全測試 196 綠（170 → 196）
 
   - id: REQ-021
     title: "[人物監控] 關鍵人物 / 帳號事件化監控（Elon Musk / Trump / 央行 / 政策人物）"

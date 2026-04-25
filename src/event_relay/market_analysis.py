@@ -25,7 +25,11 @@ from event_relay.analysis_stages import (
 )
 from event_relay.analysis_stages.schemas import assert_evidence_ids_covered
 from event_relay.config import load_settings
-from event_relay.event_enrichment import annotate as rule_annotate
+from event_relay.event_enrichment import (
+    EventAnnotation,
+    annotate as rule_annotate,
+    derive_news_impact,
+)
 from event_relay.service import MarketAnalysisRecord, MySqlEventStore
 from event_relay.weekly_summary import _call_llm, _load_secret_from_dpapi_file, _openai_web_search_enabled
 
@@ -314,6 +318,30 @@ def _inline_annotation(event: Any) -> dict[str, Any]:
     }
 
 
+def _impact_dict_from_annotation(event: Any, annotation: dict[str, Any]) -> dict[str, Any]:
+    """REQ-020: derive trade-impact tags from the (already-resolved) annotation."""
+    entities = tuple(
+        {"kind": str(e.get("kind", "")), "value": str(e.get("value", ""))}
+        for e in (annotation.get("entities") or [])
+        if isinstance(e, dict)
+    )
+    ann_obj = EventAnnotation(
+        entities=entities,
+        category=str(annotation.get("category") or "other"),
+        importance=float(annotation.get("importance") or 0.0),
+        sentiment=str(annotation.get("sentiment") or "neutral"),
+        annotator=str(annotation.get("annotator") or "rule"),
+        annotator_version=str(annotation.get("annotator_version") or "rule-v1"),
+    )
+    impact = derive_news_impact(
+        annotation=ann_obj,
+        title=event.title,
+        summary=event.summary,
+        raw_json=getattr(event, "raw_json", None),
+    )
+    return impact.to_dict()
+
+
 def _build_events_payload(store: MySqlEventStore, recent_events: list) -> list[dict[str, Any]]:
     annotation_index = store.fetch_event_annotations([event.row_id for event in recent_events])
     stored_count = 0
@@ -339,6 +367,7 @@ def _build_events_payload(store: MySqlEventStore, recent_events: list) -> list[d
                 "created_at": event.created_at,
                 "raw": _compact_event_raw_json(event.source, getattr(event, "raw_json", None)),
                 "annotation": annotation,
+                "impact": _impact_dict_from_annotation(event, annotation),
             }
         )
     logger.info(

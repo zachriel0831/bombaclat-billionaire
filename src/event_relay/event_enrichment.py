@@ -1,27 +1,16 @@
-"""Event pre-processing layer (REQ-013).
+"""Event pre-processing layer (REQ-013 + REQ-020).
 
-Given a stored relay event (title + summary + source), produce a structured
-annotation that the market-analysis pipeline can feed to stage1 without asking
-the LLM to re-derive it. Provides a deterministic rule-based path so the
-pipeline can run even when no annotation worker is active; the LLM path is
-reserved as a future opt-in.
-
-Annotation shape (see ``EventAnnotation``):
-* ``entities``  — list of ``{kind, value}`` (company / ticker / country /
-  policy / macro_indicator / person).
-* ``category``  — one of the fixed event categories.
-* ``importance``— 0.0 to 1.0.
-* ``sentiment`` — bullish / bearish / neutral (global risk-on perspective).
-
-The rule-based annotator is kept intentionally small: it favours precision on
-well-known trigger words (FOMC, CPI, TSMC, Powell …) over coverage. Events
-without a strong signal fall back to ``other`` / ``neutral`` / 0.3 importance,
-which the pipeline still treats as usable context.
+REQ-013: rule-based annotation (entities / category / importance / sentiment).
+REQ-020: trade-impact layer (topic / impact_region / impact_scope /
+         impact_direction / urgency / confidence / data_gap / cluster_id).
+The two layers compose — REQ-020 uses REQ-013 output plus title/summary to
+derive the impact tags. ``derive_news_impact`` is the REQ-020 entry point.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 import json
 import re
 from typing import Any, Iterable
@@ -470,3 +459,296 @@ def _extract_market_context_hint(raw_json: str | None) -> str:
                     parts.append(title)
 
     return " ".join(parts)
+
+
+# ====================================================================
+# REQ-020 — trade-impact enrichment layer
+# ====================================================================
+#
+# Adds a finer-grained topic taxonomy and trade-impact tags on top of the
+# REQ-013 annotation. Output is a separate ``NewsImpact`` dataclass so the
+# REQ-013 surface stays untouched.
+
+TOPIC_VALUES: tuple[str, ...] = (
+    "geopolitics",
+    "macro",
+    "central_bank",
+    "semiconductor",
+    "ai",
+    "supply_chain",
+    "energy",
+    "regulation",
+    "corporate_action",
+    "other",
+)
+
+IMPACT_REGION_VALUES: tuple[str, ...] = ("US", "TW", "CN", "EU", "JP", "KR", "Global")
+IMPACT_SCOPE_VALUES: tuple[str, ...] = ("index", "sector", "single_name")
+IMPACT_DIRECTION_VALUES: tuple[str, ...] = ("bullish", "bearish", "mixed", "unknown")
+URGENCY_VALUES: tuple[str, ...] = ("low", "medium", "high")
+CONFIDENCE_VALUES: tuple[str, ...] = ("low", "medium", "high")
+
+
+@dataclass(frozen=True)
+class NewsImpact:
+    topic: str
+    impact_region: str
+    impact_scope: str
+    impact_direction: str
+    urgency: str
+    confidence: str
+    data_gap: bool
+    cluster_id: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "topic": self.topic,
+            "impact_region": self.impact_region,
+            "impact_scope": self.impact_scope,
+            "impact_direction": self.impact_direction,
+            "urgency": self.urgency,
+            "confidence": self.confidence,
+            "data_gap": self.data_gap,
+            "cluster_id": self.cluster_id,
+        }
+
+
+# ---------- topic taxonomy ----------
+# Topic is a finer slice than REQ-013 ``category``: a regulation event in
+# semiconductor space should land in "semiconductor", not "regulation". Order
+# of rules matters — earlier rules win on tie.
+
+_TOPIC_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "central_bank",
+        (
+            "fomc", "federal reserve", "ecb", "boj", "pboc",
+            "rate hike", "rate cut", "basis point", "powell", "lagarde",
+            "聯準會", "美聯儲", "歐央", "日銀", "人行", "升息", "降息", "利率決議",
+        ),
+    ),
+    (
+        "semiconductor",
+        (
+            "tsmc", "台積電", "asml", "fab ", "wafer", "foundry",
+            "晶圓", "晶片", "半導體", "封測", "聯電", "umc",
+            "samsung foundry", "intel foundry",
+        ),
+    ),
+    (
+        "ai",
+        (
+            " ai ", "artificial intelligence", "openai", "anthropic", "chatgpt",
+            "llm", "generative ai", "nvidia gpu", "h100", "h200", "blackwell",
+            "ai 晶片", "生成式", "大語言",
+        ),
+    ),
+    (
+        "energy",
+        (
+            "oil", "crude", "opec", "natural gas", "lng",
+            "原油", "石油", "天然氣", "能源",
+        ),
+    ),
+    (
+        "geopolitics",
+        (
+            "war", "sanction", "missile", "conflict", "strike",
+            "戰爭", "制裁", "衝突", "軍事", "襲擊", "兩岸", "台海",
+        ),
+    ),
+    (
+        "supply_chain",
+        (
+            "supply chain", "shortage", "capacity", "logistics", "shipping",
+            "供應鏈", "產能", "缺貨", "物流", "航運",
+        ),
+    ),
+    (
+        "regulation",
+        (
+            "antitrust", "probe", "lawsuit", "tariff", "export control",
+            "sec charges", "監管", "罰款", "訴訟", "關稅", "反壟斷", "出口管制",
+        ),
+    ),
+    (
+        "corporate_action",
+        (
+            "dividend", "buyback", "spin-off", "merger", "acquires", "acquisition",
+            "split", "股利", "庫藏股", "合併", "收購", "分拆",
+        ),
+    ),
+    (
+        "macro",
+        (
+            "cpi", "ppi", "pce", "gdp", "pmi", "ism", "nonfarm", "jobless",
+            "retail sales", "housing starts", "unemployment",
+            "消費者物價", "生產者物價", "失業率", "零售銷售", "非農",
+        ),
+    ),
+)
+
+
+def _classify_topic(text: str) -> str:
+    lower = text.lower()
+    for topic, keywords in _TOPIC_RULES:
+        for needle in keywords:
+            if needle in lower:
+                return topic
+    return "other"
+
+
+# ---------- impact derivation ----------
+#
+# These maps drive ``derive_news_impact``; they are intentionally small and
+# string-keyed so unit tests can patch / extend without touching the
+# function body.
+
+_REGION_BY_COUNTRY: dict[str, str] = {
+    "US": "US",
+    "TW": "TW",
+    "CN": "CN",
+    "EU": "EU",
+    "JP": "JP",
+    "KR": "KR",
+}
+
+_HIGH_URGENCY_TOPICS: frozenset[str] = frozenset({"central_bank", "geopolitics"})
+_MEDIUM_URGENCY_TOPICS: frozenset[str] = frozenset(
+    {"macro", "semiconductor", "ai", "energy", "supply_chain"}
+)
+
+
+def _derive_impact_region(entities: Iterable[dict[str, str]]) -> str:
+    countries: list[str] = []
+    for entity in entities:
+        if entity.get("kind") == "country":
+            value = entity.get("value")
+            if value in _REGION_BY_COUNTRY:
+                countries.append(_REGION_BY_COUNTRY[value])
+    if not countries:
+        return "Global"
+    unique = set(countries)
+    if len(unique) == 1:
+        return next(iter(unique))
+    return "Global"
+
+
+def _derive_impact_scope(
+    entities: Iterable[dict[str, str]], topic: str
+) -> str:
+    has_ticker = any(e.get("kind") == "ticker" for e in entities)
+    has_company = any(e.get("kind") == "company" for e in entities)
+    if has_ticker or has_company:
+        return "single_name"
+    if topic in {"semiconductor", "ai", "energy", "supply_chain"}:
+        return "sector"
+    return "index"
+
+
+def _derive_impact_direction(sentiment: str, importance: float, has_entities: bool) -> str:
+    if not has_entities and importance < 0.3:
+        return "unknown"
+    if sentiment == "bullish":
+        return "bullish"
+    if sentiment == "bearish":
+        return "bearish"
+    return "mixed"
+
+
+def _derive_urgency(topic: str, importance: float) -> str:
+    if topic in _HIGH_URGENCY_TOPICS or importance >= 0.75:
+        return "high"
+    if topic in _MEDIUM_URGENCY_TOPICS or importance >= 0.5:
+        return "medium"
+    return "low"
+
+
+def _derive_confidence(importance: float, has_entities: bool) -> str:
+    if importance >= 0.7 and has_entities:
+        return "high"
+    if importance >= 0.4:
+        return "medium"
+    return "low"
+
+
+def _derive_data_gap(category: str, has_entities: bool, importance: float) -> bool:
+    return (category == "other") or (not has_entities) or (importance < 0.3)
+
+
+# ---------- cluster id ----------
+#
+# Cluster id groups duplicate headlines from different sources (BBC / Reuters
+# / AP all carrying the same Powell quote). v1 is a normalised-token hash:
+# strip punctuation, lowercase, drop a small stop-word list, sort tokens.
+# Catches paraphrasing within reordering. Different paraphrases land in
+# different clusters — accepted limitation for v1.
+
+_CLUSTER_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "the", "a", "an", "of", "in", "on", "for", "to", "by", "at", "with",
+        "and", "or", "but", "as", "is", "are", "was", "were", "be", "been",
+        "after", "before", "amid", "over", "from", "into", "vs", "v.",
+    }
+)
+_CLUSTER_TOKEN_RE = re.compile(r"[A-Za-z0-9一-鿿]+")
+_CLUSTER_SOURCE_PREFIX_RE = re.compile(
+    r"^\s*(reuters|bloomberg|ap|bbc|cnbc|wsj|ft|nikkei|新華社|中央社)[\s:\-—–]*",
+    re.IGNORECASE,
+)
+
+
+def compute_cluster_id(title: str, *, summary: str | None = None) -> str:
+    """Return a 12-char stable id grouping near-duplicate headlines.
+
+    Same logical event from multiple wire services should land in the same
+    cluster; very different wording produces different ids.
+    """
+    base = title or ""
+    if summary:
+        base = f"{base} {summary[:80]}"
+    base = _CLUSTER_SOURCE_PREFIX_RE.sub("", base)
+    tokens = [t.lower() for t in _CLUSTER_TOKEN_RE.findall(base)]
+    tokens = [t for t in tokens if t not in _CLUSTER_STOPWORDS and len(t) > 1]
+    if not tokens:
+        # Fall back to raw title hash so empty / non-tokenisable titles
+        # still get a deterministic id.
+        digest_input = (title or "").strip().lower()
+    else:
+        digest_input = " ".join(sorted(set(tokens)))
+    digest = hashlib.sha1(digest_input.encode("utf-8")).hexdigest()
+    return digest[:12]
+
+
+# ---------- public API (REQ-020) ----------
+
+
+def derive_news_impact(
+    *,
+    annotation: EventAnnotation,
+    title: str,
+    summary: str | None,
+    raw_json: str | None = None,
+) -> NewsImpact:
+    """Compute REQ-020 impact tags on top of a REQ-013 annotation."""
+    title_str = title or ""
+    summary_str = summary or ""
+    text = "\n".join(
+        filter(None, [title_str, summary_str, _extract_market_context_hint(raw_json)])
+    )
+
+    topic = _classify_topic(text)
+    has_entities = bool(annotation.entities)
+
+    return NewsImpact(
+        topic=topic,
+        impact_region=_derive_impact_region(annotation.entities),
+        impact_scope=_derive_impact_scope(annotation.entities, topic),
+        impact_direction=_derive_impact_direction(
+            annotation.sentiment, annotation.importance, has_entities
+        ),
+        urgency=_derive_urgency(topic, annotation.importance),
+        confidence=_derive_confidence(annotation.importance, has_entities),
+        data_gap=_derive_data_gap(annotation.category, has_entities, annotation.importance),
+        cluster_id=compute_cluster_id(title_str, summary=summary_str),
+    )
