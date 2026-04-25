@@ -4,7 +4,8 @@ __pycache__/
 .venv/
 .vscode/
 .idea/
-.claude/
+.claude/settings.local.json
+.claude/worktrees/
 .secrets/
 .trigger_state.json
 *.egg-info/

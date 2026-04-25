@@ -560,7 +560,7 @@ tasks:
   - id: REQ-018
     title: "[自動交易總體] Python / Java / Decision / Order 邊界與資料流定稿"
     module: architecture_foundation
-    status: pending
+    status: done
     trigger: manual
     priority: high
     description: |
@@ -594,6 +594,21 @@ tasks:
     notes: |
       2026-04-25 新列。此條是後續所有自動交易功能的設計前置條件。
       若邊界未先定稿，後續很容易把 Java 觸達、Python 分析、下單中台耦合在一起。
+      2026-04-25 進入 review：
+        - 交付物：memory-bank/09-decisions/2026-04-25-auto-trading-system-boundaries.md
+        - 文件涵蓋：四層邊界（Python data+analysis / Java delivery / decision / order）、
+          18 張核心資料表的寫入 ownership 矩陣（含 t_analysis_delivery_logs 由 Java 寫）、
+          三種運行模式 manual/semi_auto/auto + global_mode + strategy mode_override，
+          四類 kill switch（global / per-symbol / broker connectivity），
+          五個 LLM 不可繞過的 approval gate，
+          end-to-end Mermaid 流程圖 + ASCII fallback
+        - 六個強制不變式：facts before analysis / no-LLM-to-broker /
+          default manual mode / kill switch 在 submission 點生效 /
+          全鏈路 traceability / Java 獨佔 delivery
+        - Non-goals 顯式列出：column-level schema、broker 選型、prompt cache、RAG，
+          後續 REQ-019~029 個別處理
+      2026-04-25 user review 通過，狀態改 done；
+        REQ-019 起所有 PR 都必須引用本文件作為邊界依據。
 
   # ── 模組：Data Ingestion ─────────────────────────────────────────────
   - id: REQ-019
