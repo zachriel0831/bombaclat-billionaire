@@ -1,3 +1,9 @@
+"""X (Twitter) filtered-stream client.
+
+Long-lived HTTP stream that yields tweets matching configured rules and
+converts them into ``NewsItem`` rows. Handles 429 backoff, since-id
+tracking, and reconnect with jitter."""
+
 from __future__ import annotations
 
 # X Filtered Stream 封裝：追蹤指定帳號推文，提供近即時事件。

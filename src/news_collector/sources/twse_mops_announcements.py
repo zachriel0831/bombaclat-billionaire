@@ -1,3 +1,9 @@
+"""Taiwan Stock Exchange / MOPS major-announcement source.
+
+Pulls disclosures from the public TWSE MOPS endpoint, normalises the
+Chinese disclosure fields, and emits ``NewsItem`` rows tagged with
+company code + disclosure timestamp."""
+
 from __future__ import annotations
 
 import logging

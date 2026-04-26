@@ -1,3 +1,9 @@
+"""REQ-011 — Taiwan-close event builder.
+
+Aggregates same-day ``market_context:twse_flow / tpex_flow / taifex_flow``
+events plus index moves into a single ``market_context:tw_close`` row that
+the tw_close analysis slot consumes. Stored-only; no LLM call here."""
+
 from __future__ import annotations
 
 import argparse

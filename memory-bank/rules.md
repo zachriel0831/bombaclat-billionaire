@@ -25,6 +25,18 @@ If two sources conflict, prefer the higher-priority source in output or alert ex
 - Add tests for config logic and non-network core behavior.
 - For agent/skills changes, run `python scripts/validate_readiness.py`.
 
+## Context Loading Rules
+- Do not preload all memory-bank files.
+- Read the minimum relevant docs for the task.
+- Enterprise agent docs under `memory-bank/archive/enterprise/` are on-demand only.
+- Keep `tasks/todo.md` as the current task board; move stale history to `tasks/archive/`.
+
+## Response Style Rules
+- Default to primitive-short replies: few words, clear meaning, no filler.
+- For routine answers, use 1-3 concise lines and stop.
+- Avoid long summaries, tables, and repeated context unless explicitly requested.
+- Preserve correctness; do not omit key warnings, verification, or blockers.
+
 ## Change Management Rules
 - Any schema change requires updating:
   - `README.md`

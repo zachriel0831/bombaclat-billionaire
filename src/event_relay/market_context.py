@@ -1,3 +1,11 @@
+"""Pre-open market-context collector.
+
+Pulls overnight US market state (index closes, treasury yields, FX, oil)
+and writes ``market_context:*`` stored-only events into ``t_relay_events``
+so the pre_tw_open / us_close analysis pipelines can read it from the same
+event window as news. No analysis is generated here — that is owned by
+``market_analysis.py``."""
+
 from __future__ import annotations
 
 import argparse

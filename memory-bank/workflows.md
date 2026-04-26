@@ -332,10 +332,10 @@
 
 ## Workflow 6: Enterprise Readiness Review
 1. Review baseline docs:
-- `memory-bank/40-agent-enterprise-readiness.md`
-- `memory-bank/42-agent-evals-and-release-gates.md`
-- `memory-bank/43-agent-security-and-compliance.md`
-- `memory-bank/44-mcp-server-governance.md`
+- `memory-bank/archive/enterprise/40-agent-enterprise-readiness.md`
+- `memory-bank/archive/enterprise/42-agent-evals-and-release-gates.md`
+- `memory-bank/archive/enterprise/43-agent-security-and-compliance.md`
+- `memory-bank/archive/enterprise/44-mcp-server-governance.md`
 2. Validate artifacts exist and are current.
 3. Execute CI gates:
 - `build-test`

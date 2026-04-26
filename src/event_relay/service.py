@@ -1,3 +1,15 @@
+"""Event-relay storage layer (MySQL) + ingest processor.
+
+Defines the dataclasses (``RelayEvent``, ``MarketAnalysisRecord``,
+``MarketQuoteSnapshot``, …), ``MySqlEventStore`` (DDL, idempotent migrations,
+upserts for events / X posts / market snapshots / quote snapshots / analyses /
+annotations / RAG embeddings), and ``RelayProcessor`` which is the entry point
+the HTTP server calls for ``/events`` and ``/quote-snapshots``.
+
+This module owns every write to the relay-side MySQL tables; per
+REQ-018 boundaries no other module bypasses it.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

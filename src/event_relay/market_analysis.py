@@ -1,3 +1,13 @@
+"""Scheduled market-analysis pipeline orchestrator.
+
+Resolves the slot (us_close / pre_tw_open / tw_close), pulls the recent event
+window + snapshot rows, runs the multi-stage pipeline (digest → transmission
+→ tw_mapping → dual_view → critic → synthesis), persists summary +
+structured payload into ``t_market_analyses``, and emits prompt snapshots
+under ``runtime/prompts/``. Per REQ-018: collectors write source facts;
+this module reads them and writes analysis output, never the reverse.
+"""
+
 from __future__ import annotations
 
 import argparse

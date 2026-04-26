@@ -1,3 +1,9 @@
+"""News-collector CLI entry point.
+
+Selects sources, applies language filters, runs collection, and either
+prints JSON to stdout or pushes the resulting ``NewsItem`` rows through
+``relay_bridge`` to the event relay."""
+
 from __future__ import annotations
 
 import argparse

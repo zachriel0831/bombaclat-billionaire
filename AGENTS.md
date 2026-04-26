@@ -3,18 +3,24 @@
 ## Scope
 These instructions apply to this repository.
 
-## Primary Knowledge Sources
-Before making changes, reviewing code, or answering project-specific questions, read relevant files in this order:
-1. `memory-bank/00-index.md`
-2. `memory-bank/PROJECT_DOCUMENTATION.md`
-3. `memory-bank/rules.md`
-4. `memory-bank/workflows.md`
-5. `memory-bank/40-agent-enterprise-readiness.md` (for agent/skills planning)
-6. `tasks/lessons.md` (active lessons and prevention rules)
-7. Related source files for the task
+## Context Loading
+Do not preload the whole `memory-bank/`.
+Read only the smallest useful set for the task.
+
+Default:
+1. `memory-bank/rules.md`
+2. Related source files for the task
+
+Add these only when relevant:
+- `memory-bank/PROJECT_DOCUMENTATION.md`: architecture, schema, data flow, source mapping, scheduler, or service-boundary changes
+- `memory-bank/workflows.md`: service operations, runbooks, or repeatable workflow changes
+- `tasks/lessons.md`: user corrections, repeated mistakes, or task-start prevention checks
+- `tasks/todo.md`: non-trivial work with 3+ steps or architecture decisions
+- `memory-bank/09-decisions/`: decisions that explain existing behavior
+- `memory-bank/archive/enterprise/`: agent platform, skills, MCP, enterprise readiness, or eval-governance work
 
 ## Working Rules
-- Confirm `memory-bank/PROJECT_DOCUMENTATION.md` before generating or changing code.
+- Confirm `memory-bank/PROJECT_DOCUMENTATION.md` only before architecture, schema, data-flow, source-mapping, scheduler, or service-boundary code changes.
 - Prefer official data-source docs and repository facts over assumptions.
 - If required project information is missing, state the gap explicitly.
 - Do not modify unrelated files.
@@ -26,6 +32,12 @@ Before making changes, reviewing code, or answering project-specific questions, 
 - Do not mark work complete without verification evidence (tests, logs, or runtime output).
 - Prefer parallel execution for independent checks to keep task flow efficient.
 - For agent/skills related changes, run readiness gate locally: `python scripts/validate_readiness.py`.
+
+## Response Style
+- Default response style is primitive-short: minimal words, direct meaning, no filler.
+- Prefer 1-3 concise lines for routine answers.
+- Avoid long summaries, tables, and repeated context unless the user explicitly asks.
+- Keep enough technical detail to be correct; stop once the point is clear.
 
 ## PR Review Expectations
 When asked to review code, prioritize:

@@ -1,3 +1,8 @@
+"""Abstract base class for every news source.
+
+``NewsSource`` defines a single ``fetch(limit)`` returning ``NewsItem``
+rows. Subclasses are registered via the collector's source factory."""
+
 from __future__ import annotations
 
 # 新聞來源抽象基底介面。

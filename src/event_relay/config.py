@@ -1,3 +1,11 @@
+"""Event-relay runtime settings.
+
+Defines ``RelaySettings`` (host/port, MySQL connection, table names,
+retention) and ``load_settings()`` which reads env vars (with a tolerant
+``.env`` loader) and returns a frozen settings object consumed by
+``MySqlEventStore``, ``RelayProcessor``, and the HTTP server.
+"""
+
 from __future__ import annotations
 
 # 讀取 relay 服務環境設定與資料庫參數。

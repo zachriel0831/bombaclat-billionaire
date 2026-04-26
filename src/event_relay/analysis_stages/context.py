@@ -1,3 +1,10 @@
+"""Shared context + result types for the multi-stage analysis pipeline.
+
+``StageContext`` carries provider/model/slot/now_local for each stage
+call; ``StageResult`` carries the parsed output, raw text, error string,
+and extras telemetry. Stages depend on these dataclasses but not on each
+other."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

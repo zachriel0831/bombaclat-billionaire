@@ -1,3 +1,10 @@
+"""REQ-014 retrieval-augmented context for the analysis pipeline.
+
+Computes / stores embedding vectors for events and past analyses, and
+retrieves the top-K similar items to feed stage1 / stage4 as historical
+context. Pure-Python cosine similarity over MySQL-stored vectors so the
+pipeline does not depend on an external vector DB."""
+
 from __future__ import annotations
 
 import argparse

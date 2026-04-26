@@ -1,3 +1,9 @@
+"""Local readiness gate for agent / skills configuration.
+
+Checks that the required governance docs (AGENTS.md, memory-bank
+standards, skills/registry) exist and reference one another correctly.
+Run as a pre-commit / CI guard before merging skills changes."""
+
 from __future__ import annotations
 
 # 檢查專案治理與技能檔案完整性。
@@ -11,11 +17,11 @@ REQUIRED_FILES = [
     "AGENTS.md",
     "tasks/todo.md",
     "tasks/lessons.md",
-    "memory-bank/40-agent-enterprise-readiness.md",
-    "memory-bank/41-skills-engineering-standard.md",
-    "memory-bank/42-agent-evals-and-release-gates.md",
-    "memory-bank/43-agent-security-and-compliance.md",
-    "memory-bank/44-mcp-server-governance.md",
+    "memory-bank/archive/enterprise/40-agent-enterprise-readiness.md",
+    "memory-bank/archive/enterprise/41-skills-engineering-standard.md",
+    "memory-bank/archive/enterprise/42-agent-evals-and-release-gates.md",
+    "memory-bank/archive/enterprise/43-agent-security-and-compliance.md",
+    "memory-bank/archive/enterprise/44-mcp-server-governance.md",
     "skills/registry.yaml",
 ]
 

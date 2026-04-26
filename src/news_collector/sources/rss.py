@@ -1,3 +1,9 @@
+"""Official RSS / Atom feed source.
+
+Parses ``<item>`` / ``<entry>`` elements from configured feed URLs into
+``NewsItem`` rows. Tolerates mixed RSS / Atom layouts and missing
+published-at fields."""
+
 from __future__ import annotations
 
 import logging

@@ -1,3 +1,10 @@
+"""Bridge from news-collector sources to the event relay store.
+
+Long-running daemon that calls collectors on a cadence, normalises
+``NewsItem`` into ``RelayEvent``, deduplicates against the relay store,
+and posts to ``/events``. Operates as a separate process from the relay
+HTTP server."""
+
 from __future__ import annotations
 
 import argparse

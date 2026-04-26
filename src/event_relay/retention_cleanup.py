@@ -1,3 +1,10 @@
+"""Daily retention cleanup driver.
+
+Trims ``t_relay_events`` and related tables to ``RELAY_RETENTION_KEEP_DAYS``
+rows, preserving market_context / analysis-relevant rows. Invoked from the
+maintenance scheduler in ``RelayProcessor`` and exposed as a CLI for ad-hoc
+runs."""
+
 from __future__ import annotations
 
 import argparse

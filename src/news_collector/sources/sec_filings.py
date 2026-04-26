@@ -1,3 +1,9 @@
+"""SEC EDGAR filings source.
+
+Polls the EDGAR submissions API for tracked tickers and emits one
+``NewsItem`` per recent filing with form type, accession number, and
+filing URL surfaced to the analysis pipeline."""
+
 from __future__ import annotations
 
 import logging

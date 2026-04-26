@@ -1,3 +1,11 @@
+"""Event-relay service CLI entry point.
+
+Parses ``--env-file`` / ``--log-level``, loads settings, builds the
+``RelayProcessor`` (which connects to MySQL and starts the maintenance
+scheduler), and runs ``RelayHttpServer`` on the configured host/port until
+SIGINT/SIGTERM. ``python -m event_relay`` uses this to keep the relay alive.
+"""
+
 from __future__ import annotations
 
 # Event relay service: load settings, initialize storage, and expose /events.

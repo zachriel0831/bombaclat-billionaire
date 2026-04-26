@@ -1,3 +1,9 @@
+"""US index quote tracker (Dow, S&P 500, Nasdaq).
+
+Pulls regular-session OHLC from a public quote endpoint and produces
+snapshot rows used by the pre-open and US-close summaries. Predates
+REQ-019 ``t_market_quote_snapshots`` and remains for legacy summaries."""
+
 from __future__ import annotations
 
 # 美股指數追蹤器：抓道瓊與 S&P500，提供開盤/收盤推播內容。

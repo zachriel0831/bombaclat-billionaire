@@ -1,3 +1,9 @@
+"""Shared data model for collected news.
+
+``NewsItem`` is the single row format every source must produce: stable
+id, source label, title, url, optional published-at, optional summary,
+tags, and a raw-payload dict the relay turns into ``raw_json``."""
+
 from __future__ import annotations
 
 # 新聞資料模型定義。

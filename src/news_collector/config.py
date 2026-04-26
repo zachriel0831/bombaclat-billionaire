@@ -1,3 +1,9 @@
+"""News-collector configuration loader.
+
+Reads ``.env`` (tolerant) plus environment overrides into a ``Settings``
+dataclass. Resolves the X bearer token (env or DPAPI file) without
+leaking the secret into logs."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

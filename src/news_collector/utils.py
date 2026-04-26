@@ -1,3 +1,9 @@
+"""Time, hashing, and ordering helpers shared by news sources.
+
+``parse_datetime`` is tolerant across RFC 822, ISO-8601, compact UTC, and
+epoch forms. ``stable_id`` produces deterministic ids from a tuple of
+strings (used as relay event_id)."""
+
 from __future__ import annotations
 
 # 共用工具：時間解析、穩定 ID 與排序鍵。

@@ -1,3 +1,9 @@
+"""X (Twitter) account-timeline source.
+
+Polls a configured handle list using the v2 user-timeline API with
+since-id pagination and global rate-limit gating. Used as the polled
+fallback when the streaming client is offline."""
+
 from __future__ import annotations
 
 import logging

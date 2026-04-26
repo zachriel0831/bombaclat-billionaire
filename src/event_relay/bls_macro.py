@@ -1,3 +1,11 @@
+"""REQ-010 — U.S. Bureau of Labor Statistics macro data adapter.
+
+Pulls CPI / PPI / NFP / unemployment / wages from the BLS Public Data
+API v2, normalises into stored-only ``market_context:bls_macro`` events,
+and writes to ``t_relay_events`` with stable ``(series_id, year, period)``
+dedupe keys. The us_close / pre_tw_open analyses read from the same
+event window."""
+
 from __future__ import annotations
 
 import argparse

@@ -393,8 +393,7 @@ Create `.env` in project root and fill values as needed.
 - Workflows: `memory-bank/workflows.md`
 - Task board: `tasks/todo.md`
 - Lessons log: `tasks/lessons.md`
-- Enterprise readiness baseline: `memory-bank/40-agent-enterprise-readiness.md`
-- Skills engineering standard: `memory-bank/41-skills-engineering-standard.md`
+- Archived enterprise docs: `memory-bank/archive/enterprise/`
 - Skills workspace: `skills/`
 
 ## MCP servers

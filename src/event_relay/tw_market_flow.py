@@ -1,3 +1,10 @@
+"""REQ-009 — Taiwan institutional flow + TAIFEX collector.
+
+Pulls TWSE / TPEX / TAIFEX official daily datasets, normalises the
+Chinese fields, and writes ``market_context:twse_flow`` /
+``tpex_flow`` / ``taifex_flow`` stored-only events into
+``t_relay_events`` for downstream analysis."""
+
 from __future__ import annotations
 
 import argparse

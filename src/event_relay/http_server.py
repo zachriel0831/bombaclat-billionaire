@@ -1,3 +1,11 @@
+"""HTTP entry points for the event relay.
+
+Threaded ``http.server`` exposing ``GET /healthz``, ``POST /events``
+(news/X/market_context ingest), ``POST /quote-snapshots`` (REQ-019 high-
+frequency quote rows), and ``POST /market-analysis/run`` (manual / scheduled
+analysis trigger). Routes delegate to ``RelayProcessor`` in ``service.py``.
+"""
+
 from __future__ import annotations
 
 # Event relay HTTP entrypoints for data ingestion.

@@ -1,3 +1,8 @@
+"""Shared HTTP helpers used by every news-collector source.
+
+Thin wrappers around ``urllib`` providing JSON / text fetch with optional
+headers, sane User-Agent, and a single retry/timeout policy."""
+
 from __future__ import annotations
 
 # 共用 HTTP Client：提供含標頭的文字與 JSON 讀取工具。

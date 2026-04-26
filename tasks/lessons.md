@@ -217,3 +217,21 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `scripts/run_tw_market_flow.ps1 -EnvFile .env` stored 14 REQ-009 dataset events with 0 failures
   - MySQL query confirmed new REQ-009 rows `19634-19647` in `t_relay_events`
 - Status: active
+
+## LESSON-20260426-01
+- Date: 2026-04-26
+- Trigger (User correction): User asked to write the "primitive-short" response style into global rules.
+- What was wrong: Replies were still too verbose for the user's preferred low-token working style.
+- Root cause: The preference was active in conversation but not persisted in repository rules.
+- New rule (always/never): Always default to primitive-short replies: few words, clear meaning, no filler, unless depth is requested or needed for safety.
+- Prevention checklist (before final response):
+  - [ ] Can this be answered in 1-3 concise lines?
+  - [ ] Remove repeated context and unnecessary tables
+  - [ ] Keep only blockers, verification, and essential technical detail
+- Repo updates made:
+  - `AGENTS.md`
+  - `memory-bank/rules.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `rg` confirmed primitive-short rules are present in global/project rule files
+- Status: active

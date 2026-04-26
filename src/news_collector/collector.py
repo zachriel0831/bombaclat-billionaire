@@ -1,3 +1,9 @@
+"""Top-level orchestrator for news source fan-out.
+
+``build_sources()`` instantiates the configured ``NewsSource`` adapters
+(RSS / SEC / TWSE-MOPS / X) from settings; ``fetch_news()`` runs them in
+parallel and returns merged ``NewsItem`` rows ready for the relay bridge."""
+
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed

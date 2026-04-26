@@ -1,3 +1,10 @@
+"""Weekly market summary generator (Sunday 23:00 Asia/Taipei).
+
+Aggregates the past week of relay events + market analyses, calls the LLM
+(Anthropic / OpenAI) to produce a Traditional-Chinese summary, persists
+to ``t_market_analyses`` with ``slot=weekly_tw_preopen``. Hosts shared
+LLM helpers reused by ``market_analysis``."""
+
 from __future__ import annotations
 
 import argparse
