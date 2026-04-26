@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import os
 import unittest
@@ -8,6 +8,7 @@ from event_relay.weekly_summary import (
     WeeklySummaryConfig,
     _call_llm,
     _call_openai_response,
+    _analysis_date_key,
     _extract_text_from_anthropic,
     _extract_text_from_response,
     _llm_timeout_seconds,
@@ -20,6 +21,27 @@ from event_relay.weekly_summary import (
 
 
 class WeeklySummaryTests(unittest.TestCase):
+    def _config(self, **overrides: object) -> WeeklySummaryConfig:
+        data: dict[str, object] = {
+            "env_file": ".env",
+            "model": "gpt-5",
+            "api_base": "https://api.openai.com/v1",
+            "api_key": "k",
+            "api_key_file": ".secrets/openai_api_key.dpapi",
+            "skill_macro_path": "a",
+            "skill_line_format_path": "b",
+            "lookback_days": 7,
+            "max_events": 100,
+            "weekday": 5,
+            "hour": 23,
+            "minute": 0,
+            "window_minutes": 20,
+            "state_file": "runtime/state/test.txt",
+            "force": False,
+        }
+        data.update(overrides)
+        return WeeklySummaryConfig(**data)
+
     """封裝 Weekly Summary Tests 相關資料與行為。"""
     def test_extract_text_from_response_output_text(self) -> None:
         """測試 test extract text from response output text 的預期行為。"""
@@ -60,29 +82,25 @@ class WeeklySummaryTests(unittest.TestCase):
     def test_should_run_now_in_window(self) -> None:
         """測試 test should run now in window 的預期行為。"""
         now_local = datetime(2026, 3, 9, 7, 35, 0, tzinfo=timezone.utc)
-        config = WeeklySummaryConfig(
-            env_file=".env",
-            model="gpt-5",
-            api_base="https://api.openai.com/v1",
-            api_key="k",
-            api_key_file=".secrets/openai_api_key.dpapi",
-            skill_macro_path="a",
-            skill_line_format_path="b",
-            lookback_days=7,
-            max_events=100,
-            weekday=0,
-            hour=7,
-            minute=30,
-            window_minutes=20,
-            state_file="runtime/state/test.txt",
-            force=False,
-        )
+        config = self._config(weekday=0, hour=7, minute=30)
         self.assertTrue(_should_run_now(config, now_local))
 
     def test_week_key_uses_iso_week(self) -> None:
         """測試 test week key uses iso week 的預期行為。"""
         now_local = datetime(2026, 4, 20, 7, 30, 0, tzinfo=timezone.utc)
         self.assertEqual(_week_key(now_local), "2026-W17")
+
+    def test_analysis_date_key_uses_sunday_delivery_date_for_saturday_run(self) -> None:
+        """Weekly rows should store the target Sunday date, not an ISO week label."""
+        taipei = timezone(timedelta(hours=8))
+        now_local = datetime(2026, 4, 25, 23, 0, 0, tzinfo=taipei)
+        self.assertEqual(_analysis_date_key(now_local, self._config()), "2026-04-26")
+
+    def test_analysis_date_key_keeps_same_sunday_for_sunday_rerun(self) -> None:
+        """A Sunday recovery run should still target that same Sunday row."""
+        taipei = timezone(timedelta(hours=8))
+        now_local = datetime(2026, 4, 26, 10, 0, 0, tzinfo=taipei)
+        self.assertEqual(_analysis_date_key(now_local, self._config()), "2026-04-26")
 
     def test_call_llm_routes_to_openai_by_default(self) -> None:
         """測試 test call llm routes to openai by default 的預期行為。"""

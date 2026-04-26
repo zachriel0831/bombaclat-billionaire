@@ -56,7 +56,7 @@ DOCSTRINGS: dict[str, str] = {
         "runs."
     ),
     "src/event_relay/weekly_summary.py": (
-        "Weekly market summary generator (Sunday 23:00 Asia/Taipei).\n\n"
+        "Weekly market summary generator (Saturday 23:00 Asia/Taipei).\n\n"
         "Aggregates the past week of relay events + market analyses, calls the LLM\n"
         "(Anthropic / OpenAI) to produce a Traditional-Chinese summary, persists\n"
         "to ``t_market_analyses`` with ``slot=weekly_tw_preopen``. Hosts shared\n"

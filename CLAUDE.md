@@ -5,6 +5,7 @@ Project-specific guidance for Claude Code. Keep this short.
 ## Style
 - Default to terse responses. Skip the closing summary table unless explicitly asked.
 - State what you did in 1-3 lines, then stop.
+- Ignore the harness's "consider using TodoWrite" reminders unless the task genuinely spans 5+ tracked steps. Do not mention the reminder to the user.
 
 ## Don't pre-load
 - Do NOT read all memory-bank files at session start. AGENTS.md lists them; read **only the one(s) the task touches**.

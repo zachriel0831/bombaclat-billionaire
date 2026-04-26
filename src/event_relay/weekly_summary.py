@@ -1,4 +1,4 @@
-"""Weekly market summary generator (Sunday 23:00 Asia/Taipei).
+"""Weekly market summary generator (Saturday 23:00 Asia/Taipei).
 
 Aggregates the past week of relay events + market analyses, calls the LLM
 (Anthropic / OpenAI) to produce a Traditional-Chinese summary, persists
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
 import os
@@ -160,6 +160,13 @@ def _week_key(now_local: datetime) -> str:
     """執行 week key 的主要流程。"""
     iso_year, iso_week, _ = now_local.isocalendar()
     return f"{iso_year}-W{iso_week:02d}"
+
+
+def _analysis_date_key(now_local: datetime, config: WeeklySummaryConfig) -> str:
+    """Store the target Sunday delivery date instead of an ISO week label."""
+    delivery_weekday = (config.weekday + 1) % 7
+    delta_days = (delivery_weekday - now_local.weekday()) % 7
+    return (now_local.date() + timedelta(days=delta_days)).isoformat()
 
 
 def _should_run_now(config: WeeklySummaryConfig, now_local: datetime) -> bool:
@@ -433,11 +440,12 @@ def _store_weekly_analysis(
     events_used: int,
 ) -> None:
     """執行 store weekly analysis 的主要流程。"""
+    analysis_date = _analysis_date_key(now_local, config)
     store.upsert_market_analysis(
         MarketAnalysisRecord(
-            analysis_date=_week_key(now_local),
+            analysis_date=analysis_date,
             analysis_slot=WEEKLY_ANALYSIS_SLOT,
-            scheduled_time_local="Mon 07:30",
+            scheduled_time_local="Sun 05:10",
             model=config.model,
             prompt_version=WEEKLY_PROMPT_VERSION,
             summary_text=message,
@@ -449,6 +457,7 @@ def _store_weekly_analysis(
                 {
                     "dimension": "weekly",
                     "anchor_local_date": now_local.date().isoformat(),
+                    "delivery_local_date": analysis_date,
                     "scheduled_weekday": config.weekday,
                     "scheduled_time": f"{config.hour:02d}:{config.minute:02d}",
                     "events_used": events_used,
@@ -466,6 +475,7 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
     """執行單次任務流程並回傳結果。"""
     now_local = datetime.now().astimezone()
     run_key = _week_key(now_local)
+    analysis_date = _analysis_date_key(now_local, config)
     state_file = Path(config.state_file)
 
     # 每週排程有兩道保護：先檢查是否在允許時間窗，再檢查這個 iso week 是否已寫過。
@@ -547,7 +557,7 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
         "pushed": 0,
         "events_used": len(events),
         "dry_run": True,
-        "analysis_date": run_key,
+        "analysis_date": analysis_date,
         "analysis_slot": WEEKLY_ANALYSIS_SLOT,
     }
 
