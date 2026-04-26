@@ -1,6 +1,7 @@
 param(
   [string]$EnvFile = ".env",
   [string]$UsCloseTaskName = "NewsCollector-MarketAnalysis-UsClose",
+  [string]$RagIndexerTaskName = "NewsCollector-RagIndexer",
   [string]$BlsMacroTaskName = "NewsCollector-BlsMacro",
   [string]$MarketContextTaskName = "NewsCollector-MarketContext-PreTwOpen",
   [string]$PreOpenTaskName = "NewsCollector-MarketAnalysis-PreTwOpen",
@@ -8,6 +9,7 @@ param(
   [string]$TwCloseContextTaskName = "NewsCollector-TwCloseContext",
   [string]$TwCloseTaskName = "NewsCollector-MarketAnalysis-TwClose",
   [string]$UsCloseAt = "05:00",
+  [string]$RagIndexerAt = "04:40",
   [string]$BlsMacroAt = "04:50",
   [string]$MarketContextAt = "07:50",
   [string]$PreOpenAt = "08:00",
@@ -20,6 +22,7 @@ param(
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $RunScript = Join-Path $ProjectRoot "scripts\\run_market_analysis.ps1"
+$RagIndexerScript = Join-Path $ProjectRoot "scripts\\run_rag_indexer.ps1"
 $ContextScript = Join-Path $ProjectRoot "scripts\\run_market_context.ps1"
 $BlsMacroScript = Join-Path $ProjectRoot "scripts\\run_bls_macro.ps1"
 $TwMarketFlowScript = Join-Path $ProjectRoot "scripts\\run_tw_market_flow.ps1"
@@ -27,6 +30,9 @@ $TwCloseContextScript = Join-Path $ProjectRoot "scripts\\run_tw_close_context.ps
 
 if (-not (Test-Path -LiteralPath $RunScript)) {
   throw "run_market_analysis.ps1 not found: $RunScript"
+}
+if (-not (Test-Path -LiteralPath $RagIndexerScript)) {
+  throw "run_rag_indexer.ps1 not found: $RagIndexerScript"
 }
 if (-not (Test-Path -LiteralPath $ContextScript)) {
   throw "run_market_context.ps1 not found: $ContextScript"
@@ -154,6 +160,7 @@ function Register-TwCloseContextTask {
   Write-Host "  State: $($task.State)"
 }
 
+Register-CollectorTask -TaskName $RagIndexerTaskName -ScriptPath $RagIndexerScript -At $RagIndexerAt -Description "Index recent relay events and market analyses for historical-case RAG."
 Register-CollectorTask -TaskName $BlsMacroTaskName -ScriptPath $BlsMacroScript -At $BlsMacroAt -Description "Collect BLS official macro facts into t_relay_events before U.S. close analysis."
 Register-MarketAnalysisTask -TaskName $UsCloseTaskName -Slot "us_close" -At $UsCloseAt -Description "Generate stored-only U.S. close analysis at 05:00 local time."
 Register-MarketContextTask -TaskName $MarketContextTaskName -At $MarketContextAt -Description "Collect pre-open market context and store it as event-only facts before Taiwan open."

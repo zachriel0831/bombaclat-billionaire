@@ -66,10 +66,13 @@ _VALID_STAGE3 = {
 
 
 class SchemaValidationTests(unittest.TestCase):
+    """封裝 Schema Validation Tests 相關資料與行為。"""
     def test_stage1_accepts_valid_payload(self) -> None:
+        """測試 test stage1 accepts valid payload 的預期行為。"""
         validate_against_schema(_VALID_STAGE1, STAGE1_DIGEST_SCHEMA)
 
     def test_stage1_rejects_bad_importance(self) -> None:
+        """測試 test stage1 rejects bad importance 的預期行為。"""
         bad = {
             "events": [
                 {
@@ -83,6 +86,7 @@ class SchemaValidationTests(unittest.TestCase):
             validate_against_schema(bad, STAGE1_DIGEST_SCHEMA)
 
     def test_stage1_rejects_unknown_category(self) -> None:
+        """測試 test stage1 rejects unknown category 的預期行為。"""
         bad = {
             "events": [
                 {
@@ -96,20 +100,24 @@ class SchemaValidationTests(unittest.TestCase):
             validate_against_schema(bad, STAGE1_DIGEST_SCHEMA)
 
     def test_stage1_rejects_additional_top_level_key(self) -> None:
+        """測試 test stage1 rejects additional top level key 的預期行為。"""
         bad = dict(_VALID_STAGE1, extra_key="nope")
         with self.assertRaises(SchemaValidationError):
             validate_against_schema(bad, STAGE1_DIGEST_SCHEMA)
 
     def test_stage2_requires_assumptions(self) -> None:
+        """測試 test stage2 requires assumptions 的預期行為。"""
         chain = dict(_VALID_STAGE2["chains"][0])
         chain.pop("assumptions")
         with self.assertRaises(SchemaValidationError):
             validate_against_schema({"chains": [chain]}, STAGE2_TRANSMISSION_SCHEMA)
 
     def test_stage3_accepts_valid_payload(self) -> None:
+        """測試 test stage3 accepts valid payload 的預期行為。"""
         validate_against_schema(_VALID_STAGE3, STAGE3_TW_MAPPING_SCHEMA)
 
     def test_stage3_requires_evidence_ids_array(self) -> None:
+        """測試 test stage3 requires evidence ids array 的預期行為。"""
         bad = {
             **_VALID_STAGE3,
             "sector_watch": [
@@ -124,11 +132,14 @@ class SchemaValidationTests(unittest.TestCase):
 
 
 class EvidenceTraceabilityTests(unittest.TestCase):
+    """封裝 Evidence Traceability Tests 相關資料與行為。"""
     def test_all_evidence_ids_known(self) -> None:
+        """測試 test all evidence ids known 的預期行為。"""
         missing = assert_evidence_ids_covered(_VALID_STAGE3, _VALID_STAGE1)
         self.assertEqual(missing, [])
 
     def test_detects_unknown_evidence_id(self) -> None:
+        """測試 test detects unknown evidence id 的預期行為。"""
         stage3_with_phantom = {
             **_VALID_STAGE3,
             "stock_watch": [
@@ -145,7 +156,9 @@ class EvidenceTraceabilityTests(unittest.TestCase):
 
 
 class StageRunnerFallbackTests(unittest.TestCase):
+    """封裝 Stage Runner Fallback Tests 相關資料與行為。"""
     def _context(self) -> StageContext:
+        """執行 context 方法的主要邏輯。"""
         return StageContext(
             provider="openai",
             api_base="https://api.openai.com/v1",
@@ -156,6 +169,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         )
 
     def test_stage1_returns_error_result_on_llm_failure(self) -> None:
+        """測試 test stage1 returns error result on llm failure 的預期行為。"""
         with patch(
             "event_relay.analysis_stages.stage1_digest.call_llm_json",
             side_effect=RuntimeError("boom"),
@@ -169,6 +183,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("boom", result.error or "")
 
     def test_stage1_happy_path_records_event_count(self) -> None:
+        """測試 test stage1 happy path records event count 的預期行為。"""
         with patch(
             "event_relay.analysis_stages.stage1_digest.call_llm_json",
             return_value=(_VALID_STAGE1, "{\"events\": []}"),
@@ -182,9 +197,11 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertEqual(result.extras["event_count"], 1)
 
     def test_stage2_uses_stage1_json_in_prompt(self) -> None:
+        """測試 test stage2 uses stage1 json in prompt 的預期行為。"""
         captured = {}
 
         def fake_call(**kwargs):
+            """執行 fake call 方法的主要邏輯。"""
             captured["user_prompt"] = kwargs["user_prompt"]
             return _VALID_STAGE2, "raw"
 
@@ -194,7 +211,37 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertTrue(result.ok())
         self.assertIn("Fed cut policy rate", captured["user_prompt"])
 
+    def test_stage2_includes_retrieved_examples_in_prompt(self) -> None:
+        """測試 test stage2 includes retrieved examples in prompt 的預期行為。"""
+        captured = {}
+
+        def fake_call(**kwargs):
+            """執行 fake call 方法的主要邏輯。"""
+            captured["user_prompt"] = kwargs["user_prompt"]
+            return _VALID_STAGE2, "raw"
+
+        examples = [
+            {
+                "event_id": 55,
+                "source": "reuters",
+                "title": "Previous Fed cut supported semiconductors",
+                "similarity": 0.77,
+            }
+        ]
+        with patch("event_relay.analysis_stages.stage2_transmission.call_llm_json", side_effect=fake_call):
+            result = stage2_transmission.run(
+                context=self._context(),
+                stage1_output=_VALID_STAGE1,
+                retrieved_examples=examples,
+            )
+
+        self.assertTrue(result.ok())
+        self.assertIn("Historical retrieved examples JSON", captured["user_prompt"])
+        self.assertIn("Previous Fed cut supported semiconductors", captured["user_prompt"])
+        self.assertEqual(result.extras["retrieved_examples_count"], 1)
+
     def test_stage3_happy_path_counts_buckets(self) -> None:
+        """測試 test stage3 happy path counts buckets 的預期行為。"""
         with patch(
             "event_relay.analysis_stages.stage3_tw_mapping.call_llm_json",
             return_value=(_VALID_STAGE3, "raw"),
@@ -209,6 +256,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertEqual(result.extras["stocks_count"], 0)
 
     def test_stage4_returns_structured_when_schema_valid(self) -> None:
+        """測試 test stage4 returns structured when schema valid 的預期行為。"""
         structured = {
             "summary_text": "最終中文報告",
             "headline": "Fed dovish supports TW semis",
@@ -243,6 +291,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertTrue(result.extras["has_structured"])
 
     def test_stage4_falls_back_to_text_when_schema_fails(self) -> None:
+        """測試 test stage4 falls back to text when schema fails 的預期行為。"""
         with patch(
             "event_relay.analysis_stages.stage4_synthesis.call_llm_json",
             side_effect=SchemaValidationError("bad payload"),
@@ -268,6 +317,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("schema_failed", result.extras["structured_fallback"])
 
     def test_dual_view_produces_distinct_bull_and_bear(self) -> None:
+        """測試 test dual view produces distinct bull and bear 的預期行為。"""
         dual_view_payload = {
             "bull_case": {
                 "thesis": "Fed 降息點燃台股半導體 risk-on",
@@ -302,6 +352,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertEqual(result.extras["bear_drivers"], 2)
 
     def test_dual_view_returns_error_result_on_llm_failure(self) -> None:
+        """測試 test dual view returns error result on llm failure 的預期行為。"""
         with patch(
             "event_relay.analysis_stages.stage_dual_view.call_llm_json",
             side_effect=RuntimeError("network down"),
@@ -317,6 +368,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIsNone(result.output)
 
     def test_critic_recommends_low_confidence_for_thin_evidence(self) -> None:
+        """測試 test critic recommends low confidence for thin evidence 的預期行為。"""
         thin_stage1 = {"events": [], "market_snapshot": {}}
         thin_dual_view = {
             "bull_case": {
@@ -353,6 +405,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         captured: dict[str, Any] = {}
 
         def fake_call(**kwargs):
+            """執行 fake call 方法的主要邏輯。"""
             captured["user_prompt"] = kwargs["user_prompt"]
             return critic_payload, "raw"
 
@@ -373,6 +426,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("缺證據之牽強多方", captured["user_prompt"])
 
     def test_critic_failure_returns_error_result_for_pipeline_to_skip(self) -> None:
+        """測試 test critic failure returns error result for pipeline to skip 的預期行為。"""
         with patch(
             "event_relay.analysis_stages.stage_critic.call_llm_json",
             side_effect=RuntimeError("critic model timeout"),
@@ -391,6 +445,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIsNone(result.output)
 
     def test_stage4_errors_when_both_paths_fail(self) -> None:
+        """測試 test stage4 errors when both paths fail 的預期行為。"""
         with patch(
             "event_relay.analysis_stages.stage4_synthesis.call_llm_json",
             side_effect=SchemaValidationError("bad payload"),

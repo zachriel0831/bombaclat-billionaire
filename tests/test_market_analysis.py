@@ -17,15 +17,19 @@ from event_relay.service import SummaryEvent
 
 
 class _FakeAnalysisStore:
+    """封裝 Fake Analysis Store 相關資料與行為。"""
     records = []
 
     def __init__(self, _settings) -> None:
+        """初始化物件狀態與必要依賴。"""
         return None
 
     def initialize(self) -> None:
+        """執行 initialize 方法的主要邏輯。"""
         return None
 
     def fetch_recent_summary_events(self, days: int, limit: int) -> list[SummaryEvent]:
+        """抓取 fetch recent summary events 對應的資料或結果。"""
         return [
             SummaryEvent(
                 row_id=101,
@@ -51,17 +55,26 @@ class _FakeAnalysisStore:
         ]
 
     def fetch_recent_market_snapshots(self, hours: int, limit: int) -> list:
+        """抓取 fetch recent market snapshots 對應的資料或結果。"""
         return []
 
     def fetch_event_annotations(self, event_row_ids: list[int]) -> dict:
+        """抓取 fetch event annotations 對應的資料或結果。"""
         return {}
 
+    def fetch_event_embedding_candidates(self, *, embedding_model: str, limit: int) -> list:
+        """抓取 fetch event embedding candidates 對應的資料或結果。"""
+        return []
+
     def upsert_market_analysis(self, record) -> None:
+        """新增或更新 upsert market analysis 對應的資料或結果。"""
         _FakeAnalysisStore.records.append(record)
 
 
 class MarketAnalysisTests(unittest.TestCase):
+    """封裝 Market Analysis Tests 相關資料與行為。"""
     def test_resolve_slot_in_window(self) -> None:
+        """測試 test resolve slot in window 的預期行為。"""
         config = SimpleNamespace(slot="auto", window_minutes=25)
         now_local = datetime(2026, 4, 20, 7, 50, 0, tzinfo=timezone.utc)
 
@@ -70,6 +83,7 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertEqual(slot, "pre_tw_open")
 
     def test_resolve_slot_auto_tw_close_window(self) -> None:
+        """測試 test resolve slot auto tw close window 的預期行為。"""
         config = SimpleNamespace(slot="auto", window_minutes=25)
         now_local = datetime(2026, 4, 22, 15, 30, 0, tzinfo=timezone.utc)
 
@@ -78,6 +92,7 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertEqual(slot, "tw_close")
 
     def test_resolve_slot_manual_override(self) -> None:
+        """測試 test resolve slot manual override 的預期行為。"""
         config = SimpleNamespace(slot="us_close", window_minutes=25)
         now_local = datetime(2026, 4, 19, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -86,6 +101,7 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertEqual(slot, "us_close")
 
     def test_resolve_slot_manual_tw_close_override(self) -> None:
+        """測試 test resolve slot manual tw close override 的預期行為。"""
         config = SimpleNamespace(slot="tw_close", window_minutes=25)
         now_local = datetime(2026, 4, 22, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -94,10 +110,12 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertEqual(slot, "tw_close")
 
     def test_normalize_text_keeps_line_breaks(self) -> None:
+        """測試 test normalize text keeps line breaks 的預期行為。"""
         text = _normalize_text("  line1   \nline2  \n")
         self.assertEqual(text, "line1\nline2")
 
     def test_compact_event_raw_json_only_keeps_market_context_fields(self) -> None:
+        """測試 test compact event raw json only keeps market context fields 的預期行為。"""
         raw = (
             '{"event_type":"market_context_point","dimension":"market_context","slot":"pre_tw_open",'
             '"dataset":"T86_ALLBUT0999","series_id":"CUSR0000SA0",'
@@ -116,6 +134,7 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertIsNone(ignored)
 
     def test_build_prompts_contains_required_sections(self) -> None:
+        """測試 test build prompts contains required sections 的預期行為。"""
         config = SimpleNamespace(skill_macro_path="", skill_line_format_path="")
         system_prompt, user_prompt = _build_prompts(
             config=config,
@@ -135,6 +154,7 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertIn("風險與資料缺口", user_prompt)
 
     def test_build_prompts_tw_close_contains_close_review_sections(self) -> None:
+        """測試 test build prompts tw close contains close review sections 的預期行為。"""
         config = SimpleNamespace(skill_macro_path="", skill_line_format_path="")
         system_prompt, user_prompt = _build_prompts(
             config=config,
@@ -152,6 +172,7 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertIn("隔日觀察與風險", user_prompt)
 
     def test_run_once_tw_close_raw_json_dimension(self) -> None:
+        """測試 test run once tw close raw json dimension 的預期行為。"""
         _FakeAnalysisStore.records = []
         config = SimpleNamespace(
             env_file=".env",
@@ -190,11 +211,47 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertIn("market_context:tw_close", raw["event_context_sources"])
         self.assertFalse(result["push_enabled"])
 
+    def test_run_once_continues_when_rag_retrieval_fails(self) -> None:
+        """測試 test run once continues when rag retrieval fails 的預期行為。"""
+        _FakeAnalysisStore.records = []
+        config = SimpleNamespace(
+            env_file=".env",
+            model="test-model",
+            api_base="https://example.test",
+            api_key="test-key",
+            api_key_file=".secrets/test.dpapi",
+            skill_macro_path="",
+            skill_line_format_path="",
+            lookback_hours=24,
+            max_events=20,
+            max_market_rows=2,
+            window_minutes=25,
+            force=True,
+            slot="pre_tw_open",
+            provider="openai",
+        )
+
+        with patch.dict(os.environ, {"MARKET_ANALYSIS_PIPELINE": "legacy"}, clear=False):
+            with patch("event_relay.market_analysis.load_settings", return_value=SimpleNamespace(mysql_enabled=True)):
+                with patch("event_relay.market_analysis.MySqlEventStore", _FakeAnalysisStore):
+                    with patch("event_relay.market_analysis.retrieve_similar_events", side_effect=RuntimeError("rag down")):
+                        with patch("event_relay.market_analysis._write_prompt_snapshots", return_value=None):
+                            with patch("event_relay.market_analysis._call_llm", return_value="analysis text"):
+                                result = run_once(config)
+
+        self.assertTrue(result["ok"])
+        raw = json.loads(_FakeAnalysisStore.records[0].raw_json)
+        self.assertEqual(raw["rag"]["examples_count"], 0)
+        self.assertIn("rag down", raw["rag"]["error"])
+
     def test_build_events_payload_uses_stored_annotation_when_present(self) -> None:
+        """測試 test build events payload uses stored annotation when present 的預期行為。"""
         from event_relay.market_analysis import _build_events_payload
 
         class _Store:
+            """封裝 Store 相關資料與行為。"""
             def fetch_event_annotations(self, ids):
+                """抓取 fetch event annotations 對應的資料或結果。"""
                 return {
                     101: {
                         "entities": [{"kind": "policy", "value": "FOMC"}],
@@ -228,10 +285,13 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertAlmostEqual(ann["importance"], 0.9)
 
     def test_build_events_payload_falls_back_to_rule_annotation_when_missing(self) -> None:
+        """測試 test build events payload falls back to rule annotation when missing 的預期行為。"""
         from event_relay.market_analysis import _build_events_payload
 
         class _Store:
+            """封裝 Store 相關資料與行為。"""
             def fetch_event_annotations(self, ids):
+                """抓取 fetch event annotations 對應的資料或結果。"""
                 return {}
 
         events = [
@@ -257,6 +317,7 @@ class MarketAnalysisTests(unittest.TestCase):
         )
 
     def test_load_config_prefers_market_analysis_env(self) -> None:
+        """測試 test load config prefers market analysis env 的預期行為。"""
         old_model = os.environ.get("MARKET_ANALYSIS_MODEL")
         old_provider = os.environ.get("LLM_PROVIDER")
         try:
@@ -279,6 +340,7 @@ class MarketAnalysisTests(unittest.TestCase):
                 os.environ["LLM_PROVIDER"] = old_provider
 
     def test_load_config_switches_to_anthropic(self) -> None:
+        """測試 test load config switches to anthropic 的預期行為。"""
         snapshot = {
             k: os.environ.get(k)
             for k in ("LLM_PROVIDER", "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "MARKET_ANALYSIS_MODEL")
@@ -305,7 +367,9 @@ class MarketAnalysisTests(unittest.TestCase):
 
 
 class MultiStagePipelineTests(unittest.TestCase):
+    """封裝 Multi Stage Pipeline Tests 相關資料與行為。"""
     def _base_config(self) -> SimpleNamespace:
+        """執行 base config 方法的主要邏輯。"""
         return SimpleNamespace(
             env_file=".env",
             model="test-model",
@@ -324,6 +388,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         )
 
     def _run(self, *, pipeline_env: str, stage_side_effects: dict) -> tuple[dict, list]:
+        """執行 run 方法的主要邏輯。"""
         _FakeAnalysisStore.records = []
         from event_relay import market_analysis as module
 
@@ -342,6 +407,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         return result, _FakeAnalysisStore.records
 
     def test_legacy_mode_skips_pipeline(self) -> None:
+        """測試 test legacy mode skips pipeline 的預期行為。"""
         stage_side_effects = {
             "event_relay.analysis_stages.stage1_digest.run": _boom("stage1 should not be called"),
         }
@@ -353,6 +419,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(records[0].summary_text, "legacy fallback text")
 
     def test_multi_stage_happy_path(self) -> None:
+        """測試 test multi stage happy path 的預期行為。"""
         from event_relay.analysis_stages.context import StageResult
 
         stage_side_effects = {
@@ -403,6 +470,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(structured["confidence"], "medium")
 
     def test_multi_stage_text_fallback_leaves_structured_none(self) -> None:
+        """測試 test multi stage text fallback leaves structured none 的預期行為。"""
         from event_relay.analysis_stages.context import StageResult
 
         stage_side_effects = {
@@ -436,6 +504,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertIsNone(raw["structured"])
 
     def test_multi_stage_critic_failure_marks_critic_skipped_and_succeeds(self) -> None:
+        """測試 test multi stage critic failure marks critic skipped and succeeds 的預期行為。"""
         from event_relay.analysis_stages.context import StageResult
 
         dual_view_payload = {
@@ -506,6 +575,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(records[0].summary_text, "在缺 critic 下仍完成的分析")
 
     def test_multi_stage_stage3_failure_falls_back_to_legacy(self) -> None:
+        """測試 test multi stage stage3 failure falls back to legacy 的預期行為。"""
         from event_relay.analysis_stages.context import StageResult
 
         stage_side_effects = {
@@ -532,13 +602,17 @@ class MultiStagePipelineTests(unittest.TestCase):
 
 
 def _return(value):
+    """執行 return 的主要流程。"""
     def _side_effect(*_args, **_kwargs):
+        """執行 side effect 的主要流程。"""
         return value
     return _side_effect
 
 
 def _boom(message):
+    """執行 boom 的主要流程。"""
     def _side_effect(*_args, **_kwargs):
+        """執行 side effect 的主要流程。"""
         raise AssertionError(message)
     return _side_effect
 
@@ -547,15 +621,18 @@ class _nested:
     """Small context-manager helper to stack an arbitrary list of patches."""
 
     def __init__(self, *managers) -> None:
+        """初始化物件狀態與必要依賴。"""
         self._managers = managers
         self._entered: list = []
 
     def __enter__(self) -> None:
+        """進入 context manager 並準備資源。"""
         for manager in self._managers:
             self._entered.append(manager.__enter__())
         return None
 
     def __exit__(self, exc_type, exc, tb) -> None:
+        """離開 context manager 並釋放資源。"""
         for manager in reversed(self._managers):
             manager.__exit__(exc_type, exc, tb)
 

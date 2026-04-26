@@ -6,12 +6,14 @@ from news_collector.config import Settings
 
 
 class CollectorTests(unittest.TestCase):
+    """封裝 Collector Tests 相關資料與行為。"""
     def _settings(
         self,
         x_enabled: bool = False,
         x_bearer_token: str | None = None,
         x_accounts: list[str] | None = None,
     ) -> Settings:
+        """執行 settings 方法的主要邏輯。"""
         return Settings(
             sec_enabled=False,
             sec_user_agent="news-collector/0.1 local-admin@example.com",
@@ -39,6 +41,7 @@ class CollectorTests(unittest.TestCase):
         )
 
     def test_build_sources_all_without_x(self) -> None:
+        """測試 test build sources all without x 的預期行為。"""
         sources = build_sources(self._settings(x_enabled=False, x_bearer_token=None), "all")
         names = [s.name for s in sources]
         self.assertIn("official_rss", names)
@@ -47,14 +50,17 @@ class CollectorTests(unittest.TestCase):
         self.assertNotIn("x_accounts", names)
 
     def test_build_sources_x_disabled(self) -> None:
+        """測試 test build sources x disabled 的預期行為。"""
         with self.assertRaises(ValueError):
             build_sources(self._settings(x_enabled=False, x_bearer_token="token"), "x")
 
     def test_build_sources_x_requires_token(self) -> None:
+        """測試 test build sources x requires token 的預期行為。"""
         with self.assertRaises(ValueError):
             build_sources(self._settings(x_enabled=True, x_bearer_token=None), "x")
 
     def test_build_sources_x_enabled(self) -> None:
+        """測試 test build sources x enabled 的預期行為。"""
         sources = build_sources(
             self._settings(
                 x_enabled=True,
@@ -67,6 +73,7 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(sources[0].name, "x_accounts")
 
     def test_build_sources_sec_enabled(self) -> None:
+        """測試 test build sources sec enabled 的預期行為。"""
         settings = self._settings(x_enabled=False, x_bearer_token=None)
         settings = Settings(
             **{
@@ -83,6 +90,7 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(sources[0].name, "sec_filings")
 
     def test_build_sources_sec_requires_tickers(self) -> None:
+        """測試 test build sources sec requires tickers 的預期行為。"""
         settings = self._settings(x_enabled=False, x_bearer_token=None)
         settings = Settings(
             **{
@@ -96,6 +104,7 @@ class CollectorTests(unittest.TestCase):
             build_sources(settings, "sec")
 
     def test_build_sources_twse_enabled(self) -> None:
+        """測試 test build sources twse enabled 的預期行為。"""
         settings = self._settings(x_enabled=False, x_bearer_token=None)
         settings = Settings(
             **{
@@ -111,6 +120,7 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(sources[0].name, "twse_mops_announcements")
 
     def test_build_sources_twse_requires_codes(self) -> None:
+        """測試 test build sources twse requires codes 的預期行為。"""
         settings = self._settings(x_enabled=False, x_bearer_token=None)
         settings = Settings(
             **{

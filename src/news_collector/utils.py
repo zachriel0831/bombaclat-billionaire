@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 # 共用工具：時間解析、穩定 ID 與排序鍵。
 from datetime import datetime, timezone
@@ -7,6 +7,7 @@ import hashlib
 
 
 def parse_datetime(value: str | None) -> datetime | None:
+    """解析 parse datetime 對應的資料或結果。"""
     if not value:
         return None
 
@@ -34,6 +35,7 @@ def parse_datetime(value: str | None) -> datetime | None:
 
 
 def sort_timestamp(value: datetime | None) -> float:
+    """執行 sort timestamp 的主要流程。"""
     if value is None:
         return 0.0
     dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
@@ -41,11 +43,13 @@ def sort_timestamp(value: datetime | None) -> float:
 
 
 def stable_id(*parts: str) -> str:
+    """執行 stable id 的主要流程。"""
     joined = "||".join(part.strip() for part in parts if part and part.strip())
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:20]
 
 
 def local_name(tag: str) -> str:
+    """執行 local name 的主要流程。"""
     if "}" in tag:
         return tag.rsplit("}", 1)[-1]
     return tag

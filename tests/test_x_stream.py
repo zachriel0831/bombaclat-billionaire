@@ -4,7 +4,9 @@ from news_collector.x_stream import XFilteredStreamer, XStreamConfig, _normalize
 
 
 class XStreamTests(unittest.TestCase):
+    """封裝 X Stream Tests 相關資料與行為。"""
     def _streamer(self) -> XFilteredStreamer:
+        """執行 streamer 方法的主要邏輯。"""
         return XFilteredStreamer(
             XStreamConfig(
                 bearer_token="token",
@@ -15,11 +17,13 @@ class XStreamTests(unittest.TestCase):
         )
 
     def test_normalize_account(self) -> None:
+        """測試 test normalize account 的預期行為。"""
         self.assertEqual(_normalize_account("https://x.com/elonmusk"), "elonmusk")
         self.assertEqual(_normalize_account("@realDonaldTrump"), "realdonaldtrump")
         self.assertIsNone(_normalize_account("https://example.com/not-x"))
 
     def test_build_query_contains_accounts_and_excludes(self) -> None:
+        """測試 test build query contains accounts and excludes 的預期行為。"""
         streamer = self._streamer()
         query = streamer._build_query(["elonmusk", "realdonaldtrump"])
         self.assertIn("from:elonmusk", query)
@@ -28,6 +32,7 @@ class XStreamTests(unittest.TestCase):
         self.assertIn("-is:retweet", query)
 
     def test_to_news_item_parses_stream_payload(self) -> None:
+        """測試 test to news item parses stream payload 的預期行為。"""
         streamer = self._streamer()
         payload = {
             "data": {
@@ -56,16 +61,19 @@ class XStreamTests(unittest.TestCase):
         self.assertIn("lang:en", item.tags)
 
     def test_remember_tweet_dedup(self) -> None:
+        """測試 test remember tweet dedup 的預期行為。"""
         streamer = self._streamer()
         self.assertTrue(streamer._remember_tweet("x-1"))
         self.assertFalse(streamer._remember_tweet("x-1"))
 
     def test_is_too_many_connections_429(self) -> None:
+        """測試 test is too many connections 429 的預期行為。"""
         body = '{"title":"ConnectionException","connection_issue":"TooManyConnections"}'
         self.assertTrue(XFilteredStreamer._is_too_many_connections_429(body))
         self.assertFalse(XFilteredStreamer._is_too_many_connections_429('{"title":"RateLimited"}'))
 
     def test_parse_connection_kill_stats(self) -> None:
+        """測試 test parse connection kill stats 的預期行為。"""
         success, failed = XFilteredStreamer._parse_connection_kill_stats(
             {"data": {"successful_kills": 2, "failed_kills": 1}}
         )

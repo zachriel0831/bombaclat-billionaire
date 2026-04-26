@@ -39,6 +39,7 @@ SOURCE_ID = "bbc_business"
 
 # ── 爬取 ─────────────────────────────────────────────
 def fetch_page(url: str) -> BeautifulSoup:
+    """抓取 fetch page 對應的資料或結果。"""
     resp = requests.get(url, headers=HEADERS, timeout=15)
     resp.raise_for_status()
     return BeautifulSoup(resp.text, "lxml")
@@ -101,6 +102,7 @@ def extract_articles(soup: BeautifulSoup) -> list[dict]:
 
 # ── 主程式 ───────────────────────────────────────────
 def main():
+    """程式入口，負責執行此模組的主要流程。"""
     print(f"[BBC Business] Fetching {TARGET_URL} ...")
     soup     = fetch_page(TARGET_URL)
     articles = extract_articles(soup)

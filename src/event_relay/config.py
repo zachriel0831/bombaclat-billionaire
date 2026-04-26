@@ -7,6 +7,7 @@ import os
 
 
 def load_env_file(path: str) -> None:
+    """載入 load env file 對應的資料或結果。"""
     env_path = Path(path)
     if not env_path.exists():
         return
@@ -21,6 +22,7 @@ def load_env_file(path: str) -> None:
 
 @dataclass(frozen=True)
 class RelaySettings:
+    """封裝 Relay Settings 相關資料與行為。"""
     host: str
     port: int
     dispatch_interval_seconds: int
@@ -36,18 +38,22 @@ class RelaySettings:
     mysql_quote_snapshot_table: str
     mysql_analysis_table: str
     mysql_annotation_table: str
+    mysql_event_embedding_table: str
+    mysql_analysis_embedding_table: str
     mysql_connect_timeout_seconds: int
     retention_enabled: bool
     retention_keep_days: int
 
 
 def parse_bool(value: str | None, default: bool = False) -> bool:
+    """解析 parse bool 對應的資料或結果。"""
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def load_settings(env_file: str = ".env") -> RelaySettings:
+    """載入 load settings 對應的資料或結果。"""
     load_env_file(env_file)
 
     return RelaySettings(
@@ -69,6 +75,12 @@ def load_settings(env_file: str = ".env") -> RelaySettings:
         mysql_analysis_table=os.getenv("RELAY_MYSQL_ANALYSIS_TABLE", "t_market_analyses"),
         mysql_annotation_table=os.getenv(
             "RELAY_MYSQL_ANNOTATION_TABLE", "t_relay_event_annotations"
+        ),
+        mysql_event_embedding_table=os.getenv(
+            "RELAY_MYSQL_EVENT_EMBEDDING_TABLE", "t_event_embeddings"
+        ),
+        mysql_analysis_embedding_table=os.getenv(
+            "RELAY_MYSQL_ANALYSIS_EMBEDDING_TABLE", "t_analysis_embeddings"
         ),
         mysql_connect_timeout_seconds=int(os.getenv("RELAY_MYSQL_CONNECT_TIMEOUT", "5")),
         retention_enabled=parse_bool(os.getenv("RELAY_RETENTION_ENABLED", "true"), default=True),

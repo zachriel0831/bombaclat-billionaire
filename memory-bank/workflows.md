@@ -151,6 +151,7 @@
 ## Workflow 4C: Scheduled Market Analysis Storage
 1. Keep source inputs current
 - Ensure RSS, X, and US index tracker are writing to `t_relay_events` / `t_market_index_snapshots`
+- Run `scripts/run_rag_indexer.ps1` before the first daily analysis window when refreshing historical-case examples
 - Run `scripts/run_bls_macro.ps1` before the U.S. close analysis window when refreshing official U.S. macro facts
 - Run `scripts/run_market_context.ps1` before the Taiwan pre-open analysis window so `market_context:*` event facts are fresh
 - Run `scripts/run_tw_market_flow.ps1` and `scripts/run_tw_close_context.ps1` before the Taiwan close analysis window
@@ -159,6 +160,7 @@
 - Use `scripts/run_market_analysis.ps1 -Slot pre_tw_open` at `07:30`
 - Use `scripts/run_market_analysis.ps1 -Slot tw_close` at `15:30`
 - Treat `t_relay_events` as primary local evidence, not exhaustive truth
+- Stage2 transmission may receive retrieved historical examples from `t_event_embeddings`; these are analogues only, not current evidence IDs
 - OpenAI runs request web search by default; if unavailable, the prompt must label missing context instead of fabricating
 3. Persist analysis output
 - Generated text is upserted into `t_market_analyses` by `(analysis_date, analysis_slot)`
@@ -170,6 +172,23 @@
 - Query `t_market_analyses` for the current `analysis_date`
 - Query `t_relay_events` for recent `source LIKE 'market_context:%'`
 - Confirm `pushed=0`; Python does not contact LINE or create delivery jobs
+
+## Workflow 4L: Historical-Case RAG Indexing
+1. Build the local RAG index
+- Run `scripts/run_rag_indexer.ps1 -EnvFile .env`
+- The indexer writes recent relay-event vectors into `t_event_embeddings`
+- The indexer writes generated-analysis vectors into `t_analysis_embeddings`
+2. Embedding model
+- Default is `local-hash-v1`, a deterministic lexical embedding that needs no external API key
+- Keep `RAG_EMBEDDING_MODEL` stable unless intentionally rebuilding the index
+3. Use in market analysis
+- `MARKET_ANALYSIS_RAG_ENABLED=true` lets `market_analysis` retrieve similar historical events
+- Retrieved examples are inserted into `runtime/prompts/market_analysis_<slot>_stage2_transmission_user.txt`
+- RAG failure must degrade to an empty example set and never block analysis
+4. Verify
+- Run `python -m unittest tests.test_rag tests.test_analysis_stages tests.test_market_analysis -v`
+- Check `runtime/prompts/market_analysis_<slot>_stage2_transmission_user.txt` for `Historical retrieved examples JSON`
+- Inspect `t_market_analyses.raw_json.rag` for `examples_count` or an `error`
 
 ## Workflow 4D: Weekly Summary Storage
 1. Schedule for Taiwan pre-open usage

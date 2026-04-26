@@ -16,13 +16,17 @@ from event_relay.market_context import (
 
 
 class _FakeStore:
+    """封裝 Fake Store 相關資料與行為。"""
     def __init__(self, _settings) -> None:
+        """初始化物件狀態與必要依賴。"""
         self.events = []
 
     def initialize(self) -> None:
+        """執行 initialize 方法的主要邏輯。"""
         return None
 
     def enqueue_event_if_new(self, event) -> bool:
+        """執行 enqueue event if new 方法的主要邏輯。"""
         self.events.append(event)
         _FakeStore.events.append(event)
         return True
@@ -32,7 +36,9 @@ _FakeStore.events = []
 
 
 class MarketContextTests(unittest.TestCase):
+    """封裝 Market Context Tests 相關資料與行為。"""
     def test_parse_yahoo_chart_payload_builds_point(self) -> None:
+        """測試 test parse yahoo chart payload builds point 的預期行為。"""
         payload = {
             "chart": {
                 "result": [
@@ -59,6 +65,7 @@ class MarketContextTests(unittest.TestCase):
         self.assertGreater(point.change_percent or 0, 2.0)
 
     def test_parse_treasury_yield_curve_xml_uses_latest_record(self) -> None:
+        """測試 test parse treasury yield curve xml uses latest record 的預期行為。"""
         xml = """<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices"
       xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata"
@@ -82,6 +89,7 @@ class MarketContextTests(unittest.TestCase):
         self.assertAlmostEqual(spread.value or 0, 55.0)
 
     def test_build_summary_mentions_key_sections(self) -> None:
+        """測試 test build summary mentions key sections 的預期行為。"""
         points = [
             MarketContextPoint("yahoo_chart", "us_equity_index", "NASDAQ 100", "^NDX", 100.0, 99.0, 1.0, 1.01, "USD", None, "", {}),
             MarketContextPoint("yahoo_chart", "semiconductor", "PHLX Semiconductor", "^SOX", 100.0, 98.0, 2.0, 2.04, "USD", None, "", {}),
@@ -98,6 +106,7 @@ class MarketContextTests(unittest.TestCase):
         self.assertIn("來源錯誤: 1", summary)
 
     def test_build_market_context_events_marks_events_stored_only(self) -> None:
+        """測試 test build market context events marks events stored only 的預期行為。"""
         points = [
             MarketContextPoint("yahoo_chart", "us_equity_index", "NASDAQ 100", "^NDX", 100.0, 99.0, 1.0, 1.01, "USD", None, "https://example.com", {})
         ]
@@ -118,6 +127,7 @@ class MarketContextTests(unittest.TestCase):
         self.assertEqual(events[-1].source, "market_context:collector")
 
     def test_run_once_writes_relay_events(self) -> None:
+        """測試 test run once writes relay events 的預期行為。"""
         _FakeStore.events = []
         points = [
             MarketContextPoint("yahoo_chart", "us_equity_index", "NASDAQ 100", "^NDX", 100.0, 99.0, 1.0, 1.01, "USD", None, "", {})

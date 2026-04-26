@@ -287,6 +287,7 @@ Current behavior:
 - Reads recent events from `t_relay_events`
 - Reads recent DJIA / S&P 500 rows from `t_market_index_snapshots`
 - Reads stored-only `market_context:*` source facts from the recent `t_relay_events` window
+- Optionally retrieves similar historical relay events from `t_event_embeddings` and includes them as analogues in the stage2 transmission prompt
 - Calls OpenAI Responses API with web search enabled by default for missing/current fact verification
 - Stores the generated analysis in `t_market_analyses`
 - Does not push or create LINE delivery jobs; Java owns user-facing delivery
@@ -316,6 +317,7 @@ BLS macro collector:
 Run context collection once:
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_rag_indexer.ps1 -EnvFile .env
 powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env
 powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_market_flow.ps1 -EnvFile .env
 powershell -ExecutionPolicy Bypass -File .\scripts\run_bls_macro.ps1 -EnvFile .env
@@ -344,6 +346,15 @@ Market analysis env keys:
 - `MARKET_ANALYSIS_MAX_EVENTS` (default `120`)
 - `MARKET_ANALYSIS_MAX_MARKET_ROWS` (default `24`)
 - `MARKET_ANALYSIS_WINDOW_MINUTES` (default `25`)
+- `MARKET_ANALYSIS_RAG_ENABLED` (default `true`)
+- `MARKET_ANALYSIS_RAG_K` (default `5`)
+- `MARKET_ANALYSIS_RAG_MIN_SIMILARITY` (default `0.22`)
+- `MARKET_ANALYSIS_RAG_CANDIDATE_LIMIT` (default `500`)
+- `RAG_EMBEDDING_MODEL` (default `local-hash-v1`)
+- `RAG_EMBEDDING_DIMENSIONS` (default `128`)
+- `RAG_INDEX_LOOKBACK_DAYS` (default `30`)
+- `RAG_INDEX_EVENT_LIMIT` (default `500`)
+- `RAG_INDEX_ANALYSIS_LIMIT` (default `100`)
 - `LLM_WEB_SEARCH_ENABLED` (default `true` for OpenAI; set `false` for local-only analysis)
 - `LLM_TIMEOUT_SECONDS` (default `120`, shared OpenAI/Anthropic HTTP timeout)
 - `MARKET_CONTEXT_TWSE_CODES` (optional; defaults to `TWSE_MOPS_TRACKED_CODES`)

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_sources(settings: Settings, source_name: str) -> list[NewsSource]:
+    """建立 build sources 對應的資料或結果。"""
     selected = source_name.lower()
 
     sources: list[NewsSource] = []
@@ -109,6 +110,7 @@ def build_sources(settings: Settings, source_name: str) -> list[NewsSource]:
 
 
 def fetch_news(sources: list[NewsSource], limit_per_source: int = 20) -> list[NewsItem]:
+    """抓取 fetch news 對應的資料或結果。"""
     logger.info("Starting fetch run: sources=%d, limit_per_source=%d", len(sources), limit_per_source)
     items: list[NewsItem] = []
 
@@ -158,6 +160,7 @@ def fetch_news(sources: list[NewsSource], limit_per_source: int = 20) -> list[Ne
 
 def _dedupe(items: list[NewsItem]) -> list[NewsItem]:
     # 先用 URL 去重；若無 URL，退化為 source+title key。
+    """依穩定鍵移除重複資料。"""
     seen: set[str] = set()
     output: list[NewsItem] = []
     for item in items:

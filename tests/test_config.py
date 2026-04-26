@@ -8,7 +8,9 @@ from news_collector.config import DEFAULT_RSS_FEEDS, load_settings
 
 
 class ConfigTests(unittest.TestCase):
+    """封裝 Config Tests 相關資料與行為。"""
     def test_load_settings_uses_defaults_when_env_missing(self) -> None:
+        """測試 test load settings uses defaults when env missing 的預期行為。"""
         with tempfile.TemporaryDirectory() as tmp_dir:
             env_path = Path(tmp_dir) / ".env"
             env_path.write_text("", encoding="utf-8")
@@ -38,6 +40,7 @@ class ConfigTests(unittest.TestCase):
         self.assertGreaterEqual(settings.http_timeout_seconds, 1)
 
     def test_load_settings_reads_env_file(self) -> None:
+        """測試 test load settings reads env file 的預期行為。"""
         with tempfile.TemporaryDirectory() as tmp_dir:
             env_path = Path(tmp_dir) / ".env"
             env_path.write_text(

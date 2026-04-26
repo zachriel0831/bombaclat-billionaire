@@ -7,6 +7,7 @@ import os
 import time
 
 def run(task: dict, base_dir: str) -> bool:
+    """執行 run 的主要流程。"""
     rate_limit = task.get("rules", {}).get("rate_limit_sec", 0)
     if rate_limit > 0:
         time.sleep(rate_limit)

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 # X Filtered Stream 封裝：追蹤指定帳號推文，提供近即時事件。
 from collections import deque
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class XStreamConfig:
+    """封裝 X Stream Config 相關資料與行為。"""
     bearer_token: str
     accounts: list[str]
     include_replies: bool = False
@@ -35,10 +36,12 @@ class XStreamConfig:
 
 
 class _StopStream(RuntimeError):
+    """封裝 Stop Stream 相關資料與行為。"""
     pass
 
 
 class XFilteredStreamer:
+    """封裝 X Filtered Streamer 相關資料與行為。"""
     rules_endpoint = "https://api.x.com/2/tweets/search/stream/rules"
     stream_endpoint = "https://api.x.com/2/tweets/search/stream"
     connections_endpoint = "https://api.x.com/2/connections"
@@ -46,6 +49,7 @@ class XFilteredStreamer:
     rule_tag_prefix = "news_collector_x_stream"
 
     def __init__(self, config: XStreamConfig) -> None:
+        """初始化物件狀態與必要依賴。"""
         self.config = config
         self._seen_limit = 5000
         self._seen_ids: deque[str] = deque()
@@ -53,6 +57,7 @@ class XFilteredStreamer:
         self._last_connection_heal_at = 0.0
 
     def run(self, on_item: Callable[[NewsItem], None], stop_event: threading.Event) -> None:
+        """執行 run 方法的主要邏輯。"""
         accounts = [name for name in (_normalize_account(x) for x in self.config.accounts) if name]
         if not accounts:
             logger.warning("X stream skipped: no valid accounts configured")
@@ -84,6 +89,7 @@ class XFilteredStreamer:
             self._clear_owned_rules()
 
     def _consume_stream(self, on_item: Callable[[NewsItem], None], stop_event: threading.Event) -> None:
+        """執行 consume stream 方法的主要邏輯。"""
         params = {
             "tweet.fields": "created_at,lang,public_metrics,referenced_tweets,author_id",
             "expansions": "author_id",
@@ -141,6 +147,7 @@ class XFilteredStreamer:
             raise RuntimeError(f"X stream URLError: {exc}") from exc
 
     def _auto_heal_too_many_connections(self, body_text: str) -> bool:
+        """執行 auto heal too many connections 方法的主要邏輯。"""
         if not self.config.auto_heal_too_many_connections:
             return False
         if not self._is_too_many_connections_429(body_text):
@@ -164,17 +171,20 @@ class XFilteredStreamer:
 
     @staticmethod
     def _is_too_many_connections_429(body_text: str) -> bool:
+        """判斷 is too many connections 429 對應的資料或結果。"""
         text = (body_text or "").lower()
         return "toomanyconnections" in text or "maximum allowed connection limit" in text
 
     @staticmethod
     def _parse_connection_kill_stats(result: dict[str, Any]) -> tuple[int, int]:
+        """解析 parse connection kill stats 對應的資料或結果。"""
         data = result.get("data") if isinstance(result, dict) else None
         if not isinstance(data, dict):
             return 0, 0
         return int(data.get("successful_kills") or 0), int(data.get("failed_kills") or 0)
 
     def _sync_rules(self, query: str) -> None:
+        """執行 sync rules 方法的主要邏輯。"""
         self._clear_owned_rules()
         payload = {
             "add": [
@@ -196,6 +206,7 @@ class XFilteredStreamer:
         logger.info("X stream rule synced")
 
     def _clear_owned_rules(self) -> None:
+        """執行 clear owned rules 方法的主要邏輯。"""
         try:
             result = self._request_json(self.rules_endpoint, method="GET")
         except Exception as exc:
@@ -227,6 +238,7 @@ class XFilteredStreamer:
             logger.warning("X rules delete failed ids=%s error=%s", ",".join(owned_ids), exc)
 
     def _request_json(self, url: str, method: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """送出請求並處理回應 request json 對應的資料或結果。"""
         data = None
         if payload is not None:
             data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -247,6 +259,7 @@ class XFilteredStreamer:
         return {"data": parsed}
 
     def _build_query(self, accounts: list[str]) -> str:
+        """建立 build query 對應的資料或結果。"""
         from_terms = [f"from:{name}" for name in accounts]
         query = f"({' OR '.join(from_terms)})"
 
@@ -257,6 +270,7 @@ class XFilteredStreamer:
         return query
 
     def _to_news_item(self, payload: dict[str, Any]) -> NewsItem | None:
+        """轉換 to news item 對應的資料或結果。"""
         if not isinstance(payload, dict):
             return None
 
@@ -292,6 +306,7 @@ class XFilteredStreamer:
 
     @staticmethod
     def _resolve_username(includes: Any, author_id: str) -> str | None:
+        """解析並決定 resolve username 對應的資料或結果。"""
         if not isinstance(includes, dict):
             return None
         users = includes.get("users")
@@ -309,6 +324,7 @@ class XFilteredStreamer:
         return None
 
     def _remember_tweet(self, item_id: str) -> bool:
+        """執行 remember tweet 方法的主要邏輯。"""
         if item_id in self._seen_set:
             return False
 
@@ -323,6 +339,7 @@ class XFilteredStreamer:
 
 
 def _normalize_account(raw: str) -> str | None:
+    """正規化 normalize account 對應的資料或結果。"""
     text = (raw or "").strip()
     if not text:
         return None
@@ -350,6 +367,7 @@ def _normalize_account(raw: str) -> str | None:
 
 
 def _tweet_title(text: str) -> str:
+    """執行 tweet title 的主要流程。"""
     compact = " ".join(text.split()).strip()
     if len(compact) <= 140:
         return compact

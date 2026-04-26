@@ -49,6 +49,7 @@ else:
 
 
 def _require_optional_dependencies() -> None:
+    """執行 require optional dependencies 的主要流程。"""
     missing = []
     if yf is None:
         missing.append("yfinance")
@@ -106,6 +107,7 @@ OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "stocks
 
 # ── 從 yf.download() 批次結果萃取單支 quote ───────────────
 def _extract_field_series(df, field: str, symbol: str):
+    """取出 extract field series 對應的資料或結果。"""
     if isinstance(df.columns, pd.MultiIndex):
         if field not in df.columns.get_level_values(0):
             return None
@@ -180,6 +182,7 @@ def _extract_quote_from_download(df, symbol: str, name: str) -> dict | None:
 
 # ── 抓取所有清單 ─────────────────────────────────────────
 def fetch_all(watchlist: dict) -> dict:
+    """抓取 fetch all 對應的資料或結果。"""
     _require_optional_dependencies()
 
     # 批次下載（更快，減少 API 請求次數）
@@ -225,6 +228,7 @@ def fetch_all(watchlist: dict) -> dict:
 
 # ── 儲存 JSON（alert_workflow 需要此檔） ──────────────────
 def save_json(data: dict, output_dir: str) -> str:
+    """執行 save json 的主要流程。"""
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename  = f"stocks_{timestamp}.json"
@@ -246,6 +250,7 @@ _CATEGORY_TO_MARKET = {
 
 
 def _build_snapshot_row(quote: dict, category: str, scraped_at: str, trade_date: str) -> dict:
+    """建立 build snapshot row 對應的資料或結果。"""
     market = _CATEGORY_TO_MARKET.get(category, category.upper())
     return {
         "symbol":     quote["symbol"],
@@ -272,6 +277,7 @@ def _build_snapshot_row(quote: dict, category: str, scraped_at: str, trade_date:
 
 
 def _build_movement_events(quote: dict, category: str, trade_date: str, scraped_at: str) -> list[dict]:
+    """建立 build movement events 對應的資料或結果。"""
     market = _CATEGORY_TO_MARKET.get(category, category.upper())
     detected = detect_movement_events(
         symbol=quote["symbol"],
@@ -303,6 +309,7 @@ def _build_movement_events(quote: dict, category: str, trade_date: str, scraped_
 
 # ── 推送：snapshots → /quote-snapshots；異動 → /events ──
 def push_to_relay(stocks_data: dict, scraped_at: str) -> None:
+    """執行 push to relay 的主要流程。"""
     trade_date = scraped_at[:10]
     snapshots: list[dict] = []
     move_events: list[dict] = []
@@ -335,6 +342,7 @@ def push_to_relay(stocks_data: dict, scraped_at: str) -> None:
 
 # ── 主程式 ─────────────────────────────────────────────
 def main():
+    """程式入口，負責執行此模組的主要流程。"""
     print("[Yahoo Finance] Fetching stock quotes via yfinance...")
     try:
         _require_optional_dependencies()

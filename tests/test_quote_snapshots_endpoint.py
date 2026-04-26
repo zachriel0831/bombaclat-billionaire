@@ -13,6 +13,7 @@ from event_relay.service import MarketQuoteSnapshot, RelayProcessor
 
 
 def _settings() -> RelaySettings:
+    """執行 settings 的主要流程。"""
     return RelaySettings(
         host="127.0.0.1",
         port=0,
@@ -29,6 +30,8 @@ def _settings() -> RelaySettings:
         mysql_quote_snapshot_table="t_market_quote_snapshots",
         mysql_analysis_table="t_market_analyses",
         mysql_annotation_table="t_relay_event_annotations",
+        mysql_event_embedding_table="t_event_embeddings",
+        mysql_analysis_embedding_table="t_analysis_embeddings",
         mysql_connect_timeout_seconds=5,
         retention_enabled=False,
         retention_keep_days=7,
@@ -36,7 +39,9 @@ def _settings() -> RelaySettings:
 
 
 class ProcessorCoerceTests(unittest.TestCase):
+    """封裝 Processor Coerce Tests 相關資料與行為。"""
     def test_coerce_minimum_fields(self) -> None:
+        """測試 test coerce minimum fields 的預期行為。"""
         snap = RelayProcessor._coerce_quote_snapshot(
             {
                 "symbol": "2330.TW",
@@ -53,6 +58,7 @@ class ProcessorCoerceTests(unittest.TestCase):
         self.assertEqual(snap.source, "yfinance")
 
     def test_coerce_uses_open_high_low_aliases(self) -> None:
+        """測試 test coerce uses open high low aliases 的預期行為。"""
         snap = RelayProcessor._coerce_quote_snapshot(
             {
                 "symbol": "AAPL",
@@ -74,13 +80,16 @@ class ProcessorCoerceTests(unittest.TestCase):
         self.assertEqual(json.loads(snap.raw_json)["category"], "us")
 
     def test_coerce_rejects_missing_required(self) -> None:
+        """測試 test coerce rejects missing required 的預期行為。"""
         with self.assertRaises(ValueError):
             RelayProcessor._coerce_quote_snapshot({"symbol": "X", "market": "US"})
 
 
 class ProcessorQuoteSnapshotsTests(unittest.TestCase):
+    """封裝 Processor Quote Snapshots Tests 相關資料與行為。"""
     def setUp(self) -> None:
         # Bypass __init__ side-effects (DB, scheduler) — only test the method.
+        """準備每個測試案例需要的前置狀態。"""
         self.proc = RelayProcessor.__new__(RelayProcessor)
         self.proc._settings = _settings()
         self.proc._store = MagicMock()
@@ -89,6 +98,7 @@ class ProcessorQuoteSnapshotsTests(unittest.TestCase):
         self.proc._daily_cleanup_ran_for_date = None
 
     def test_stores_valid_rows_skips_invalid(self) -> None:
+        """測試 test stores valid rows skips invalid 的預期行為。"""
         result = self.proc.process_quote_snapshots(
             [
                 {"symbol": "2330.TW", "market": "TW", "ts": "2026-04-25 14:30:00", "price": 605.5},
@@ -102,6 +112,7 @@ class ProcessorQuoteSnapshotsTests(unittest.TestCase):
         self.proc._store.upsert_market_quote_snapshot.assert_called_once()
 
     def test_dropped_when_store_disabled(self) -> None:
+        """測試 test dropped when store disabled 的預期行為。"""
         self.proc._store = None
         result = self.proc.process_quote_snapshots(
             [{"symbol": "X", "market": "US", "ts": "2026-04-25 14:30:00"}]
@@ -110,6 +121,7 @@ class ProcessorQuoteSnapshotsTests(unittest.TestCase):
         self.assertEqual(result["results"][0]["status"], "dropped")
 
     def test_failure_path_records_error(self) -> None:
+        """測試 test failure path records error 的預期行為。"""
         self.proc._store.upsert_market_quote_snapshot.side_effect = RuntimeError("boom")
         result = self.proc.process_quote_snapshots(
             [{"symbol": "X", "market": "US", "ts": "2026-04-25 14:30:00"}]
@@ -118,20 +130,25 @@ class ProcessorQuoteSnapshotsTests(unittest.TestCase):
         self.assertEqual(result["results"][0]["status"], "failed")
 
     def test_payload_must_be_list(self) -> None:
+        """測試 test payload must be list 的預期行為。"""
         with self.assertRaises(ValueError):
             self.proc.process_quote_snapshots({"symbol": "X"})
 
 
 class _FakeProcessor:
+    """封裝 Fake Processor 相關資料與行為。"""
     def __init__(self) -> None:
+        """初始化物件狀態與必要依賴。"""
         self.calls: list = []
 
     def process_quote_snapshots(self, payload):
+        """執行 process quote snapshots 方法的主要邏輯。"""
         self.calls.append(payload)
         return {"received": len(payload), "stored": len(payload)}
 
 
 def _start(processor) -> tuple[RelayHttpServer, threading.Thread]:
+    """執行 start 的主要流程。"""
     server = RelayHttpServer(("127.0.0.1", 0), processor, env_file=".env")
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -139,12 +156,14 @@ def _start(processor) -> tuple[RelayHttpServer, threading.Thread]:
 
 
 def _stop(server: RelayHttpServer, thread: threading.Thread) -> None:
+    """執行 stop 的主要流程。"""
     server.shutdown()
     server.server_close()
     thread.join(timeout=2.0)
 
 
 def _post(server: RelayHttpServer, body) -> tuple[int, dict]:
+    """執行 post 的主要流程。"""
     conn = HTTPConnection(*server.server_address)
     try:
         raw = json.dumps(body).encode("utf-8")
@@ -162,7 +181,9 @@ def _post(server: RelayHttpServer, body) -> tuple[int, dict]:
 
 
 class QuoteSnapshotsEndpointTests(unittest.TestCase):
+    """封裝 Quote Snapshots Endpoint Tests 相關資料與行為。"""
     def test_post_routes_to_processor(self) -> None:
+        """測試 test post routes to processor 的預期行為。"""
         proc = _FakeProcessor()
         server, thread = _start(proc)
         try:

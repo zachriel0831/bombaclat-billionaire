@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
@@ -25,6 +25,7 @@ WEEKLY_PROMPT_VERSION = "weekly-summary-v1"
 
 @dataclass(frozen=True)
 class WeeklySummaryConfig:
+    """封裝 Weekly Summary Config 相關資料與行為。"""
     env_file: str
     model: str
     api_base: str
@@ -44,6 +45,7 @@ class WeeklySummaryConfig:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Generate weekly macro summary and store it")
     parser.add_argument("--env-file", default=".env", help="Path to env file")
     parser.add_argument("--force", action="store_true", help="Bypass schedule gate and run immediately")
@@ -53,6 +55,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _load_secret_from_dpapi_file(path: str) -> str | None:
+    """載入 load secret from dpapi file 對應的資料或結果。"""
     file_path = Path(path)
     if not file_path.exists():
         return None
@@ -78,6 +81,7 @@ def _load_secret_from_dpapi_file(path: str) -> str | None:
 
 
 def _resolve_anthropic_settings() -> tuple[str, str, str, str, str | None]:
+    """解析並決定 resolve anthropic settings 對應的資料或結果。"""
     api_key_file = (os.getenv("ANTHROPIC_API_KEY_FILE") or ".secrets/anthropic_api_key.dpapi").strip()
     direct_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
     api_key = direct_key or (_load_secret_from_dpapi_file(api_key_file) or "")
@@ -91,6 +95,7 @@ def _resolve_anthropic_settings() -> tuple[str, str, str, str, str | None]:
 
 
 def _resolve_openai_settings(default_model: str) -> tuple[str, str, str, str, str | None]:
+    """解析並決定 resolve openai settings 對應的資料或結果。"""
     api_key_file = (os.getenv("WEEKLY_SUMMARY_OPENAI_API_KEY_FILE") or ".secrets/openai_api_key.dpapi").strip()
     direct_key = (os.getenv("WEEKLY_SUMMARY_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
     api_key = direct_key or (_load_secret_from_dpapi_file(api_key_file) or "")
@@ -112,6 +117,7 @@ def _resolve_llm_settings(default_openai_model: str) -> tuple[str, str, str, str
 
 
 def _load_weekly_config(args: argparse.Namespace) -> WeeklySummaryConfig:
+    """載入 load weekly config 對應的資料或結果。"""
     provider, model, api_base, api_key_file, api_key = _resolve_llm_settings(default_openai_model="gpt-5")
 
     return WeeklySummaryConfig(
@@ -144,11 +150,13 @@ def _load_weekly_config(args: argparse.Namespace) -> WeeklySummaryConfig:
 
 
 def _week_key(now_local: datetime) -> str:
+    """執行 week key 的主要流程。"""
     iso_year, iso_week, _ = now_local.isocalendar()
     return f"{iso_year}-W{iso_week:02d}"
 
 
 def _should_run_now(config: WeeklySummaryConfig, now_local: datetime) -> bool:
+    """執行 should run now 的主要流程。"""
     if config.force:
         return True
     if now_local.weekday() != config.weekday:
@@ -160,6 +168,7 @@ def _should_run_now(config: WeeklySummaryConfig, now_local: datetime) -> bool:
 
 
 def _already_sent_this_week(state_file: Path, key: str) -> bool:
+    """執行 already sent this week 的主要流程。"""
     if not state_file.exists():
         return False
     saved = state_file.read_text(encoding="utf-8", errors="ignore").strip()
@@ -167,11 +176,13 @@ def _already_sent_this_week(state_file: Path, key: str) -> bool:
 
 
 def _mark_sent_this_week(state_file: Path, key: str) -> None:
+    """執行 mark sent this week 的主要流程。"""
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text(key, encoding="utf-8")
 
 
 def _load_text(path: str) -> str:
+    """載入 load text 對應的資料或結果。"""
     p = Path(path)
     if not p.exists():
         return ""
@@ -179,6 +190,7 @@ def _load_text(path: str) -> str:
 
 
 def _compile_prompts(config: WeeklySummaryConfig) -> tuple[str, str]:
+    """執行 compile prompts 的主要流程。"""
     macro_skill = _load_text(config.skill_macro_path)
     line_format_skill = _load_text(config.skill_line_format_path)
 
@@ -216,6 +228,7 @@ def _compile_prompts(config: WeeklySummaryConfig) -> tuple[str, str]:
 
 
 def _write_prompt_snapshots(system_prompt: str, reusable_prompt: str) -> None:
+    """寫入 write prompt snapshots 對應的資料或結果。"""
     out_dir = Path("runtime/prompts")
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "weekly_summary_system_prompt.txt").write_text(system_prompt, encoding="utf-8")
@@ -223,6 +236,7 @@ def _write_prompt_snapshots(system_prompt: str, reusable_prompt: str) -> None:
 
 
 def _extract_text_from_response(resp_json: dict[str, Any]) -> str:
+    """取出 extract text from response 對應的資料或結果。"""
     if isinstance(resp_json.get("output_text"), str) and resp_json.get("output_text").strip():
         return str(resp_json["output_text"]).strip()
 
@@ -248,6 +262,7 @@ def _extract_text_from_response(resp_json: dict[str, Any]) -> str:
 
 
 def _parse_bool_env(value: str | None, default: bool) -> bool:
+    """解析 parse bool env 對應的資料或結果。"""
     if value is None:
         return default
     normalized = value.strip().lower()
@@ -259,6 +274,7 @@ def _parse_bool_env(value: str | None, default: bool) -> bool:
 
 
 def _openai_web_search_enabled() -> bool:
+    """執行 openai web search enabled 的主要流程。"""
     raw = os.getenv("LLM_WEB_SEARCH_ENABLED")
     if raw is None:
         raw = os.getenv("OPENAI_WEB_SEARCH_ENABLED")
@@ -266,6 +282,7 @@ def _openai_web_search_enabled() -> bool:
 
 
 def _send_openai_response_request(url: str, api_key: str, payload: dict[str, Any]) -> str:
+    """執行 send openai response request 的主要流程。"""
     req = Request(url, method="POST", data=json.dumps(payload, ensure_ascii=False).encode("utf-8"))
     req.add_header("Authorization", f"Bearer {api_key}")
     req.add_header("Content-Type", "application/json")
@@ -282,6 +299,7 @@ def _send_openai_response_request(url: str, api_key: str, payload: dict[str, Any
 
 
 def _should_retry_openai_without_web_search(error_message: str) -> bool:
+    """執行 should retry openai without web search 的主要流程。"""
     lower = error_message.lower()
     if not any(f"status={status}" in lower for status in (400, 403, 404)):
         return False
@@ -289,6 +307,7 @@ def _should_retry_openai_without_web_search(error_message: str) -> bool:
 
 
 def _call_openai_response(api_base: str, api_key: str, model: str, system_prompt: str, user_prompt: str) -> str:
+    """執行 call openai response 的主要流程。"""
     url = f"{api_base.rstrip('/')}/responses"
     payload = {
         "model": model,
@@ -322,11 +341,13 @@ def _call_openai_response(api_base: str, api_key: str, model: str, system_prompt
 
 
 def _openai_model_supports_temperature(model: str) -> bool:
+    """執行 openai model supports temperature 的主要流程。"""
     value = (model or "").strip().lower()
     return not (value == "gpt-5" or value.startswith("gpt-5-"))
 
 
 def _llm_timeout_seconds(default: int = 120) -> int:
+    """執行 llm timeout seconds 的主要流程。"""
     raw = os.getenv("LLM_TIMEOUT_SECONDS") or os.getenv("OPENAI_RESPONSE_TIMEOUT_SECONDS") or str(default)
     try:
         value = int(raw)
@@ -336,6 +357,7 @@ def _llm_timeout_seconds(default: int = 120) -> int:
 
 
 def _extract_text_from_anthropic(resp_json: dict[str, Any]) -> str:
+    """取出 extract text from anthropic 對應的資料或結果。"""
     content = resp_json.get("content")
     if not isinstance(content, list):
         return ""
@@ -352,6 +374,7 @@ def _extract_text_from_anthropic(resp_json: dict[str, Any]) -> str:
 
 
 def _call_anthropic_message(api_base: str, api_key: str, model: str, system_prompt: str, user_prompt: str) -> str:
+    """執行 call anthropic message 的主要流程。"""
     url = f"{api_base.rstrip('/')}/v1/messages"
     payload = {
         "model": model,
@@ -383,12 +406,14 @@ def _call_anthropic_message(api_base: str, api_key: str, model: str, system_prom
 
 
 def _call_llm(provider: str, api_base: str, api_key: str, model: str, system_prompt: str, user_prompt: str) -> str:
+    """執行 call llm 的主要流程。"""
     if (provider or "").strip().lower() == "anthropic":
         return _call_anthropic_message(api_base, api_key, model, system_prompt, user_prompt)
     return _call_openai_response(api_base, api_key, model, system_prompt, user_prompt)
 
 
 def _normalize_line_text(text: str) -> str:
+    """正規化 normalize line text 對應的資料或結果。"""
     compact = re.sub(r"[ \t]+", " ", text).strip()
     return compact[:4500]
 
@@ -400,6 +425,7 @@ def _store_weekly_analysis(
     message: str,
     events_used: int,
 ) -> None:
+    """執行 store weekly analysis 的主要流程。"""
     store.upsert_market_analysis(
         MarketAnalysisRecord(
             analysis_date=_week_key(now_local),
@@ -430,6 +456,7 @@ def _store_weekly_analysis(
 
 
 def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
+    """執行單次任務流程並回傳結果。"""
     now_local = datetime.now().astimezone()
     run_key = _week_key(now_local)
     state_file = Path(config.state_file)
@@ -519,6 +546,7 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):

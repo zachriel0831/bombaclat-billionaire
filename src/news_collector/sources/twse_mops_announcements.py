@@ -26,6 +26,7 @@ TWSE_KEY_EXPLANATION = "\u8aaa\u660e"
 
 
 def _normalize_code(raw: str) -> str | None:
+    """正規化 normalize code 對應的資料或結果。"""
     text = (raw or "").strip()
     if not text:
         return None
@@ -35,6 +36,7 @@ def _normalize_code(raw: str) -> str | None:
 
 
 def _parse_roc_datetime(date_text: str | None, time_text: str | None) -> datetime | None:
+    """解析 parse roc datetime 對應的資料或結果。"""
     date_value = (date_text or "").strip()
     if not date_value:
         return None
@@ -56,15 +58,18 @@ def _parse_roc_datetime(date_text: str | None, time_text: str | None) -> datetim
 
 
 class TwseMopsAnnouncementsSource(NewsSource):
+    """封裝 Twse Mops Announcements Source 相關資料與行為。"""
     name = "twse_mops_announcements"
     endpoint = "https://openapi.twse.com.tw/v1/opendata/t187ap04_L"
 
     def __init__(self, tracked_codes: list[str], timeout_seconds: int = 15, max_items_per_company: int = 5) -> None:
+        """初始化物件狀態與必要依賴。"""
         self._tracked_codes = tracked_codes
         self._timeout_seconds = timeout_seconds
         self._max_items_per_company = max(1, int(max_items_per_company))
 
     def fetch(self, limit: int = 20) -> list[NewsItem]:
+        """執行 fetch 方法的主要邏輯。"""
         rows = self._load_rows()
         if not isinstance(rows, list):
             return []
@@ -123,6 +128,7 @@ class TwseMopsAnnouncementsSource(NewsSource):
         return items[: max(int(limit), 1)]
 
     def _load_rows(self) -> list[dict]:
+        """載入 load rows 對應的資料或結果。"""
         last_error: Exception | None = None
         for attempt in range(2):
             try:

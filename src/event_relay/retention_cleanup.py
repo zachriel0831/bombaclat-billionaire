@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_once(env_file: str = ".env", keep_days: int | None = None, dry_run: bool = False) -> dict[str, int]:
+    """執行單次任務流程並回傳結果。"""
     settings = load_settings(env_file)
     if not settings.mysql_enabled:
         raise RuntimeError("Retention cleanup requires RELAY_MYSQL_ENABLED=true")
@@ -36,6 +37,7 @@ def run_once(env_file: str = ".env", keep_days: int | None = None, dry_run: bool
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Delete old relay event and X post rows from MySQL")
     parser.add_argument("--env-file", default=".env", help="Path to env file")
     parser.add_argument("--keep-days", type=int, default=None, help="Override retention days")
@@ -50,6 +52,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):

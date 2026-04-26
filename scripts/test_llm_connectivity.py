@@ -23,6 +23,7 @@ from event_relay.weekly_summary import _load_secret_from_dpapi_file  # type: ign
 
 
 def _load_env_file(path: Path) -> None:
+    """載入 load env file 對應的資料或結果。"""
     if not path.exists():
         return
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -36,6 +37,7 @@ def _load_env_file(path: Path) -> None:
 
 
 def _resolve_key(env_key_name: str, file_env_name: str, default_file: str) -> str | None:
+    """解析並決定 resolve key 對應的資料或結果。"""
     direct = (os.getenv(env_key_name) or "").strip()
     if direct:
         return direct
@@ -44,6 +46,7 @@ def _resolve_key(env_key_name: str, file_env_name: str, default_file: str) -> st
 
 
 def test_anthropic() -> bool:
+    """測試 test anthropic 的預期行為。"""
     print("\n=== Anthropic ===")
     key = _resolve_key("ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY_FILE", ".secrets/anthropic_api_key.dpapi")
     if not key:
@@ -91,6 +94,7 @@ def test_anthropic() -> bool:
 
 
 def test_openai() -> bool:
+    """測試 test openai 的預期行為。"""
     print("\n=== OpenAI ===")
     key = _resolve_key("WEEKLY_SUMMARY_OPENAI_API_KEY", "WEEKLY_SUMMARY_OPENAI_API_KEY_FILE", ".secrets/openai_api_key.dpapi")
     if not key:
@@ -144,6 +148,7 @@ def test_openai() -> bool:
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     _load_env_file(ROOT / ".env")
     target = (sys.argv[1].lower() if len(sys.argv) > 1 else "both").strip()
 

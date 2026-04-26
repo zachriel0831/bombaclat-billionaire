@@ -11,7 +11,9 @@ from event_relay.quote_movement import (
 
 
 class GapDetectionTests(unittest.TestCase):
+    """封裝 Gap Detection Tests 相關資料與行為。"""
     def test_gap_up_above_threshold(self) -> None:
+        """測試 test gap up above threshold 的預期行為。"""
         events = detect_movement_events(
             symbol="2330.TW",
             market="TW",
@@ -26,6 +28,7 @@ class GapDetectionTests(unittest.TestCase):
         self.assertIn("gap_up", types)
 
     def test_gap_down_below_negative_threshold(self) -> None:
+        """測試 test gap down below negative threshold 的預期行為。"""
         events = detect_movement_events(
             symbol="2330.TW",
             market="TW",
@@ -40,6 +43,7 @@ class GapDetectionTests(unittest.TestCase):
         self.assertIn("gap_down", types)
 
     def test_no_gap_within_threshold(self) -> None:
+        """測試 test no gap within threshold 的預期行為。"""
         events = detect_movement_events(
             symbol="2330.TW",
             market="TW",
@@ -55,6 +59,7 @@ class GapDetectionTests(unittest.TestCase):
         self.assertNotIn("gap_down", types)
 
     def test_no_gap_when_prev_close_missing(self) -> None:
+        """測試 test no gap when prev close missing 的預期行為。"""
         events = detect_movement_events(
             symbol="2330.TW",
             market="TW",
@@ -69,7 +74,9 @@ class GapDetectionTests(unittest.TestCase):
 
 
 class SharpMoveTests(unittest.TestCase):
+    """封裝 Sharp Move Tests 相關資料與行為。"""
     def test_sharp_up_emits_when_above_threshold(self) -> None:
+        """測試 test sharp up emits when above threshold 的預期行為。"""
         events = detect_movement_events(
             symbol="AAPL",
             market="US",
@@ -84,6 +91,7 @@ class SharpMoveTests(unittest.TestCase):
         self.assertIn("sharp_up", types)
 
     def test_sharp_down_at_negative_threshold(self) -> None:
+        """測試 test sharp down at negative threshold 的預期行為。"""
         events = detect_movement_events(
             symbol="AAPL",
             market="US",
@@ -98,6 +106,7 @@ class SharpMoveTests(unittest.TestCase):
         self.assertIn("sharp_down", types)
 
     def test_below_threshold_no_sharp(self) -> None:
+        """測試 test below threshold no sharp 的預期行為。"""
         events = detect_movement_events(
             symbol="AAPL",
             market="US",
@@ -114,7 +123,9 @@ class SharpMoveTests(unittest.TestCase):
 
 
 class VolumeSpikeTests(unittest.TestCase):
+    """封裝 Volume Spike Tests 相關資料與行為。"""
     def test_spike_above_multiple(self) -> None:
+        """測試 test spike above multiple 的預期行為。"""
         events = detect_movement_events(
             symbol="2330.TW",
             market="TW",
@@ -131,6 +142,7 @@ class VolumeSpikeTests(unittest.TestCase):
         self.assertEqual(metric["volume_ratio"], 2.5)
 
     def test_no_spike_when_below(self) -> None:
+        """測試 test no spike when below 的預期行為。"""
         events = detect_movement_events(
             symbol="2330.TW",
             market="TW",
@@ -145,6 +157,7 @@ class VolumeSpikeTests(unittest.TestCase):
         self.assertNotIn("volume_spike", types)
 
     def test_no_spike_when_avg_unknown(self) -> None:
+        """測試 test no spike when avg unknown 的預期行為。"""
         events = detect_movement_events(
             symbol="2330.TW",
             market="TW",
@@ -160,7 +173,9 @@ class VolumeSpikeTests(unittest.TestCase):
 
 
 class CompositeAndContractTests(unittest.TestCase):
+    """封裝 Composite And Contract Tests 相關資料與行為。"""
     def test_gap_and_sharp_and_spike_can_coexist(self) -> None:
+        """測試 test gap and sharp and spike can coexist 的預期行為。"""
         events = detect_movement_events(
             symbol="2330.TW",
             market="TW",
@@ -175,6 +190,7 @@ class CompositeAndContractTests(unittest.TestCase):
         self.assertEqual(types, ["gap_up", "sharp_up", "volume_spike"])
 
     def test_event_contract_fields(self) -> None:
+        """測試 test event contract fields 的預期行為。"""
         events = detect_movement_events(
             symbol="2330.TW",
             market="TW",
@@ -194,6 +210,7 @@ class CompositeAndContractTests(unittest.TestCase):
             self.assertEqual(evt["raw_json"]["market"], "TW")
 
     def test_event_id_is_stable_per_day_and_type(self) -> None:
+        """測試 test event id is stable per day and type 的預期行為。"""
         eid_a = build_event_id("TW", "2330.TW", "2026-04-25", "gap_up")
         eid_b = build_event_id("TW", "2330.TW", "2026-04-25", "gap_up")
         self.assertEqual(eid_a, eid_b)
@@ -204,6 +221,7 @@ class CompositeAndContractTests(unittest.TestCase):
 
     def test_threshold_override(self) -> None:
         # 0.5% open move would not trip default 1% gap_pct, but trips lowered threshold
+        """測試 test threshold override 的預期行為。"""
         loose = MovementThresholds(gap_pct=0.004, sharp_pct=0.999, volume_multiple=999.0)
         events = detect_movement_events(
             symbol="X",

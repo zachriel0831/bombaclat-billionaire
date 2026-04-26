@@ -13,6 +13,7 @@ DEFAULT_HEADERS = {
 
 
 def http_get_text(url: str, params: dict[str, str | int] | None = None, timeout: int = 15) -> str:
+    """執行 http get text 的主要流程。"""
     return http_get_text_with_headers(url=url, params=params, timeout=timeout, headers=None)
 
 
@@ -22,6 +23,7 @@ def http_get_text_with_headers(
     timeout: int = 15,
     headers: dict[str, str] | None = None,
 ) -> str:
+    """執行 http get text with headers 的主要流程。"""
     full_url = f"{url}?{urlencode(params)}" if params else url
     request_headers = dict(DEFAULT_HEADERS)
     if headers:
@@ -32,6 +34,7 @@ def http_get_text_with_headers(
 
 
 def http_get_json(url: str, params: dict[str, str | int] | None = None, timeout: int = 15) -> dict:
+    """執行 http get json 的主要流程。"""
     return http_get_json_with_headers(url=url, params=params, timeout=timeout, headers=None)
 
 
@@ -41,6 +44,7 @@ def http_get_json_with_headers(
     timeout: int = 15,
     headers: dict[str, str] | None = None,
 ) -> dict:
+    """執行 http get json with headers 的主要流程。"""
     text = http_get_text_with_headers(url=url, params=params, timeout=timeout, headers=headers)
     data = json.loads(text)
     if isinstance(data, dict):

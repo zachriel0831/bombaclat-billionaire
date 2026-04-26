@@ -33,6 +33,7 @@ DEFAULT_SOURCE_PREFIXES = (
 
 @dataclass(frozen=True)
 class TwCloseContextConfig:
+    """封裝 Tw Close Context Config 相關資料與行為。"""
     env_file: str
     slot: str
     scheduled_time_local: str
@@ -43,6 +44,7 @@ class TwCloseContextConfig:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(
         description="Build Taiwan close context from existing t_relay_events facts"
     )
@@ -58,6 +60,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _load_config(args: argparse.Namespace) -> TwCloseContextConfig:
+    """載入 load config 對應的資料或結果。"""
     load_settings(args.env_file)
     env_prefixes = os.getenv("TW_CLOSE_CONTEXT_SOURCE_PREFIXES") or ""
     prefixes_text = args.source_prefixes or env_prefixes
@@ -81,6 +84,7 @@ def _load_config(args: argparse.Namespace) -> TwCloseContextConfig:
 
 
 def _resolve_trade_date(config: TwCloseContextConfig, now_local: datetime) -> str:
+    """解析並決定 resolve trade date 對應的資料或結果。"""
     if config.trade_date:
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", config.trade_date):
             raise ValueError("trade_date must use YYYY-MM-DD")
@@ -89,6 +93,7 @@ def _resolve_trade_date(config: TwCloseContextConfig, now_local: datetime) -> st
 
 
 def _parse_raw_json(value: str | None) -> dict[str, Any]:
+    """解析 parse raw json 對應的資料或結果。"""
     if not value:
         return {}
     try:
@@ -99,12 +104,14 @@ def _parse_raw_json(value: str | None) -> dict[str, Any]:
 
 
 def _date_from_text(value: str | None) -> str | None:
+    """執行 date from text 的主要流程。"""
     text = str(value or "").strip()
     match = re.match(r"(\d{4}-\d{2}-\d{2})", text)
     return match.group(1) if match else None
 
 
 def _event_trade_date(event: SummaryEvent, raw: dict[str, Any]) -> str | None:
+    """執行 event trade date 的主要流程。"""
     raw_trade_date = raw.get("trade_date")
     if raw_trade_date:
         return _date_from_text(str(raw_trade_date))
@@ -112,6 +119,7 @@ def _event_trade_date(event: SummaryEvent, raw: dict[str, Any]) -> str | None:
 
 
 def _source_matches(source: str, prefixes: tuple[str, ...]) -> bool:
+    """執行 source matches 的主要流程。"""
     normalized = source.strip().lower()
     return any(normalized.startswith(prefix.strip().lower()) for prefix in prefixes)
 
@@ -121,6 +129,7 @@ def filter_tw_close_source_events(
     trade_date: str,
     source_prefixes: tuple[str, ...] = DEFAULT_SOURCE_PREFIXES,
 ) -> list[SummaryEvent]:
+    """執行 filter tw close source events 的主要流程。"""
     selected: list[SummaryEvent] = []
     for event in events:
         if not _source_matches(event.source, source_prefixes):
@@ -132,6 +141,7 @@ def filter_tw_close_source_events(
 
 
 def _compact_raw(raw: dict[str, Any]) -> dict[str, Any]:
+    """執行 compact raw 的主要流程。"""
     keep_keys = (
         "stored_only",
         "event_type",
@@ -169,6 +179,7 @@ def _compact_raw(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def _compact_event(event: SummaryEvent) -> dict[str, Any]:
+    """執行 compact event 的主要流程。"""
     raw = _parse_raw_json(event.raw_json)
     compact: dict[str, Any] = {
         "id": event.row_id,
@@ -185,6 +196,7 @@ def _compact_event(event: SummaryEvent) -> dict[str, Any]:
 
 
 def _source_counts(events: list[SummaryEvent]) -> dict[str, int]:
+    """執行 source counts 的主要流程。"""
     counts: dict[str, int] = {}
     for event in events:
         counts[event.source] = counts.get(event.source, 0) + 1
@@ -192,6 +204,7 @@ def _source_counts(events: list[SummaryEvent]) -> dict[str, int]:
 
 
 def build_summary(events: list[SummaryEvent], trade_date: str) -> str:
+    """建立 build summary 對應的資料或結果。"""
     if not events:
         return f"Taiwan close context for {trade_date}: no same-day flow/disclosure events found."
     counts = _source_counts(events)
@@ -206,6 +219,7 @@ def build_summary(events: list[SummaryEvent], trade_date: str) -> str:
 
 
 def _stable_event_id(slot: str, trade_date: str) -> str:
+    """執行 stable event id 的主要流程。"""
     safe_slot = re.sub(r"[^a-z0-9_-]+", "-", slot.lower()).strip("-") or DEFAULT_SLOT
     return f"market-context-{safe_slot}-{trade_date}"
 
@@ -215,6 +229,7 @@ def build_tw_close_context_event(
     config: TwCloseContextConfig,
     now_local: datetime,
 ) -> RelayEvent:
+    """建立 build tw close context event 對應的資料或結果。"""
     trade_date = _resolve_trade_date(config, now_local)
     generated_at = now_local.isoformat()
     source_counts = _source_counts(source_events)
@@ -245,6 +260,7 @@ def build_tw_close_context_event(
 
 
 def run_once(config: TwCloseContextConfig) -> dict[str, Any]:
+    """執行單次任務流程並回傳結果。"""
     relay_settings = load_settings(config.env_file)
     if not relay_settings.mysql_enabled:
         raise RuntimeError("Taiwan close context requires RELAY_MYSQL_ENABLED=true")
@@ -281,6 +297,7 @@ def run_once(config: TwCloseContextConfig) -> dict[str, Any]:
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):

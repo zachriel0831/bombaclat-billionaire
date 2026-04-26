@@ -76,6 +76,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - `t_x_posts`
 - `t_market_index_snapshots`
 - `t_market_analyses`
+- `t_event_embeddings`
+- `t_analysis_embeddings`
 - Current behavior:
   - Crawler bridge owns normal source ingestion and writes event rows directly
   - `t_relay_events` is treated as event-only storage
@@ -129,9 +131,16 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   1. Read latest event context from `t_relay_events`
   2. Read latest DJIA / S&P 500 rows from `t_market_index_snapshots`
   3. Include stored-only `market_context:*` raw event payloads in the prompt event window
-  4. Build Traditional Chinese prompts from existing macro + mobile-chat formatting skills
-  5. Call OpenAI Responses API with web search enabled by default for current-fact verification
-  6. Store generated text in `t_market_analyses`
+  4. Retrieve similar historical events from `t_event_embeddings` for stage2 transmission analogues when available
+  5. Build Traditional Chinese prompts from existing macro + mobile-chat formatting skills
+  6. Call OpenAI Responses API with web search enabled by default for current-fact verification
+  7. Store generated text in `t_market_analyses`
+- Historical-case RAG:
+  - Module: `src/event_relay/rag.py`
+  - First implementation uses deterministic local lexical embeddings (`local-hash-v1`) to avoid a new paid API dependency
+  - `scripts/run_rag_indexer.ps1` incrementally indexes recent `t_relay_events` into `t_event_embeddings` and `t_market_analyses` into `t_analysis_embeddings`
+  - `stage2_transmission` receives retrieved examples as analogues only; historical event IDs are not valid current evidence IDs
+  - If RAG retrieval fails or has no candidates, market analysis continues without historical examples and records the gap in `raw_json.rag`
 - Market context storage contract:
   - `source` starts with `market_context:`
   - `raw_json.stored_only=true`
@@ -150,6 +159,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Current target schedule requirement:
   - Every Sunday 23:00 (Asia/Taipei, local machine timezone) for weekly summary (Java pushes it at Monday 05:10)
   - Every day 05:00, 07:30, and 15:30 (Asia/Taipei, local machine timezone) for market analysis
+  - Every day 04:40 (Asia/Taipei, local machine timezone) for historical-case RAG indexing
   - Every day 04:50 (Asia/Taipei, local machine timezone) for BLS macro event collection
   - Every day 07:20 (Asia/Taipei, local machine timezone) for pre-open market context collection
   - Every day 15:10 (Asia/Taipei, local machine timezone) for Taiwan official market-flow collection

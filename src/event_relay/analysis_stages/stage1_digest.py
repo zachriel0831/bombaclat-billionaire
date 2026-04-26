@@ -37,6 +37,7 @@ def build_prompts(
     events_json: str,
     market_snapshot_json: str,
 ) -> tuple[str, str]:
+    """建立 build prompts 對應的資料或結果。"""
     system_prompt = (
         "You are a market-data normaliser. "
         "Your sole job is to classify events, extract named entities, score "
@@ -77,6 +78,7 @@ def run(
     market_payload: list[dict[str, Any]],
     snapshot_dir: Path | None = None,
 ) -> StageResult:
+    """執行 run 的主要流程。"""
     logger.info(
         "[stage1_digest] start slot=%s model=%s events_in=%d market_rows_in=%d",
         context.slot,
@@ -133,6 +135,7 @@ def run(
 
 
 def _write_prompt_snapshot(snapshot_dir: Path, slot: str, system_prompt: str, user_prompt: str) -> None:
+    """寫入 write prompt snapshot 對應的資料或結果。"""
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     (snapshot_dir / f"market_analysis_{slot}_stage1_digest_system.txt").write_text(system_prompt, encoding="utf-8")
     (snapshot_dir / f"market_analysis_{slot}_stage1_digest_user.txt").write_text(user_prompt, encoding="utf-8")

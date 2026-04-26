@@ -35,15 +35,18 @@ WORKFLOW_MAP = {
 
 
 def ensure_dirs():
+    """執行 ensure dirs 的主要流程。"""
     for d in [PENDING, RUNNING, DONE, FAILED]:
         os.makedirs(d, exist_ok=True)
 
 
 def log(msg: str):
+    """執行 log 的主要流程。"""
     print(f"[{datetime.now().strftime('%H:%M:%S')}][{WORKER_ID}] {msg}")
 
 
 def load_workflow(workflow_name: str):
+    """載入 load workflow 對應的資料或結果。"""
     module_file = WORKFLOW_MAP.get(workflow_name)
     if not module_file:
         raise ValueError(f"Unknown workflow: '{workflow_name}'. Available: {list(WORKFLOW_MAP.keys())}")
@@ -57,6 +60,7 @@ def load_workflow(workflow_name: str):
 
 
 def claim_task():
+    """執行 claim task 的主要流程。"""
     try:
         files = sorted(os.listdir(PENDING))
     except FileNotFoundError:
@@ -75,6 +79,7 @@ def claim_task():
 
 
 def execute_task(task: dict) -> bool:
+    """執行 execute task 的主要流程。"""
     name      = task.get("name", task.get("id", "unknown"))
     workflow  = task.get("workflow", "scraper")
     rules     = task.get("rules", {})
@@ -96,6 +101,7 @@ def execute_task(task: dict) -> bool:
 
 
 def finish_task(running_path: str, success: bool):
+    """執行 finish task 的主要流程。"""
     filename = os.path.basename(running_path)
     dest = os.path.join(DONE if success else FAILED, filename)
     try:
@@ -112,6 +118,7 @@ def finish_task(running_path: str, success: bool):
 
 
 def run_once() -> int:
+    """執行單次任務流程並回傳結果。"""
     count = 0
     while True:
         running_path, task = claim_task()
@@ -128,6 +135,7 @@ def run_once() -> int:
 
 
 def main():
+    """程式入口，負責執行此模組的主要流程。"""
     parser = argparse.ArgumentParser()
     parser.add_argument("--watch", action="store_true")
     args = parser.parse_args()

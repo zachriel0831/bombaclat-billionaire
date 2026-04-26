@@ -16,20 +16,25 @@ from event_relay.tw_market_flow import (
 
 
 class _FakeStore:
+    """封裝 Fake Store 相關資料與行為。"""
     events = []
 
     def __init__(self, _settings) -> None:
+        """初始化物件狀態與必要依賴。"""
         self.initialized = False
 
     def initialize(self) -> None:
+        """執行 initialize 方法的主要邏輯。"""
         self.initialized = True
 
     def enqueue_event_if_new(self, event) -> bool:
+        """執行 enqueue event if new 方法的主要邏輯。"""
         _FakeStore.events.append(event)
         return True
 
 
 def _sample_dataset() -> OfficialFlowDataset:
+    """執行 sample dataset 的主要流程。"""
     return OfficialFlowDataset(
         family="tpex",
         source_family="tpex_flow",
@@ -43,7 +48,9 @@ def _sample_dataset() -> OfficialFlowDataset:
 
 
 class TwMarketFlowTests(unittest.TestCase):
+    """封裝 Tw Market Flow Tests 相關資料與行為。"""
     def test_normalize_trade_date_supports_roc_and_iso_values(self) -> None:
+        """測試 test normalize trade date supports roc and iso values 的預期行為。"""
         self.assertEqual(_normalize_trade_date("1150421"), "2026-04-21")
         self.assertEqual(_normalize_trade_date("115/04/21"), "2026-04-21")
         self.assertEqual(_normalize_trade_date("20260421"), "2026-04-21")
@@ -51,6 +58,7 @@ class TwMarketFlowTests(unittest.TestCase):
         self.assertEqual(_normalize_trade_date("2026-04-21T00:00:00+08:00"), "2026-04-21")
 
     def test_build_snapshot_uses_dataset_trade_date_and_metrics(self) -> None:
+        """測試 test build snapshot uses dataset trade date and metrics 的預期行為。"""
         dataset = _sample_dataset()
         payload = {
             "data": [
@@ -68,6 +76,7 @@ class TwMarketFlowTests(unittest.TestCase):
         self.assertEqual(snapshot.normalized_metrics["field_totals"]["NetBuySell"], 400)
 
     def test_extract_rows_supports_twse_fields_data_tables(self) -> None:
+        """測試 test extract rows supports twse fields data tables 的預期行為。"""
         payload = {
             "date": "20260422",
             "fields": ["證券代號", "三大法人買賣超股數"],
@@ -92,6 +101,7 @@ class TwMarketFlowTests(unittest.TestCase):
         self.assertEqual(snapshot.normalized_metrics["field_totals"]["三大法人買賣超股數"], 500)
 
     def test_build_tw_market_flow_events_marks_dataset_event_stored_only(self) -> None:
+        """測試 test build tw market flow events marks dataset event stored only 的預期行為。"""
         dataset = _sample_dataset()
         snapshot = _build_snapshot(
             dataset,
@@ -121,6 +131,7 @@ class TwMarketFlowTests(unittest.TestCase):
         self.assertEqual(event.raw["normalized_metrics"]["field_totals"]["NetBuySell"], 80)
 
     def test_stable_event_id_contains_required_dedupe_parts(self) -> None:
+        """測試 test stable event id contains required dedupe parts 的預期行為。"""
         first = _stable_event_id("twse_flow", "2026-04-21", "MI_MARGN")
         second = _stable_event_id("twse_flow", "2026-04-21", "MI_MARGN")
         next_day = _stable_event_id("twse_flow", "2026-04-22", "MI_MARGN")
@@ -132,6 +143,7 @@ class TwMarketFlowTests(unittest.TestCase):
         self.assertIn("MI_MARGN", first)
 
     def test_run_once_writes_events_to_store(self) -> None:
+        """測試 test run once writes events to store 的預期行為。"""
         _FakeStore.events = []
         dataset = _sample_dataset()
         snapshot = _build_snapshot(

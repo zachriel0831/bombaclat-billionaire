@@ -11,6 +11,7 @@ from event_relay.service import RelayProcessor
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Event relay service for incoming data events")
     parser.add_argument("--env-file", default=".env", help="Path to env file")
     parser.add_argument(
@@ -23,6 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):

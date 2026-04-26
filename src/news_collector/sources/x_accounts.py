@@ -21,6 +21,7 @@ _X_SINCE_ID_CACHE: dict[str, str] = {}
 
 
 def _throttle_x_requests() -> None:
+    """執行 throttle x requests 的主要流程。"""
     global _LAST_X_REQUEST_TS
     now = time.monotonic()
     wait_seconds = _X_MIN_REQUEST_INTERVAL_SECONDS - (now - _LAST_X_REQUEST_TS)
@@ -30,6 +31,7 @@ def _throttle_x_requests() -> None:
 
 
 def _normalize_account(raw: str) -> str | None:
+    """正規化 normalize account 對應的資料或結果。"""
     text = (raw or "").strip()
     if not text:
         return None
@@ -57,6 +59,7 @@ def _normalize_account(raw: str) -> str | None:
 
 
 class XAccountSource(NewsSource):
+    """封裝 X Account Source 相關資料與行為。"""
     name = "x_accounts"
     users_lookup_endpoint = "https://api.x.com/2/users/by"
     user_tweets_endpoint = "https://api.x.com/2/users/{user_id}/tweets"
@@ -71,6 +74,7 @@ class XAccountSource(NewsSource):
         include_replies: bool = False,
         include_retweets: bool = False,
     ) -> None:
+        """初始化物件狀態與必要依賴。"""
         self._bearer_token = bearer_token.strip()
         self._accounts = accounts
         self._timeout_seconds = timeout_seconds
@@ -80,6 +84,7 @@ class XAccountSource(NewsSource):
         self._include_retweets = bool(include_retweets)
 
     def fetch(self, limit: int = 20) -> list[NewsItem]:
+        """執行 fetch 方法的主要邏輯。"""
         global _X_STOPPED_BY_429
 
         if self._stop_on_429 and _X_STOPPED_BY_429:
@@ -173,6 +178,7 @@ class XAccountSource(NewsSource):
         return output
 
     def _resolve_user_ids(self, usernames: list[str]) -> dict[str, str]:
+        """解析並決定 resolve user ids 對應的資料或結果。"""
         missing = [name for name in usernames if name not in _X_USER_ID_CACHE]
         if missing:
             payload = self._request_json(
@@ -198,6 +204,7 @@ class XAccountSource(NewsSource):
         return {username: _X_USER_ID_CACHE[username] for username in usernames if username in _X_USER_ID_CACHE}
 
     def _request_json(self, url: str, params: dict[str, str | int]) -> dict | None:
+        """送出請求並處理回應 request json 對應的資料或結果。"""
         global _X_STOPPED_BY_429
         try:
             _throttle_x_requests()
@@ -223,6 +230,7 @@ class XAccountSource(NewsSource):
 
     @staticmethod
     def _tweet_title(text: str) -> str:
+        """執行 tweet title 方法的主要邏輯。"""
         compact = " ".join(text.split()).strip()
         if len(compact) <= 140:
             return compact

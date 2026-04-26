@@ -3,17 +3,31 @@
 Use this file for non-trivial tasks (3+ steps or architecture decisions).
 
 ## Current Task
-- Task: Add Traditional Chinese comments to complex code paths
+- Task: Add Chinese docstrings/comments to repository methods
 - Requested by: User
-- Start date: 2026-04-25
-- Scope: scan the current repo, identify complex logic that is hard to read or easy to misinterpret later, and add concise Traditional Chinese comments without changing behavior.
+- Start date: 2026-04-26
+- Scope: add concise Chinese docstrings to Python classes/functions across the repo so future readers can quickly identify each method's purpose without changing runtime behavior.
 
 ## Plan (checkable)
-- [x] Scan core source files and pick the highest-complexity logic paths worth annotating.
-- [x] Add concise Traditional Chinese comments to those complex logic sections only.
-- [x] Run formatting / compile verification to confirm comments did not break runtime.
+- [x] Scan Python files under `src`, `scripts`, and `tests` for classes/functions missing docstrings.
+- [x] Add concise Chinese docstrings mechanically while preserving behavior.
+- [x] Run compile/tests needed to confirm docstrings did not break syntax.
 
 ## Progress Notes
+- 2026-04-26 - user requested adding Chinese comments/docstrings to methods across this repo.
+- 2026-04-26 - approach: add one concise Chinese docstring to every Python class/function missing one under `src`, `scripts`, and `tests`; test methods will get short purpose docstrings rather than long commentary.
+- 2026-04-26 - added Chinese docstrings to all Python classes/functions under `src`, `scripts`, and `tests`; final scan reports `missing_docstrings=0`.
+- 2026-04-26 - first insertion attempt exposed Windows encoding damage (`???`) and one decorated-method insertion issue; cleaned the generated docstrings and reinserted using Unicode escapes so files remain valid UTF-8.
+- 2026-04-26 - verification passed: `.venv\\Scripts\\python.exe -m compileall src scripts tests`; full unittest discovery passed with 204 tests; `git diff --check -- src scripts tests tasks/todo.md` passed with CRLF warnings only.
+- 2026-04-25 - user requested starting implementation of REQ-014 historical-case RAG.
+- 2026-04-25 - confirmed project boundary: facts stay in `t_relay_events`; model analysis stays in `t_market_analyses`; Python does not deliver LINE messages.
+- 2026-04-25 - initial implementation shape: local deterministic embedding fallback for row indexing, MySQL tables for future real embeddings, and prompt integration that degrades to an empty example set if RAG fails.
+- 2026-04-26 - REQ-014 acceptance is now complete and archived as `done` in `requirements.done.yml`; active `requirements.yml` no longer contains REQ-014.
+- 2026-04-25 - user requested moving completed (`status: done`) requirements into a separate YAML file.
+- 2026-04-25 - planned approach: create a dedicated done-requirements archive, keep `requirements.yml` as the active backlog, and leave blocked/pending items in place.
+- 2026-04-25 - split the requirement file into active `requirements.yml` and archived `requirements.done.yml`; active file now keeps only non-`done` items and points readers to the archive.
+- 2026-04-25 - moved 15 completed requirements into `requirements.done.yml`; `requirements.yml` now contains 13 active items (`blocked` or `pending`) only.
+- 2026-04-25 - verification passed via UTF-8 content checks, status distribution scan (`requirements.yml` has no `done`; `requirements.done.yml` is all `done`), and `git diff --check` with CRLF warning only. `.venv` still lacks `PyYAML`, so structural verification used deterministic text/status checks instead of YAML parsing.
 - 2026-04-25 - user requested scanning the code package and adding Chinese comments to complex logic for future readability.
 - 2026-04-25 - this pass will focus on core runtime paths rather than noisy line-by-line comments: event store, relay bridge, market analysis pipeline, official source normalization, and X stream recovery logic.
 - 2026-04-25 - added Traditional Chinese comments to the most complex runtime paths in `event_relay/service.py`, `market_analysis.py`, `weekly_summary.py`, `market_context.py`, `tw_market_flow.py`, `bls_macro.py`, `event_enrichment.py`, `analysis_stages/llm_json.py`, `news_collector/relay_bridge.py`, and `news_collector/x_stream.py`.

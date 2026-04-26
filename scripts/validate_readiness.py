@@ -22,6 +22,7 @@ REQUIRED_FILES = [
 
 @dataclass
 class SkillEntry:
+    """封裝 Skill Entry 相關資料與行為。"""
     name: str
     path: str
     evals: str
@@ -29,6 +30,7 @@ class SkillEntry:
 
 
 def parse_registry(text: str) -> list[SkillEntry]:
+    """解析 parse registry 對應的資料或結果。"""
     skills: list[SkillEntry] = []
     blocks = re.findall(r"-\s+name:\s*(.+?)(?=\n\s*-\s+name:|\Z)", text, flags=re.S)
     for block in blocks:
@@ -42,11 +44,13 @@ def parse_registry(text: str) -> list[SkillEntry]:
 
 
 def _capture_field(block: str, key: str) -> str:
+    """執行 capture field 的主要流程。"""
     m = re.search(rf"^\s*{re.escape(key)}:\s*(.+)\s*$", block, flags=re.M)
     return m.group(1).strip() if m else ""
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     root = Path(__file__).resolve().parent.parent
     errors: list[str] = []
     warnings: list[str] = []

@@ -48,6 +48,7 @@ TWSE_INDEX_NAMES = (
 
 @dataclass(frozen=True)
 class MarketContextConfig:
+    """封裝 Market Context Config 相關資料與行為。"""
     env_file: str
     analysis_slot: str
     scheduled_time_local: str
@@ -57,6 +58,7 @@ class MarketContextConfig:
 
 @dataclass(frozen=True)
 class MarketContextPoint:
+    """封裝 Market Context Point 相關資料與行為。"""
     source: str
     category: str
     name: str
@@ -73,11 +75,13 @@ class MarketContextPoint:
 
 @dataclass(frozen=True)
 class SourceFailure:
+    """封裝 Source Failure 相關資料與行為。"""
     source: str
     error: str
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Collect market context and store it as event-only facts in t_relay_events")
     parser.add_argument("--env-file", default=".env", help="Path to env file")
     parser.add_argument("--analysis-slot", default=DEFAULT_ANALYSIS_SLOT, help="t_market_analyses analysis_slot")
@@ -88,6 +92,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _load_config(args: argparse.Namespace) -> MarketContextConfig:
+    """載入 load config 對應的資料或結果。"""
     load_settings(args.env_file)
     code_text = os.getenv("MARKET_CONTEXT_TWSE_CODES") or os.getenv("TWSE_MOPS_TRACKED_CODES") or ""
     twse_codes = [x.strip() for x in code_text.split(",") if x.strip()]
@@ -102,6 +107,7 @@ def _load_config(args: argparse.Namespace) -> MarketContextConfig:
 
 
 def _to_float(value: Any) -> float | None:
+    """轉換 to float 對應的資料或結果。"""
     if isinstance(value, (int, float)):
         return float(value)
     if value is None:
@@ -116,6 +122,7 @@ def _to_float(value: Any) -> float | None:
 
 
 def _roc_date_to_iso(value: str | None) -> str | None:
+    """執行 roc date to iso 的主要流程。"""
     text = (value or "").strip()
     if len(text) != 7 or not text.isdigit():
         return None
@@ -124,6 +131,7 @@ def _roc_date_to_iso(value: str | None) -> str | None:
 
 
 def _epoch_to_iso(value: Any) -> str | None:
+    """執行 epoch to iso 的主要流程。"""
     if not isinstance(value, (int, float)):
         return None
     return datetime.fromtimestamp(int(value), tz=timezone.utc).isoformat()
@@ -135,6 +143,7 @@ def _parse_yahoo_chart_payload(
     category: str,
     url: str,
 ) -> MarketContextPoint | None:
+    """解析 parse yahoo chart payload 對應的資料或結果。"""
     result = ((payload.get("chart") or {}).get("result") or [None])[0]
     if not isinstance(result, dict):
         return None
@@ -172,6 +181,7 @@ def _parse_yahoo_chart_payload(
 
 
 def fetch_yahoo_market_points(timeout_seconds: int) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
+    """抓取 fetch yahoo market points 對應的資料或結果。"""
     points: list[MarketContextPoint] = []
     failures: list[SourceFailure] = []
     for encoded_symbol, label, category, url in YAHOO_MARKET_SYMBOLS:
@@ -192,6 +202,7 @@ def fetch_yahoo_market_points(timeout_seconds: int) -> tuple[list[MarketContextP
 
 
 def _parse_treasury_yield_curve_xml(text: str) -> list[MarketContextPoint]:
+    """解析 parse treasury yield curve xml 對應的資料或結果。"""
     root = ET.fromstring(text)
     ns = {
         "atom": "http://www.w3.org/2005/Atom",
@@ -265,6 +276,7 @@ def _parse_treasury_yield_curve_xml(text: str) -> list[MarketContextPoint]:
 
 
 def fetch_treasury_points(timeout_seconds: int) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
+    """抓取 fetch treasury points 對應的資料或結果。"""
     year = datetime.now().year
     try:
         text = http_get_text(
@@ -281,6 +293,7 @@ def fetch_treasury_points(timeout_seconds: int) -> tuple[list[MarketContextPoint
 
 
 def _twse_index_point(row: dict[str, Any]) -> MarketContextPoint | None:
+    """執行 twse index point 的主要流程。"""
     name = str(row.get("指數") or "").strip()
     if name not in TWSE_INDEX_NAMES:
         return None
@@ -309,6 +322,7 @@ def _twse_index_point(row: dict[str, Any]) -> MarketContextPoint | None:
 
 
 def _twse_stock_point(row: dict[str, Any]) -> MarketContextPoint | None:
+    """執行 twse stock point 的主要流程。"""
     code = str(row.get("Code") or "").strip()
     close = _to_float(row.get("ClosingPrice"))
     if not code or close is None:
@@ -331,6 +345,7 @@ def _twse_stock_point(row: dict[str, Any]) -> MarketContextPoint | None:
 
 
 def _twse_margin_point(row: dict[str, Any]) -> MarketContextPoint | None:
+    """執行 twse margin point 的主要流程。"""
     code = str(row.get("股票代號") or "").strip()
     if not code:
         return None
@@ -360,6 +375,7 @@ def _twse_margin_point(row: dict[str, Any]) -> MarketContextPoint | None:
 
 
 def fetch_twse_points(timeout_seconds: int, tracked_codes: list[str]) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
+    """抓取 fetch twse points 對應的資料或結果。"""
     points: list[MarketContextPoint] = []
     failures: list[SourceFailure] = []
     tracked = {code.strip() for code in tracked_codes if code.strip()}
@@ -400,6 +416,7 @@ def fetch_twse_points(timeout_seconds: int, tracked_codes: list[str]) -> tuple[l
 
 
 def collect_market_context(config: MarketContextConfig) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
+    """彙整 collect market context 對應的資料或結果。"""
     all_points: list[MarketContextPoint] = []
     all_failures: list[SourceFailure] = []
     for points, failures in (
@@ -413,12 +430,14 @@ def collect_market_context(config: MarketContextConfig) -> tuple[list[MarketCont
 
 
 def _fmt_pct(value: float | None) -> str:
+    """格式化 fmt pct 對應的資料或結果。"""
     if value is None:
         return "n/a"
     return f"{value:+.2f}%"
 
 
 def _find(points: list[MarketContextPoint], name: str) -> MarketContextPoint | None:
+    """執行 find 的主要流程。"""
     for point in points:
         if point.name == name or point.symbol == name:
             return point
@@ -426,6 +445,7 @@ def _find(points: list[MarketContextPoint], name: str) -> MarketContextPoint | N
 
 
 def build_summary(points: list[MarketContextPoint], failures: list[SourceFailure], now_local: datetime) -> str:
+    """建立 build summary 對應的資料或結果。"""
     ndx = _find(points, "NASDAQ 100")
     sox = _find(points, "PHLX Semiconductor")
     vix = _find(points, "VIX")
@@ -461,18 +481,21 @@ def build_summary(points: list[MarketContextPoint], failures: list[SourceFailure
 
 
 def _stable_event_id(*parts: Any) -> str:
+    """執行 stable event id 的主要流程。"""
     key = "|".join(str(part) for part in parts if part is not None)
     digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:20]
     return f"market-context-{digest}"
 
 
 def _format_number(value: float | None) -> str:
+    """格式化 format number 對應的資料或結果。"""
     if value is None:
         return "n/a"
     return f"{value:.4f}".rstrip("0").rstrip(".")
 
 
 def _point_title(point: MarketContextPoint) -> str:
+    """執行 point title 的主要流程。"""
     value = _format_number(point.value)
     if point.change_percent is not None:
         return f"{point.name} {value} ({point.change_percent:+.2f}%)"
@@ -482,6 +505,7 @@ def _point_title(point: MarketContextPoint) -> str:
 
 
 def _point_summary(point: MarketContextPoint) -> str:
+    """執行 point summary 的主要流程。"""
     fields = [
         f"category={point.category}",
         f"symbol={point.symbol}",
@@ -500,6 +524,7 @@ def _point_summary(point: MarketContextPoint) -> str:
 
 
 def _point_to_event(point: MarketContextPoint, config: MarketContextConfig, generated_at: str) -> RelayEvent:
+    """執行 point to event 的主要流程。"""
     return RelayEvent(
         event_id=_stable_event_id(
             point.source,
@@ -534,6 +559,7 @@ def build_market_context_events(
     config: MarketContextConfig,
     now_local: datetime,
 ) -> list[RelayEvent]:
+    """建立 build market context events 對應的資料或結果。"""
     generated_at = now_local.isoformat()
     # collector summary event 是整包 context 的索引入口：
     # 單點資料看細節，summary event 看本輪抓了多少點、哪幾個來源失敗。
@@ -564,6 +590,7 @@ def build_market_context_events(
 
 
 def run_once(config: MarketContextConfig) -> dict[str, Any]:
+    """執行單次任務流程並回傳結果。"""
     relay_settings = load_settings(config.env_file)
     if not relay_settings.mysql_enabled:
         raise RuntimeError("Market context requires RELAY_MYSQL_ENABLED=true")
@@ -602,6 +629,7 @@ def run_once(config: MarketContextConfig) -> dict[str, Any]:
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):

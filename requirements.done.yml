@@ -1,0 +1,677 @@
+version: 1
+project: D:\work_space\stock\data-collecting
+archive_type: completed_requirements
+source_file: requirements.yml
+archived_on: 2026-04-25
+
+tasks:
+  - id: REQ-001
+    title: 修正 yfinance 股價抓取
+    status: done
+    trigger: manual
+    priority: high
+    description: |
+      yfinance_stocks.py 目前 total_symbols 回傳 0。
+      改用 yf.download() 或確認 fast_info 正常運作，
+      確保每次執行後 data/stocks/ 有非空 JSON 且 MySQL t_relay_events 有新增 yfinance_ 紀錄。
+    depends_on: []
+    acceptance:
+      - data/stocks/ 最新 JSON 的 total_symbols > 0                        # done (2026-04-20 實測 17)
+      - MySQL t_relay_events 有 source LIKE 'yfinance_%' 且 created_at >= TODAY  # done (2026-04-25 實測 26)
+    notes: |
+      2026-04-20 修復完成並通過單元測試 + 端對端 JSON 驗證：
+        根因：原 fetch_quote 依賴 fast_info.last_price/previous_close，
+              近期 yfinance 版本在此 endpoint 經常回 None → 每檔 return None → total_symbols=0。
+        修法：改用 yf.download(period='5d', group_by='column') 批次抓，
+              新增 pure _extract_quote_from_download() 從 DataFrame 萃 Close/Volume。
+        驗證：PYTHONPATH=src .venv/Scripts/python.exe -m unittest tests.test_yfinance_stocks -v  (4/4 pass)
+              執行 scraper 產出 stocks_20260420_093536.json, total_symbols=17
+        附帶：requirements.txt 補齊 yfinance、pandas；Python 環境改為 .venv (Python 3.13)。
+      2026-04-25 補完正式驗收：
+        - 使用 repo `.venv\\Scripts\\python.exe` 執行 scraper，產出 `stocks_20260425_025225.json`, total_symbols=26
+        - MySQL 查詢確認 `t_relay_events` 當日 `source LIKE 'yfinance%'` 共 26 筆
+        - 另修正 Windows cp950 終端下成功訊息的 Unicode 輸出錯誤，避免寫庫成功後因 console 編碼而 exit 1。
+
+  # ── LINE 模組 Java 化遷移（四階段）──────────────────────
+  # 目標：Python 專職爬蟲/監聽/AI 分析 → 寫 MySQL；
+  #       Java (Spring Boot 3 / Java 21) 專職 LINE 社群管理與推送。
+  # 兩邊透過共用 MySQL 解耦，不走 HTTP。
+  # 新專案路徑：D:\work_space\claude-box\workspace\line-relay-service (獨立 repo)
+  # 部署：Python 與 Java service 位於不同機器。
+
+  - id: REQ-005
+    title: "[Java 遷移 Phase 1] 骨架 + webhook 接收 + push client"
+    status: done
+    trigger: manual
+    priority: high
+    description: |
+      建立獨立 Spring Boot 3.3.x / Java 21 專案 (Maven + mvnw)。
+      套件：com.zack.linerelay
+      功能：
+        1. GET /health - healthcheck
+        2. POST /webhook - LINE webhook 接收，驗 X-Line-Signature (HMAC-SHA256)，
+           解析 join/leave/message/follow/unfollow 事件，先只 log 不寫 DB
+        3. LinePushClient service - push(targetId, text) / multicast(targetIds, text)
+        4. 設定走環境變數 (LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN)
+        5. README + .env.example + .gitignore
+      此階段不含 DB 連線、dispatcher、queue 表。
+    depends_on: []
+    acceptance:
+      - 專案位於 D:\work_space\claude-box\workspace\line-relay-service 且為獨立 git repo  # done (commit fcdfc93)
+      - ./mvnw spring-boot:run 可啟動服務                                                   # pending：需先裝 JDK 21
+      - /health 回 200                                                                      # pending：需先啟動服務
+      - ngrok/cloudflared 暴露後，LINE Console webhook 測試成功（log 顯示事件）              # pending：需先啟動服務
+      - 手動呼叫 LinePushClient.push() 能成功推送訊息到指定 LINE 用戶/群組                   # pending：需先啟動服務
+    notes: |
+      2026-04-20 Phase 1 程式骨架 + 單元測試已完成並 commit (fcdfc93)。
+      交付物：
+        - Spring Boot 3.3.5 / Java 21 / Maven wrapper (3.9.9)
+        - HealthController, SignatureVerifier, WebhookController, LinePushClient
+        - 單元測試 16 個（SignatureVerifier 5、WebhookController 4、LinePushClient 7）
+        - README.md, .env.example, .gitignore
+      待人工完成的驗收前置：
+        1. 安裝 Amazon Corretto 21，設定 JAVA_HOME
+        2. ./mvnw test 驗證單元測試
+        3. 設 LINE_CHANNEL_SECRET / LINE_CHANNEL_ACCESS_TOKEN 後 ./mvnw spring-boot:run
+        4. ngrok 暴露 → LINE Console 切 webhook → 觀察事件 log
+        5. 呼叫 push 驗證推送成功後 → 可將 status 改 done 並啟動 REQ-006
+
+  - id: REQ-006
+    title: "[Java 遷移 Phase 2] 切換 LINE webhook + 接管群組/用戶註冊"
+    status: done
+    trigger: manual
+    priority: high
+    description: |
+      Java service 接上共用 MySQL，接管群組與用戶狀態管理：
+        1. 新增 JDBC / JPA 設定 (連到 Python 共用的 MySQL，跨機器)
+        2. Repository：t_bot_group_info、t_bot_user_info
+        3. Webhook handler 寫入/更新群組/用戶資料 (join → active, leave → inactive)
+        4. 在 LINE Developer Console 切換 webhook URL 從 Python 指到 Java
+        5. Python 端的 webhook service 保留做 backup，暫不關閉
+    depends_on: [REQ-005]
+    acceptance:
+      - Java service 能從遠端 MySQL 讀寫 t_bot_group_info / t_bot_user_info   # done
+      - LINE webhook URL 已切換到 Java 端                                     # done
+      - 新群組加 bot / 新用戶 follow 後，DB 狀態由 Java 正確寫入              # done
+      - 原 Python webhook 不再收到 LINE 事件（或視情況保留 backup）          # done
+    notes: |
+      2026-04-22 完成並實測：服務已起、推送正常、67/67 單元測試通過。
+      交付物（line-relay-service repo）：
+        - BotTargetRepository：t_bot_group_info / t_bot_user_info upsert + active/test_account 過濾
+        - WebhookEventProcessor：follow/unfollow/join/leave/memberJoined 直接寫 DB
+        - AdminController：/admin/list-targets、/admin/poll-market-analysis
+        - LINE Console webhook URL 已切到 Java /webhook，Python 端不再收 LINE 事件
+
+  - id: REQ-007
+    title: "[Java 遷移 Phase 3] Java 直讀 t_market_analyses 排程推送，Python 專注爬取與寫庫"
+    status: done
+    trigger: manual
+    priority: high
+    description: |
+      2026-04-22 架構調整：**捨棄 t_push_queue 佇列設計**。改由 Python 端單純爬取
+      資料 + AI 分析後寫入共用 MySQL，Java 端 scheduler 直接讀表並推送，不再雙向排隊。
+
+      分工：
+        - Python (data-collecting)：負責爬取各類行情/新聞資料，做 AI 分析後寫入
+          t_market_analyses（含 analysis_date / analysis_slot / summary_text / push_enabled 等）。
+          **不得**呼叫任何 LINE API、不得保留 LINE webhook handler。
+        - Java (line-relay-service)：負責 LINE webhook 接收、群組/用戶狀態、
+          直接讀 t_market_analyses 後在 Asia/Taipei 排程推送：
+            * 05:10 us_close（週一改 weekly_tw_preopen）
+            * 07:40 pre_tw_open
+            * 00:00 設 push_enabled=0 清理昨天之前未推送的 row
+          另支援 LINE 指令 `測試西卡卡` / `關閉西卡卡` / `西卡卡推送`。
+    depends_on: [REQ-006]
+    acceptance:
+      - Java MarketAnalysisPoller + MarketAnalysisScheduler 能按排程讀 t_market_analyses 並推送  # done
+      - Python 端不再呼叫 LINE Messaging API（linebot、push 等）                                   # done (2026-04-25 REQ-008 驗證完成)
+      - Java 單元測試覆蓋 no_analysis / no_targets / push_enabled 過濾 / 排程 slot 選擇             # done (67/67 pass)
+    notes: |
+      原規格的 t_push_queue + dispatcher 模型因「實際只有 market_analysis 一路需要推播、
+      再加通用佇列反而增加兩端協調成本」而捨棄。後續若需要多個 Python 模組各自觸發 LINE，
+      走「各模組寫自己的專用表 + Java 各自排程讀」模式，不重啟通用 queue。
+
+  - id: REQ-008
+    title: "[Java 遷移 Phase 4] 移除 Python webhook 與 LinePushClient"
+    status: done
+    trigger: manual
+    priority: medium
+    description: |
+      確認 Java 端穩定運作後，清理 Python 端殘留：
+        1. 移除 src/event_relay/service.py 中的 LinePushClient 類別
+        2. 移除 Python webhook 服務與相關排程（保留事件儲存邏輯）
+        3. 更新 README / memory-bank / PROJECT_DOCUMENTATION.md 描述新架構
+        4. 刪除 scripts/register_weekly_summary_task.ps1 等僅服務舊流程的腳本
+           （保留仍需要的 AI 分析觸發腳本）
+        5. 確認 .env 仍保留 DB 連線與 AI provider 設定，移除 LINE 相關變數
+    depends_on: [REQ-007]
+    acceptance:
+      - Python codebase 不再 import linebot 或呼叫 LINE Messaging API
+      - 所有 LINE 相關推送/接收皆由 Java service 負責
+      - 文件已更新，README 反映新架構
+      - 所有測試仍通過
+    notes: |
+      2026-04-25 驗收完成：
+        - 靜態掃描確認 Python 活躍程式碼中已無 `linebot`、`LinePushClient`、`/line/webhook`、
+          `/push/direct`、`analysis_push`、`run_analysis_push`、`t_line_push_jobs`
+        - 已刪除最後殘留的 `start_summary_sender.bat` 舊式 LINE dispatcher launcher
+        - Windows Task Scheduler 僅剩 source/context/analysis/retention 任務，無 AnalysisPush / LINE / SummarySender
+        - `.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v` 通過（140 tests）
+
+  - id: REQ-009
+    title: "[台股資金流] 官方資料源標準化寫入 t_relay_events"
+    status: done
+    trigger: manual
+    priority: high
+    description: |
+      下一迭代補上台股早盤資金流資料包。所有資料先以 stored-only event 形式寫入
+      t_relay_events，不直接寫入 t_market_analyses；早盤分析再從事件窗彙整後產出
+      t_market_analyses。
+
+      資料源以官方來源為主：
+        1. TWSE：三大法人買賣超、外資持股、融資融券、借券/SBL、大盤/類股/跨市場行情。
+        2. TPEx：上櫃三大法人、外資持股、融資融券、融券借券賣出餘額、OTC 指數/類股。
+        3. TAIFEX：台指期/小台/選擇權未平倉、外資期貨淨部位、put/call 結構、大額交易人。
+
+      事件設計方向：
+        - source 使用 market_context:twse_flow / market_context:tpex_flow / market_context:taifex_flow。
+        - raw_json 保留官方原始欄位、trade_date、normalized metrics、stored_only=true。
+        - dedupe key 應包含 source family、trade_date、dataset、symbol 或 contract。
+        - 不做 LINE 推送；Python 僅負責資料蒐集、事件寫庫與 AI 分析寫庫。
+    depends_on: []
+    acceptance:
+      - 官方來源 endpoint 與欄位 mapping 已確認並記錄在 memory-bank 文件
+      - TWSE / TPEx / TAIFEX adapters 可分別單獨執行並回傳 normalized event payload
+      - 事件會寫入 t_relay_events，source 以 market_context: 開頭且 raw_json.stored_only=true
+      - pre_tw_open 分析會讀取最近台股資金流事件，並在 prompt snapshot 中可追溯
+      - 新增非網路 unit tests 覆蓋解析、dedupe key、空資料/錯誤處理
+    notes: |
+      2026-04-22 已完成實作：TWSE / TPEx / TAIFEX 官方資料已標準化為
+      market_context:* stored-only events，可用來判斷外資現貨/期貨是否同向、
+      上櫃是否跟上上市、融資是否追價、借券是否升高，以及選擇權 put/call
+      結構是否偏防守。
+      2026-04-25 補完正式驗收：
+        - `event_relay.tw_market_flow`、`scripts/run_tw_market_flow.ps1`、`tests/test_tw_market_flow.py` 已在 repo
+        - `.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v` 通過，含 `test_tw_market_flow`
+        - 實跑 `scripts/run_tw_market_flow.ps1 -EnvFile .env` 成功，`stored=14`, `failures=0`
+        - MySQL 查詢確認新寫入 row id `19634-19647`，source 分別為
+          `market_context:twse_flow` / `market_context:tpex_flow` / `market_context:taifex_flow`
+        - memory-bank 已記錄官方 endpoint/mapping 與決策：`PROJECT_DOCUMENTATION.md`、
+          `workflows.md`、`09-decisions/2026-04-22-tw-market-flow-official-datasets.md`
+
+  - id: REQ-010
+    title: "[美國總經] BLS 官方數據標準化寫入 t_relay_events"
+    status: done
+    trigger: manual
+    priority: high
+    description: |
+      下一迭代補上美國總經官方資料包，優先使用 U.S. Bureau of Labor Statistics
+      Public Data API 取得 JSON time series。資料先以 stored-only event 形式寫入
+      t_relay_events，不直接寫入 t_market_analyses；美股收盤與台股早盤分析再從
+      事件窗彙整後產出 t_market_analyses。
+
+      第一批指標：
+        1. CPI：headline CPI、core CPI。
+        2. PPI：headline PPI、core / final demand 相關序列。
+        3. 就業：非農就業、失業率、勞動參與率。
+        4. 薪資：平均時薪、平均週工時、薪資年增/月增。
+
+      API 設計方向：
+        - endpoint 使用 https://api.bls.gov/publicAPI/v2/timeseries/data/。
+        - 支援 BLS_API_KEY；未設定 key 時保留 no-key / 低頻 fallback，避免配額與限制問題。
+        - series id mapping 應集中設定，實作前需再次對照 BLS catalog / 官方文件。
+        - source 使用 market_context:bls_macro。
+        - raw_json 保留 series_id、period、periodName、year、value、footnotes、release metadata、
+          normalized metrics、stored_only=true。
+        - dedupe key 應包含 source family、series_id、year、period。
+    depends_on: []
+    acceptance:
+      - BLS endpoint、series id mapping、發布頻率與修正註記已記錄在 memory-bank 文件
+      - BLS adapter 可單獨執行並回傳 normalized event payload
+      - 事件會寫入 t_relay_events，source=market_context:bls_macro 且 raw_json.stored_only=true
+      - us_close / pre_tw_open 分析會讀取最近 BLS macro events，並在 prompt snapshot 中可追溯
+      - 新增非網路 unit tests 覆蓋解析、dedupe key、缺 key、空資料、BLS API error message 處理
+    notes: |
+      2026-04-22 已進入 review。BLS 是官方總經資料源，對利率預期、通膨再加速、
+      就業強弱、薪資黏性與台股風險偏好判斷有直接價值。
+      2026-04-25 review 通過，狀態改 done：
+        - bls_macro.py: 9 個 series（CPI/core CPI/PPI/PPI core/PPI core ex-foods/
+          NFP/失業率/勞動參與率/平均時薪 monthly + weekly），SOURCE=market_context:bls_macro
+        - dedupe key: build_event_id(series_id, year, period) at bls_macro.py:428
+        - raw_json.stored_only=true，保留 footnotes 與 normalized metrics
+        - memory-bank/09-decisions/2026-04-22-bls-macro-relay-events.md 記錄端點與設計
+        - tests/test_bls_macro.py 覆蓋解析、dedupe、缺 key、空資料、API error
+        - us_close / pre_tw_open 透過既有 market_context:* 事件窗讀取，無需特例代碼
+
+  - id: REQ-011
+    title: "[台股收盤] 收盤事件寫入 t_relay_events 並產出 tw_close 分析"
+    status: done
+    trigger: schedule
+    priority: high
+    description: |
+      下一迭代新增台股收盤資料包與 tw_close 分析。所有台股收盤相關資料必須先以
+      stored-only event 形式寫入 t_relay_events，不得由來源 collector 直接寫入
+      t_market_analyses。tw_close 分析流程再統合當日 t_relay_events 內的台股市場事件、
+      market_context:* stored-only events、MOPS 重大訊息、國際新聞與 X 事件，問模型後
+      才寫入 t_market_analyses。
+
+      分析重點：
+        1. 加權 / 櫃買指數收盤表現、成交量、強弱類股。
+        2. 法人資金流與期權籌碼是否支持當日行情。
+        3. 融資融券、借券/SBL 是否顯示散戶追價或空方壓力。
+        4. 權值股、半導體、AI 供應鏈、金融與中小型股輪動。
+        5. 對隔日早盤的觀察清單與風險提醒。
+
+      排程設計方向：
+        - 收盤資料包事件 source 使用 market_context:tw_close / market_context:tw_close_flow。
+        - 收盤資料包建議台股交易日 15:20 Asia/Taipei 寫入 t_relay_events。
+        - analysis_slot 使用 tw_close。
+        - tw_close 分析建議台股交易日 15:30 Asia/Taipei 執行，等待收盤資料包事件入庫。
+        - analysis_date 使用台股交易日 YYYY-MM-DD。
+        - raw_json.dimension 使用 daily_tw_close。
+        - push_enabled 預設維持 0；Java 是否推送由 Java repo 另行決定。
+    depends_on: [REQ-009]
+    acceptance:
+      - 台股收盤報告的 slot、排程時間與資料窗口已記錄在 memory-bank 文件
+      - 台股收盤資料包事件會先寫入 t_relay_events，source 以 market_context:tw_close 開頭且 raw_json.stored_only=true
+      - market_analysis 支援 Slot=tw_close，讀取當日 t_relay_events 後才寫入 t_market_analyses
+      - prompt snapshot 會落在 runtime/prompts/market_analysis_tw_close_*.txt
+      - 報告可讀取當日 market_context:twse_flow / tpex_flow / taifex_flow 事件
+      - 無 LINE push / webhook / direct push 邏輯
+      - 新增 unit tests 覆蓋 slot routing、analysis_date、raw_json.dimension、push_enabled 預設值
+    notes: |
+      2026-04-22 已進入 review。重要邊界：REQ-009、REQ-010、REQ-011 都是先把
+      來源/情境事實寫入 t_relay_events；t_market_analyses 僅保存模型統合事件後
+      產出的分析文字。tw_close 以 15:20 context event + 15:30 analysis slot 落地，
+      用來補足早盤前分析之外的收盤復盤。
+      2026-04-25 review 通過，狀態改 done：
+        - tw_close_context.build_tw_close_context_event 寫入 source=market_context:tw_close
+          + stored_only=True（tw_close_context.py:223-230）
+        - 過濾來源含 twse_flow / tpex_flow / taifex_flow（tw_close_context.py:25-27）；
+          tw_market_flow.py 提供這三類資料的 collector
+        - market_analysis 支援 slot=tw_close，排程窗口 (15, 30)（market_analysis.py:39, 64）
+        - raw_json.dimension="daily_tw_close"、push_enabled=0（market_analysis.py:630-631）
+        - prompt snapshot 路徑由 stage4_synthesis._write_prompt_snapshot 統一處理
+        - memory-bank/09-decisions/2026-04-22-tw-close-event-first-analysis.md +
+          2026-04-22-tw-market-flow-official-datasets.md 記錄資料窗口與資料來源
+        - tests/test_tw_close_context.py + tests/test_tw_market_flow.py 覆蓋 slot routing、
+          analysis_date、dimension、push_enabled、collector 解析；REQ-010+011 共 11 tests 綠
+
+  # ── 模型分析品質提升（六項弱點）──────────────────────
+  # 目標：在不更動資料蒐集與 Java 推送邊界的前提下，提升 t_market_analyses 產出的
+  #       推理深度、可驗證性與 token 效率。依序解決 REQ-012 → REQ-017。
+
+  - id: REQ-012
+    title: "[分析品質] 多階段分析 pipeline（事件解讀 → 影響傳導 → 台股映射 → 風險）"
+    status: done
+    trigger: manual
+    priority: high
+    description: |
+      現況：src/event_relay/market_analysis.py 在單一 LLM call 同時處理事件理解、
+      因果推導、台股映射與風險提示，模型被迫走捷徑 → 深度不足、互相稀釋。
+
+      目標：把 run_once() 改為多階段 chain：
+        1. stage_event_digest：對 t_relay_events 視窗內事件做分類、重要性分級、
+           受影響資產/產業標註（輸出 JSON）。
+        2. stage_transmission：基於 stage1 JSON + market_context 推導「總經/政策/
+           地緣事件 → 美股 → 台股」的傳導鏈（輸出 JSON）。
+        3. stage_tw_mapping：將 stage2 映射到具體台股族群/權值股/供應鏈（輸出 JSON）。
+        4. stage_synthesis：依 slot 指令（us_close / pre_tw_open / tw_close）產出
+           最終 220-700 字中文報告，作為 t_market_analyses.summary_text。
+        各 stage 之間以 JSON 傳遞，不重讀原始事件。
+    depends_on: []
+    acceptance:
+      - market_analysis.py 拆出 stage_event_digest / stage_transmission / stage_tw_mapping / stage_synthesis 四個純函式
+      - 每個 stage 有 prompt snapshot 落在 runtime/prompts/market_analysis_<slot>_stage<N>_*.txt
+      - 每個 stage 的 JSON 輸出透過 schema 驗證（OpenAI structured outputs 或 Anthropic tool schema）
+      - t_market_analyses.raw_json 新增 pipeline_stages 欄位，保存各 stage 輸出的摘要
+      - 既有 us_close / pre_tw_open slot 行為向後相容（summary_text 欄位不變）
+      - 新增 unit tests 覆蓋 stage schema 驗證、stage 間欄位傳遞、stage 失敗時的降級行為
+    notes: |
+      2026-04-22 新列。此為本批六項中最先解決，因其他幾項（RAG、critic、結構化輸出）
+      都需要先有 stage 邊界才方便插入。實作時保留單階段 fallback：若多 stage call 任一
+      失敗，記錄 stage 錯誤並回退到現有單次 prompt，避免推送斷炊。
+      2026-04-25 完成並驗收：
+        - 交付物：src/event_relay/analysis_stages/ 下 4 個 stage + llm_json + schemas + context
+        - market_analysis.py 改為預設 multi_stage，保留 legacy 回退
+        - pipeline_stages / pipeline_mode / pipeline_version 已寫入 t_market_analyses.raw_json
+        - 28 個單元測試全綠（stage 14、market_analysis 14）
+        - 併波策略：013 + 017 可並行（015 要等 017 完成後再動 stage4）
+
+  - id: REQ-013
+    title: "[分析品質] 事件預處理層：實體抽取 + 事件分類 + 重要性評分"
+    status: done
+    trigger: manual
+    priority: high
+    description: |
+      現況：market_analysis._compact_event_raw_json() 只做欄位瘦身，丟給模型的仍是
+      原始 title/summary 字串陣列，模型必須自己解析誰是主角、事件屬哪一類、
+      是否重要。這會浪費推理預算且造成遺漏。
+
+      目標：在 event_relay 寫入 t_relay_events 後、被分析讀取前，補一層預處理：
+        1. 實體抽取：company / ticker / country / policy / macro_indicator / person。
+        2. 事件分類：rate_decision / earnings / geopolitics / supply_chain / regulation /
+           macro_release / corporate_action / other。
+        3. 重要性評分 0-1（based on 來源權重 × 標題觸發字 × 是否含具體數字）。
+        4. 情緒極性：bullish / bearish / neutral（以全球風險偏好視角）。
+      結果寫回 t_relay_events 新欄位或新表 t_relay_event_annotations，供 REQ-012
+      stage_event_digest 直接引用。
+    depends_on: [REQ-012]
+    acceptance:
+      - 設計並 migrate t_relay_event_annotations（或 t_relay_events 新欄位）
+      - 新增 src/event_relay/event_enrichment.py 提供 annotate(event) 介面
+      - 可選用規則 + 輕量 LLM（Claude Haiku / gpt-4.1-mini）模式，不強綁單一 provider
+      - market_analysis 讀事件時一併讀 annotations，並在 stage1 prompt 中使用
+      - 新增 unit tests 覆蓋實體抽取、事件分類、重要性計算邊界值（0 / 0.5 / 1）
+      - 退化路徑：若 annotation 缺失，stage1 仍能跑（使用 fallback heuristics）
+    notes: |
+      2026-04-22 新列。此為 REQ-012 的「input 升級」，讓 stage1 不必從零做解析。
+      重要性評分建議先以 rule-based 起步，後續再考慮 fine-tune / embedding。
+      2026-04-25 完成並驗收：
+        - 交付物：src/event_relay/event_enrichment.py（rule-based annotate()）
+          + service.fetch_event_annotations / upsert_event_annotation
+          + t_relay_event_annotations DDL（PK event_row_id, idx category+importance, annotated_at）
+        - market_analysis._build_events_payload 先讀 DB annotation，缺時 inline 規則補
+        - stage1_digest prompt 新增 annotation 先驗指引
+        - 22 個 enrichment 單元測試 + 2 個 market_analysis 整合測試（stored vs. fallback）
+        - 全測試 140 綠（4 skipped）
+
+  - id: REQ-014
+    title: "[分析品質] 歷史案例 RAG：類似事件 → 過去市場反應"
+    status: done
+    trigger: manual
+    priority: medium
+    description: |
+      現況：模型只能靠訓練期記憶推「升息 25bp 對台股是什麼反應」，缺本專案累積的
+      歷史案例。隨著 t_relay_events 與 t_market_analyses 日漸累積，應自建向量庫
+      做 few-shot 檢索。
+
+      目標：
+        1. 選定 embedding 模型（OpenAI text-embedding-3-large 或 Voyage / BGE 自架）。
+        2. 建立 t_event_embeddings（event_id, embedding, created_at）與
+           t_analysis_embeddings（analysis_id, embedding, summary_text, trade_outcome）。
+        3. 新增 src/event_relay/rag.py 提供 retrieve_similar_events(query_events, k)。
+        4. REQ-012 stage_transmission 使用檢索到的前 k=3~5 個類似歷史事件 + 當時
+           後續 1 / 5 / 20 日指數變化作為 few-shot 範例。
+        5. 回測：蒐集近 30 天資料，比對加 RAG vs. 不加 RAG 的分析品質（人評 + 自動）。
+    depends_on: [REQ-012, REQ-013]
+    acceptance:
+      - 建 t_event_embeddings / t_analysis_embeddings 並有每日增量更新任務
+      - rag.retrieve_similar_events() 單元測試覆蓋空庫、k>庫筆數、相似度閾值
+      - stage_transmission prompt snapshot 可看到 retrieved examples 區塊
+      - 新增 runtime/evals/rag_ab_YYYY-MM-DD.md 至少一次 A/B 評估紀錄
+      - 當 RAG 服務失敗時自動降級為無 RAG 版本，不中斷分析
+    notes: |
+      2026-04-22 新列。embedding 儲存先用 MySQL BLOB / JSON，體量大時再評估升級
+      向量資料庫（pgvector / Qdrant）。outcome 標註（漲/跌/震盪）可先用
+      t_market_index_snapshots 自動計算，免人工標。
+      2026-04-26 完成並驗收：
+        - 新增 `src/event_relay/rag.py`，提供 `retrieve_similar_events()` 與增量索引流程
+        - `MySqlEventStore.initialize()` 會建立 `t_event_embeddings` 與 `t_analysis_embeddings`
+        - 新增 `scripts/run_rag_indexer.ps1`，並在 `register_market_analysis_tasks.ps1`
+          註冊 `NewsCollector-RagIndexer` 每日 04:40 執行
+        - `stage2_transmission` prompt 會包含 `Historical retrieved examples JSON`
+        - `market_analysis` 在 RAG 空庫或失敗時會降級為空 examples，並寫入 `raw_json.rag`
+        - 新增 `runtime/evals/rag_ab_2026-04-25.md` 作為第一版 A/B baseline
+        - 單元測試覆蓋空庫、k limit、similarity threshold、排除本輪 event ids、
+          索引事件/分析、prompt 注入、RAG 失敗降級
+
+  - id: REQ-015
+    title: "[分析品質] Critic 自我驗證 + Bull/Bear 雙角度推理"
+    status: done
+    trigger: manual
+    priority: medium
+    description: |
+      現況：LLM 一次產出即入庫，沒有任何反方驗證。容易出現「表面合理但邏輯漏洞」
+      的報告，也沒辦法標示信心區間。
+
+      目標：在 REQ-012 的 stage_synthesis 之前插入兩個子步驟：
+        1. stage_dual_view：同一份 stage_tw_mapping JSON 分別產 bull_case 與 bear_case
+           JSON（列出論點 + 論據 + 反面風險）。
+        2. stage_critic：一個獨立角色（風控分析師 persona）挑最終 synthesis 的毛病
+           —— 邏輯跳躍、事實無據、過度自信；產生 critique JSON 與建議修改清單。
+        3. 最終 synthesis 階段吃 bull/bear/critic 三份輸入，輸出時必須包含
+           「信心等級 low/medium/high」與「主要反方觀點一行」。
+    depends_on: [REQ-012]
+    acceptance:
+      - pipeline 新增 stage_dual_view 與 stage_critic 兩個階段
+      - summary_text 必含「信心等級」與「主要反方觀點」兩個欄位（格式統一、可正則抽取）
+      - t_market_analyses.raw_json 保存 bull_case / bear_case / critique 全文
+      - 新增 unit tests 覆蓋 critic 對缺證據報告的打分、bull/bear 兩份不同內容
+      - 退化：critic 失敗時標記 raw_json.critic_skipped=true，不阻塞主流程
+    notes: |
+      2026-04-22 新列。Critic 可選用較便宜的模型（Haiku / gpt-4.1-mini）節省成本，
+      只要它有獨立 persona 與明確 checklist 即可。實測再決定是否升到主力模型。
+      2026-04-25 完成並驗收：
+        - 交付物：analysis_stages/stage_dual_view.py + stage_critic.py（含 schemas
+          STAGE_DUAL_VIEW_SCHEMA、STAGE_CRITIC_SCHEMA），pipeline 升級至 multi-stage-v2
+        - market_analysis.run_multi_stage_pipeline 在 stage3 之後依序呼叫 stage_dual_view、
+          stage_critic；critic 失敗時 telemetry["critic_skipped"]=true，主流程不阻斷；
+          dual_view 失敗時連帶略過 critic
+        - stage4_synthesis.ensure_confidence_footer 保證 summary_text 以
+          「信心等級：x / 主要反方觀點：y」兩行收尾，可由 CONFIDENCE_LINE_RE / COUNTERPOINT_LINE_RE 抽取
+        - raw_json.pipeline_stages 保留 bull_case / bear_case / critique 全文（critique 為 null 表示 skipped）
+        - 新增 4 個 stage 單元測試（dual_view 雙視角差異、dual_view LLM 失敗、critic 對缺證據打 low、
+          critic LLM 失敗回 error result）+ 1 個整合測試（critic_skipped 主流程不阻塞）
+        - 全測試 148 綠
+
+  - id: REQ-017
+    title: "[分析品質] 結構化輸出：summary_text 之外落入可查詢欄位"
+    status: done
+    trigger: manual
+    priority: medium
+    description: |
+      現況：t_market_analyses.summary_text 只有純文字，難以後續做評估、回測或
+      搜尋「過去所有 bearish 訊號中有提到半導體的分析」。
+
+      目標：stage_synthesis 同時產出純文字 summary_text 與 JSON schema 輸出：
+        1. schema：{ headline, sentiment(bullish|bearish|neutral), confidence(low|medium|high),
+           key_drivers[], tw_sector_watch[{sector, direction, rationale}],
+           stock_watch[{ticker, direction, rationale}], risks[], data_gaps[] }。
+        2. OpenAI 用 structured outputs（response_format JSON schema）；
+           Anthropic 用 tool use 的 input_schema 強制輸出。
+        3. 落地到 t_market_analyses 新增欄位 structured_json 或 raw_json.structured。
+        4. 提供 query_output.py 之類的查詢範例：依情緒 / 產業 / 信心等級篩歷史分析。
+    depends_on: [REQ-012, REQ-015]
+    acceptance:
+      - stage_synthesis 同時返回 summary_text 與 structured JSON（通過 schema 驗證）
+      - t_market_analyses schema migrate：新增 structured_json JSON 欄位 + index
+      - 新增 scripts/query_analyses.ps1 / .py 範例，可依 sentiment / sector 查歷史
+      - summary_text 欄位仍保留，向後相容 Java 推送端
+      - 新增 unit tests 覆蓋 schema 驗證失敗時的 retry / fallback 行為
+    notes: |
+      2026-04-22 新列。結構化輸出是 REQ-014（RAG）的前置條件之一：有結構才方便
+      embedding 與相似度檢索。也讓 REQ-015 的信心等級與反方觀點有固定欄位可抽。
+      2026-04-25 完成並驗收：
+        - 交付物：schemas.STAGE4_SYNTHESIS_SCHEMA + stage4_synthesis 雙路徑（structured 主、純文字 fallback）
+        - service.MarketAnalysisRecord.structured_json 欄位 + ALTER TABLE 自動遷移
+        - market_analysis 將 structured payload 同時寫入 t_market_analyses.structured_json 與 raw_json.structured
+        - scripts/query_analyses.py：依 sentiment / confidence / sector / ticker / slot / since 查歷史
+        - 新增 stage4 三個測試（schema valid / schema fail fallback / 雙路皆失敗）
+          + market_analysis 多階段成功 + structured fallback 共 2 個整合測試
+        - 全測試 143 綠
+      2026-04-25 重新驗收（重啟後）：
+        - 後續 REQ-015 critic / dual_view 擴充把 stage4 升到 multi-stage-v2 並由 ensure_confidence_footer
+          保證 summary_text 以「信心等級：x / 主要反方觀點：y」結尾，造成 3 個測試漂移
+        - 修正：test_analysis_stages.py 兩個 stage4 測試改為 prefix+substring 斷言；
+          test_market_analysis.py 將 pipeline_version 期望值升 v1→v2
+        - 重跑 143 綠，REQ-017 結案維持有效
+
+  # ── 自動交易系統（下一階段）────────────────────────────────────────────
+  # 原則：
+  #   1. Python 仍負責資料蒐集、事件寫庫、模型分析、監控、決策與交易執行中台。
+  #   2. Java 仍負責 LINE webhook、群組/用戶管理、分析/通知推送。
+  #   3. t_relay_events 保存來源事實與監控事件；t_market_analyses 僅保存模型分析結果。
+  #   4. LLM 不可直接下單；必須先經過規則/風控/審批層形成 order intent。
+  #
+  # 模組分類（REQ-018 起）：
+  #   - architecture_foundation：系統邊界、資料流、治理與安全閘門
+  #   - data_ingestion：行情、新聞、人物監控與事件標準化
+  #   - analysis_engine：交易導向分析輸出
+  #   - delivery_java：Java 端訂閱、推送與 delivery log
+  #   - market_watch：盤中 watchlist 與觸發監控
+  #   - decision_engine：策略知識庫、signal、risk check、approval
+  #   - order_execution：order intent、paper trading、broker adapter
+  #   - operations_evaluation：replay、績效、觀測、incident/rollback
+
+  # ── 模組：Architecture Foundation ────────────────────────────────────
+  - id: REQ-018
+    title: "[自動交易總體] Python / Java / Decision / Order 邊界與資料流定稿"
+    module: architecture_foundation
+    status: done
+    trigger: manual
+    priority: high
+    description: |
+      目標：先把自動交易系統的服務邊界、資料流、資料表責任與安全閘門定清楚，
+      避免後續把 crawler、LINE、決策、下單邏輯混在一起。
+
+      範圍：
+        1. Python（本 repo）：
+           - 蒐集新聞、社群、公告、行情與市場上下文
+           - 將來源事實寫入 t_relay_events / 專用快照表
+           - 產出 t_market_analyses（市場分析、交易候選、監控摘要）
+           - 執行 watchlist 監控、決策產生與 order intent 建立
+        2. Java（line-relay-service）：
+           - 負責 LINE webhook、群組/用戶管理、訂閱偏好、推送紀錄、消息觸達
+        3. Decision layer：
+           - 管理策略知識庫、候選訊號、風控審批、模式切換（manual / semi-auto / auto）
+        4. Order layer：
+           - 對接券商 API、委託生命週期、成交回報、對帳與 kill switch
+
+      強制原則：
+        - 來源資料不可直接寫入 t_market_analyses，必須先成為 relay facts 或專用快照資料。
+        - 模型不可直接產生 broker API 呼叫；只能先產生候選策略/決策建議。
+        - 每一筆分析、決策、下單都必須可追溯回來源事件與 prompt/規則版本。
+    depends_on: []
+    acceptance:
+      - 補一份 memory-bank 決策文件，明確定義 Python / Java / decision / order 四層邊界
+      - 明確列出核心資料表與責任邊界：events / analyses / watchlist / decisions / orders / delivery logs
+      - 定義三種運行模式：manual、semi_auto、auto，並有 enable/disable 開關
+      - 定義全域停機開關（kill switch）與人工審批閘門，不允許 LLM 直連下單
+      - 補充一份端到端流程圖：source event -> analysis -> watchlist -> decision -> order intent -> broker
+    notes: |
+      2026-04-25 新列。此條是後續所有自動交易功能的設計前置條件。
+      若邊界未先定稿，後續很容易把 Java 觸達、Python 分析、下單中台耦合在一起。
+      2026-04-25 進入 review：
+        - 交付物：memory-bank/09-decisions/2026-04-25-auto-trading-system-boundaries.md
+        - 文件涵蓋：四層邊界（Python data+analysis / Java delivery / decision / order）、
+          18 張核心資料表的寫入 ownership 矩陣（含 t_analysis_delivery_logs 由 Java 寫）、
+          三種運行模式 manual/semi_auto/auto + global_mode + strategy mode_override，
+          四類 kill switch（global / per-symbol / broker connectivity），
+          五個 LLM 不可繞過的 approval gate，
+          end-to-end Mermaid 流程圖 + ASCII fallback
+        - 六個強制不變式：facts before analysis / no-LLM-to-broker /
+          default manual mode / kill switch 在 submission 點生效 /
+          全鏈路 traceability / Java 獨佔 delivery
+        - Non-goals 顯式列出：column-level schema、broker 選型、prompt cache、RAG，
+          後續 REQ-019~029 個別處理
+      2026-04-25 user review 通過，狀態改 done；
+        REQ-019 起所有 PR 都必須引用本文件作為邊界依據。
+
+  # ── 模組：Data Ingestion ─────────────────────────────────────────────
+  - id: REQ-019
+    title: "[交易資料] 台股 / 美股 / 指數行情快照與異動事件標準化"
+    module: data_ingestion
+    status: done
+    trigger: schedule
+    priority: high
+    description: |
+      目標：除了現有新聞、公告、社群與 market_context 事件外，再補上可供交易監控使用的
+      行情快照與價格異動資料。
+
+      範圍：
+        1. 台股與美股個股、指數、ETF、期貨關聯標的的行情快照。
+        2. 開高/收高、跳空、爆量、急漲急跌、波動放大等價格異動事件。
+        3. 將高頻原始快照寫入專用表，將可分析/可告警的異動摘要寫入 t_relay_events。
+
+      建議資料表：
+        - t_market_quote_snapshots：symbol、market、ts、open/high/low/close、volume、turnover、source
+        - t_market_quote_events：或直接標準化寫入 t_relay_events，保存 significant move 事件
+
+      建議 event contract：
+        - source=market_quote:<market>
+        - raw_json.dimension=market_quote
+        - raw_json.event_type=quote_snapshot_summary 或 price_move_event
+        - raw_json 包含 symbol、market、session、price、change_pct、volume_ratio、trade_date
+    depends_on: [REQ-018]
+    acceptance:
+      - 補齊台股 / 美股 / 指數行情來源映射與輪詢頻率文件
+      - 建立行情快照表與寫入流程，支援同 symbol 多時間點快照
+      - 建立異動事件標準化邏輯，寫入 t_relay_events 並具 stable dedupe key
+      - 新增單元測試覆蓋 session、百分比變動、異常量、跳空等判定規則
+      - 盤前分析、收盤分析、watchlist 監控都能讀到同一套快照/異動資料
+    notes: |
+      2026-04-25 新列。高頻價格資料不建議全部塞進 t_relay_events；
+      原始快照進專用表、事件摘要進 relay_events，會比單表更可控。
+      2026-04-25 完成並驗收：
+        Phase A（後端基礎）：
+          - service.MarketQuoteSnapshot dataclass + DDL `t_market_quote_snapshots`
+            + upsert_market_quote_snapshot；config 新增 mysql_quote_snapshot_table
+          - quote_movement.py 純函式 detector：gap_up/gap_down (1%)、
+            sharp_up/sharp_down (3%)、volume_spike (2x n_day_avg)；
+            stable event_id `market-quote-{market}-{symbol}-{trade_date}-{event_type}`；
+            可由 MovementThresholds 覆寫
+          - 14 個 quote_movement 單元測試（gap / sharp / volume / 組合 / 契約 / threshold）
+        Phase B（資料流接通）：
+          - HTTP /quote-snapshots 端點 + RelayProcessor.process_quote_snapshots
+            （含欄位 coercion、跳過無效列、MySQL disabled 時回 dropped）
+          - relay_client.push_quote_snapshots
+          - scrapers/yfinance_stocks.py 重構：snapshots → /quote-snapshots，
+            僅顯著異動 → /events；類別 → market 映射 (TW/US/INDEX/CRYPTO/MACRO/FX)
+          - 8 個 endpoint + processor 測試
+        文件：
+          - memory-bank/09-decisions/2026-04-25-market-quote-snapshots-and-moves.md
+            記錄表結構、event contract、source 映射、輪詢 cadence、threshold
+        驗證：全測試 170 綠（148 → 162 → 170）
+
+  - id: REQ-020
+    title: "[交易資料] 全球重大政治 / 經濟 / 科技新聞強化與交易影響標註"
+    module: data_ingestion
+    status: done
+    trigger: schedule
+    priority: high
+    description: |
+      目標：把現有新聞蒐集從「能抓到新聞」提升到「能被交易分析直接使用」。
+
+      範圍：
+        1. 依主題將全球新聞分為 geopolitics / macro / central_bank / semiconductor /
+           ai / supply_chain / energy / regulation / corporate_action 等類別。
+        2. 對每則新聞補交易影響標註：
+           - impact_region（US / TW / CN / EU / Global）
+           - impact_scope（index / sector / single_name）
+           - impact_direction（bullish / bearish / mixed / unknown）
+           - urgency、confidence、data_gap
+        3. 重大事件需可聚合同題多來源，降低單一媒體標題誤導。
+
+      輸出：
+        - 原始/標準化新聞仍寫入 t_relay_events
+        - enrichment / annotation 可寫入 t_relay_event_annotations 或 raw_json 補充欄位
+    depends_on: [REQ-013, REQ-018]
+    acceptance:
+      - 新聞主題 taxonomy 與 impact 欄位定義寫入 memory-bank
+      - 新聞事件可區分「宏觀因子」與「個股催化」
+      - 重大同題事件具聚合鍵或 cluster id，避免模型把同一事件重複當多條利多/利空
+      - 分析 prompt 可直接使用 impact_region / impact_scope / impact_direction
+      - 新增單元測試覆蓋 topic/impact mapping 與 cluster 去重邏輯
+    notes: |
+      2026-04-25 新列。這條重點不是盲目再加更多新聞源，而是把現有來源提升成
+      更適合交易決策的結構化事件。
+      2026-04-25 完成並驗收：
+        - event_enrichment.py 加 NewsImpact dataclass：
+            topic / impact_region / impact_scope / impact_direction /
+            urgency / confidence / data_gap / cluster_id
+          以及 derive_news_impact() 公開 API、compute_cluster_id() 群聚輔助函式
+        - topic taxonomy 10 值：geopolitics / macro / central_bank / semiconductor /
+          ai / supply_chain / energy / regulation / corporate_action / other
+          （rule order 設計使「半導體領域的法規事件」歸 semiconductor 而非 regulation）
+        - 區分宏觀因子 vs 個股催化：impact_scope 由 ticker/company 實體存在性
+          + topic 推得 → single_name / sector / index
+        - cluster_id：去 wire prefix → token + sort + sha1 → 12 字 hex；
+          同題多來源（BBC/Reuters/AP）落同一 cluster
+        - market_analysis._build_events_payload 新增 impact 欄位，
+          stage1 prompt 自動可見 impact_region/scope/direction 等標註，
+          無需動 stage prompt 文字
+        - memory-bank/09-decisions/2026-04-25-news-impact-and-clustering.md
+          記錄 taxonomy、derivation 規則、cluster 語意、deferred 工作
+        - 26 個新單元測試（topic / region / scope / direction / urgency /
+          confidence / contract / cluster_id），全測試 196 綠（170 → 196）

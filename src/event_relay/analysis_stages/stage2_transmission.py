@@ -29,7 +29,9 @@ def build_prompts(
     slot: str,
     now_local_iso: str,
     stage1_json: str,
+    retrieved_examples_json: str = "[]",
 ) -> tuple[str, str]:
+    """建立 build prompts 對應的資料或結果。"""
     slot_focus = {
         "us_close": "how the U.S. close transmits to the Taiwan next session.",
         "pre_tw_open": "what matters before 09:00 Taiwan open.",
@@ -54,6 +56,10 @@ def build_prompts(
         "- strength 0.8+: high-confidence direct link; 0.4-0.7: conditional; <0.4: weak/speculative.\n"
         "- assumptions are the load-bearing conditions; list at least one.\n"
         "- Produce 1-5 chains total; deduplicate overlapping paths.\n\n"
+        "Historical retrieved examples JSON:\n"
+        f"{retrieved_examples_json}\n\n"
+        "Use historical examples only as analogues for possible transmission paths. "
+        "They are not current facts and their event IDs must not appear in trigger_event_ids.\n\n"
         f"Stage1 digest JSON:\n{stage1_json}\n"
     )
     return system_prompt, user_prompt
@@ -63,8 +69,10 @@ def run(
     *,
     context: StageContext,
     stage1_output: dict[str, Any],
+    retrieved_examples: list[dict[str, Any]] | None = None,
     snapshot_dir: Path | None = None,
 ) -> StageResult:
+    """執行 run 的主要流程。"""
     events_in = len(stage1_output.get("events") or [])
     logger.info(
         "[stage2_transmission] start slot=%s model=%s stage1_events=%d",
@@ -78,6 +86,7 @@ def run(
         slot=context.slot,
         now_local_iso=context.now_local.isoformat(),
         stage1_json=json.dumps(stage1_output, ensure_ascii=False),
+        retrieved_examples_json=json.dumps(retrieved_examples or [], ensure_ascii=False),
     )
     if snapshot_dir is not None:
         _write_prompt_snapshot(snapshot_dir, context.slot, system_prompt, user_prompt)
@@ -104,6 +113,7 @@ def run(
         )
 
     chains_count = len(parsed.get("chains") or [])
+    examples_count = len(retrieved_examples or [])
     elapsed = time.perf_counter() - started
     logger.info(
         "[stage2_transmission] ok elapsed=%.2fs chains=%d",
@@ -115,11 +125,16 @@ def run(
         model=context.model,
         output=parsed,
         raw_text=raw_text,
-        extras={"chains_count": chains_count, "elapsed_sec": round(elapsed, 3)},
+        extras={
+            "chains_count": chains_count,
+            "retrieved_examples_count": examples_count,
+            "elapsed_sec": round(elapsed, 3),
+        },
     )
 
 
 def _write_prompt_snapshot(snapshot_dir: Path, slot: str, system_prompt: str, user_prompt: str) -> None:
+    """寫入 write prompt snapshot 對應的資料或結果。"""
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     (snapshot_dir / f"market_analysis_{slot}_stage2_transmission_system.txt").write_text(system_prompt, encoding="utf-8")
     (snapshot_dir / f"market_analysis_{slot}_stage2_transmission_user.txt").write_text(user_prompt, encoding="utf-8")

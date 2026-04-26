@@ -5,13 +5,16 @@ from news_collector.sources.sec_filings import SecFilingsSource, _normalize_tick
 
 
 class SecFilingsSourceTests(unittest.TestCase):
+    """封裝 Sec Filings Source Tests 相關資料與行為。"""
     def test_normalize_ticker(self) -> None:
+        """測試 test normalize ticker 的預期行為。"""
         self.assertEqual(_normalize_ticker(" nvda "), "NVDA")
         self.assertEqual(_normalize_ticker("BRK-B"), "BRK-B")
         self.assertIsNone(_normalize_ticker("bad ticker"))
 
     @patch("news_collector.sources.sec_filings.http_get_json_with_headers")
     def test_fetch_filters_allowed_forms_and_builds_index_url(self, mock_get_json) -> None:
+        """測試 test fetch filters allowed forms and builds index url 的預期行為。"""
         mock_get_json.side_effect = [
             {
                 "0": {"cik_str": 1045810, "ticker": "NVDA", "title": "NVIDIA CORP"},
@@ -67,6 +70,7 @@ class SecFilingsSourceTests(unittest.TestCase):
 
     @patch("news_collector.sources.sec_filings.http_get_json_with_headers")
     def test_fetch_skips_unknown_ticker(self, mock_get_json) -> None:
+        """測試 test fetch skips unknown ticker 的預期行為。"""
         mock_get_json.return_value = {
             "0": {"cik_str": 1045810, "ticker": "NVDA", "title": "NVIDIA CORP"},
         }

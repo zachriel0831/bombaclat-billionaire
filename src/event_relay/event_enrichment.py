@@ -43,6 +43,7 @@ ENTITY_KINDS: tuple[str, ...] = (
 
 @dataclass(frozen=True)
 class EventAnnotation:
+    """封裝 Event Annotation 相關資料與行為。"""
     entities: tuple[dict[str, str], ...]
     category: str
     importance: float
@@ -51,6 +52,7 @@ class EventAnnotation:
     annotator_version: str
 
     def to_dict(self) -> dict[str, Any]:
+        """轉換 to dict 對應的資料或結果。"""
         return {
             "entities": [dict(entity) for entity in self.entities],
             "category": self.category,
@@ -180,6 +182,7 @@ def _extract_keyword_entities(
     keywords: Iterable[tuple[str, str]],
     kind: str,
 ) -> list[dict[str, str]]:
+    """取出 extract keyword entities 對應的資料或結果。"""
     hits: list[dict[str, str]] = []
     seen: set[str] = set()
     lower = text.lower()
@@ -194,6 +197,7 @@ def _extract_keyword_entities(
 
 
 def _extract_ticker_entities(text: str) -> list[dict[str, str]]:
+    """取出 extract ticker entities 對應的資料或結果。"""
     hits: list[dict[str, str]] = []
     seen: set[str] = set()
     for match in _US_TICKER_RE.findall(text):
@@ -212,6 +216,7 @@ def _extract_ticker_entities(text: str) -> list[dict[str, str]]:
 
 
 def _extract_entities(text: str) -> list[dict[str, str]]:
+    """取出 extract entities 對應的資料或結果。"""
     entities: list[dict[str, str]] = []
     entities.extend(_extract_keyword_entities(text, _COMPANY_KEYWORDS, "company"))
     entities.extend(_extract_ticker_entities(text))
@@ -282,6 +287,7 @@ _CATEGORY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 
 def _classify_category(text: str) -> str:
+    """執行 classify category 的主要流程。"""
     lower = text.lower()
     for category, keywords in _CATEGORY_RULES:
         for needle in keywords:
@@ -338,6 +344,7 @@ def _score_importance(
 ) -> float:
     # importance 只做便宜且可預期的 heuristic，故意不要太聰明；
     # 真正的因果與權重交給 stage pipeline，這裡只提供穩定先驗。
+    """計算分數 score importance 對應的資料或結果。"""
     score = 0.3
     text = f"{title}\n{summary}"
     lower = text.lower()
@@ -380,6 +387,7 @@ _BEARISH_TERMS: tuple[str, ...] = (
 
 
 def _score_sentiment(title: str, summary: str) -> str:
+    """計算分數 score sentiment 對應的資料或結果。"""
     text = f"{title}\n{summary}".lower()
     bull = sum(1 for term in _BULLISH_TERMS if term.lower() in text)
     bear = sum(1 for term in _BEARISH_TERMS if term.lower() in text)
@@ -491,6 +499,7 @@ CONFIDENCE_VALUES: tuple[str, ...] = ("low", "medium", "high")
 
 @dataclass(frozen=True)
 class NewsImpact:
+    """封裝 News Impact 相關資料與行為。"""
     topic: str
     impact_region: str
     impact_scope: str
@@ -501,6 +510,7 @@ class NewsImpact:
     cluster_id: str
 
     def to_dict(self) -> dict[str, Any]:
+        """轉換 to dict 對應的資料或結果。"""
         return {
             "topic": self.topic,
             "impact_region": self.impact_region,
@@ -590,6 +600,7 @@ _TOPIC_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 
 def _classify_topic(text: str) -> str:
+    """執行 classify topic 的主要流程。"""
     lower = text.lower()
     for topic, keywords in _TOPIC_RULES:
         for needle in keywords:
@@ -620,6 +631,7 @@ _MEDIUM_URGENCY_TOPICS: frozenset[str] = frozenset(
 
 
 def _derive_impact_region(entities: Iterable[dict[str, str]]) -> str:
+    """執行 derive impact region 的主要流程。"""
     countries: list[str] = []
     for entity in entities:
         if entity.get("kind") == "country":
@@ -637,6 +649,7 @@ def _derive_impact_region(entities: Iterable[dict[str, str]]) -> str:
 def _derive_impact_scope(
     entities: Iterable[dict[str, str]], topic: str
 ) -> str:
+    """執行 derive impact scope 的主要流程。"""
     has_ticker = any(e.get("kind") == "ticker" for e in entities)
     has_company = any(e.get("kind") == "company" for e in entities)
     if has_ticker or has_company:
@@ -647,6 +660,7 @@ def _derive_impact_scope(
 
 
 def _derive_impact_direction(sentiment: str, importance: float, has_entities: bool) -> str:
+    """執行 derive impact direction 的主要流程。"""
     if not has_entities and importance < 0.3:
         return "unknown"
     if sentiment == "bullish":
@@ -657,6 +671,7 @@ def _derive_impact_direction(sentiment: str, importance: float, has_entities: bo
 
 
 def _derive_urgency(topic: str, importance: float) -> str:
+    """執行 derive urgency 的主要流程。"""
     if topic in _HIGH_URGENCY_TOPICS or importance >= 0.75:
         return "high"
     if topic in _MEDIUM_URGENCY_TOPICS or importance >= 0.5:
@@ -665,6 +680,7 @@ def _derive_urgency(topic: str, importance: float) -> str:
 
 
 def _derive_confidence(importance: float, has_entities: bool) -> str:
+    """執行 derive confidence 的主要流程。"""
     if importance >= 0.7 and has_entities:
         return "high"
     if importance >= 0.4:
@@ -673,6 +689,7 @@ def _derive_confidence(importance: float, has_entities: bool) -> str:
 
 
 def _derive_data_gap(category: str, has_entities: bool, importance: float) -> bool:
+    """執行 derive data gap 的主要流程。"""
     return (category == "other") or (not has_entities) or (importance < 0.3)
 
 

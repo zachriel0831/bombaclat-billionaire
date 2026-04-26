@@ -22,6 +22,7 @@ from pathlib import Path
 
 # 讀取 .env（與 relay service 相同的設定方式）
 def _load_env(env_file: str = ".env") -> None:
+    """載入 load env 對應的資料或結果。"""
     p = Path(env_file)
     if not p.exists():
         return
@@ -35,6 +36,7 @@ def _load_env(env_file: str = ".env") -> None:
 
 # ── MySQL 連線設定（從環境變數讀取）──────────────────────
 def _get_db_config() -> dict:
+    """執行 get db config 的主要流程。"""
     return {
         "host":             os.environ.get("RELAY_MYSQL_HOST",     "127.0.0.1"),
         "port":             int(os.environ.get("RELAY_MYSQL_PORT", "3306")),
@@ -111,6 +113,7 @@ def query_events(hours: int = 3, event_type: str = "all") -> dict:
 
     # datetime 物件轉字串
     def _dt(v):
+        """執行 dt 的主要流程。"""
         return v.isoformat() if isinstance(v, datetime) else str(v) if v is not None else None
 
     for r in news_rows + latest_stocks:
@@ -129,6 +132,7 @@ def query_events(hours: int = 3, event_type: str = "all") -> dict:
 
 def main():
     # 自動尋找 .env（從 src/ 往上找到專案根目錄）
+    """程式入口，負責執行此模組的主要流程。"""
     script_dir = Path(__file__).resolve().parent
     env_path   = script_dir.parent / ".env"
     _load_env(str(env_path))

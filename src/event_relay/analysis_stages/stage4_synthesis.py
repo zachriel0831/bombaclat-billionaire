@@ -63,6 +63,7 @@ _SLOT_SECTIONS: dict[str, tuple[str, list[str]]] = {
 
 
 def _structured_instructions() -> str:
+    """執行 structured instructions 的主要流程。"""
     return (
         "Produce BOTH a Traditional-Chinese narrative AND a structured JSON view\n"
         "of the same analysis.\n"
@@ -100,6 +101,7 @@ def build_prompts(
     dual_view_json: str | None = None,
     critic_json: str | None = None,
 ) -> tuple[str, str]:
+    """建立 build prompts 對應的資料或結果。"""
     focus, sections = _SLOT_SECTIONS.get(slot, _SLOT_SECTIONS["pre_tw_open"])
     numbered_sections = "\n".join(f"{idx + 1}) {title}" for idx, title in enumerate(sections))
 
@@ -170,6 +172,7 @@ def run(
     dual_view_output: dict[str, Any] | None = None,
     critic_output: dict[str, Any] | None = None,
 ) -> StageResult:
+    """執行 run 的主要流程。"""
     logger.info(
         "[stage4_synthesis] start slot=%s model=%s sectors=%d stocks=%d dual=%s critic=%s",
         context.slot,
@@ -291,6 +294,7 @@ def ensure_confidence_footer(
 
 
 def _resolve_confidence(structured: dict[str, Any] | None, critic: dict[str, Any] | None) -> str:
+    """解析並決定 resolve confidence 對應的資料或結果。"""
     if isinstance(structured, dict):
         value = str(structured.get("confidence") or "").strip().lower()
         if value in _VALID_CONFIDENCE:
@@ -303,6 +307,7 @@ def _resolve_confidence(structured: dict[str, Any] | None, critic: dict[str, Any
 
 
 def _resolve_counterpoint(critic: dict[str, Any] | None, dual_view: dict[str, Any] | None) -> str:
+    """解析並決定 resolve counterpoint 對應的資料或結果。"""
     if isinstance(critic, dict):
         value = str(critic.get("top_counterpoint") or "").strip()
         if value:
@@ -367,6 +372,7 @@ def _try_structured_call(
     system_prompt: str,
     user_prompt: str,
 ) -> tuple[dict[str, Any] | None, str | None]:
+    """執行 try structured call 的主要流程。"""
     try:
         parsed, _raw_text = call_llm_json(
             provider=context.provider,
@@ -399,6 +405,7 @@ def _run_text_fallback(
     dual_view_json: str | None,
     critic_json: str | None,
 ) -> str:
+    """執行 run text fallback 的主要流程。"""
     text_system, text_user = build_prompts(
         slot=slot,
         now_local_iso=context.now_local.isoformat(),
@@ -423,10 +430,12 @@ def _run_text_fallback(
 
 
 def _normalize(text: str) -> str:
+    """執行 normalize 的主要流程。"""
     return (text or "").strip()
 
 
 def _write_prompt_snapshot(snapshot_dir: Path, slot: str, system_prompt: str, user_prompt: str) -> None:
+    """寫入 write prompt snapshot 對應的資料或結果。"""
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     (snapshot_dir / f"market_analysis_{slot}_stage4_synthesis_system.txt").write_text(system_prompt, encoding="utf-8")
     (snapshot_dir / f"market_analysis_{slot}_stage4_synthesis_user.txt").write_text(user_prompt, encoding="utf-8")

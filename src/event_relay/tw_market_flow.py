@@ -24,6 +24,7 @@ TAIPEI_TZ = timezone(timedelta(hours=8))
 
 @dataclass(frozen=True)
 class OfficialFlowDataset:
+    """封裝 Official Flow Dataset 相關資料與行為。"""
     family: str
     source_family: str
     source: str
@@ -36,6 +37,7 @@ class OfficialFlowDataset:
 
 @dataclass(frozen=True)
 class TwMarketFlowConfig:
+    """封裝 Tw Market Flow Config 相關資料與行為。"""
     env_file: str
     timeout_seconds: int
     families: tuple[str, ...]
@@ -44,6 +46,7 @@ class TwMarketFlowConfig:
 
 @dataclass(frozen=True)
 class DatasetSnapshot:
+    """封裝 Dataset Snapshot 相關資料與行為。"""
     source_family: str
     source: str
     dataset: str
@@ -57,6 +60,7 @@ class DatasetSnapshot:
 
 @dataclass(frozen=True)
 class SourceFailure:
+    """封裝 Source Failure 相關資料與行為。"""
     source_family: str
     dataset: str
     official_url: str
@@ -314,6 +318,7 @@ DEFAULT_DATASETS: tuple[OfficialFlowDataset, ...] = (
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Collect official Taiwan market-flow facts into t_relay_events")
     parser.add_argument("--env-file", default=".env", help="Path to env file")
     parser.add_argument("--timeout-seconds", type=int, default=20, help="Per-source HTTP timeout")
@@ -328,6 +333,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _load_config(args: argparse.Namespace) -> TwMarketFlowConfig:
+    """載入 load config 對應的資料或結果。"""
     return TwMarketFlowConfig(
         env_file=args.env_file,
         timeout_seconds=max(5, int(args.timeout_seconds)),
@@ -337,6 +343,7 @@ def _load_config(args: argparse.Namespace) -> TwMarketFlowConfig:
 
 
 def _parse_families(value: str) -> tuple[str, ...]:
+    """解析 parse families 對應的資料或結果。"""
     requested = [part.strip().lower() for part in (value or "all").split(",") if part.strip()]
     if not requested or "all" in requested:
         return ("twse", "tpex", "taifex")
@@ -350,6 +357,7 @@ def _parse_families(value: str) -> tuple[str, ...]:
 
 
 def _extract_rows(payload: Any) -> list[dict[str, Any]]:
+    """取出 extract rows 對應的資料或結果。"""
     if isinstance(payload, list):
         raw_rows = payload
         fields = None
@@ -374,6 +382,7 @@ def _extract_rows(payload: Any) -> list[dict[str, Any]]:
 
 
 def _parse_number(value: Any) -> float | None:
+    """解析 parse number 對應的資料或結果。"""
     if isinstance(value, (int, float)):
         return float(value)
     if value is None:
@@ -394,6 +403,7 @@ def _parse_number(value: Any) -> float | None:
 
 
 def _normalize_trade_date(value: Any) -> str | None:
+    """正規化 normalize trade date 對應的資料或結果。"""
     text = str(value or "").strip()
     if not text:
         return None
@@ -421,6 +431,7 @@ def _normalize_trade_date(value: Any) -> str | None:
 
 
 def _row_value(row: dict[str, Any], field: str) -> Any:
+    """執行 row value 的主要流程。"""
     if field in row:
         return row[field]
     target = field.strip()
@@ -436,6 +447,7 @@ def _resolve_trade_date(
     now_local: datetime,
     payload: Any | None = None,
 ) -> str:
+    """解析並決定 resolve trade date 對應的資料或結果。"""
     dates: list[str] = []
     # 各資料集日期欄位格式不一致，先從 row-level 指定欄位抓；
     # 若抓不到，再退回 payload 頂層日期，最後才用當地今天保底。
@@ -455,10 +467,12 @@ def _resolve_trade_date(
 
 
 def _display_number(value: float) -> int | float:
+    """執行 display number 的主要流程。"""
     return int(value) if value.is_integer() else round(value, 4)
 
 
 def _normalize_metrics(rows: list[dict[str, Any]], metric_fields: tuple[str, ...]) -> dict[str, Any]:
+    """正規化 normalize metrics 對應的資料或結果。"""
     totals: dict[str, int | float] = {}
     counts: dict[str, int] = {}
     # 這裡不試圖做金融語意推理，只做 dataset-level totals/counts，
@@ -488,6 +502,7 @@ def _build_snapshot(
     now_local: datetime,
     official_url: str | None = None,
 ) -> DatasetSnapshot:
+    """建立 build snapshot 對應的資料或結果。"""
     rows = _extract_rows(payload)
     generated_at = now_local.astimezone(TAIPEI_TZ).isoformat()
     # snapshot 是 event 化之前的中繼層：保留原始 rows + 壓縮過的 totals，
@@ -514,6 +529,7 @@ def collect_tw_market_flow(
     config: TwMarketFlowConfig,
     now_local: datetime | None = None,
 ) -> tuple[list[DatasetSnapshot], list[SourceFailure]]:
+    """彙整 collect tw market flow 對應的資料或結果。"""
     now_local = now_local or datetime.now(TAIPEI_TZ)
     enabled = set(config.families)
     snapshots: list[DatasetSnapshot] = []
@@ -556,10 +572,12 @@ def collect_tw_market_flow(
 
 
 def _dataset_url(dataset: OfficialFlowDataset, now_local: datetime) -> str:
+    """執行 dataset url 的主要流程。"""
     return dataset.url.replace("{date}", now_local.astimezone(TAIPEI_TZ).strftime("%Y%m%d"))
 
 
 def _stable_event_id(source_family: str, trade_date: str, dataset: str) -> str:
+    """執行 stable event id 的主要流程。"""
     dataset_slug = re.sub(r"[^0-9A-Za-z_]+", "_", dataset).strip("_") or hashlib.sha1(
         dataset.encode("utf-8")
     ).hexdigest()[:12]
@@ -571,11 +589,13 @@ def _stable_event_id(source_family: str, trade_date: str, dataset: str) -> str:
 
 
 def _event_title(snapshot: DatasetSnapshot) -> str:
+    """執行 event title 的主要流程。"""
     row_count = snapshot.normalized_metrics.get("row_count", len(snapshot.rows))
     return f"{snapshot.title} {snapshot.trade_date} rows={row_count}"
 
 
 def _event_summary(snapshot: DatasetSnapshot) -> str:
+    """執行 event summary 的主要流程。"""
     totals = snapshot.normalized_metrics.get("field_totals")
     total_items = list(totals.items())[:6] if isinstance(totals, dict) else []
     total_text = "; ".join(f"{key}={value}" for key, value in total_items)
@@ -584,6 +604,7 @@ def _event_summary(snapshot: DatasetSnapshot) -> str:
 
 
 def _snapshot_to_event(snapshot: DatasetSnapshot) -> RelayEvent:
+    """執行 snapshot to event 的主要流程。"""
     dedupe_key = {
         "source_family": snapshot.source_family,
         "trade_date": snapshot.trade_date,
@@ -615,10 +636,12 @@ def _snapshot_to_event(snapshot: DatasetSnapshot) -> RelayEvent:
 
 
 def build_tw_market_flow_events(snapshots: list[DatasetSnapshot]) -> list[RelayEvent]:
+    """建立 build tw market flow events 對應的資料或結果。"""
     return [_snapshot_to_event(snapshot) for snapshot in snapshots]
 
 
 def run_once(config: TwMarketFlowConfig) -> dict[str, Any]:
+    """執行單次任務流程並回傳結果。"""
     relay_settings = load_settings(config.env_file)
     if not relay_settings.mysql_enabled and not config.dry_run:
         raise RuntimeError("TW market flow requires RELAY_MYSQL_ENABLED=true")
@@ -663,6 +686,7 @@ def run_once(config: TwMarketFlowConfig) -> dict[str, Any]:
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):

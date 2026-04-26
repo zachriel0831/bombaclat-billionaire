@@ -121,6 +121,7 @@ def call_llm_json(
 
 
 def _append_retry_hint(original_user_prompt: str, error_message: str) -> str:
+    """執行 append retry hint 的主要流程。"""
     return (
         f"{original_user_prompt}\n\n"
         "Your previous response did not satisfy the required schema.\n"
@@ -130,6 +131,7 @@ def _append_retry_hint(original_user_prompt: str, error_message: str) -> str:
 
 
 def _post_json(url: str, headers: dict[str, str], payload: dict[str, Any], provider_label: str) -> str:
+    """送出 post json 對應的資料或結果。"""
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = Request(url, method="POST", data=data)
     for key, value in headers.items():
@@ -163,6 +165,7 @@ def _call_openai_structured(
     schema: dict[str, Any],
     schema_name: str,
 ) -> str:
+    """執行 call openai structured 的主要流程。"""
     url = f"{api_base.rstrip('/')}/responses"
     payload: dict[str, Any] = {
         "model": model,
@@ -203,6 +206,7 @@ def _call_anthropic_tool(
     schema: dict[str, Any],
     schema_name: str,
 ) -> str:
+    """執行 call anthropic tool 的主要流程。"""
     url = f"{api_base.rstrip('/')}/v1/messages"
     payload = {
         "model": model,

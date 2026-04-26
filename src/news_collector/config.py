@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +7,7 @@ import subprocess
 
 
 def _load_env_file(path: Path) -> None:
+    """載入 load env file 對應的資料或結果。"""
     if not path.exists():
         return
 
@@ -22,6 +23,7 @@ def _load_env_file(path: Path) -> None:
 
 @dataclass(frozen=True)
 class Settings:
+    """封裝 Settings 相關資料與行為。"""
     sec_enabled: bool
     sec_user_agent: str
     sec_tracked_tickers: list[str]
@@ -55,6 +57,7 @@ DEFAULT_RSS_FEEDS = [
 
 
 def load_settings(env_file: str = ".env") -> Settings:
+    """載入 load settings 對應的資料或結果。"""
     _load_env_file(Path(env_file))
 
     feeds = os.getenv("OFFICIAL_RSS_FEEDS", "")
@@ -97,12 +100,14 @@ def load_settings(env_file: str = ".env") -> Settings:
 
 def resolve_x_bearer_token(settings: Settings) -> str | None:
     # 優先使用環境變數；若未提供，再嘗試讀取本機加密檔。
+    """解析並決定 resolve x bearer token 對應的資料或結果。"""
     if settings.x_bearer_token:
         return settings.x_bearer_token
     return _load_secret_from_dpapi_file(settings.x_bearer_token_file)
 
 
 def _load_secret_from_dpapi_file(path: str) -> str | None:
+    """載入 load secret from dpapi file 對應的資料或結果。"""
     file_path = Path(path)
     if not file_path.exists():
         return None
@@ -132,6 +137,7 @@ def _load_secret_from_dpapi_file(path: str) -> str | None:
 
 
 def _parse_bool(value: str | None) -> bool:
+    """解析 parse bool 對應的資料或結果。"""
     if value is None:
         return False
     return value.strip().lower() in {"1", "true", "yes", "on"}

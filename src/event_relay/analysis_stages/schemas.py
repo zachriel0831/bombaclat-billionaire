@@ -318,6 +318,7 @@ def validate_against_schema(value: Any, schema: dict[str, Any], path: str = "$")
 
 
 def _matches_type(value: Any, expected: Any) -> bool:
+    """執行 matches type 的主要流程。"""
     if isinstance(expected, list):
         return any(_matches_type(value, t) for t in expected)
     if expected == "object":

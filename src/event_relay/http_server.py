@@ -17,27 +17,32 @@ _ALLOWED_MARKET_ANALYSIS_SLOTS = {"auto", "us_close", "pre_tw_open", "tw_close"}
 
 
 class RelayHttpServer(ThreadingHTTPServer):
+    """封裝 Relay Http Server 相關資料與行為。"""
     def __init__(
         self,
         server_address: tuple[str, int],
         processor: RelayProcessor,
         env_file: str = ".env",
     ) -> None:
+        """初始化物件狀態與必要依賴。"""
         self.processor = processor
         self.env_file = env_file
         super().__init__(server_address, RelayRequestHandler)
 
 
 class RelayRequestHandler(BaseHTTPRequestHandler):
+    """封裝 Relay Request Handler 相關資料與行為。"""
     server: RelayHttpServer
 
     def do_GET(self) -> None:  # noqa: N802
+        """執行 do G E T 方法的主要邏輯。"""
         if self._request_path() == "/healthz":
             self._json_response(200, {"ok": True})
             return
         self._json_response(404, {"error": "not_found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        """執行 do P O S T 方法的主要邏輯。"""
         path = self._request_path()
 
         if path == "/events":
@@ -55,6 +60,7 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
         self._json_response(404, {"error": "not_found"})
 
     def _handle_events_post(self) -> None:
+        """處理 handle events post 對應的資料或結果。"""
         try:
             payload = self._read_json_body()
             result = self.server.processor.process_payload(payload)
@@ -66,6 +72,7 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
             self._json_response(500, {"error": str(exc)})
 
     def _handle_quote_snapshots_post(self) -> None:
+        """處理 handle quote snapshots post 對應的資料或結果。"""
         try:
             payload = self._read_json_body()
             result = self.server.processor.process_quote_snapshots(payload)
@@ -77,6 +84,7 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
             self._json_response(500, {"error": str(exc)})
 
     def _handle_market_analysis_run(self) -> None:
+        """處理 handle market analysis run 對應的資料或結果。"""
         try:
             payload = self._read_json_body_optional()
         except ValueError as exc:
@@ -112,18 +120,22 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
             self._json_response(500, {"error": str(exc)})
 
     def log_message(self, fmt: str, *args: Any) -> None:
+        """執行 log message 方法的主要邏輯。"""
         logger.info("%s - %s", self.client_address[0], fmt % args)
 
     def _request_path(self) -> str:
+        """送出請求並處理回應 request path 對應的資料或結果。"""
         return urlsplit(self.path).path
 
     def _read_raw_body(self) -> bytes:
+        """讀取 read raw body 對應的資料或結果。"""
         content_len = int(self.headers.get("Content-Length", "0"))
         if content_len <= 0:
             raise ValueError("empty request body")
         return self.rfile.read(content_len)
 
     def _read_json_body(self) -> Any:
+        """讀取 read json body 對應的資料或結果。"""
         raw = self._read_raw_body()
         try:
             return json.loads(raw.decode("utf-8"))
@@ -131,6 +143,7 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
             raise ValueError(f"invalid json: {exc}") from exc
 
     def _read_json_body_optional(self) -> dict[str, Any]:
+        """讀取 read json body optional 對應的資料或結果。"""
         content_len = int(self.headers.get("Content-Length", "0"))
         if content_len <= 0:
             return {}
@@ -144,6 +157,7 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
         return parsed
 
     def _json_response(self, status: int, data: dict[str, Any]) -> None:
+        """執行 json response 方法的主要邏輯。"""
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")

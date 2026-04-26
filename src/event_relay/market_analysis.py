@@ -30,6 +30,15 @@ from event_relay.event_enrichment import (
     annotate as rule_annotate,
     derive_news_impact,
 )
+from event_relay.rag import (
+    DEFAULT_CANDIDATE_LIMIT as RAG_DEFAULT_CANDIDATE_LIMIT,
+    DEFAULT_EMBEDDING_DIMENSIONS as RAG_DEFAULT_EMBEDDING_DIMENSIONS,
+    DEFAULT_EMBEDDING_MODEL as RAG_DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_MIN_SIMILARITY as RAG_DEFAULT_MIN_SIMILARITY,
+    DEFAULT_RAG_K,
+    rag_enabled_from_env,
+    retrieve_similar_events,
+)
 from event_relay.service import MarketAnalysisRecord, MySqlEventStore
 from event_relay.weekly_summary import _call_llm, _load_secret_from_dpapi_file, _openai_web_search_enabled
 
@@ -46,6 +55,7 @@ SLOTS = {
 
 @dataclass(frozen=True)
 class MarketAnalysisConfig:
+    """封裝 Market Analysis Config 相關資料與行為。"""
     env_file: str
     model: str
     api_base: str
@@ -63,6 +73,7 @@ class MarketAnalysisConfig:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Generate scheduled market analysis")
     parser.add_argument("--env-file", default=".env", help="Path to env file")
     parser.add_argument("--slot", default="auto", choices=["auto", "us_close", "pre_tw_open", "tw_close"])
@@ -72,6 +83,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _load_text(path: str) -> str:
+    """載入 load text 對應的資料或結果。"""
     try:
         return Path(path).read_text(encoding="utf-8", errors="ignore").strip()
     except OSError:
@@ -79,6 +91,7 @@ def _load_text(path: str) -> str:
 
 
 def _resolve_market_anthropic_settings() -> tuple[str, str, str, str, str | None]:
+    """解析並決定 resolve market anthropic settings 對應的資料或結果。"""
     api_key_file = (os.getenv("ANTHROPIC_API_KEY_FILE") or ".secrets/anthropic_api_key.dpapi").strip()
     direct_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
     api_key = direct_key or (_load_secret_from_dpapi_file(api_key_file) or "")
@@ -92,6 +105,7 @@ def _resolve_market_anthropic_settings() -> tuple[str, str, str, str, str | None
 
 
 def _resolve_market_openai_settings() -> tuple[str, str, str, str, str | None]:
+    """解析並決定 resolve market openai settings 對應的資料或結果。"""
     api_key_file = (
         os.getenv("MARKET_ANALYSIS_OPENAI_API_KEY_FILE")
         or os.getenv("WEEKLY_SUMMARY_OPENAI_API_KEY_FILE")
@@ -114,6 +128,7 @@ def _resolve_market_openai_settings() -> tuple[str, str, str, str, str | None]:
 
 
 def _load_config(args: argparse.Namespace) -> MarketAnalysisConfig:
+    """載入 load config 對應的資料或結果。"""
     load_settings(args.env_file)
     provider_env = (os.getenv("LLM_PROVIDER") or "openai").strip().lower()
     if provider_env == "anthropic":
@@ -147,6 +162,7 @@ def _load_config(args: argparse.Namespace) -> MarketAnalysisConfig:
 
 
 def _resolve_slot(config: MarketAnalysisConfig, now_local: datetime) -> str | None:
+    """解析並決定 resolve slot 對應的資料或結果。"""
     if config.slot != "auto":
         return config.slot
     # Weekend slot filtering:
@@ -177,6 +193,7 @@ def _build_prompts(
     events_json: str,
     market_json: str,
 ) -> tuple[str, str]:
+    """建立 build prompts 對應的資料或結果。"""
     macro_skill = _load_text(config.skill_macro_path)
     line_skill = _load_text(config.skill_line_format_path)
     slot_instruction = {
@@ -236,10 +253,12 @@ def _build_prompts(
 
 
 def _normalize_text(text: str) -> str:
+    """正規化 normalize text 對應的資料或結果。"""
     return "\n".join(line.rstrip() for line in text.strip().splitlines()).strip()[:4500]
 
 
 def _write_prompt_snapshots(system_prompt: str, user_prompt: str, slot: str) -> None:
+    """寫入 write prompt snapshots 對應的資料或結果。"""
     out_dir = Path("runtime/prompts")
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"market_analysis_{slot}_system_prompt.txt").write_text(system_prompt, encoding="utf-8")
@@ -247,6 +266,7 @@ def _write_prompt_snapshots(system_prompt: str, user_prompt: str, slot: str) -> 
 
 
 def _compact_event_raw_json(source: str, value: str | None) -> Any:
+    """執行 compact event raw json 的主要流程。"""
     if not value:
         return None
     try:
@@ -301,6 +321,7 @@ def _compact_event_raw_json(source: str, value: str | None) -> Any:
 
 
 def _inline_annotation(event: Any) -> dict[str, Any]:
+    """執行 inline annotation 的主要流程。"""
     inline = rule_annotate(
         source=event.source,
         title=event.title,
@@ -343,6 +364,7 @@ def _impact_dict_from_annotation(event: Any, annotation: dict[str, Any]) -> dict
 
 
 def _build_events_payload(store: MySqlEventStore, recent_events: list) -> list[dict[str, Any]]:
+    """建立 build events payload 對應的資料或結果。"""
     annotation_index = store.fetch_event_annotations([event.row_id for event in recent_events])
     stored_count = 0
     inline_count = 0
@@ -380,6 +402,7 @@ def _build_events_payload(store: MySqlEventStore, recent_events: list) -> list[d
 
 
 def _pipeline_mode_from_env() -> str:
+    """執行 pipeline mode from env 的主要流程。"""
     raw = (os.getenv("MARKET_ANALYSIS_PIPELINE") or "multi_stage").strip().lower()
     if raw not in {"legacy", "multi_stage", "auto"}:
         return "multi_stage"
@@ -393,6 +416,7 @@ def _run_multi_stage_pipeline(
     now_local: datetime,
     events_payload: list[dict[str, Any]],
     market_payload: list[dict[str, Any]],
+    rag_examples: list[dict[str, Any]] | None = None,
 ) -> tuple[str | None, dict[str, Any] | None, dict[str, Any]]:
     """Run the four-stage pipeline.
 
@@ -415,6 +439,7 @@ def _run_multi_stage_pipeline(
     snapshot_dir = Path("runtime/prompts")
     telemetry: dict[str, Any] = {
         "pipeline_version": MULTI_STAGE_PIPELINE_VERSION,
+        "rag_examples_count": len(rag_examples or []),
         "stages": {},
     }
 
@@ -448,6 +473,7 @@ def _run_multi_stage_pipeline(
     stage2 = stage2_transmission.run(
         context=ctx,
         stage1_output=stage1.output,
+        retrieved_examples=rag_examples or [],
         snapshot_dir=snapshot_dir,
     )
     telemetry["stages"]["stage2"] = _stage_telemetry(stage2)
@@ -561,6 +587,7 @@ def _run_multi_stage_pipeline(
 
 
 def _stage_telemetry(result: StageResult) -> dict[str, Any]:
+    """執行 stage telemetry 的主要流程。"""
     payload: dict[str, Any] = {
         "model": result.model,
         "ok": result.ok(),
@@ -572,7 +599,46 @@ def _stage_telemetry(result: StageResult) -> dict[str, Any]:
     return payload
 
 
+def _retrieve_rag_examples(store: MySqlEventStore, events_payload: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """檢索 retrieve rag examples 對應的資料或結果。"""
+    if not rag_enabled_from_env():
+        return [], {"enabled": False, "examples_count": 0}
+
+    embedding_model = (os.getenv("RAG_EMBEDDING_MODEL") or RAG_DEFAULT_EMBEDDING_MODEL).strip()
+    try:
+        examples = retrieve_similar_events(
+            store,
+            events_payload,
+            k=max(1, int(os.getenv("MARKET_ANALYSIS_RAG_K", str(DEFAULT_RAG_K)))),
+            min_similarity=float(os.getenv("MARKET_ANALYSIS_RAG_MIN_SIMILARITY", str(RAG_DEFAULT_MIN_SIMILARITY))),
+            candidate_limit=max(
+                1,
+                int(os.getenv("MARKET_ANALYSIS_RAG_CANDIDATE_LIMIT", str(RAG_DEFAULT_CANDIDATE_LIMIT))),
+            ),
+            embedding_model=embedding_model,
+            dimensions=max(
+                16,
+                int(os.getenv("RAG_EMBEDDING_DIMENSIONS", str(RAG_DEFAULT_EMBEDDING_DIMENSIONS))),
+            ),
+        )
+        prompt_examples = [example.to_prompt_dict() for example in examples]
+        return prompt_examples, {
+            "enabled": True,
+            "embedding_model": embedding_model,
+            "examples_count": len(prompt_examples),
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("RAG retrieval failed; continuing without historical examples: %s", exc)
+        return [], {
+            "enabled": True,
+            "embedding_model": embedding_model,
+            "examples_count": 0,
+            "error": str(exc)[:500],
+        }
+
+
 def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
+    """執行單次任務流程並回傳結果。"""
     now_local = datetime.now().astimezone()
     slot = _resolve_slot(config, now_local)
     if slot is None and not config.force:
@@ -612,6 +678,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         }
         for row in recent_market_rows
     ]
+    rag_examples, rag_telemetry = _retrieve_rag_examples(store, events_payload)
 
     pipeline_mode = _pipeline_mode_from_env()
     pipeline_telemetry: dict[str, Any] | None = None
@@ -625,6 +692,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
             now_local=now_local,
             events_payload=events_payload,
             market_payload=market_payload,
+            rag_examples=rag_examples,
         )
         if summary_text is None:
             logger.warning(
@@ -697,6 +765,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 "delivery_owner": "java",
                 "python_push_removed": True,
                 "web_search_requested": config.provider == "openai" and _openai_web_search_enabled(),
+                "rag": rag_telemetry,
                 "pipeline_mode": "multi_stage" if used_multi_stage else "legacy",
                 "pipeline_stages": pipeline_telemetry,
                 "structured": structured_payload,
@@ -716,6 +785,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         "analysis_date": record.analysis_date,
         "events_used": record.events_used,
         "market_rows_used": record.market_rows_used,
+        "rag_examples_used": len(rag_examples),
         "push_enabled": push_enabled,
         "pushed": 0,
         "model": config.model,
@@ -723,6 +793,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):

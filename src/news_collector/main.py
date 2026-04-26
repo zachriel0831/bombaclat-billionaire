@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import json
@@ -10,6 +10,7 @@ from news_collector.config import load_settings
 
 
 def _normalize_language(value: str | None) -> str | None:
+    """正規化 normalize language 對應的資料或結果。"""
     if value is None:
         return None
     normalized = value.strip().lower()
@@ -27,6 +28,7 @@ def _normalize_language(value: str | None) -> str | None:
 
 
 def _item_language(item: NewsItem) -> str | None:
+    """執行 item language 的主要流程。"""
     raw = item.raw if isinstance(item.raw, dict) else {}
     raw_lang = raw.get("language")
     if isinstance(raw_lang, str):
@@ -41,6 +43,7 @@ def _item_language(item: NewsItem) -> str | None:
     return None
 
 def _build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Collect breaking international finance news.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -72,6 +75,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     # 強制使用 UTF-8，避免 Windows 主控台輸出中文或多語內容時亂碼。
+    """程式入口，負責執行此模組的主要流程。"""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):

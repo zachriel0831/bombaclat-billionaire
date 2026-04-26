@@ -10,6 +10,7 @@ from news_collector.http_client import http_get_json
 
 @dataclass(frozen=True)
 class IndexQuote:
+    """封裝 Index Quote 相關資料與行為。"""
     symbol: str
     label: str
     url: str
@@ -21,15 +22,18 @@ class IndexQuote:
 
 
 class UsIndexTracker:
+    """封裝 Us Index Tracker 相關資料與行為。"""
     symbols = (
         ("%5EDJI", "DJIA", "https://finance.yahoo.com/quote/%5EDJI"),
         ("%5EGSPC", "S&P 500", "https://finance.yahoo.com/quote/%5EGSPC"),
     )
 
     def __init__(self, timeout_seconds: int = 12) -> None:
+        """初始化物件狀態與必要依賴。"""
         self._timeout_seconds = max(timeout_seconds, 5)
 
     def fetch_snapshot(self) -> tuple[date | None, dict[str, IndexQuote]]:
+        """抓取 fetch snapshot 對應的資料或結果。"""
         quotes: dict[str, IndexQuote] = {}
         trade_dates: set[date] = set()
 
@@ -54,6 +58,7 @@ class UsIndexTracker:
         return next(iter(trade_dates)), quotes
 
     def format_open_message(self, trade_date: date, quotes: dict[str, IndexQuote]) -> str:
+        """格式化 format open message 對應的資料或結果。"""
         dji = quotes["DJIA"]
         gspc = quotes["S&P 500"]
         return "\n".join(
@@ -67,6 +72,7 @@ class UsIndexTracker:
         )
 
     def format_close_message(self, trade_date: date, quotes: dict[str, IndexQuote]) -> str:
+        """格式化 format close message 對應的資料或結果。"""
         dji = quotes["DJIA"]
         gspc = quotes["S&P 500"]
         return "\n".join(
@@ -80,6 +86,7 @@ class UsIndexTracker:
         )
 
     def _parse_quote(self, result: dict[str, Any], label: str, url: str) -> IndexQuote | None:
+        """解析 parse quote 對應的資料或結果。"""
         meta = result.get("meta") if isinstance(result.get("meta"), dict) else {}
         symbol = str(meta.get("symbol") or "").strip()
         if not symbol:
@@ -117,4 +124,5 @@ class UsIndexTracker:
 
     @staticmethod
     def _fmt_price(value: float) -> str:
+        """格式化 fmt price 對應的資料或結果。"""
         return f"{value:,.2f}"

@@ -30,6 +30,7 @@ def build_prompts(
     stage1_json: str,
     stage2_json: str,
 ) -> tuple[str, str]:
+    """建立 build prompts 對應的資料或結果。"""
     system_prompt = (
         "You are a Taiwan equity analyst. Given normalised events and "
         "transmission chains, produce: sector_watch, stock_watch, risks, "
@@ -62,6 +63,7 @@ def run(
     stage2_output: dict[str, Any],
     snapshot_dir: Path | None = None,
 ) -> StageResult:
+    """執行 run 的主要流程。"""
     chains_in = len(stage2_output.get("chains") or [])
     logger.info(
         "[stage3_tw_mapping] start slot=%s model=%s chains_in=%d",
@@ -130,6 +132,7 @@ def run(
 
 
 def _write_prompt_snapshot(snapshot_dir: Path, slot: str, system_prompt: str, user_prompt: str) -> None:
+    """寫入 write prompt snapshot 對應的資料或結果。"""
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     (snapshot_dir / f"market_analysis_{slot}_stage3_tw_mapping_system.txt").write_text(system_prompt, encoding="utf-8")
     (snapshot_dir / f"market_analysis_{slot}_stage3_tw_mapping_user.txt").write_text(user_prompt, encoding="utf-8")

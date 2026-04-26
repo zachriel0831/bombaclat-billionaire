@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import html
@@ -133,6 +133,7 @@ TOPIC_EXCLUDE_KEYWORDS = (
 
 @dataclass(frozen=True)
 class BridgeConfig:
+    """封裝 Bridge Config 相關資料與行為。"""
     relay_url: str
     env_file: str
     poll_interval_seconds: int
@@ -147,16 +148,20 @@ class BridgeConfig:
 
 @dataclass(frozen=True)
 class EventSubmitResult:
+    """封裝 Event Submit Result 相關資料與行為。"""
     status: str
     accepted: bool
     stored: bool = False
 
 
 class DirectDbEventSink:
+    """封裝 Direct Db Event Sink 相關資料與行為。"""
     def __init__(self, store: MySqlEventStore) -> None:
+        """初始化物件狀態與必要依賴。"""
         self._store = store
 
     def submit(self, event: dict[str, Any]) -> EventSubmitResult:
+        """執行 submit 方法的主要邏輯。"""
         relay_event = _event_to_relay_event(event)
         if relay_event is None:
             return EventSubmitResult(status="dropped_invalid", accepted=False)
@@ -202,6 +207,7 @@ class DirectDbEventSink:
 
 
 def _allow_event_topic(event: dict[str, Any]) -> bool:
+    """執行 allow event topic 的主要流程。"""
     title = str(event.get("title") or "")
     summary = str(event.get("summary") or "")
     url = str(event.get("url") or "")
@@ -217,6 +223,7 @@ def _allow_event_topic(event: dict[str, Any]) -> bool:
 
 
 def _parse_published_at(value: Any) -> datetime | None:
+    """解析 parse published at 對應的資料或結果。"""
     if value is None:
         return None
     text = str(value).strip()
@@ -236,6 +243,7 @@ def _parse_published_at(value: Any) -> datetime | None:
 
 def _allow_event_date(event: dict[str, Any]) -> bool:
     # Allow events from today and previous 2 days (local timezone).
+    """執行 allow event date 的主要流程。"""
     published = _parse_published_at(event.get("published_at"))
     if published is None:
         return False
@@ -246,6 +254,7 @@ def _allow_event_date(event: dict[str, Any]) -> bool:
 
 
 def _normalize_summary(value: str) -> str:
+    """正規化 normalize summary 對應的資料或結果。"""
     text = html.unescape(value)
     text = re.sub(r"<[^>]+>", " ", text)
     text = " ".join(text.split())
@@ -253,6 +262,7 @@ def _normalize_summary(value: str) -> str:
 
 
 def _event_to_relay_event(event: dict[str, Any]) -> RelayEvent | None:
+    """執行 event to relay event 的主要流程。"""
     title = " ".join(str(event.get("title") or "").split()).strip()
     url = str(event.get("url") or "").strip()
     source = str(event.get("source") or "unknown").strip() or "unknown"
@@ -276,6 +286,7 @@ def _event_to_relay_event(event: dict[str, Any]) -> RelayEvent | None:
 
 
 def _post_event(relay_url: str, event: dict[str, Any], timeout_seconds: int = 8) -> bool:
+    """送出 post event 對應的資料或結果。"""
     body = json.dumps(event, ensure_ascii=False).encode("utf-8")
     req = Request(relay_url, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
@@ -303,6 +314,7 @@ def _submit_event(
     relay_url: str,
     event: dict[str, Any],
 ) -> EventSubmitResult:
+    """執行 submit event 的主要流程。"""
     if event_sink is not None:
         return event_sink.submit(event)
 
@@ -312,6 +324,7 @@ def _submit_event(
 
 
 def _build_event_sink(config: BridgeConfig) -> DirectDbEventSink | None:
+    """建立 build event sink 對應的資料或結果。"""
     if config.event_sink == "relay":
         logger.info("Bridge event sink: relay HTTP endpoint=%s", config.relay_url)
         return None
@@ -335,6 +348,7 @@ def _build_event_sink(config: BridgeConfig) -> DirectDbEventSink | None:
 
 
 def _poll_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, stop_event: threading.Event) -> None:
+    """執行 poll loop 的主要流程。"""
     while not stop_event.is_set():
         settings = load_settings(config.env_file)
         # 依當前 .env 即時決定要不要帶上 SEC / TWSE，讓 operator 調設定後不用重改程式。
@@ -399,6 +413,7 @@ def _poll_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, stop_
 
 
 def _x_stream_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, stop_event: threading.Event) -> None:
+    """執行 x stream loop 的主要流程。"""
     try:
         settings = load_settings(config.env_file)
         if not settings.x_enabled:
@@ -432,6 +447,7 @@ def _x_stream_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, s
         )
 
         def on_item(item: Any) -> None:
+            """執行 on item 的主要流程。"""
             if stop_event.is_set():
                 return
             event = item.to_dict()
@@ -465,6 +481,7 @@ def _run_x_backfill(
     bearer_token: str,
     event_sink: DirectDbEventSink | None = None,
 ) -> dict[str, int]:
+    """執行 run x backfill 的主要流程。"""
     if not getattr(settings, "x_backfill_enabled", True):
         logger.info("X startup backfill skipped: X_BACKFILL_ENABLED=false")
         return {"fetched": 0, "pushed": 0, "stored": 0, "duplicates": 0, "failed": 0, "dropped_by_date": 0, "dropped_by_topic": 0}
@@ -540,6 +557,7 @@ def _run_x_backfill(
 
 
 def _build_us_index_event(session: str, trade_day: str, message: str, quotes: dict[str, Any]) -> dict[str, Any]:
+    """建立 build us index event 對應的資料或結果。"""
     normalized_session = session.strip().lower()
     title = f"US index {normalized_session} {trade_day}"
     summary = " ".join(line.strip() for line in str(message or "").splitlines() if line.strip())
@@ -565,6 +583,7 @@ def _build_us_index_event(session: str, trade_day: str, message: str, quotes: di
 
 
 def _us_index_direct_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, stop_event: threading.Event) -> None:
+    """執行 us index direct loop 的主要流程。"""
     if not config.us_index_enabled:
         logger.info("US index event bridge skipped: disabled")
         return
@@ -609,6 +628,7 @@ def _us_index_direct_loop(config: BridgeConfig, event_sink: DirectDbEventSink | 
 
 
 def _quote_to_payload(quote: Any) -> dict[str, Any]:
+    """執行 quote to payload 的主要流程。"""
     return {
         "symbol": getattr(quote, "symbol", ""),
         "label": getattr(quote, "label", ""),
@@ -621,6 +641,7 @@ def _quote_to_payload(quote: Any) -> dict[str, Any]:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Bridge all news sources into the crawler-owned event store")
     parser.add_argument("--relay-url", default="http://127.0.0.1:18090/events", help="Compatibility event relay /events endpoint")
     parser.add_argument(
@@ -651,6 +672,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):

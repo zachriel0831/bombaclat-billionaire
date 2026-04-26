@@ -29,11 +29,13 @@ INTERVAL         = 10 * 60  # 10 分鐘
 
 
 def ensure_dirs():
+    """執行 ensure dirs 的主要流程。"""
     for d in [PENDING, RUNNING, DONE, FAILED]:
         os.makedirs(d, exist_ok=True)
 
 
 def load_task_configs() -> list[dict]:
+    """載入 load task configs 對應的資料或結果。"""
     configs = []
     for path in glob.glob(os.path.join(TASKS_CONFIG_DIR, "*.json")):
         try:
@@ -48,6 +50,7 @@ def load_task_configs() -> list[dict]:
 
 
 def dispatch_round(configs: list[dict]) -> int:
+    """執行 dispatch round 的主要流程。"""
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     dispatched = []
     for task in configs:
@@ -64,6 +67,7 @@ def dispatch_round(configs: list[dict]) -> int:
 
 
 def status():
+    """執行 status 的主要流程。"""
     ensure_dirs()
     print(f"\n── Queue Status ─────────────────────")
     print(f"  pending : {len(os.listdir(PENDING))}")
@@ -74,6 +78,7 @@ def status():
 
 
 def list_tasks(configs):
+    """執行 list tasks 的主要流程。"""
     print(f"\n── Registered Tasks ({len(configs)}) ─────────")
     for c in configs:
         rules = c.get("rules", {})
@@ -83,6 +88,7 @@ def list_tasks(configs):
 
 
 def main():
+    """程式入口，負責執行此模組的主要流程。"""
     parser = argparse.ArgumentParser()
     parser.add_argument("--watch",  action="store_true")
     parser.add_argument("--status", action="store_true")

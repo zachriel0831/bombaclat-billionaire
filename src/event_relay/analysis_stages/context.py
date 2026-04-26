@@ -7,6 +7,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class StageContext:
+    """封裝 Stage Context 相關資料與行為。"""
     provider: str
     api_base: str
     api_key: str
@@ -17,6 +18,7 @@ class StageContext:
 
 @dataclass
 class StageResult:
+    """封裝 Stage Result 相關資料與行為。"""
     name: str
     model: str
     output: Any
@@ -27,4 +29,5 @@ class StageResult:
     extras: dict[str, Any] = field(default_factory=dict)
 
     def ok(self) -> bool:
+        """執行 ok 方法的主要邏輯。"""
         return self.error is None and self.output is not None

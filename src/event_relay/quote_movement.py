@@ -26,6 +26,7 @@ DIMENSION = "market_quote"
 
 @dataclass(frozen=True)
 class MovementThresholds:
+    """封裝 Movement Thresholds 相關資料與行為。"""
     gap_pct: float = 0.01           # 1% gap vs prev_close
     sharp_pct: float = 0.03         # 3% intraday move
     volume_multiple: float = 2.0    # 2x n-day avg
@@ -115,12 +116,14 @@ def detect_movement_events(
 
 
 def build_event_id(market: str, symbol: str, trade_date: str, event_type: str) -> str:
+    """建立 build event id 對應的資料或結果。"""
     return f"market-quote-{market.lower()}-{symbol.lower()}-{trade_date}-{event_type}"
 
 
 def _classify_gap(
     open_price: float | None, prev_close: float | None, threshold: float
 ) -> str | None:
+    """執行 classify gap 的主要流程。"""
     pct = _pct_change(open_price, prev_close)
     if pct is None:
         return None
@@ -134,6 +137,7 @@ def _classify_gap(
 def _classify_sharp(
     last_price: float | None, prev_close: float | None, threshold: float
 ) -> str | None:
+    """執行 classify sharp 的主要流程。"""
     pct = _pct_change(last_price, prev_close)
     if pct is None:
         return None
@@ -147,12 +151,14 @@ def _classify_sharp(
 def _is_volume_spike(
     volume: int | None, n_day_avg: float | None, multiple: float
 ) -> bool:
+    """判斷 is volume spike 對應的資料或結果。"""
     if volume is None or n_day_avg is None or n_day_avg <= 0:
         return False
     return volume >= n_day_avg * multiple
 
 
 def _pct_change(current: float | None, base: float | None) -> float | None:
+    """執行 pct change 的主要流程。"""
     if current is None or base is None or base == 0:
         return None
     return (current - base) / base
@@ -167,6 +173,7 @@ def _build_event(
     trade_date: str,
     metric: dict[str, Any],
 ) -> dict[str, Any]:
+    """建立 build event 對應的資料或結果。"""
     event_id = build_event_id(market, symbol, trade_date, event_type)
     title = f"{market.upper()} {symbol} {event_type}"
     summary_bits = [f"{event_type}", f"symbol={symbol}", f"date={trade_date}"]

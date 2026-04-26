@@ -15,6 +15,7 @@ from event_relay.bls_macro import (
 
 
 def _sample_response(latest_flag: bool = True) -> dict:
+    """執行 sample response 的主要流程。"""
     latest = {"latest": "true"} if latest_flag else {}
     return {
         "status": "REQUEST_SUCCEEDED",
@@ -69,21 +70,27 @@ def _sample_response(latest_flag: bool = True) -> dict:
 
 
 class _FakeStore:
+    """封裝 Fake Store 相關資料與行為。"""
     events = []
 
     def __init__(self, _settings) -> None:
+        """初始化物件狀態與必要依賴。"""
         return None
 
     def initialize(self) -> None:
+        """執行 initialize 方法的主要邏輯。"""
         return None
 
     def enqueue_event_if_new(self, event) -> bool:
+        """執行 enqueue event if new 方法的主要邏輯。"""
         _FakeStore.events.append(event)
         return True
 
 
 class BlsMacroTests(unittest.TestCase):
+    """封裝 Bls Macro Tests 相關資料與行為。"""
     def test_parse_bls_response_builds_normalized_point(self) -> None:
+        """測試 test parse bls response builds normalized point 的預期行為。"""
         points = parse_bls_response(_sample_response())
 
         self.assertEqual(len(points), 1)
@@ -99,6 +106,7 @@ class BlsMacroTests(unittest.TestCase):
         self.assertTrue(point.normalized_metrics["is_preliminary"])
 
     def test_latest_observation_selection_uses_latest_period_when_no_flag(self) -> None:
+        """測試 test latest observation selection uses latest period when no flag 的預期行為。"""
         points = parse_bls_response(_sample_response(latest_flag=False))
 
         self.assertEqual(points[0].observation.year, "2026")
@@ -106,11 +114,13 @@ class BlsMacroTests(unittest.TestCase):
         self.assertEqual(points[0].observation.period_name, "March")
 
     def test_event_id_contains_source_family_series_year_period(self) -> None:
+        """測試 test event id contains source family series year period 的預期行為。"""
         event_id = build_event_id("CUSR0000SA0", "2026", "M03")
 
         self.assertEqual(event_id, "market-context-bls_macro-cusr0000sa0-2026-m03")
 
     def test_build_events_marks_raw_json_stored_only(self) -> None:
+        """測試 test build events marks raw json stored only 的預期行為。"""
         point = parse_bls_response(_sample_response())[0]
 
         events = build_bls_macro_events([point], generated_at="2026-04-22T00:00:00+00:00")
@@ -131,6 +141,7 @@ class BlsMacroTests(unittest.TestCase):
         self.assertEqual(event.raw["normalized_metrics"]["value"], 320.0)
 
     def test_no_key_payload_omits_registration_key(self) -> None:
+        """測試 test no key payload omits registration key 的預期行為。"""
         no_key_payload = _build_bls_payload(["CUSR0000SA0"], api_key=None)
         keyed_payload = _build_bls_payload(["CUSR0000SA0"], api_key="secret-key")
 
@@ -138,10 +149,12 @@ class BlsMacroTests(unittest.TestCase):
         self.assertEqual(keyed_payload["registrationkey"], "secret-key")
 
     def test_api_error_response_raises_explicit_exception(self) -> None:
+        """測試 test api error response raises explicit exception 的預期行為。"""
         with self.assertRaisesRegex(BlsApiError, "REQUEST_FAILED"):
             parse_bls_response({"status": "REQUEST_FAILED", "message": ["Invalid series id"]})
 
     def test_run_once_writes_relay_events(self) -> None:
+        """測試 test run once writes relay events 的預期行為。"""
         _FakeStore.events = []
         point = parse_bls_response(_sample_response())[0]
         config = BlsMacroConfig(

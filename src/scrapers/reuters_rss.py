@@ -53,6 +53,7 @@ HEADERS = {
 
 # ── 解析 ─────────────────────────────────────────────
 def parse_rss(xml_text: str, source_id: str) -> list[dict]:
+    """解析 parse rss 對應的資料或結果。"""
     root    = ET.fromstring(xml_text)
     channel = root.find("channel")
     if channel is None:
@@ -87,6 +88,7 @@ def parse_rss(xml_text: str, source_id: str) -> list[dict]:
 
 
 def fetch_feed(feed: dict) -> list[dict]:
+    """抓取 fetch feed 對應的資料或結果。"""
     print(f"  Fetching: {feed['name']} ...")
     try:
         resp = requests.get(feed["url"], headers=HEADERS, timeout=15)
@@ -99,6 +101,7 @@ def fetch_feed(feed: dict) -> list[dict]:
 
 # ── 主程式 ───────────────────────────────────────────
 def main():
+    """程式入口，負責執行此模組的主要流程。"""
     print("[Reuters RSS] Starting ...")
     all_articles = []
 

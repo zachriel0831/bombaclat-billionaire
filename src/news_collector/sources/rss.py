@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 from xml.etree import ElementTree as ET
@@ -13,14 +13,17 @@ logger = logging.getLogger(__name__)
 
 
 class OfficialRssSource(NewsSource):
+    """封裝 Official Rss Source 相關資料與行為。"""
     name = "official_rss"
 
     def __init__(self, feed_urls: list[str], timeout_seconds: int = 15, first_per_feed: bool = False) -> None:
+        """初始化物件狀態與必要依賴。"""
         self.feed_urls = feed_urls
         self.timeout_seconds = timeout_seconds
         self.first_per_feed = first_per_feed
 
     def fetch(self, limit: int = 20) -> list[NewsItem]:
+        """執行 fetch 方法的主要邏輯。"""
         items: list[NewsItem] = []
         per_feed_limit = 1 if self.first_per_feed else max(int(limit), 1)
         for url in self.feed_urls:
@@ -52,6 +55,7 @@ class OfficialRssSource(NewsSource):
         return deduped
 
     def _parse_feed(self, xml_text: str, feed_url: str) -> list[NewsItem]:
+        """解析 parse feed 對應的資料或結果。"""
         root = ET.fromstring(xml_text)
         root_name = local_name(root.tag).lower()
 
@@ -71,6 +75,7 @@ class OfficialRssSource(NewsSource):
         return parsed
 
     def _parse_rss(self, root: ET.Element, feed_url: str) -> list[NewsItem]:
+        """解析 parse rss 對應的資料或結果。"""
         channel = root.find("channel")
         channel_title = (channel.findtext("title") if channel is not None else None) or "official_rss"
         items = root.findall(".//item")
@@ -83,6 +88,7 @@ class OfficialRssSource(NewsSource):
         return parsed
 
     def _parse_atom(self, root: ET.Element, feed_url: str) -> list[NewsItem]:
+        """解析 parse atom 對應的資料或結果。"""
         feed_title = root.findtext("{*}title") or "official_rss"
         entries = root.findall(".//{*}entry")
 
@@ -94,7 +100,9 @@ class OfficialRssSource(NewsSource):
         return parsed
 
     def _node_to_item(self, node: ET.Element, feed_url: str, source_name: str) -> NewsItem | None:
+        """執行 node to item 方法的主要邏輯。"""
         def t(*names: str) -> str | None:
+            """執行 t 方法的主要邏輯。"""
             for name in names:
                 direct = node.findtext(name)
                 if direct:
@@ -146,6 +154,7 @@ class OfficialRssSource(NewsSource):
     @staticmethod
     def _dedupe(items: list[NewsItem]) -> list[NewsItem]:
         # RSS 內部先去重一次，避免同 feed 重複條目污染後續排序。
+        """依穩定鍵移除重複資料。"""
         seen: set[str] = set()
         result: list[NewsItem] = []
         for item in items:

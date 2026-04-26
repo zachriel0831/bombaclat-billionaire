@@ -21,6 +21,7 @@ from event_relay.service import MySqlEventStore  # noqa: E402
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Query t_market_analyses by structured fields.")
     parser.add_argument("--env-file", default=".env")
     parser.add_argument("--sentiment", choices=["bullish", "bearish", "neutral"])
@@ -34,6 +35,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _matches(structured: dict, args: argparse.Namespace) -> bool:
+    """執行 matches 的主要流程。"""
     if args.sentiment and structured.get("sentiment") != args.sentiment:
         return False
     if args.confidence and structured.get("confidence") != args.confidence:
@@ -50,6 +52,7 @@ def _matches(structured: dict, args: argparse.Namespace) -> bool:
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     args = _build_parser().parse_args()
     settings = load_settings(args.env_file)
     if not settings.mysql_enabled:

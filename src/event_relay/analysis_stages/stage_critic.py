@@ -36,6 +36,7 @@ def build_prompts(
     stage3_json: str,
     dual_view_json: str,
 ) -> tuple[str, str]:
+    """建立 build prompts 對應的資料或結果。"""
     system_prompt = (
         "You are a senior risk officer reviewing a junior analyst's draft.\n"
         "Your job is NOT to write the report — it is to find weaknesses.\n"
@@ -69,6 +70,7 @@ def run(
     dual_view_output: dict[str, Any],
     snapshot_dir: Path | None = None,
 ) -> StageResult:
+    """執行 run 的主要流程。"""
     logger.info("[stage_critic] start slot=%s model=%s", context.slot, context.model)
     started = time.perf_counter()
 
@@ -125,6 +127,7 @@ def run(
 
 
 def _write_prompt_snapshot(snapshot_dir: Path, slot: str, system_prompt: str, user_prompt: str) -> None:
+    """寫入 write prompt snapshot 對應的資料或結果。"""
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     (snapshot_dir / f"market_analysis_{slot}_stage_critic_system.txt").write_text(system_prompt, encoding="utf-8")
     (snapshot_dir / f"market_analysis_{slot}_stage_critic_user.txt").write_text(user_prompt, encoding="utf-8")

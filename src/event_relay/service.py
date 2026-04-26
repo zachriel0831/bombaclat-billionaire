@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RelayEvent:
+    """封裝 Relay Event 相關資料與行為。"""
     event_id: str
     source: str
     title: str
@@ -30,6 +31,7 @@ class RelayEvent:
 
 @dataclass
 class SummaryEvent:
+    """封裝 Summary Event 相關資料與行為。"""
     row_id: int
     source: str
     title: str
@@ -38,10 +40,12 @@ class SummaryEvent:
     published_at: str | None
     created_at: str
     raw_json: str | None = None
+    event_id: str | None = None
 
 
 @dataclass
 class MarketSnapshotRow:
+    """封裝 Market Snapshot Row 相關資料與行為。"""
     event_id: str
     source: str
     trade_date: str
@@ -57,6 +61,7 @@ class MarketSnapshotRow:
 
 @dataclass
 class MarketQuoteSnapshot:
+    """封裝 Market Quote Snapshot 相關資料與行為。"""
     symbol: str
     market: str
     session: str
@@ -75,6 +80,7 @@ class MarketQuoteSnapshot:
 
 @dataclass
 class MarketAnalysisRecord:
+    """封裝 Market Analysis Record 相關資料與行為。"""
     analysis_date: str
     analysis_slot: str
     scheduled_time_local: str
@@ -91,6 +97,7 @@ class MarketAnalysisRecord:
 
 @dataclass
 class StoredMarketAnalysisRecord:
+    """封裝 Stored Market Analysis Record 相關資料與行為。"""
     row_id: int
     analysis_date: str
     analysis_slot: str
@@ -102,8 +109,38 @@ class StoredMarketAnalysisRecord:
     updated_at: str
 
 
+@dataclass
+class StoredEventEmbedding:
+    """封裝 Stored Event Embedding 相關資料與行為。"""
+    event_row_id: int
+    event_id: str | None
+    source: str
+    title: str
+    url: str
+    summary: str
+    published_at: str | None
+    created_at: str
+    embedding_model: str
+    embedding_dim: int
+    embedding: list[float]
+    text_hash: str
+
+
+@dataclass
+class AnalysisEmbeddingSource:
+    """封裝 Analysis Embedding Source 相關資料與行為。"""
+    row_id: int
+    analysis_date: str
+    analysis_slot: str
+    summary_text: str
+    raw_json: str | None
+    updated_at: str
+
+
 class MySqlEventStore:
+    """封裝 My Sql Event Store 相關資料與行為。"""
     def __init__(self, settings: RelaySettings) -> None:
+        """初始化物件狀態與必要依賴。"""
         self._settings = settings
         self._event_table = settings.mysql_event_table
         self._x_table = settings.mysql_x_table
@@ -111,16 +148,20 @@ class MySqlEventStore:
         self._quote_snapshot_table = settings.mysql_quote_snapshot_table
         self._analysis_table = settings.mysql_analysis_table
         self._annotation_table = settings.mysql_annotation_table
+        self._event_embedding_table = settings.mysql_event_embedding_table
+        self._analysis_embedding_table = settings.mysql_analysis_embedding_table
         self._connector = self._import_mysql_connector()
         self._conn = None
         self._lock = threading.RLock()
 
     def initialize(self) -> None:
+        """執行 initialize 方法的主要邏輯。"""
         self._create_database_if_needed()
         self._connect_database()
         self._create_tables_if_needed()
 
     def enqueue_event_if_new(self, event: RelayEvent) -> bool:
+        """執行 enqueue event if new 方法的主要邏輯。"""
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
 
@@ -161,6 +202,7 @@ class MySqlEventStore:
                 cur.close()
 
     def fetch_recent_summary_events(self, days: int, limit: int) -> list[SummaryEvent]:
+        """抓取 fetch recent summary events 對應的資料或結果。"""
         if self._conn is None:
             return []
 
@@ -170,7 +212,7 @@ class MySqlEventStore:
         # market-context rows can carry large official payloads, and filesort
         # over created_at/raw_json can exceed MySQL's sort buffer on small DBs.
         sql = (
-            f"SELECT id, source, title, url, summary, published_at, created_at, raw_json "
+            f"SELECT id, event_id, source, title, url, summary, published_at, created_at, raw_json "
             f"FROM {self._event_table} "
             "WHERE created_at >= (NOW() - INTERVAL %s DAY) "
             "AND source NOT REGEXP '^(local_live_test|manual_test)' "
@@ -190,13 +232,14 @@ class MySqlEventStore:
             result.append(
                 SummaryEvent(
                     row_id=int(row[0]),
-                    source=str(row[1]),
-                    title=str(row[2]),
-                    url=str(row[3]),
-                    summary=str(row[4] or ""),
-                    published_at=str(row[5]) if row[5] is not None else None,
-                    created_at=str(row[6]),
-                    raw_json=str(row[7]) if row[7] is not None else None,
+                    event_id=str(row[1]) if row[1] is not None else None,
+                    source=str(row[2]),
+                    title=str(row[3]),
+                    url=str(row[4]),
+                    summary=str(row[5] or ""),
+                    published_at=str(row[6]) if row[6] is not None else None,
+                    created_at=str(row[7]),
+                    raw_json=str(row[8]) if row[8] is not None else None,
                 )
             )
         return result
@@ -261,6 +304,7 @@ class MySqlEventStore:
         annotator: str,
         annotator_version: str,
     ) -> None:
+        """新增或更新 upsert event annotation 對應的資料或結果。"""
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
 
@@ -293,7 +337,245 @@ class MySqlEventStore:
             finally:
                 cur.close()
 
+    def fetch_events_missing_embeddings(
+        self,
+        *,
+        days: int,
+        limit: int,
+        embedding_model: str,
+    ) -> list[SummaryEvent]:
+        """抓取 fetch events missing embeddings 對應的資料或結果。"""
+        if self._conn is None:
+            return []
+
+        safe_days = max(int(days), 1)
+        safe_limit = max(int(limit), 1)
+        sql = (
+            f"SELECT e.id, e.event_id, e.source, e.title, e.url, e.summary, "
+            f"e.published_at, e.created_at, e.raw_json "
+            f"FROM {self._event_table} e "
+            f"LEFT JOIN {self._event_embedding_table} emb "
+            "ON emb.event_row_id = e.id AND emb.embedding_model = %s "
+            "WHERE e.created_at >= (NOW() - INTERVAL %s DAY) "
+            "AND e.source NOT REGEXP '^(local_live_test|manual_test)' "
+            "AND emb.event_row_id IS NULL "
+            "ORDER BY e.id DESC "
+            "LIMIT %s"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, (embedding_model, safe_days, safe_limit))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        return [
+            SummaryEvent(
+                row_id=int(row[0]),
+                event_id=str(row[1]) if row[1] is not None else None,
+                source=str(row[2] or ""),
+                title=str(row[3] or ""),
+                url=str(row[4] or ""),
+                summary=str(row[5] or ""),
+                published_at=str(row[6]) if row[6] is not None else None,
+                created_at=str(row[7]) if row[7] is not None else "",
+                raw_json=str(row[8]) if row[8] is not None else None,
+            )
+            for row in rows
+        ]
+
+    def upsert_event_embedding(
+        self,
+        *,
+        event: SummaryEvent,
+        embedding_model: str,
+        embedding: list[float],
+        text_hash: str,
+    ) -> None:
+        """新增或更新 upsert event embedding 對應的資料或結果。"""
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+
+        embedding_json = json.dumps(list(embedding), ensure_ascii=False)
+        sql = (
+            f"INSERT INTO {self._event_embedding_table} "
+            "(event_row_id, event_id, source, title, url, summary, published_at, "
+            "embedding_model, embedding_dim, embedding_json, text_hash) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "ON DUPLICATE KEY UPDATE "
+            "event_id=VALUES(event_id), "
+            "source=VALUES(source), "
+            "title=VALUES(title), "
+            "url=VALUES(url), "
+            "summary=VALUES(summary), "
+            "published_at=VALUES(published_at), "
+            "embedding_dim=VALUES(embedding_dim), "
+            "embedding_json=VALUES(embedding_json), "
+            "text_hash=VALUES(text_hash), "
+            "indexed_at=CURRENT_TIMESTAMP"
+        )
+        values = (
+            int(event.row_id),
+            event.event_id,
+            event.source,
+            event.title,
+            event.url,
+            event.summary,
+            event.published_at,
+            embedding_model,
+            len(embedding),
+            embedding_json,
+            text_hash,
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, values)
+                self._conn.commit()
+            finally:
+                cur.close()
+
+    def fetch_event_embedding_candidates(
+        self,
+        *,
+        embedding_model: str,
+        limit: int,
+    ) -> list[StoredEventEmbedding]:
+        """抓取 fetch event embedding candidates 對應的資料或結果。"""
+        if self._conn is None:
+            return []
+
+        safe_limit = max(int(limit), 1)
+        sql = (
+            f"SELECT event_row_id, event_id, source, title, url, summary, published_at, "
+            "created_at, embedding_model, embedding_dim, embedding_json, text_hash "
+            f"FROM {self._event_embedding_table} "
+            "WHERE embedding_model = %s "
+            "ORDER BY event_row_id DESC "
+            "LIMIT %s"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, (embedding_model, safe_limit))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        candidates: list[StoredEventEmbedding] = []
+        for row in rows:
+            try:
+                embedding = json.loads(row[10]) if isinstance(row[10], str) else row[10]
+            except (TypeError, ValueError):
+                embedding = []
+            if not isinstance(embedding, list):
+                embedding = []
+            candidates.append(
+                StoredEventEmbedding(
+                    event_row_id=int(row[0]),
+                    event_id=str(row[1]) if row[1] is not None else None,
+                    source=str(row[2] or ""),
+                    title=str(row[3] or ""),
+                    url=str(row[4] or ""),
+                    summary=str(row[5] or ""),
+                    published_at=str(row[6]) if row[6] is not None else None,
+                    created_at=str(row[7]) if row[7] is not None else "",
+                    embedding_model=str(row[8] or ""),
+                    embedding_dim=int(row[9] or 0),
+                    embedding=[float(value) for value in embedding if isinstance(value, (int, float))],
+                    text_hash=str(row[11] or ""),
+                )
+            )
+        return candidates
+
+    def fetch_analyses_missing_embeddings(
+        self,
+        *,
+        limit: int,
+        embedding_model: str,
+    ) -> list[AnalysisEmbeddingSource]:
+        """抓取 fetch analyses missing embeddings 對應的資料或結果。"""
+        if self._conn is None:
+            return []
+
+        safe_limit = max(int(limit), 1)
+        sql = (
+            f"SELECT a.id, a.analysis_date, a.analysis_slot, a.summary_text, a.raw_json, a.updated_at "
+            f"FROM {self._analysis_table} a "
+            f"LEFT JOIN {self._analysis_embedding_table} emb "
+            "ON emb.analysis_id = a.id AND emb.embedding_model = %s "
+            "WHERE emb.analysis_id IS NULL "
+            "ORDER BY a.id DESC "
+            "LIMIT %s"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, (embedding_model, safe_limit))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        return [
+            AnalysisEmbeddingSource(
+                row_id=int(row[0]),
+                analysis_date=str(row[1] or ""),
+                analysis_slot=str(row[2] or ""),
+                summary_text=str(row[3] or ""),
+                raw_json=str(row[4]) if row[4] is not None else None,
+                updated_at=str(row[5]) if row[5] is not None else "",
+            )
+            for row in rows
+        ]
+
+    def upsert_analysis_embedding(
+        self,
+        *,
+        analysis: AnalysisEmbeddingSource,
+        embedding_model: str,
+        embedding: list[float],
+        text_hash: str,
+        outcome_json: dict[str, Any] | None = None,
+    ) -> None:
+        """新增或更新 upsert analysis embedding 對應的資料或結果。"""
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+
+        sql = (
+            f"INSERT INTO {self._analysis_embedding_table} "
+            "(analysis_id, analysis_date, analysis_slot, embedding_model, embedding_dim, "
+            "embedding_json, text_hash, outcome_json) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) "
+            "ON DUPLICATE KEY UPDATE "
+            "analysis_date=VALUES(analysis_date), "
+            "analysis_slot=VALUES(analysis_slot), "
+            "embedding_dim=VALUES(embedding_dim), "
+            "embedding_json=VALUES(embedding_json), "
+            "text_hash=VALUES(text_hash), "
+            "outcome_json=VALUES(outcome_json), "
+            "indexed_at=CURRENT_TIMESTAMP"
+        )
+        values = (
+            int(analysis.row_id),
+            analysis.analysis_date,
+            analysis.analysis_slot,
+            embedding_model,
+            len(embedding),
+            json.dumps(list(embedding), ensure_ascii=False),
+            text_hash,
+            json.dumps(outcome_json or {"status": "unlabeled"}, ensure_ascii=False),
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, values)
+                self._conn.commit()
+            finally:
+                cur.close()
+
     def fetch_recent_market_snapshots(self, hours: int, limit: int) -> list[MarketSnapshotRow]:
+        """抓取 fetch recent market snapshots 對應的資料或結果。"""
         if self._conn is None:
             return []
 
@@ -361,6 +643,7 @@ class MySqlEventStore:
             self._conn.rollback()
 
     def upsert_market_analysis(self, record: MarketAnalysisRecord) -> None:
+        """新增或更新 upsert market analysis 對應的資料或結果。"""
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
 
@@ -410,6 +693,7 @@ class MySqlEventStore:
                 cur.close()
 
     def upsert_market_quote_snapshot(self, snapshot: MarketQuoteSnapshot) -> None:
+        """新增或更新 upsert market quote snapshot 對應的資料或結果。"""
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
 
@@ -456,6 +740,7 @@ class MySqlEventStore:
                 cur.close()
 
     def fetch_latest_market_analysis(self, analysis_slot: str) -> StoredMarketAnalysisRecord | None:
+        """抓取 fetch latest market analysis 對應的資料或結果。"""
         if self._conn is None:
             return None
 
@@ -489,6 +774,7 @@ class MySqlEventStore:
         )
 
     def fetch_market_analysis(self, analysis_date: str, analysis_slot: str) -> StoredMarketAnalysisRecord | None:
+        """抓取 fetch market analysis 對應的資料或結果。"""
         if self._conn is None:
             return None
 
@@ -522,6 +808,7 @@ class MySqlEventStore:
         )
 
     def delete_events_older_than_days(self, keep_days: int) -> int:
+        """刪除 delete events older than days 對應的資料或結果。"""
         if self._conn is None:
             return 0
 
@@ -542,6 +829,7 @@ class MySqlEventStore:
                 cur.close()
 
     def delete_retention_older_than_days(self, keep_days: int) -> dict[str, int]:
+        """刪除 delete retention older than days 對應的資料或結果。"""
         if self._conn is None:
             return {"events": 0, "x_posts": 0}
 
@@ -570,6 +858,7 @@ class MySqlEventStore:
                 cur.close()
 
     def _create_database_if_needed(self) -> None:
+        """執行 create database if needed 方法的主要邏輯。"""
         conn = self._connector.connect(
             host=self._settings.mysql_host,
             port=self._settings.mysql_port,
@@ -586,6 +875,7 @@ class MySqlEventStore:
             conn.close()
 
     def _connect_database(self) -> None:
+        """執行 connect database 方法的主要邏輯。"""
         self._conn = self._connector.connect(
             host=self._settings.mysql_host,
             port=self._settings.mysql_port,
@@ -597,6 +887,7 @@ class MySqlEventStore:
         )
 
     def _create_tables_if_needed(self) -> None:
+        """執行 create tables if needed 方法的主要邏輯。"""
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
 
@@ -726,6 +1017,45 @@ class MySqlEventStore:
           KEY idx_annotation_annotated_at (annotated_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
+        ddl_event_embeddings = f"""
+        CREATE TABLE IF NOT EXISTS `{self._event_embedding_table}` (
+          event_row_id BIGINT NOT NULL,
+          event_id VARCHAR(128) NULL,
+          source VARCHAR(64) NOT NULL,
+          title TEXT NOT NULL,
+          url TEXT NOT NULL,
+          summary TEXT NULL,
+          published_at VARCHAR(64) NULL,
+          embedding_model VARCHAR(64) NOT NULL,
+          embedding_dim INT NOT NULL,
+          embedding_json JSON NOT NULL,
+          text_hash CHAR(40) NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          indexed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (event_row_id, embedding_model),
+          KEY idx_event_embedding_model (embedding_model, indexed_at),
+          KEY idx_event_embedding_source (source, indexed_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+        ddl_analysis_embeddings = f"""
+        CREATE TABLE IF NOT EXISTS `{self._analysis_embedding_table}` (
+          analysis_id BIGINT NOT NULL,
+          analysis_date VARCHAR(16) NOT NULL,
+          analysis_slot VARCHAR(32) NOT NULL,
+          embedding_model VARCHAR(64) NOT NULL,
+          embedding_dim INT NOT NULL,
+          embedding_json JSON NOT NULL,
+          text_hash CHAR(40) NOT NULL,
+          outcome_json JSON NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          indexed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (analysis_id, embedding_model),
+          KEY idx_analysis_embedding_slot (analysis_slot, analysis_date),
+          KEY idx_analysis_embedding_model (embedding_model, indexed_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
         cur = self._conn.cursor()
         try:
             cur.execute(ddl_event)
@@ -734,6 +1064,8 @@ class MySqlEventStore:
             cur.execute(ddl_quote_snapshot)
             cur.execute(ddl_analysis)
             cur.execute(ddl_annotation)
+            cur.execute(ddl_event_embeddings)
+            cur.execute(ddl_analysis_embeddings)
             self._conn.commit()
             self._migrate_analysis_structured_json(cur)
         finally:
@@ -741,6 +1073,7 @@ class MySqlEventStore:
         # 將 X 貼文資料同步到 t_x_posts，方便後續查詢與分析。
     def _upsert_x_post(self, cur: Any, event: RelayEvent) -> None:
         # 解析 relay event 內的 X raw payload，取出 tweet 主要欄位。
+        """新增或更新 upsert x post 對應的資料或結果。"""
         tweet_obj = {}
         if isinstance(event.raw, dict):
             raw_tweet = event.raw.get("raw")
@@ -802,6 +1135,7 @@ class MySqlEventStore:
         )
 
     def upsert_market_snapshot(self, payload: dict[str, Any]) -> int:
+        """新增或更新 upsert market snapshot 對應的資料或結果。"""
         if self._conn is None:
             return 0
 
@@ -839,6 +1173,7 @@ class MySqlEventStore:
         return affected
 
     def _upsert_market_snapshot_from_event(self, cur: Any, event: RelayEvent) -> int:
+        """新增或更新 upsert market snapshot from event 對應的資料或結果。"""
         snapshot = event.raw.get("market_snapshot") if isinstance(event.raw, dict) else None
         if not isinstance(snapshot, dict):
             return 0
@@ -870,6 +1205,7 @@ class MySqlEventStore:
         market_session: str,
         indexes: list[Any],
     ) -> int:
+        """新增或更新 upsert market rows 對應的資料或結果。"""
         sql = (
             f"INSERT INTO {self._market_table} "
             "(event_id, source, trade_date, market_session, symbol, label, quote_url, open_price, last_price, recorded_price, "
@@ -924,17 +1260,20 @@ class MySqlEventStore:
 
     @staticmethod
     def _has_market_snapshot(event: RelayEvent) -> bool:
+        """判斷是否具備 has market snapshot 對應的資料或結果。"""
         if not isinstance(event.raw, dict):
             return False
         return isinstance(event.raw.get("market_snapshot"), dict)
 
     @staticmethod
     def _event_hash(title: str, url: str) -> str:
+        """執行 event hash 方法的主要邏輯。"""
         key = f"{' '.join(title.split()).lower()}::{url.strip().lower()}"
         return hashlib.sha1(key.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _event_hash_for_event(event: RelayEvent) -> str:
+        """執行 event hash for event 方法的主要邏輯。"""
         source = (event.source or "").strip().lower()
         # market_context 類事件常常 url/title 長得很像；若仍只靠 title+url 去重，
         # 同一天不同資料點可能互相吃掉，所以改用 event_id 做穩定去重。
@@ -944,6 +1283,7 @@ class MySqlEventStore:
 
     @staticmethod
     def _to_decimal_value(value: Any) -> float | None:
+        """轉換 to decimal value 對應的資料或結果。"""
         if isinstance(value, (int, float)):
             return float(value)
         if value is None:
@@ -958,6 +1298,7 @@ class MySqlEventStore:
 
     @staticmethod
     def _to_int_value(value: Any) -> int | None:
+        """轉換 to int value 對應的資料或結果。"""
         if isinstance(value, int):
             return value
         if value is None:
@@ -972,6 +1313,7 @@ class MySqlEventStore:
 
     @staticmethod
     def _import_mysql_connector():
+        """執行 import mysql connector 方法的主要邏輯。"""
         try:
             import mysql.connector  # type: ignore
         except Exception as exc:
@@ -980,7 +1322,9 @@ class MySqlEventStore:
 
 
 class RelayProcessor:
+    """封裝 Relay Processor 相關資料與行為。"""
     def __init__(self, settings: RelaySettings) -> None:
+        """初始化物件狀態與必要依賴。"""
         self._settings = settings
         self._store = None
         self._stop_event = threading.Event()
@@ -1008,6 +1352,7 @@ class RelayProcessor:
     def process_payload(self, payload: Any) -> dict[str, Any]:
         # /events 相容入口允許單筆、批次、或 {events:[...]} 三種格式；
         # 這裡統一轉成 RelayEvent 後再做寫庫，讓上游 crawler 不必知道底層細節。
+        """執行 process payload 方法的主要邏輯。"""
         events = self._extract_events(payload)
         queued = 0
         logged_only = 0
@@ -1099,6 +1444,7 @@ class RelayProcessor:
 
     @staticmethod
     def _coerce_quote_snapshot(row: dict[str, Any]) -> "MarketQuoteSnapshot":
+        """轉換並校正 coerce quote snapshot 對應的資料或結果。"""
         symbol = str(row.get("symbol") or "").strip()
         market = str(row.get("market") or "").strip()
         session = str(row.get("session") or "regular").strip()
@@ -1107,6 +1453,7 @@ class RelayProcessor:
             raise ValueError("symbol, market, ts are required")
 
         def _opt_float(v: Any) -> float | None:
+            """執行 opt float 方法的主要邏輯。"""
             if v is None:
                 return None
             try:
@@ -1115,6 +1462,7 @@ class RelayProcessor:
                 return None
 
         def _opt_int(v: Any) -> int | None:
+            """執行 opt int 方法的主要邏輯。"""
             if v is None:
                 return None
             try:
@@ -1145,6 +1493,7 @@ class RelayProcessor:
         )
 
     def _start_maintenance_scheduler(self) -> None:
+        """執行 start maintenance scheduler 方法的主要邏輯。"""
         if self._store is None:
             logger.warning("Maintenance scheduler disabled because MySQL store is unavailable")
             return
@@ -1157,6 +1506,7 @@ class RelayProcessor:
         )
 
     def _maintenance_loop(self) -> None:
+        """執行 maintenance loop 方法的主要邏輯。"""
         interval = max(self._settings.dispatch_interval_seconds, 1)
         while not self._stop_event.is_set():
             try:
@@ -1166,6 +1516,7 @@ class RelayProcessor:
             self._stop_event.wait(interval)
 
     def maintenance_once(self) -> None:
+        """執行 maintenance once 方法的主要邏輯。"""
         if self._store is None:
             return
 
@@ -1173,6 +1524,7 @@ class RelayProcessor:
         logger.info("Maintenance tick complete; Python service does not perform LINE delivery")
 
     def _run_daily_retention_cleanup_if_due(self) -> None:
+        """執行 run daily retention cleanup if due 方法的主要邏輯。"""
         if self._store is None:
             return
         if not self._settings.retention_enabled:
@@ -1198,6 +1550,7 @@ class RelayProcessor:
         )
 
     def _extract_events(self, payload: Any) -> list[RelayEvent]:
+        """取出 extract events 對應的資料或結果。"""
         if isinstance(payload, list):
             raw_events = payload
         elif isinstance(payload, dict) and isinstance(payload.get("events"), list):
@@ -1244,6 +1597,7 @@ class RelayProcessor:
 
     @staticmethod
     def _normalize_summary(value: str) -> str:
+        """正規化 normalize summary 對應的資料或結果。"""
         text = html.unescape(value)
         text = re.sub(r"<[^>]+>", " ", text)
         text = " ".join(text.split())
@@ -1251,11 +1605,13 @@ class RelayProcessor:
 
     @staticmethod
     def _is_test_source(source: str | None) -> bool:
+        """判斷 is test source 對應的資料或結果。"""
         value = (source or "").strip().lower()
         return value == "local_live_test" or value.startswith("manual_test")
 
     @staticmethod
     def _is_older_than_days(published_at: str | None, days: int, now_local: datetime | None = None) -> bool:
+        """判斷 is older than days 對應的資料或結果。"""
         if not published_at:
             return False
         parsed = RelayProcessor._parse_published_at(published_at)
@@ -1267,6 +1623,7 @@ class RelayProcessor:
     @staticmethod
     def _allow_event_date(published_at: str | None) -> bool:
         # Keep events within recent 2 days + today (local timezone).
+        """執行 allow event date 方法的主要邏輯。"""
         if not published_at:
             return False
         parsed = RelayProcessor._parse_published_at(published_at)
@@ -1278,6 +1635,7 @@ class RelayProcessor:
 
     @staticmethod
     def _parse_published_at(value: str) -> datetime | None:
+        """解析 parse published at 對應的資料或結果。"""
         normalized = value.strip().replace("Z", "+00:00")
         if not normalized:
             return None

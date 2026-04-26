@@ -24,8 +24,10 @@ import yfinance_stocks  # noqa: E402
 
 @unittest.skipIf(pd is None, "pandas not available")
 class ExtractQuoteFromDownloadTests(unittest.TestCase):
+    """封裝 Extract Quote From Download Tests 相關資料與行為。"""
     def _multi_index_df(self) -> "pd.DataFrame":
         # Mimic shape returned by yf.download(tickers="AAPL NVDA", group_by="column").
+        """執行 multi index df 方法的主要邏輯。"""
         idx = pd.date_range("2026-04-14", periods=3, freq="D")
         columns = pd.MultiIndex.from_tuples(
             [
@@ -43,6 +45,7 @@ class ExtractQuoteFromDownloadTests(unittest.TestCase):
         return pd.DataFrame(data, index=idx, columns=columns)
 
     def _single_symbol_df(self) -> "pd.DataFrame":
+        """執行 single symbol df 方法的主要邏輯。"""
         idx = pd.date_range("2026-04-14", periods=3, freq="D")
         return pd.DataFrame(
             {
@@ -53,6 +56,7 @@ class ExtractQuoteFromDownloadTests(unittest.TestCase):
         )
 
     def test_multi_symbol_extract(self) -> None:
+        """測試 test multi symbol extract 的預期行為。"""
         df = self._multi_index_df()
         quote = yfinance_stocks._extract_quote_from_download(df, "AAPL", "Apple")
         self.assertIsNotNone(quote)
@@ -64,12 +68,14 @@ class ExtractQuoteFromDownloadTests(unittest.TestCase):
         self.assertEqual(quote["volume"], 1_200_000)
 
     def test_missing_symbol_returns_none(self) -> None:
+        """測試 test missing symbol returns none 的預期行為。"""
         df = self._multi_index_df()
         self.assertIsNone(
             yfinance_stocks._extract_quote_from_download(df, "UNKNOWN", "??")
         )
 
     def test_single_symbol_extract(self) -> None:
+        """測試 test single symbol extract 的預期行為。"""
         df = self._single_symbol_df()
         quote = yfinance_stocks._extract_quote_from_download(df, "FOO", "Foo")
         self.assertIsNotNone(quote)
@@ -78,6 +84,7 @@ class ExtractQuoteFromDownloadTests(unittest.TestCase):
         self.assertEqual(quote["volume"], 700)
 
     def test_empty_df_returns_none(self) -> None:
+        """測試 test empty df returns none 的預期行為。"""
         self.assertIsNone(
             yfinance_stocks._extract_quote_from_download(None, "AAPL", "Apple")
         )

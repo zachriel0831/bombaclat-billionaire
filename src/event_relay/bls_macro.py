@@ -25,6 +25,7 @@ DEFAULT_TIMEOUT_SECONDS = 30
 
 @dataclass(frozen=True)
 class BlsSeriesSpec:
+    """封裝 Bls Series Spec 相關資料與行為。"""
     slug: str
     series_id: str
     name: str
@@ -37,6 +38,7 @@ class BlsSeriesSpec:
 
 @dataclass(frozen=True)
 class BlsMacroConfig:
+    """封裝 Bls Macro Config 相關資料與行為。"""
     env_file: str
     api_key: str | None
     timeout_seconds: int
@@ -46,6 +48,7 @@ class BlsMacroConfig:
 
 @dataclass(frozen=True)
 class BlsObservation:
+    """封裝 Bls Observation 相關資料與行為。"""
     series_id: str
     year: str
     period: str
@@ -59,6 +62,7 @@ class BlsObservation:
 
 @dataclass(frozen=True)
 class BlsMacroPoint:
+    """封裝 Bls Macro Point 相關資料與行為。"""
     spec: BlsSeriesSpec
     observation: BlsObservation
     previous_observation: BlsObservation | None
@@ -158,6 +162,7 @@ BLS_SERIES_BY_ID: dict[str, BlsSeriesSpec] = {spec.series_id: spec for spec in B
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Collect BLS macro data and store it as event-only facts in t_relay_events")
     parser.add_argument("--env-file", default=".env", help="Path to env file")
     parser.add_argument("--timeout-seconds", type=int, default=DEFAULT_TIMEOUT_SECONDS, help="BLS API timeout")
@@ -172,6 +177,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _load_config(args: argparse.Namespace) -> BlsMacroConfig:
+    """載入 load config 對應的資料或結果。"""
     load_settings(args.env_file)
     requested = str(os.getenv("BLS_SERIES_IDS") or args.series or "").strip()
     if requested:
@@ -193,6 +199,7 @@ def _load_config(args: argparse.Namespace) -> BlsMacroConfig:
 
 
 def _build_bls_payload(series_ids: list[str], api_key: str | None = None) -> dict[str, Any]:
+    """建立 build bls payload 對應的資料或結果。"""
     payload: dict[str, Any] = {"seriesid": list(series_ids)}
     if api_key:
         payload["registrationkey"] = api_key
@@ -200,6 +207,7 @@ def _build_bls_payload(series_ids: list[str], api_key: str | None = None) -> dic
 
 
 def _post_bls_payload(payload: dict[str, Any], timeout_seconds: int) -> dict[str, Any]:
+    """送出 post bls payload 對應的資料或結果。"""
     body = json.dumps(payload).encode("utf-8")
     req = Request(
         BLS_API_URL,
@@ -230,6 +238,7 @@ def _post_bls_payload(payload: dict[str, Any], timeout_seconds: int) -> dict[str
 
 
 def fetch_bls_response(config: BlsMacroConfig) -> dict[str, Any]:
+    """抓取 fetch bls response 對應的資料或結果。"""
     payload = _build_bls_payload(config.series_ids, config.api_key)
     logger.info(
         "Fetching BLS macro series: count=%d api_key_configured=%s",
@@ -240,6 +249,7 @@ def fetch_bls_response(config: BlsMacroConfig) -> dict[str, Any]:
 
 
 def parse_bls_response(payload: dict[str, Any], specs: dict[str, BlsSeriesSpec] | None = None) -> list[BlsMacroPoint]:
+    """解析 parse bls response 對應的資料或結果。"""
     _raise_for_bls_error(payload)
     spec_map = specs or BLS_SERIES_BY_ID
     points: list[BlsMacroPoint] = []
@@ -273,6 +283,7 @@ def parse_bls_response(payload: dict[str, Any], specs: dict[str, BlsSeriesSpec] 
 
 
 def _raise_for_bls_error(payload: dict[str, Any]) -> None:
+    """執行 raise for bls error 的主要流程。"""
     status = str(payload.get("status") or "").strip()
     if not status or status == "REQUEST_SUCCEEDED":
         return
@@ -285,6 +296,7 @@ def _raise_for_bls_error(payload: dict[str, Any]) -> None:
 
 
 def _extract_series(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """取出 extract series 對應的資料或結果。"""
     results = payload.get("Results")
     series_entries: list[Any] = []
     if isinstance(results, dict):
@@ -298,6 +310,7 @@ def _extract_series(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _parse_observations(series_id: str, data: Any) -> list[BlsObservation]:
+    """解析 parse observations 對應的資料或結果。"""
     observations: list[BlsObservation] = []
     if not isinstance(data, list):
         return observations
@@ -327,6 +340,7 @@ def _parse_observations(series_id: str, data: Any) -> list[BlsObservation]:
 
 
 def select_latest_observation(observations: list[BlsObservation]) -> BlsObservation | None:
+    """從候選資料中選出 select latest observation 對應的資料或結果。"""
     valid = [obs for obs in observations if _period_sort_key(obs) is not None]
     if not valid:
         return None
@@ -338,6 +352,7 @@ def select_latest_observation(observations: list[BlsObservation]) -> BlsObservat
 
 
 def _previous_observation(observations: list[BlsObservation], latest: BlsObservation) -> BlsObservation | None:
+    """執行 previous observation 的主要流程。"""
     sorted_obs = sorted(
         [obs for obs in observations if _period_sort_key(obs) is not None],
         key=lambda obs: _period_sort_key(obs) or (0, 0),
@@ -350,6 +365,7 @@ def _previous_observation(observations: list[BlsObservation], latest: BlsObserva
 
 
 def _year_ago_observation(observations: list[BlsObservation], latest: BlsObservation) -> BlsObservation | None:
+    """執行 year ago observation 的主要流程。"""
     try:
         target_year = str(int(latest.year) - 1)
     except ValueError:
@@ -368,6 +384,7 @@ def _normalized_metrics(
 ) -> dict[str, Any]:
     # 這裡把 period / year-over-year 指標預先算成結構化欄位，
     # 後面 market_analysis 就不必再用 prompt 重新做數學。
+    """執行 normalized metrics 的主要流程。"""
     value = latest.value_float
     previous_value = previous.value_float if previous else None
     year_ago_value = year_ago.value_float if year_ago else None
@@ -396,10 +413,12 @@ def _normalized_metrics(
 
 
 def build_bls_macro_events(points: list[BlsMacroPoint], generated_at: str) -> list[RelayEvent]:
+    """建立 build bls macro events 對應的資料或結果。"""
     return [_point_to_event(point, generated_at) for point in points]
 
 
 def _point_to_event(point: BlsMacroPoint, generated_at: str) -> RelayEvent:
+    """執行 point to event 的主要流程。"""
     obs = point.observation
     spec = point.spec
     return RelayEvent(
@@ -432,15 +451,18 @@ def _point_to_event(point: BlsMacroPoint, generated_at: str) -> RelayEvent:
 
 
 def build_event_id(series_id: str, year: str, period: str) -> str:
+    """建立 build event id 對應的資料或結果。"""
     return f"market-context-{SOURCE_FAMILY}-{series_id.lower()}-{year}-{period.lower()}"
 
 
 def _event_title(point: BlsMacroPoint) -> str:
+    """執行 event title 的主要流程。"""
     obs = point.observation
     return f"BLS {point.spec.name}: {obs.value} {point.spec.unit} ({obs.year}-{obs.period})"
 
 
 def _event_summary(point: BlsMacroPoint) -> str:
+    """執行 event summary 的主要流程。"""
     metrics = point.normalized_metrics
     parts = [
         f"category={point.spec.category}",
@@ -459,11 +481,13 @@ def _event_summary(point: BlsMacroPoint) -> str:
 
 
 def collect_bls_macro(config: BlsMacroConfig) -> list[BlsMacroPoint]:
+    """彙整 collect bls macro 對應的資料或結果。"""
     payload = fetch_bls_response(config)
     return parse_bls_response(payload)
 
 
 def run_once(config: BlsMacroConfig) -> dict[str, Any]:
+    """執行單次任務流程並回傳結果。"""
     relay_settings = load_settings(config.env_file)
     if not relay_settings.mysql_enabled and not config.dry_run:
         raise RuntimeError("BLS macro collection requires RELAY_MYSQL_ENABLED=true")
@@ -509,6 +533,7 @@ def run_once(config: BlsMacroConfig) -> dict[str, Any]:
 
 
 def _period_sort_key(obs: BlsObservation) -> tuple[int, int] | None:
+    """執行 period sort key 的主要流程。"""
     try:
         year = int(obs.year)
     except ValueError:
@@ -520,6 +545,7 @@ def _period_sort_key(obs: BlsObservation) -> tuple[int, int] | None:
 
 
 def _monthly_period_index(period: str) -> int | None:
+    """執行 monthly period index 的主要流程。"""
     if len(period) != 3 or not period.startswith("M"):
         return None
     try:
@@ -532,6 +558,7 @@ def _monthly_period_index(period: str) -> int | None:
 
 
 def _period_start_iso(year: str, period: str) -> str | None:
+    """執行 period start iso 的主要流程。"""
     month = _monthly_period_index(period)
     if month is None:
         return None
@@ -543,12 +570,14 @@ def _period_start_iso(year: str, period: str) -> str | None:
 
 
 def _period_label(obs: BlsObservation | None) -> str | None:
+    """執行 period label 的主要流程。"""
     if obs is None:
         return None
     return f"{obs.year}-{obs.period}"
 
 
 def _to_float(value: Any) -> float | None:
+    """轉換 to float 對應的資料或結果。"""
     if isinstance(value, (int, float)):
         return float(value)
     if value is None:
@@ -563,18 +592,21 @@ def _to_float(value: Any) -> float | None:
 
 
 def _difference(current: float | None, previous: float | None) -> float | None:
+    """執行 difference 的主要流程。"""
     if current is None or previous is None:
         return None
     return current - previous
 
 
 def _percent_change(current: float | None, previous: float | None) -> float | None:
+    """執行 percent change 的主要流程。"""
     if current is None or previous in {None, 0}:
         return None
     return (current - previous) / previous * 100.0
 
 
 def _format_number(value: Any) -> str:
+    """格式化 format number 對應的資料或結果。"""
     numeric = _to_float(value)
     if numeric is None:
         return "n/a"
@@ -582,15 +614,18 @@ def _format_number(value: Any) -> str:
 
 
 def _footnote_codes(footnotes: list[dict[str, Any]]) -> list[str]:
+    """執行 footnote codes 的主要流程。"""
     return [str(item.get("code") or "").strip() for item in footnotes if str(item.get("code") or "").strip()]
 
 
 def _has_footnote_code(footnotes: list[dict[str, Any]], code: str) -> bool:
+    """判斷是否具備 has footnote code 對應的資料或結果。"""
     target = code.strip().upper()
     return any(str(item.get("code") or "").strip().upper() == target for item in footnotes)
 
 
 def main() -> int:
+    """程式入口，負責執行此模組的主要流程。"""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):

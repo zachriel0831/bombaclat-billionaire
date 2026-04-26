@@ -5,11 +5,14 @@ from news_collector.sources.twse_mops_announcements import TwseMopsAnnouncements
 
 
 class TwseMopsAnnouncementsTests(unittest.TestCase):
+    """封裝 Twse Mops Announcements Tests 相關資料與行為。"""
     def test_normalize_code(self) -> None:
+        """測試 test normalize code 的預期行為。"""
         self.assertEqual(_normalize_code("2330"), "2330")
         self.assertIsNone(_normalize_code("TSM"))
 
     def test_parse_roc_datetime(self) -> None:
+        """測試 test parse roc datetime 的預期行為。"""
         value = _parse_roc_datetime("1150418", "70003")
         self.assertIsNotNone(value)
         assert value is not None
@@ -17,6 +20,7 @@ class TwseMopsAnnouncementsTests(unittest.TestCase):
 
     @patch("news_collector.sources.twse_mops_announcements.http_get_json")
     def test_fetch_filters_by_tracked_codes(self, mock_get_json) -> None:
+        """測試 test fetch filters by tracked codes 的預期行為。"""
         mock_get_json.return_value = {
             "data": [
                 {
@@ -63,6 +67,7 @@ class TwseMopsAnnouncementsTests(unittest.TestCase):
 
     @patch("news_collector.sources.twse_mops_announcements.http_get_json")
     def test_fetch_limits_items_per_company(self, mock_get_json) -> None:
+        """測試 test fetch limits items per company 的預期行為。"""
         mock_get_json.return_value = {
             "data": [
                 {
@@ -101,6 +106,7 @@ class TwseMopsAnnouncementsTests(unittest.TestCase):
 
     @patch("news_collector.sources.twse_mops_announcements.http_get_json")
     def test_fetch_retries_once_on_transient_error(self, mock_get_json) -> None:
+        """測試 test fetch retries once on transient error 的預期行為。"""
         mock_get_json.side_effect = [
             RuntimeError("temporary ssl error"),
             {

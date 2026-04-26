@@ -6,7 +6,9 @@ from news_collector.us_index_tracker import IndexQuote, UsIndexTracker
 
 
 class UsIndexTrackerTests(unittest.TestCase):
+    """封裝 Us Index Tracker Tests 相關資料與行為。"""
     def test_parse_quote(self) -> None:
+        """測試 test parse quote 的預期行為。"""
         tracker = UsIndexTracker(timeout_seconds=5)
         result = {
             "meta": {
@@ -40,6 +42,7 @@ class UsIndexTrackerTests(unittest.TestCase):
         self.assertEqual(quote.regular_end_epoch, 1772821200)
 
     def test_format_messages(self) -> None:
+        """測試 test format messages 的預期行為。"""
         tracker = UsIndexTracker(timeout_seconds=5)
         quotes = {
             "DJIA": IndexQuote(
@@ -72,6 +75,7 @@ class UsIndexTrackerTests(unittest.TestCase):
         self.assertIn("6,122.75", close_text)
 
     def test_quote_to_payload(self) -> None:
+        """測試 test quote to payload 的預期行為。"""
         quote = IndexQuote(
             symbol="DJIA",
             label="DJIA",

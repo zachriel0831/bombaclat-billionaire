@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def _normalize_ticker(raw: str) -> str | None:
+    """正規化 normalize ticker 對應的資料或結果。"""
     text = (raw or "").strip().upper()
     if not text:
         return None
@@ -23,6 +24,7 @@ def _normalize_ticker(raw: str) -> str | None:
 
 
 class SecFilingsSource(NewsSource):
+    """封裝 Sec Filings Source 相關資料與行為。"""
     name = "sec_filings"
     ticker_map_url = "https://www.sec.gov/files/company_tickers.json"
     submissions_url_template = "https://data.sec.gov/submissions/CIK{cik}.json"
@@ -35,6 +37,7 @@ class SecFilingsSource(NewsSource):
         timeout_seconds: int = 15,
         max_filings_per_company: int = 5,
     ) -> None:
+        """初始化物件狀態與必要依賴。"""
         self._user_agent = user_agent.strip()
         self._tracked_tickers = tracked_tickers
         self._allowed_forms = {form.strip().upper() for form in allowed_forms if form.strip()}
@@ -42,6 +45,7 @@ class SecFilingsSource(NewsSource):
         self._max_filings_per_company = max(1, int(max_filings_per_company))
 
     def fetch(self, limit: int = 20) -> list[NewsItem]:
+        """執行 fetch 方法的主要邏輯。"""
         if not self._user_agent:
             raise ValueError("SEC_USER_AGENT is required for SEC EDGAR access")
 
@@ -71,6 +75,7 @@ class SecFilingsSource(NewsSource):
         return deduped[: max(int(limit), 1)]
 
     def _load_ticker_map(self) -> dict[str, dict[str, str]]:
+        """載入 load ticker map 對應的資料或結果。"""
         payload = http_get_json_with_headers(
             self.ticker_map_url,
             timeout=self._timeout_seconds,
@@ -88,6 +93,7 @@ class SecFilingsSource(NewsSource):
         return result
 
     def _fetch_company_filings(self, ticker: str, cik: str, company_title: str) -> list[NewsItem]:
+        """抓取 fetch company filings 對應的資料或結果。"""
         payload = http_get_json_with_headers(
             self.submissions_url_template.format(cik=cik),
             timeout=self._timeout_seconds,
@@ -156,6 +162,7 @@ class SecFilingsSource(NewsSource):
 
     @staticmethod
     def _col(columns: dict[str, Any], key: str, idx: int) -> Any:
+        """執行 col 方法的主要邏輯。"""
         values = columns.get(key)
         if not isinstance(values, list):
             return None
@@ -165,6 +172,7 @@ class SecFilingsSource(NewsSource):
 
     @staticmethod
     def _build_filing_index_url(cik: str, accession: str) -> str:
+        """建立 build filing index url 對應的資料或結果。"""
         cik_no_leading = str(int(str(cik or "0")))
         accession_clean = accession.replace("-", "").strip()
         if not accession_clean:
@@ -173,6 +181,7 @@ class SecFilingsSource(NewsSource):
 
     @staticmethod
     def _dedupe(items: list[NewsItem]) -> list[NewsItem]:
+        """依穩定鍵移除重複資料。"""
         seen: set[str] = set()
         result: list[NewsItem] = []
         for item in items:

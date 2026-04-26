@@ -16,17 +16,22 @@ from news_collector.us_index_tracker import IndexQuote
 
 
 class _FakeDirectStore:
+    """封裝 Fake Direct Store 相關資料與行為。"""
     def __init__(self, inserted: bool = True) -> None:
+        """初始化物件狀態與必要依賴。"""
         self.inserted = inserted
         self.events = []
 
     def enqueue_event_if_new(self, event) -> bool:
+        """執行 enqueue event if new 方法的主要邏輯。"""
         self.events.append(event)
         return self.inserted
 
 
 class RelayBridgeBackfillTests(unittest.TestCase):
+    """封裝 Relay Bridge Backfill Tests 相關資料與行為。"""
     def _settings(self, **overrides) -> Settings:
+        """執行 settings 方法的主要邏輯。"""
         base = dict(
             sec_enabled=False,
             sec_user_agent="news-collector/0.1 local-admin@example.com",
@@ -56,6 +61,7 @@ class RelayBridgeBackfillTests(unittest.TestCase):
         return Settings(**base)
 
     def test_run_x_backfill_posts_recent_items(self) -> None:
+        """測試 test run x backfill posts recent items 的預期行為。"""
         settings = self._settings()
         recent_base = datetime.now(timezone.utc) - timedelta(hours=2)
         items = [
@@ -93,6 +99,7 @@ class RelayBridgeBackfillTests(unittest.TestCase):
         self.assertEqual(result["dropped_by_topic"], 0)
 
     def test_run_x_backfill_skips_when_disabled(self) -> None:
+        """測試 test run x backfill skips when disabled 的預期行為。"""
         settings = self._settings(x_backfill_enabled=False)
 
         with patch("news_collector.relay_bridge.XAccountSource.fetch") as fetch_mock:
@@ -103,6 +110,7 @@ class RelayBridgeBackfillTests(unittest.TestCase):
         self.assertEqual(result["pushed"], 0)
 
     def test_event_to_relay_event_preserves_raw_payload(self) -> None:
+        """測試 test event to relay event preserves raw payload 的預期行為。"""
         event = {
             "id": "x-123",
             "source": "x:elonmusk",
@@ -124,6 +132,7 @@ class RelayBridgeBackfillTests(unittest.TestCase):
         self.assertIs(relay_event.raw, event)
 
     def test_direct_db_event_sink_writes_store(self) -> None:
+        """測試 test direct db event sink writes store 的預期行為。"""
         store = _FakeDirectStore(inserted=True)
         sink = DirectDbEventSink(store)  # type: ignore[arg-type]
         event = {
@@ -144,6 +153,7 @@ class RelayBridgeBackfillTests(unittest.TestCase):
         self.assertEqual(store.events[0].event_id, "rss-1")
 
     def test_direct_db_event_sink_treats_duplicates_as_accepted(self) -> None:
+        """測試 test direct db event sink treats duplicates as accepted 的預期行為。"""
         store = _FakeDirectStore(inserted=False)
         sink = DirectDbEventSink(store)  # type: ignore[arg-type]
         event = {
@@ -162,6 +172,7 @@ class RelayBridgeBackfillTests(unittest.TestCase):
         self.assertEqual(result.status, "duplicate")
 
     def test_build_us_index_event_uses_events_schema(self) -> None:
+        """測試 test build us index event uses events schema 的預期行為。"""
         quotes = {
             "DJIA": IndexQuote(
                 symbol="DJIA",
@@ -196,6 +207,7 @@ class RelayBridgeBackfillTests(unittest.TestCase):
         self.assertEqual(len(payload["market_snapshot"]["indexes"]), 2)
 
     def test_allow_event_topic_bypasses_sec_allowlist(self) -> None:
+        """測試 test allow event topic bypasses sec allowlist 的預期行為。"""
         event = {
             "source": "sec:NVDA",
             "title": "NVDA filed 8-K",
@@ -206,6 +218,7 @@ class RelayBridgeBackfillTests(unittest.TestCase):
         self.assertTrue(_allow_event_topic(event))
 
     def test_allow_event_topic_bypasses_twse_allowlist(self) -> None:
+        """測試 test allow event topic bypasses twse allowlist 的預期行為。"""
         event = {
             "source": "twse_mops:2330",
             "title": "2330 台積電: 董事會通過財報",
