@@ -50,6 +50,7 @@ from event_relay.rag import (
     retrieve_similar_events,
 )
 from event_relay.service import MarketAnalysisRecord, MySqlEventStore
+from event_relay.trade_signals import build_trade_signals_from_analysis
 from event_relay.weekly_summary import _call_llm, _load_secret_from_dpapi_file, _openai_web_search_enabled
 
 
@@ -582,6 +583,7 @@ def _run_multi_stage_pipeline(
     telemetry["bull_case"] = (dual_view_output or {}).get("bull_case") if dual_view_output else None
     telemetry["bear_case"] = (dual_view_output or {}).get("bear_case") if dual_view_output else None
     telemetry["critique"] = critic_output
+    telemetry["tw_mapping"] = stage3.output
 
     pipeline_elapsed = _time.perf_counter() - pipeline_started
     telemetry["elapsed_sec"] = round(pipeline_elapsed, 3)
@@ -788,7 +790,23 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
             else None
         ),
     )
-    store.upsert_market_analysis(record)
+    analysis_id = store.upsert_market_analysis(record)
+    trade_signals_count = 0
+    if used_multi_stage and analysis_id:
+        trade_signals = build_trade_signals_from_analysis(
+            analysis_id=analysis_id,
+            analysis_date=record.analysis_date,
+            analysis_slot=record.analysis_slot,
+            structured_payload=structured_payload,
+            pipeline_telemetry=pipeline_telemetry,
+        )
+        trade_signals_count = store.replace_trade_signals_for_analysis(analysis_id, trade_signals)
+        logger.info(
+            "[TRADE_SIGNALS_STORED] analysis_id=%s slot=%s count=%d status=pending_review",
+            analysis_id,
+            slot,
+            trade_signals_count,
+        )
     return {
         "ok": True,
         "slot": slot,
@@ -796,6 +814,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         "events_used": record.events_used,
         "market_rows_used": record.market_rows_used,
         "rag_examples_used": len(rag_examples),
+        "trade_signals_stored": trade_signals_count,
         "push_enabled": push_enabled,
         "pushed": 0,
         "model": config.model,

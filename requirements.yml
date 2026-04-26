@@ -151,38 +151,44 @@ tasks:
 
   # ── 模組：Market Watch ──────────────────────────────────────────────
   - id: REQ-024
-    title: "[台股監聽] 從分析結果抽 watchlist，盤中監控推薦標的"
+    title: "[交易訊號] 從 market_analysis 拆出推薦股 signal"
     module: market_watch
-    status: pending
+    status: done
     trigger: schedule
     priority: high
     description: |
-      目標：讓系統能依據 t_market_analyses 中的 trade ideas，自動建立與維護台股監控名單，
-      並在盤中持續觀察推薦標的的價格與量能變化。
+      目標：把 t_market_analyses.structured_json 內的台股推薦名單拆成獨立交易訊號表，
+      讓後續 review、risk gate、decision、outcome 可以各自獨立追蹤。
 
-      建議資料表：
-        - t_trade_watchlist：
-          analysis_id、ticker、market、direction、entry_zone、invalidation、tp_zone、status、source_slot
-        - t_watchlist_price_snapshots：
-          watchlist_id、ts、price、change_pct、volume、volume_ratio、source
-        - t_watchlist_trigger_events：
-          watchlist_id、trigger_type、trigger_value、triggered_at、raw_json
+      已實作資料表：
+        - t_trade_signals：
+          analysis_id、analysis_date、analysis_slot、market、ticker、name、signal_type、
+          strategy_type、direction、confidence、entry_zone、invalidation、take_profit_zone、
+          holding_horizon、rationale、risk_notes、source_event_ids、status、idempotency_key、raw_json
+        - t_signal_reviews：
+          signal_id、review_type、status、reviewer、reason、risk_score、failed_rules、raw_json
+        - t_signal_outcomes：
+          signal_id、status、evaluated_at、entry_hit、stop_hit、target_hit、return_pct、
+          max_drawdown_pct、outcome_json
 
-      監控條件：
-        - 進場區觸達
-        - 漲跌幅超門檻
-        - 放量 / 爆量
-        - 跌破失效點
-        - 達到停利區或減碼區
-    depends_on: [REQ-019, REQ-022, REQ-023]
+      邊界：
+        - LLM 只產生 signal，不直接下單
+        - review / risk gate 必須獨立
+        - 每個 signal 都有 idempotency_key，避免重複處理
+        - 每個 signal 可回指原始 analysis 與 source_event_ids
+        - outcome 必須回寫，供後續評估模型品質
+    depends_on: [REQ-022]
     acceptance:
-      - 可由 market_analysis.structured_json.trade_ideas 自動產出 watchlist rows
-      - 盤中排程會刷新 watchlist 標的的快照資料
-      - 命中條件時會產生 trigger event，且可回指原 analysis 與 ticker
-      - Java 可選擇性讀 trigger event / 摘要分析後推送
-      - 新增測試覆蓋 watchlist 生成、去重、觸發條件、過期清理
+      - market_analysis 寫入 t_market_analyses 後會抽出 stock_watch / trade_ideas 到 t_trade_signals
+      - 只保留台股標的，非台股 signal 會略過
+      - 重跑同一 analysis 時用 signal_key / idempotency_key 去重
+      - 同一 analysis 舊的 pending/new/watch signal 會標成 superseded
+      - t_signal_reviews 與 t_signal_outcomes 已建表，但不與下單耦合
+      - 新增 backfill script 可從既有 t_market_analyses 補寫 t_trade_signals
+      - 新增單元測試覆蓋解析、去重、非台股略過、market_analysis 寫入路徑
     notes: |
-      2026-04-25 新列。這條把「盤前分析」與「盤中監聽」串起來，是後續決策與下單的前置。
+      2026-04-26 已完成。這條取代原先 watchlist 版本，先建立「分析結果 -> 可審核交易訊號」鏈路。
+      驗證：focused tests 43 passed、full unittest 210 passed、DB 已建立三張表、backfill 寫入 1 筆 2330 pending_review signal。
 
   # ── 模組：Decision Engine ───────────────────────────────────────────
   - id: REQ-025
@@ -224,9 +230,11 @@ tasks:
     description: |
       目標：把分析結果與監控事件轉成可執行但仍可控的交易決策。
 
-      建議資料表：
+      既有輸入：
         - t_trade_signals：
-          signal_id、analysis_id、watchlist_id、ticker、signal_type、direction、strength、raw_json
+          由 REQ-024 建立，保存 analysis-derived candidate signals
+
+      建議資料表：
         - t_trade_decisions：
           decision_id、signal_id、strategy_key、decision_status、reasoning_summary、risk_flags、
           approval_status、mode(manual/semi_auto/auto)、created_at
@@ -234,20 +242,21 @@ tasks:
           scope(global/strategy/symbol)、max_position_pct、max_daily_loss、max_open_orders、enabled
 
       決策流程：
-        1. 分析結果 / watchlist trigger 產生 signal
+        1. 讀取 pending_review t_trade_signals
         2. 套用策略知識庫與 symbol override
         3. 做風控檢查（曝險、黑名單、冷卻期、持倉衝突）
         4. 產生 decision
         5. 依模式決定是否需要人工批准才可轉成 order intent
     depends_on: [REQ-024, REQ-025]
     acceptance:
-      - 建立 signal / decision / risk limit schema 與基本 service
+      - 建立 decision / risk limit schema 與基本 service
       - manual / semi_auto / auto 三種模式能分別控制是否需要人工批准
       - 每筆 decision 都保存理由、命中策略、風控結果、approval 狀態
       - 有全域 kill switch 與 per-symbol 停用機制
-      - 新增單元測試覆蓋 risk reject、approval required、duplicate signal suppression
+      - 新增單元測試覆蓋 risk reject、approval required、duplicate decision suppression
     notes: |
-      2026-04-25 新列。這條的關鍵是把 LLM 輸出變成「候選訊號」，而不是直接變成下單命令。
+      2026-04-25 新列。這條的關鍵是把候選 signal 轉成有風控與審批邊界的 decision，而不是直接下單。
+      2026-04-26 調整：t_trade_signals 已由 REQ-024 建立，REQ-026 只負責 risk / decision layer。
 
   # ── 模組：Order Execution ───────────────────────────────────────────
   - id: REQ-027

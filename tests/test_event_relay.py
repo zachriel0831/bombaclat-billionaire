@@ -56,6 +56,9 @@ def _build_settings() -> RelaySettings:
         mysql_annotation_table="t_relay_event_annotations",
         mysql_event_embedding_table="t_event_embeddings",
         mysql_analysis_embedding_table="t_analysis_embeddings",
+        mysql_trade_signal_table="t_trade_signals",
+        mysql_signal_review_table="t_signal_reviews",
+        mysql_signal_outcome_table="t_signal_outcomes",
         mysql_connect_timeout_seconds=5,
         retention_enabled=True,
         retention_keep_days=7,
@@ -108,6 +111,9 @@ class LineEventRelayTests(unittest.TestCase):
 
         self.assertTrue(defaults.retention_enabled)
         self.assertEqual(defaults.retention_keep_days, 7)
+        self.assertEqual(defaults.mysql_trade_signal_table, "t_trade_signals")
+        self.assertEqual(defaults.mysql_signal_review_table, "t_signal_reviews")
+        self.assertEqual(defaults.mysql_signal_outcome_table, "t_signal_outcomes")
         self.assertFalse(configured.retention_enabled)
         self.assertEqual(configured.retention_keep_days, 14)
 

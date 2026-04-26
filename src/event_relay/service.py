@@ -108,6 +108,32 @@ class MarketAnalysisRecord:
 
 
 @dataclass
+class TradeSignalRecord:
+    """Structured trade signal derived from one market-analysis row."""
+    signal_key: str
+    idempotency_key: str
+    analysis_id: int
+    analysis_date: str
+    analysis_slot: str
+    market: str
+    ticker: str
+    name: str | None
+    signal_type: str
+    strategy_type: str
+    direction: str
+    confidence: str | None
+    entry_zone_json: str | None
+    invalidation_json: str | None
+    take_profit_zone_json: str | None
+    holding_horizon: str | None
+    rationale: str | None
+    risk_notes_json: str | None
+    source_event_ids_json: str | None
+    status: str
+    raw_json: str | None
+
+
+@dataclass
 class StoredMarketAnalysisRecord:
     """封裝 Stored Market Analysis Record 相關資料與行為。"""
     row_id: int
@@ -117,6 +143,17 @@ class StoredMarketAnalysisRecord:
     model: str
     prompt_version: str
     summary_text: str
+    raw_json: str | None
+    updated_at: str
+
+
+@dataclass
+class MarketAnalysisSignalSource:
+    """Analysis row fields needed to rebuild trade signals."""
+    row_id: int
+    analysis_date: str
+    analysis_slot: str
+    structured_json: str | None
     raw_json: str | None
     updated_at: str
 
@@ -162,6 +199,9 @@ class MySqlEventStore:
         self._annotation_table = settings.mysql_annotation_table
         self._event_embedding_table = settings.mysql_event_embedding_table
         self._analysis_embedding_table = settings.mysql_analysis_embedding_table
+        self._trade_signal_table = settings.mysql_trade_signal_table
+        self._signal_review_table = settings.mysql_signal_review_table
+        self._signal_outcome_table = settings.mysql_signal_outcome_table
         self._connector = self._import_mysql_connector()
         self._conn = None
         self._lock = threading.RLock()
@@ -654,7 +694,7 @@ class MySqlEventStore:
             # Column may have been added between our check and the ALTER; do not fail init.
             self._conn.rollback()
 
-    def upsert_market_analysis(self, record: MarketAnalysisRecord) -> None:
+    def upsert_market_analysis(self, record: MarketAnalysisRecord) -> int:
         """新增或更新 upsert market analysis 對應的資料或結果。"""
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
@@ -677,6 +717,7 @@ class MySqlEventStore:
             "pushed=VALUES(pushed), "
             "raw_json=VALUES(raw_json), "
             "structured_json=VALUES(structured_json), "
+            "id=LAST_INSERT_ID(id), "
             "updated_at=CURRENT_TIMESTAMP"
         )
 
@@ -701,8 +742,101 @@ class MySqlEventStore:
                     ),
                 )
                 self._conn.commit()
+                return int(cur.lastrowid or 0)
             finally:
                 cur.close()
+
+    def replace_trade_signals_for_analysis(self, analysis_id: int, signals: list[TradeSignalRecord]) -> int:
+        """Upsert current signals for an analysis and supersede stale pending ones."""
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+
+        safe_analysis_id = int(analysis_id)
+        current_keys = [signal.signal_key for signal in signals]
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                for signal in signals:
+                    self._upsert_trade_signal(cur, signal)
+                if current_keys:
+                    placeholders = ",".join(["%s"] * len(current_keys))
+                    cur.execute(
+                        f"UPDATE `{self._trade_signal_table}` "
+                        "SET status='superseded', updated_at=CURRENT_TIMESTAMP "
+                        f"WHERE analysis_id=%s AND signal_key NOT IN ({placeholders}) "
+                        "AND status IN ('pending_review','new','watch')",
+                        (safe_analysis_id, *current_keys),
+                    )
+                else:
+                    cur.execute(
+                        f"UPDATE `{self._trade_signal_table}` "
+                        "SET status='superseded', updated_at=CURRENT_TIMESTAMP "
+                        "WHERE analysis_id=%s AND status IN ('pending_review','new','watch')",
+                        (safe_analysis_id,),
+                    )
+                self._conn.commit()
+                return len(signals)
+            except Exception:
+                self._conn.rollback()
+                raise
+            finally:
+                cur.close()
+
+    def _upsert_trade_signal(self, cur: Any, signal: TradeSignalRecord) -> None:
+        """Store one signal without changing an already-reviewed status."""
+        sql = (
+            f"INSERT INTO `{self._trade_signal_table}` "
+            "(signal_key, idempotency_key, analysis_id, analysis_date, analysis_slot, market, ticker, name, "
+            "signal_type, strategy_type, direction, confidence, entry_zone, invalidation, take_profit_zone, "
+            "holding_horizon, rationale, risk_notes, source_event_ids, status, raw_json) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "ON DUPLICATE KEY UPDATE "
+            "analysis_date=VALUES(analysis_date), "
+            "analysis_slot=VALUES(analysis_slot), "
+            "market=VALUES(market), "
+            "ticker=VALUES(ticker), "
+            "name=VALUES(name), "
+            "signal_type=VALUES(signal_type), "
+            "strategy_type=VALUES(strategy_type), "
+            "direction=VALUES(direction), "
+            "confidence=VALUES(confidence), "
+            "entry_zone=VALUES(entry_zone), "
+            "invalidation=VALUES(invalidation), "
+            "take_profit_zone=VALUES(take_profit_zone), "
+            "holding_horizon=VALUES(holding_horizon), "
+            "rationale=VALUES(rationale), "
+            "risk_notes=VALUES(risk_notes), "
+            "source_event_ids=VALUES(source_event_ids), "
+            "status=IF(status='superseded', VALUES(status), status), "
+            "raw_json=VALUES(raw_json), "
+            "updated_at=CURRENT_TIMESTAMP"
+        )
+        cur.execute(
+            sql,
+            (
+                signal.signal_key,
+                signal.idempotency_key,
+                signal.analysis_id,
+                signal.analysis_date,
+                signal.analysis_slot,
+                signal.market,
+                signal.ticker,
+                signal.name,
+                signal.signal_type,
+                signal.strategy_type,
+                signal.direction,
+                signal.confidence,
+                signal.entry_zone_json,
+                signal.invalidation_json,
+                signal.take_profit_zone_json,
+                signal.holding_horizon,
+                signal.rationale,
+                signal.risk_notes_json,
+                signal.source_event_ids_json,
+                signal.status,
+                signal.raw_json,
+            ),
+        )
 
     def upsert_market_quote_snapshot(self, snapshot: MarketQuoteSnapshot) -> None:
         """新增或更新 upsert market quote snapshot 對應的資料或結果。"""
@@ -818,6 +952,43 @@ class MySqlEventStore:
             raw_json=str(row[7]) if row[7] is not None else None,
             updated_at=str(row[8]) if row[8] is not None else "",
         )
+
+    def fetch_recent_market_analyses_for_signals(
+        self, *, days: int, limit: int
+    ) -> list[MarketAnalysisSignalSource]:
+        """Fetch recent structured analyses that can produce trade signals."""
+        if self._conn is None:
+            return []
+
+        safe_days = max(int(days), 1)
+        safe_limit = max(int(limit), 1)
+        sql = (
+            f"SELECT id, analysis_date, analysis_slot, structured_json, raw_json, updated_at "
+            f"FROM {self._analysis_table} "
+            "WHERE structured_json IS NOT NULL "
+            "AND updated_at >= (NOW() - INTERVAL %s DAY) "
+            "ORDER BY updated_at DESC, id DESC "
+            "LIMIT %s"
+        )
+        with self._lock:
+            cur = self._conn.cursor()
+            try:
+                cur.execute(sql, (safe_days, safe_limit))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        return [
+            MarketAnalysisSignalSource(
+                row_id=int(row[0]),
+                analysis_date=str(row[1] or ""),
+                analysis_slot=str(row[2] or ""),
+                structured_json=str(row[3]) if row[3] is not None else None,
+                raw_json=str(row[4]) if row[4] is not None else None,
+                updated_at=str(row[5]) if row[5] is not None else "",
+            )
+            for row in rows
+        ]
 
     def delete_events_older_than_days(self, keep_days: int) -> int:
         """刪除 delete events older than days 對應的資料或結果。"""
@@ -1068,6 +1239,78 @@ class MySqlEventStore:
           KEY idx_analysis_embedding_model (embedding_model, indexed_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
+        ddl_trade_signals = f"""
+        CREATE TABLE IF NOT EXISTS `{self._trade_signal_table}` (
+          id BIGINT NOT NULL AUTO_INCREMENT,
+          signal_key VARCHAR(64) NOT NULL,
+          idempotency_key CHAR(40) NOT NULL,
+          analysis_id BIGINT NOT NULL,
+          analysis_date VARCHAR(16) NOT NULL,
+          analysis_slot VARCHAR(32) NOT NULL,
+          market VARCHAR(16) NOT NULL DEFAULT 'TW',
+          ticker VARCHAR(32) NOT NULL,
+          name VARCHAR(128) NULL,
+          signal_type VARCHAR(32) NOT NULL DEFAULT 'analysis_stock_watch',
+          strategy_type VARCHAR(32) NOT NULL DEFAULT 'watch',
+          direction VARCHAR(16) NOT NULL,
+          confidence VARCHAR(16) NULL,
+          entry_zone JSON NULL,
+          invalidation JSON NULL,
+          take_profit_zone JSON NULL,
+          holding_horizon VARCHAR(64) NULL,
+          rationale TEXT NULL,
+          risk_notes JSON NULL,
+          source_event_ids JSON NULL,
+          status VARCHAR(24) NOT NULL DEFAULT 'pending_review',
+          raw_json JSON NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_trade_signal_key (signal_key),
+          UNIQUE KEY uq_trade_signal_idempotency (idempotency_key),
+          KEY idx_trade_signal_analysis (analysis_id),
+          KEY idx_trade_signal_ticker (market, ticker, status, created_at),
+          KEY idx_trade_signal_slot (analysis_date, analysis_slot, status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+        ddl_signal_reviews = f"""
+        CREATE TABLE IF NOT EXISTS `{self._signal_review_table}` (
+          id BIGINT NOT NULL AUTO_INCREMENT,
+          signal_id BIGINT NOT NULL,
+          review_type VARCHAR(32) NOT NULL DEFAULT 'risk_gate',
+          status VARCHAR(24) NOT NULL DEFAULT 'pending',
+          reviewer VARCHAR(64) NULL,
+          reason TEXT NULL,
+          risk_score DECIMAL(8,4) NULL,
+          failed_rules JSON NULL,
+          raw_json JSON NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          KEY idx_signal_review_signal (signal_id, review_type, status),
+          KEY idx_signal_review_status (status, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+        ddl_signal_outcomes = f"""
+        CREATE TABLE IF NOT EXISTS `{self._signal_outcome_table}` (
+          id BIGINT NOT NULL AUTO_INCREMENT,
+          signal_id BIGINT NOT NULL,
+          status VARCHAR(24) NOT NULL DEFAULT 'pending',
+          evaluated_at DATETIME NULL,
+          entry_hit TINYINT(1) NULL,
+          stop_hit TINYINT(1) NULL,
+          target_hit TINYINT(1) NULL,
+          realized_return_pct DECIMAL(10,4) NULL,
+          max_gain_pct DECIMAL(10,4) NULL,
+          max_drawdown_pct DECIMAL(10,4) NULL,
+          outcome_json JSON NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_signal_outcome_signal (signal_id),
+          KEY idx_signal_outcome_status (status, evaluated_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
         cur = self._conn.cursor()
         try:
             cur.execute(ddl_event)
@@ -1078,6 +1321,9 @@ class MySqlEventStore:
             cur.execute(ddl_annotation)
             cur.execute(ddl_event_embeddings)
             cur.execute(ddl_analysis_embeddings)
+            cur.execute(ddl_trade_signals)
+            cur.execute(ddl_signal_reviews)
+            cur.execute(ddl_signal_outcomes)
             self._conn.commit()
             self._migrate_analysis_structured_json(cur)
         finally:

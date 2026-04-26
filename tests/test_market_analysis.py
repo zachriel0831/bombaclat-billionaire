@@ -19,6 +19,7 @@ from event_relay.service import SummaryEvent
 class _FakeAnalysisStore:
     """封裝 Fake Analysis Store 相關資料與行為。"""
     records = []
+    signals = []
 
     def __init__(self, _settings) -> None:
         """初始化物件狀態與必要依賴。"""
@@ -66,9 +67,15 @@ class _FakeAnalysisStore:
         """抓取 fetch event embedding candidates 對應的資料或結果。"""
         return []
 
-    def upsert_market_analysis(self, record) -> None:
+    def upsert_market_analysis(self, record) -> int:
         """新增或更新 upsert market analysis 對應的資料或結果。"""
         _FakeAnalysisStore.records.append(record)
+        return 777
+
+    def replace_trade_signals_for_analysis(self, analysis_id: int, signals: list) -> int:
+        """保存 extracted trade signals 方便測試確認。"""
+        _FakeAnalysisStore.signals.append((analysis_id, list(signals)))
+        return len(signals)
 
 
 class MarketAnalysisTests(unittest.TestCase):
@@ -174,6 +181,7 @@ class MarketAnalysisTests(unittest.TestCase):
     def test_run_once_tw_close_raw_json_dimension(self) -> None:
         """測試 test run once tw close raw json dimension 的預期行為。"""
         _FakeAnalysisStore.records = []
+        _FakeAnalysisStore.signals = []
         config = SimpleNamespace(
             env_file=".env",
             model="test-model",
@@ -214,6 +222,7 @@ class MarketAnalysisTests(unittest.TestCase):
     def test_run_once_continues_when_rag_retrieval_fails(self) -> None:
         """測試 test run once continues when rag retrieval fails 的預期行為。"""
         _FakeAnalysisStore.records = []
+        _FakeAnalysisStore.signals = []
         config = SimpleNamespace(
             env_file=".env",
             model="test-model",
@@ -390,6 +399,7 @@ class MultiStagePipelineTests(unittest.TestCase):
     def _run(self, *, pipeline_env: str, stage_side_effects: dict) -> tuple[dict, list]:
         """執行 run 方法的主要邏輯。"""
         _FakeAnalysisStore.records = []
+        _FakeAnalysisStore.signals = []
         from event_relay import market_analysis as module
 
         patches = [
@@ -468,6 +478,81 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertIsNotNone(records[0].structured_json)
         structured = json.loads(records[0].structured_json)
         self.assertEqual(structured["confidence"], "medium")
+
+    def test_multi_stage_extracts_trade_signals_from_structured_stock_watch(self) -> None:
+        """測試 structured stock_watch 會轉成 pending_review trade signal。"""
+        from event_relay.analysis_stages.context import StageResult
+
+        stage_side_effects = {
+            "event_relay.analysis_stages.stage1_digest.run": _return(
+                StageResult(name="stage1_digest", model="m", output={"events": [{"id": 101}], "market_snapshot": {}})
+            ),
+            "event_relay.analysis_stages.stage2_transmission.run": _return(
+                StageResult(name="stage2_transmission", model="m", output={"chains": []})
+            ),
+            "event_relay.analysis_stages.stage3_tw_mapping.run": _return(
+                StageResult(
+                    name="stage3_tw_mapping",
+                    model="m",
+                    output={
+                        "sector_watch": [],
+                        "stock_watch": [
+                            {
+                                "ticker": "2330",
+                                "direction": "bullish",
+                                "rationale": "AI demand supports TSMC supply chain",
+                                "evidence_ids": [101],
+                            }
+                        ],
+                        "risks": [],
+                        "data_gaps": [],
+                    },
+                )
+            ),
+            "event_relay.analysis_stages.stage4_synthesis.run": _return(
+                StageResult(
+                    name="stage4_synthesis",
+                    model="m",
+                    output={
+                        "summary_text": "台股偏多，先觀察台積電。",
+                        "structured": {
+                            "summary_text": "台股偏多，先觀察台積電。",
+                            "headline": "AI鏈偏多",
+                            "sentiment": "bullish",
+                            "confidence": "medium",
+                            "key_drivers": ["AI demand"],
+                            "tw_sector_watch": [],
+                            "stock_watch": [
+                                {
+                                    "ticker": "2330",
+                                    "market": "TW",
+                                    "name": "台積電",
+                                    "direction": "bullish",
+                                    "rationale": "AI demand supports TSMC supply chain",
+                                    "strategy_type": "swing",
+                                    "entry_zone": {"low": 600, "high": 610},
+                                    "invalidation": {"price": 590},
+                                    "take_profit_zone": {"first": 630},
+                                }
+                            ],
+                            "risks": [],
+                            "data_gaps": [],
+                        },
+                    },
+                )
+            ),
+        }
+
+        result, _records = self._run(pipeline_env="multi_stage", stage_side_effects=stage_side_effects)
+
+        self.assertEqual(result["trade_signals_stored"], 1)
+        self.assertEqual(_FakeAnalysisStore.signals[0][0], 777)
+        signal = _FakeAnalysisStore.signals[0][1][0]
+        self.assertEqual(signal.ticker, "2330")
+        self.assertEqual(signal.direction, "long")
+        self.assertEqual(signal.strategy_type, "swing")
+        self.assertEqual(signal.status, "pending_review")
+        self.assertEqual(json.loads(signal.source_event_ids_json), [101])
 
     def test_multi_stage_text_fallback_leaves_structured_none(self) -> None:
         """測試 test multi stage text fallback leaves structured none 的預期行為。"""

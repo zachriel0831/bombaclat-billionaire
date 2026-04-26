@@ -48,6 +48,9 @@ class RelaySettings:
     mysql_annotation_table: str
     mysql_event_embedding_table: str
     mysql_analysis_embedding_table: str
+    mysql_trade_signal_table: str
+    mysql_signal_review_table: str
+    mysql_signal_outcome_table: str
     mysql_connect_timeout_seconds: int
     retention_enabled: bool
     retention_keep_days: int
@@ -90,6 +93,9 @@ def load_settings(env_file: str = ".env") -> RelaySettings:
         mysql_analysis_embedding_table=os.getenv(
             "RELAY_MYSQL_ANALYSIS_EMBEDDING_TABLE", "t_analysis_embeddings"
         ),
+        mysql_trade_signal_table=os.getenv("RELAY_MYSQL_TRADE_SIGNAL_TABLE", "t_trade_signals"),
+        mysql_signal_review_table=os.getenv("RELAY_MYSQL_SIGNAL_REVIEW_TABLE", "t_signal_reviews"),
+        mysql_signal_outcome_table=os.getenv("RELAY_MYSQL_SIGNAL_OUTCOME_TABLE", "t_signal_outcomes"),
         mysql_connect_timeout_seconds=int(os.getenv("RELAY_MYSQL_CONNECT_TIMEOUT", "5")),
         retention_enabled=parse_bool(os.getenv("RELAY_RETENTION_ENABLED", "true"), default=True),
         retention_keep_days=max(1, min(365, int(os.getenv("RELAY_RETENTION_KEEP_DAYS", "7")))),

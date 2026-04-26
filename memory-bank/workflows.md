@@ -164,12 +164,17 @@
 - OpenAI runs request web search by default; if unavailable, the prompt must label missing context instead of fabricating
 3. Persist analysis output
 - Generated text is upserted into `t_market_analyses` by `(analysis_date, analysis_slot)`
+- Structured stock recommendations are extracted into `t_trade_signals`
+- New signals use `status=pending_review`; stale pending signals for the same analysis are marked `superseded`
+- Do not create orders here. Risk gate / review and outcomes stay in `t_signal_reviews` and `t_signal_outcomes`
+- For existing rows, run `scripts/run_trade_signal_extraction.ps1 -EnvFile .env`
 4. Keep Python storage-only
 - `market_analysis` does not push directly or create delivery jobs
 - Java owns user-facing delivery
 5. Verify
 - Check prompt snapshots under `runtime/prompts/`
 - Query `t_market_analyses` for the current `analysis_date`
+- Query `t_trade_signals` by `analysis_id` or `(analysis_date, analysis_slot)`
 - Query `t_relay_events` for recent `source LIKE 'market_context:%'`
 - Confirm `pushed=0`; Python does not contact LINE or create delivery jobs
 
@@ -192,7 +197,7 @@
 
 ## Workflow 4D: Weekly Summary Storage
 1. Schedule for Taiwan pre-open usage
-- Run `weekly_summary` every Sunday `23:00` local time (Java pushes it at Monday `05:10`)
+- Run `weekly_summary` every Saturday `23:00` local time (Java pushes it at Sunday `05:10`)
 2. Generate the weekly brief
 - Read the last 7 days from `t_relay_events`
 - Call OpenAI Responses API with weekly summary prompts and web search enabled by default for current-fact verification
@@ -201,12 +206,12 @@
 - Upsert into `t_market_analyses`
 - Java owns user-facing LINE delivery
 4. Mark the row as weekly scope
-- Use `analysis_date=YYYY-Www`
+- Use `analysis_date=YYYY-MM-DD` for the target Sunday delivery date
 - Use `analysis_slot=weekly_tw_preopen`
 - Put `dimension=weekly` in `raw_json`
 5. Verify
 - Check scheduled task next run
-- Query `t_market_analyses` by `analysis_date='YYYY-Www'`
+- Query `t_market_analyses` by the target Sunday `analysis_date`
 
 ## Workflow 4E: SEC Tracked Filings Flow
 1. Define tracked universe

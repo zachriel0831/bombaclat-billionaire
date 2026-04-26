@@ -78,10 +78,15 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - `t_market_analyses`
 - `t_event_embeddings`
 - `t_analysis_embeddings`
+- `t_trade_signals`
+- `t_signal_reviews`
+- `t_signal_outcomes`
 - Current behavior:
   - Crawler bridge owns normal source ingestion and writes event rows directly
   - `t_relay_events` is treated as event-only storage
   - Source/context facts must land in `t_relay_events` first; `t_market_analyses` is only for model-generated analysis after reading event windows
+  - `t_trade_signals` is derived from `t_market_analyses.structured_json`; it is not a direct source-ingestion table
+  - Signal review/risk gate and signal outcomes are independent from analysis generation
   - Python should not be considered the LINE delivery service; Java is responsible for user-facing LINE push/webhook behavior
   - Python contains no LINE push/webhook/direct-push contact path
   - Daily retention cleanup for old event rows
@@ -106,7 +111,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   4. Store the weekly text into `t_market_analyses`
   5. Leave user-facing delivery to the Java system
 - Storage contract:
-  - `analysis_date` uses ISO week key like `2026-W17`
+  - `analysis_date` uses the target Sunday delivery date like `2026-04-26`
   - `analysis_slot=weekly_tw_preopen`
   - `raw_json.dimension=weekly`
 - Prompt snapshots:
@@ -135,6 +140,14 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   5. Build Traditional Chinese prompts from existing macro + mobile-chat formatting skills
   6. Call OpenAI Responses API with web search enabled by default for current-fact verification
   7. Store generated text in `t_market_analyses`
+  8. Extract `structured_json.stock_watch` into `t_trade_signals` as `pending_review` rows
+- Trade-signal boundary:
+  - `t_trade_signals` stores analysis-derived Taiwan ticker ideas only
+  - Every signal keeps `analysis_id`, slot/date, ticker, strategy/direction, optional entry/stop/target JSON, and `source_event_ids`
+  - `idempotency_key` suppresses duplicate signals for the same analysis/ticker/strategy
+  - `t_signal_reviews` is reserved for risk gate / human / model-review decisions
+  - `t_signal_outcomes` is reserved for later performance feedback
+  - LLM analysis never creates order intents or broker calls directly
 - Historical-case RAG:
   - Module: `src/event_relay/rag.py`
   - First implementation uses deterministic local lexical embeddings (`local-hash-v1`) to avoid a new paid API dependency
@@ -157,7 +170,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `scripts/register_market_analysis_tasks.ps1`
   - `scripts/register_retention_cleanup_task.ps1`
 - Current target schedule requirement:
-  - Every Sunday 23:00 (Asia/Taipei, local machine timezone) for weekly summary (Java pushes it at Monday 05:10)
+  - Every Saturday 23:00 (Asia/Taipei, local machine timezone) for weekly summary (Java pushes it at Sunday 05:10)
   - Every day 05:00, 07:30, and 15:30 (Asia/Taipei, local machine timezone) for market analysis
   - Every day 04:40 (Asia/Taipei, local machine timezone) for historical-case RAG indexing
   - Every day 04:50 (Asia/Taipei, local machine timezone) for BLS macro event collection
@@ -196,6 +209,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot us_close -Force`
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force`
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot tw_close -Force`
+- Extract trade signals from existing structured analyses:
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_trade_signal_extraction.ps1 -EnvFile .env -Days 14 -Limit 50`
 - Run market context once:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env`
 - Run Taiwan official market-flow context once:

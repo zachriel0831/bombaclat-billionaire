@@ -1,4 +1,4 @@
-# News Collector (MVP)
+﻿# News Collector (MVP)
 
 This project starts from data ingestion for international finance breaking news.
 
@@ -13,7 +13,7 @@ This project starts from data ingestion for international finance breaking news.
 - Starter `.env` set watches `NVDA,TSM,AAPL,MSFT,AMD,TSLA`
 
 3. TWSE / MOPS official listed-company announcements (no API key)
-- Uses TWSE openapi dataset `上市公司每日重大訊息`
+- Uses TWSE openapi dataset `銝??砍瘥?之閮`
 - Starter `.env` set watches `2330,2317,2454,2308,2881,2882`
 
 4. X account stream (Bearer token required)
@@ -97,7 +97,7 @@ X source is now consumed by filtered stream (near real-time) with auto reconnect
 Bridge startup also runs a one-shot X backfill before connecting the filtered stream, so tweets published while the bridge was down can be replayed into `t_relay_events` and `t_x_posts` without the event relay API running.
 When X returns `429` with `connection_issue=TooManyConnections`, bridge will auto-heal by terminating stale stream connections and retrying (configurable by `X_AUTO_HEAL_TOO_MANY_CONNECTIONS`).
 SEC tracked filings use the official SEC `company_tickers.json` mapping plus `data.sec.gov/submissions/CIK##########.json`, then write high-signal filings directly into `t_relay_events`.
-TWSE/MOPS tracked announcements use the official TWSE openapi `t187ap04_L` dataset (`上市公司每日重大訊息`) and write tracked company disclosures directly into `t_relay_events`.
+TWSE/MOPS tracked announcements use the official TWSE openapi `t187ap04_L` dataset (`銝??砍瘥?之閮`) and write tracked company disclosures directly into `t_relay_events`.
 US index chain tracks DJIA and S&P 500 open/close, writes normalized stored-only events into `t_relay_events`, and stores structured quote rows in `t_market_index_snapshots` for same-day analysis.
 All Python source events are stored-only. No LINE delivery is attempted from this repo.
 
@@ -234,7 +234,7 @@ Required `.env` keys for TWSE/MOPS:
 
 Notes:
 - This source uses the official TWSE openapi dataset `https://openapi.twse.com.tw/v1/opendata/t187ap04_L`.
-- Current MVP covers `上市公司每日重大訊息`.
+- Current MVP covers `銝??砍瘥?之閮`.
 - Events flow directly into `t_relay_events` through the crawler bridge.
 
 ## Weekly macro summary (AI, stored only)
@@ -255,7 +255,7 @@ Prompt pipeline:
 - Send to OpenAI Responses API.
 - OpenAI calls request the Responses API `web_search` tool by default so the model can verify fresh gaps beyond `t_relay_events`; set `LLM_WEB_SEARCH_ENABLED=false` to disable. If the API/project does not support the tool, the caller retries once without web search.
 - Store the weekly summary in `t_market_analyses` with:
-  - `analysis_date=YYYY-Www`
+  - `analysis_date=YYYY-MM-DD` for the target Sunday delivery date
   - `analysis_slot=weekly_tw_preopen`
 
 Weekly summary env keys:
@@ -264,7 +264,7 @@ Weekly summary env keys:
 - `WEEKLY_SUMMARY_MODEL` (default `gpt-5`)
 - `WEEKLY_SUMMARY_LOOKBACK_DAYS` (default `7`)
 - `WEEKLY_SUMMARY_MAX_EVENTS` (default `120`)
-- `WEEKLY_SUMMARY_WEEKDAY` (0=Mon ... 6=Sun, default `6` — Sunday)
+- `WEEKLY_SUMMARY_WEEKDAY` (0=Mon ... 6=Sun, default `5` - Saturday)
 - `WEEKLY_SUMMARY_HOUR` (default `23`)
 - `WEEKLY_SUMMARY_MINUTE` (default `0`)
 - `WEEKLY_SUMMARY_WINDOW_MINUTES` (default `20`)
@@ -273,7 +273,7 @@ Weekly summary env keys:
 Weekly schedule helper (Windows Task Scheduler):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\register_weekly_summary_task.ps1 -TaskName "NewsCollector-WeeklySummary" -DayOfWeek "Sunday" -At "23:00" -Force
+powershell -ExecutionPolicy Bypass -File .\scripts\register_weekly_summary_task.ps1 -TaskName "NewsCollector-WeeklySummary" -DayOfWeek "Saturday" -At "23:00" -Force
 ```
 
 ## Scheduled market analysis (AI, stored only)
@@ -290,8 +290,17 @@ Current behavior:
 - Optionally retrieves similar historical relay events from `t_event_embeddings` and includes them as analogues in the stage2 transmission prompt
 - Calls OpenAI Responses API with web search enabled by default for missing/current fact verification
 - Stores the generated analysis in `t_market_analyses`
+- Extracts Taiwan stock recommendations from `structured_json.stock_watch` into `t_trade_signals`
 - Does not push or create LINE delivery jobs; Java owns user-facing delivery
 - Treats `t_relay_events` as primary local evidence, not as the only possible source of truth; prompts require explicit data-gap labeling when context is insufficient
+
+Trade signal storage:
+- `t_trade_signals` stores one row per recommended Taiwan ticker from a market analysis.
+- Signals start as `status=pending_review`; they are not orders.
+- Each signal carries `analysis_id`, `analysis_date`, `analysis_slot`, `ticker`, `strategy_type`, `direction`, optional entry/stop/target JSON, and `source_event_ids`.
+- `idempotency_key` prevents duplicate signals for the same analysis/ticker/strategy.
+- `t_signal_reviews` and `t_signal_outcomes` are separate follow-up tables for risk gate / human review and performance feedback.
+- LLM output stops at signal creation. Order intents and broker calls must be created only after independent review/risk approval.
 
 Pre-open market context collector:
 - Module: `event_relay.market_context`
@@ -330,6 +339,12 @@ Run once manually:
 powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot us_close -Force
 powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force
 powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot tw_close -Force
+```
+
+Backfill trade signals from existing structured analyses:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_trade_signal_extraction.ps1 -EnvFile .env -Days 14 -Limit 50
 ```
 
 Prompt snapshots:
