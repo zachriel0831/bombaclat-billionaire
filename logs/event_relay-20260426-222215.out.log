@@ -1,0 +1,9 @@
+Starting event relay...
+2026-04-26 22:22:17,031 INFO mysql.connector - package: mysql.connector.plugins
+2026-04-26 22:22:17,032 INFO mysql.connector - plugin_name: caching_sha2_password
+2026-04-26 22:22:17,032 INFO mysql.connector - AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+2026-04-26 22:22:17,167 INFO event_relay.service - MySQL ready: 127.0.0.1:3306/news_relay event_table=t_relay_events x_table=t_x_posts market_table=t_market_index_snapshots analysis_table=t_market_analyses
+2026-04-26 22:22:17,168 INFO event_relay.service - Maintenance scheduler started: interval=300s
+2026-04-26 22:22:17,180 INFO root - Event relay listening on http://0.0.0.0:18090
+2026-04-26 22:22:17,200 INFO event_relay.service - Daily retention cleanup executed at 2026-04-26T22:22:17.168665+08:00: keep_days=7 events_deleted=0 x_posts_deleted=0
+2026-04-26 22:22:17,200 INFO event_relay.service - Maintenance tick complete; Python service does not perform LINE delivery

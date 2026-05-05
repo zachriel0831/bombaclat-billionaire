@@ -4,10 +4,17 @@ import unittest
 from unittest.mock import patch
 
 from event_relay.analysis_stages.context import StageContext
+from event_relay.prompt_assets import TokenUsage
+
+# Sentinel usage row used by every call_llm_json mock so the new 3-tuple
+# return shape (REQ-016) is satisfied without each test caring about the
+# exact numbers.
+_FAKE_USAGE = TokenUsage(provider="openai", model="gpt-test", prompt_tokens=100, completion_tokens=50)
 from event_relay.analysis_stages.schemas import (
     STAGE1_DIGEST_SCHEMA,
     STAGE2_TRANSMISSION_SCHEMA,
     STAGE3_TW_MAPPING_SCHEMA,
+    STAGE4_SYNTHESIS_SCHEMA,
     STAGE_CRITIC_SCHEMA,
     STAGE_DUAL_VIEW_SCHEMA,
     SchemaValidationError,
@@ -130,6 +137,67 @@ class SchemaValidationTests(unittest.TestCase):
         with self.assertRaises(SchemaValidationError):
             validate_against_schema(bad, STAGE3_TW_MAPPING_SCHEMA)
 
+    def test_stage4_schema_requires_every_closed_object_property(self) -> None:
+        """OpenAI structured output rejects closed objects with optional properties."""
+
+        def walk(schema: dict[str, Any], path: str = "$") -> None:
+            schema_type = schema.get("type")
+            is_object = schema_type == "object" or (
+                isinstance(schema_type, list) and "object" in schema_type
+            )
+            properties = schema.get("properties")
+            if is_object and isinstance(properties, dict) and schema.get("additionalProperties") is False:
+                self.assertEqual(
+                    set(properties),
+                    set(schema.get("required") or []),
+                    f"{path} required keys must match properties",
+                )
+            for key, child in (properties or {}).items():
+                if isinstance(child, dict):
+                    walk(child, f"{path}.{key}")
+            items = schema.get("items")
+            if isinstance(items, dict):
+                walk(items, f"{path}[]")
+
+        walk(STAGE4_SYNTHESIS_SCHEMA)
+
+    def test_stage4_accepts_nullable_stock_execution_fields(self) -> None:
+        """Stage4 stock_watch keeps all keys while allowing unknown prices as null."""
+        payload = {
+            "summary_text": "test",
+            "headline": "test",
+            "sentiment": "bullish",
+            "confidence": "medium",
+            "key_drivers": ["AI demand"],
+            "tw_sector_watch": [],
+            "stock_watch": [
+                {
+                    "ticker": "2330",
+                    "market": "TW",
+                    "name": None,
+                    "direction": "bullish",
+                    "rationale": "SOX supports Taiwan semis.",
+                    "strategy_type": "swing",
+                    "entry_zone": {
+                        "low": 600,
+                        "high": 610,
+                        "timing": None,
+                        "basis": "latest close",
+                    },
+                    "invalidation": None,
+                    "take_profit_zone": None,
+                    "holding_horizon": "short_to_medium",
+                    "confidence": "medium",
+                    "risk_notes": [],
+                    "evidence_ids": [101],
+                }
+            ],
+            "risks": [],
+            "data_gaps": [],
+        }
+
+        validate_against_schema(payload, STAGE4_SYNTHESIS_SCHEMA)
+
 
 class EvidenceTraceabilityTests(unittest.TestCase):
     """封裝 Evidence Traceability Tests 相關資料與行為。"""
@@ -186,7 +254,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         """測試 test stage1 happy path records event count 的預期行為。"""
         with patch(
             "event_relay.analysis_stages.stage1_digest.call_llm_json",
-            return_value=(_VALID_STAGE1, "{\"events\": []}"),
+            return_value=(_VALID_STAGE1, "{\"events\": []}", _FAKE_USAGE),
         ):
             result = stage1_digest.run(
                 context=self._context(),
@@ -203,7 +271,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         def fake_call(**kwargs):
             """執行 fake call 方法的主要邏輯。"""
             captured["user_prompt"] = kwargs["user_prompt"]
-            return _VALID_STAGE2, "raw"
+            return _VALID_STAGE2, "raw", _FAKE_USAGE
 
         with patch("event_relay.analysis_stages.stage2_transmission.call_llm_json", side_effect=fake_call):
             result = stage2_transmission.run(context=self._context(), stage1_output=_VALID_STAGE1)
@@ -218,7 +286,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         def fake_call(**kwargs):
             """執行 fake call 方法的主要邏輯。"""
             captured["user_prompt"] = kwargs["user_prompt"]
-            return _VALID_STAGE2, "raw"
+            return _VALID_STAGE2, "raw", _FAKE_USAGE
 
         examples = [
             {
@@ -244,7 +312,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         """測試 test stage3 happy path counts buckets 的預期行為。"""
         with patch(
             "event_relay.analysis_stages.stage3_tw_mapping.call_llm_json",
-            return_value=(_VALID_STAGE3, "raw"),
+            return_value=(_VALID_STAGE3, "raw", _FAKE_USAGE),
         ):
             result = stage3_tw_mapping.run(
                 context=self._context(),
@@ -272,7 +340,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         }
         with patch(
             "event_relay.analysis_stages.stage4_synthesis.call_llm_json",
-            return_value=(structured, "raw"),
+            return_value=(structured, "raw", _FAKE_USAGE),
         ):
             result = stage4_synthesis.run(
                 context=self._context(),
@@ -290,6 +358,27 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertEqual(result.output["structured"]["sentiment"], "bullish")
         self.assertTrue(result.extras["has_structured"])
 
+    def test_stage4_pre_open_prompt_uses_readable_sections(self) -> None:
+        _system, user_prompt = stage4_synthesis.build_prompts(
+            slot="pre_tw_open",
+            now_local_iso="2026-04-30T08:00:00+08:00",
+            stage1_json="{}",
+            stage2_json="{}",
+            stage3_json="{}",
+            macro_skill="",
+            line_skill="",
+            structured=True,
+        )
+
+        self.assertIn("總經 Regime", user_prompt)
+        self.assertIn("利率與流動性", user_prompt)
+        self.assertIn("景氣循環", user_prompt)
+        self.assertIn("市場情緒", user_prompt)
+        self.assertIn("台股配置", user_prompt)
+        self.assertIn("Section 2 利率與流動性", user_prompt)
+        self.assertIn("date-only", user_prompt)
+        self.assertNotIn("對台股的可能影響", user_prompt)
+
     def test_stage4_falls_back_to_text_when_schema_fails(self) -> None:
         """測試 test stage4 falls back to text when schema fails 的預期行為。"""
         with patch(
@@ -297,7 +386,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
             side_effect=SchemaValidationError("bad payload"),
         ), patch(
             "event_relay.analysis_stages.stage4_synthesis._call_llm",
-            return_value="  純文字降級報告  ",
+            return_value=("  純文字降級報告  ", _FAKE_USAGE),
         ):
             result = stage4_synthesis.run(
                 context=self._context(),
@@ -335,7 +424,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         validate_against_schema(dual_view_payload, STAGE_DUAL_VIEW_SCHEMA)
         with patch(
             "event_relay.analysis_stages.stage_dual_view.call_llm_json",
-            return_value=(dual_view_payload, "raw"),
+            return_value=(dual_view_payload, "raw", _FAKE_USAGE),
         ):
             result = stage_dual_view.run(
                 context=self._context(),
@@ -407,7 +496,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         def fake_call(**kwargs):
             """執行 fake call 方法的主要邏輯。"""
             captured["user_prompt"] = kwargs["user_prompt"]
-            return critic_payload, "raw"
+            return critic_payload, "raw", _FAKE_USAGE
 
         with patch(
             "event_relay.analysis_stages.stage_critic.call_llm_json",

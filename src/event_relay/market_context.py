@@ -9,9 +9,11 @@ event window as news. No analysis is generated here — that is owned by
 from __future__ import annotations
 
 import argparse
+import csv
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
+import io
 import json
 import logging
 import os
@@ -44,7 +46,17 @@ YAHOO_MARKET_SYMBOLS = (
     ("ASML", "ASML", "semiconductor_stock", "https://finance.yahoo.com/quote/ASML"),
     ("AVGO", "Broadcom", "semiconductor_stock", "https://finance.yahoo.com/quote/AVGO"),
     ("MU", "Micron", "semiconductor_stock", "https://finance.yahoo.com/quote/MU"),
+    ("KRE", "SPDR S&P Regional Banking ETF", "bank_credit_proxy", "https://finance.yahoo.com/quote/KRE"),
+    ("XLF", "Financial Select Sector SPDR Fund", "financials_proxy", "https://finance.yahoo.com/quote/XLF"),
+    ("HYG", "iShares High Yield Corporate Bond ETF", "credit_proxy", "https://finance.yahoo.com/quote/HYG"),
+    ("LQD", "iShares Investment Grade Corporate Bond ETF", "credit_proxy", "https://finance.yahoo.com/quote/LQD"),
+    ("TLT", "iShares 20+ Year Treasury Bond ETF", "duration_proxy", "https://finance.yahoo.com/quote/TLT"),
+    ("QQQ", "Invesco QQQ Trust", "growth_proxy", "https://finance.yahoo.com/quote/QQQ"),
+    ("SPY", "SPDR S&P 500 ETF", "risk_proxy", "https://finance.yahoo.com/quote/SPY"),
+    ("IWM", "iShares Russell 2000 ETF", "small_cap_proxy", "https://finance.yahoo.com/quote/IWM"),
 )
+
+FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 
 TWSE_INDEX_NAMES = (
     "發行量加權股價指數",
@@ -62,6 +74,47 @@ class MarketContextConfig:
     scheduled_time_local: str
     timeout_seconds: int
     twse_codes: list[str]
+    tw_yahoo_symbols: tuple["TaiwanYahooSymbol", ...] = ()
+    fred_enabled: bool = True
+    fred_series_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class TaiwanYahooSymbol:
+    """Taiwan stock quote symbol used as Yahoo fallback for tracked stocks."""
+    symbol: str
+    name: str
+
+
+@dataclass(frozen=True)
+class FredSeriesSpec:
+    """FRED public CSV series used as macro-regime context."""
+    series_id: str
+    name: str
+    category: str
+    unit: str
+
+
+FRED_SERIES_SPECS: tuple[FredSeriesSpec, ...] = (
+    FredSeriesSpec("DFEDTARU", "Fed Target Range Upper Limit", "fed_path", "percent"),
+    FredSeriesSpec("DFEDTARL", "Fed Target Range Lower Limit", "fed_path", "percent"),
+    FredSeriesSpec("SOFR", "Secured Overnight Financing Rate", "fed_path", "percent"),
+    FredSeriesSpec("DGS2", "US Treasury 2Y Constant Maturity", "fed_path", "percent"),
+    FredSeriesSpec("DGS10", "US Treasury 10Y Constant Maturity", "rates", "percent"),
+    FredSeriesSpec("T10Y2Y", "10Y-2Y Treasury Spread", "rates_spread", "percent"),
+    FredSeriesSpec("WALCL", "Federal Reserve Total Assets", "liquidity", "usd_millions"),
+    FredSeriesSpec("RRPONTSYD", "Overnight Reverse Repo", "liquidity", "usd_billions"),
+    FredSeriesSpec("WTREGEN", "Treasury General Account", "liquidity", "usd_millions"),
+    FredSeriesSpec("WRESBAL", "Reserve Balances", "liquidity", "usd_millions"),
+    FredSeriesSpec("NFCI", "Chicago Fed National Financial Conditions Index", "financial_conditions", "index"),
+    FredSeriesSpec("STLFSI4", "St. Louis Fed Financial Stress Index", "financial_conditions", "index"),
+    FredSeriesSpec("BAMLH0A0HYM2", "US High Yield Option-Adjusted Spread", "credit_stress", "percent"),
+    FredSeriesSpec("BAMLC0A0CM", "US Corporate Option-Adjusted Spread", "credit_stress", "percent"),
+    FredSeriesSpec("BAA10Y", "Moody's Baa Corporate Yield Spread vs 10Y", "credit_stress", "percent"),
+    FredSeriesSpec("VIXCLS", "CBOE VIX Close", "sentiment_positioning", "index"),
+)
+
+FRED_SERIES_BY_ID = {spec.series_id: spec for spec in FRED_SERIES_SPECS}
 
 
 @dataclass(frozen=True)
@@ -104,6 +157,7 @@ def _load_config(args: argparse.Namespace) -> MarketContextConfig:
     load_settings(args.env_file)
     code_text = os.getenv("MARKET_CONTEXT_TWSE_CODES") or os.getenv("TWSE_MOPS_TRACKED_CODES") or ""
     twse_codes = [x.strip() for x in code_text.split(",") if x.strip()]
+    fred_series_ids = _parse_csv_env(os.getenv("MARKET_CONTEXT_FRED_SERIES_IDS"))
     return MarketContextConfig(
         env_file=args.env_file,
         analysis_slot=(os.getenv("MARKET_CONTEXT_ANALYSIS_SLOT") or args.analysis_slot).strip() or DEFAULT_ANALYSIS_SLOT,
@@ -111,7 +165,50 @@ def _load_config(args: argparse.Namespace) -> MarketContextConfig:
         or DEFAULT_SCHEDULED_TIME,
         timeout_seconds=max(5, int(os.getenv("MARKET_CONTEXT_TIMEOUT_SECONDS") or args.timeout_seconds)),
         twse_codes=twse_codes,
+        tw_yahoo_symbols=_parse_tw_yahoo_symbols(os.getenv("MARKET_CONTEXT_TW_YAHOO_SYMBOLS")),
+        fred_enabled=_env_bool("MARKET_CONTEXT_FRED_ENABLED", True),
+        fred_series_ids=tuple(fred_series_ids),
     )
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    """Read a bool env var without making missing config fatal."""
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _parse_csv_env(text: str | None) -> list[str]:
+    """Parse comma-separated env values."""
+    return [item.strip() for item in str(text or "").split(",") if item.strip()]
+
+
+def _tw_yahoo_symbol_code(symbol: str) -> str:
+    """Extract the 4-digit Taiwan ticker code from a Yahoo Taiwan symbol."""
+    return str(symbol or "").strip().upper().split(".", 1)[0]
+
+
+def _parse_tw_yahoo_symbols(text: str | None) -> tuple[TaiwanYahooSymbol, ...]:
+    """Parse MARKET_CONTEXT_TW_YAHOO_SYMBOLS entries like 4749.TWO:新應材."""
+    items: list[TaiwanYahooSymbol] = []
+    for raw in str(text or "").split(","):
+        entry = raw.strip()
+        if not entry:
+            continue
+        symbol, name = entry, ""
+        for separator in (":", "|", "="):
+            if separator in entry:
+                symbol, name = entry.split(separator, 1)
+                break
+        symbol = symbol.strip().upper()
+        if not symbol:
+            continue
+        if symbol.isdigit():
+            symbol = f"{symbol}.TW"
+        code = _tw_yahoo_symbol_code(symbol)
+        items.append(TaiwanYahooSymbol(symbol=symbol, name=name.strip() or code))
+    return tuple(items)
 
 
 def _to_float(value: Any) -> float | None:
@@ -205,7 +302,41 @@ def fetch_yahoo_market_points(timeout_seconds: int) -> tuple[list[MarketContextP
             else:
                 failures.append(SourceFailure(source=f"yahoo_chart:{label}", error="empty quote payload"))
         except Exception as exc:
-            failures.append(SourceFailure(source=f"yahoo_chart:{label}", error=str(exc)))
+                failures.append(SourceFailure(source=f"yahoo_chart:{label}", error=str(exc)))
+    return points, failures
+
+
+def fetch_yahoo_tracked_tw_points(
+    timeout_seconds: int,
+    symbols: tuple[TaiwanYahooSymbol, ...],
+    *,
+    skip_codes: set[str] | None = None,
+) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
+    """Fetch Taiwan tracked-stock quotes from Yahoo when official TWSE rows are missing."""
+    points: list[MarketContextPoint] = []
+    failures: list[SourceFailure] = []
+    skipped = {_tw_yahoo_symbol_code(code) for code in (skip_codes or set())}
+    seen: set[str] = set()
+    for item in symbols:
+        symbol = item.symbol.strip().upper()
+        code = _tw_yahoo_symbol_code(symbol)
+        if not symbol or not code or code in skipped or symbol in seen:
+            continue
+        seen.add(symbol)
+        url = f"https://finance.yahoo.com/quote/{symbol}"
+        try:
+            payload = http_get_json(
+                f"https://query2.finance.yahoo.com/v8/finance/chart/{symbol}",
+                params={"interval": "1d", "range": "5d"},
+                timeout=timeout_seconds,
+            )
+            point = _parse_yahoo_chart_payload(payload=payload, label=item.name, category="tw_tracked_stock", url=url)
+            if point is not None:
+                points.append(point)
+            else:
+                failures.append(SourceFailure(source=f"yahoo_chart:{symbol}", error="empty tracked Taiwan quote payload"))
+        except Exception as exc:
+            failures.append(SourceFailure(source=f"yahoo_chart:{symbol}", error=str(exc)))
     return points, failures
 
 
@@ -298,6 +429,74 @@ def fetch_treasury_points(timeout_seconds: int) -> tuple[list[MarketContextPoint
         return points, []
     except Exception as exc:
         return [], [SourceFailure(source="us_treasury", error=str(exc))]
+
+
+def _parse_fred_csv(text: str, spec: FredSeriesSpec) -> MarketContextPoint | None:
+    """Parse one FRED graph CSV response into the latest observation point."""
+    rows = csv.DictReader(io.StringIO(text))
+    observations: list[tuple[str, float]] = []
+    for row in rows:
+        as_of = str(row.get("observation_date") or "").strip()
+        value = _to_float(row.get(spec.series_id))
+        if as_of and value is not None:
+            observations.append((as_of, value))
+    if not observations:
+        return None
+
+    as_of, value = observations[-1]
+    previous = observations[-2][1] if len(observations) >= 2 else None
+    change = (value - previous) if previous is not None else None
+    change_percent = (change / previous * 100.0) if change is not None and previous not in {None, 0} else None
+    return MarketContextPoint(
+        source="fred",
+        category=spec.category,
+        name=spec.name,
+        symbol=spec.series_id,
+        value=value,
+        previous_value=previous,
+        change=change,
+        change_percent=change_percent,
+        unit=spec.unit,
+        as_of=as_of,
+        url=f"https://fred.stlouisfed.org/series/{spec.series_id}",
+        raw={"series_id": spec.series_id, "csv_url": FRED_CSV_URL},
+    )
+
+
+def fetch_fred_points(
+    timeout_seconds: int,
+    series_ids: tuple[str, ...] | None = None,
+) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
+    """Fetch Fed/FRED public CSV facts for macro regime context."""
+    points: list[MarketContextPoint] = []
+    failures: list[SourceFailure] = []
+    specs: list[FredSeriesSpec] = []
+    requested = tuple(series_ids or ())
+    if requested:
+        for series_id in requested:
+            spec = FRED_SERIES_BY_ID.get(series_id)
+            if spec is None:
+                failures.append(SourceFailure(source=f"fred:{series_id}", error="unknown FRED series id"))
+            else:
+                specs.append(spec)
+    else:
+        specs = list(FRED_SERIES_SPECS)
+
+    for spec in specs:
+        try:
+            text = http_get_text(
+                FRED_CSV_URL,
+                params={"id": spec.series_id},
+                timeout=max(timeout_seconds, 15),
+            )
+            point = _parse_fred_csv(text, spec)
+            if point is not None:
+                points.append(point)
+            else:
+                failures.append(SourceFailure(source=f"fred:{spec.series_id}", error="empty FRED CSV payload"))
+        except Exception as exc:
+            failures.append(SourceFailure(source=f"fred:{spec.series_id}", error=str(exc)))
+    return points, failures
 
 
 def _twse_index_point(row: dict[str, Any]) -> MarketContextPoint | None:
@@ -427,10 +626,28 @@ def collect_market_context(config: MarketContextConfig) -> tuple[list[MarketCont
     """彙整 collect market context 對應的資料或結果。"""
     all_points: list[MarketContextPoint] = []
     all_failures: list[SourceFailure] = []
+    yahoo_points, yahoo_failures = fetch_yahoo_market_points(config.timeout_seconds)
+    treasury_points, treasury_failures = fetch_treasury_points(config.timeout_seconds)
+    fred_points: list[MarketContextPoint] = []
+    fred_failures: list[SourceFailure] = []
+    if config.fred_enabled:
+        fred_points, fred_failures = fetch_fred_points(config.timeout_seconds, config.fred_series_ids)
+    twse_points, twse_failures = fetch_twse_points(config.timeout_seconds, config.twse_codes)
+    official_twse_stock_codes = {
+        point.symbol for point in twse_points if point.category == "tw_tracked_stock" and point.symbol
+    }
+    tw_yahoo_points, tw_yahoo_failures = fetch_yahoo_tracked_tw_points(
+        config.timeout_seconds,
+        config.tw_yahoo_symbols,
+        skip_codes=official_twse_stock_codes,
+    )
+
     for points, failures in (
-        fetch_yahoo_market_points(config.timeout_seconds),
-        fetch_treasury_points(config.timeout_seconds),
-        fetch_twse_points(config.timeout_seconds, config.twse_codes),
+        (yahoo_points, yahoo_failures),
+        (treasury_points, treasury_failures),
+        (fred_points, fred_failures),
+        (twse_points, twse_failures),
+        (tw_yahoo_points, tw_yahoo_failures),
     ):
         all_points.extend(points)
         all_failures.extend(failures)
@@ -459,6 +676,12 @@ def build_summary(points: list[MarketContextPoint], failures: list[SourceFailure
     vix = _find(points, "VIX")
     us10 = _find(points, "US Treasury 10Y")
     spread = _find(points, "US10Y2Y")
+    fed_upper = _find(points, "DFEDTARU")
+    rrp = _find(points, "RRPONTSYD")
+    reserves = _find(points, "WRESBAL")
+    hy_oas = _find(points, "BAMLH0A0HYM2")
+    nfci = _find(points, "NFCI")
+    stlfsi = _find(points, "STLFSI4")
     taiex = _find(points, "發行量加權股價指數")
     semi = _find(points, "半導體類指數")
     tsm = _find(points, "2330")
@@ -475,6 +698,16 @@ def build_summary(points: list[MarketContextPoint], failures: list[SourceFailure
         us10_text = f"{us10.value:.2f}%" if us10 and us10.value is not None else "n/a"
         spread_text = f"{spread.value:.0f}bp" if spread and spread.value is not None else "n/a"
         lines.append(f"利率: US10Y {us10_text}, 10Y-2Y {spread_text}")
+    if fed_upper or rrp or reserves:
+        fed_text = f"{fed_upper.value:.2f}%" if fed_upper and fed_upper.value is not None else "n/a"
+        rrp_text = _format_number(rrp.value) if rrp else "n/a"
+        reserves_text = _format_number(reserves.value) if reserves else "n/a"
+        lines.append(f"Fed/liquidity: target upper {fed_text}, RRP {rrp_text}, reserves {reserves_text}")
+    if hy_oas or nfci or stlfsi:
+        hy_text = f"{hy_oas.value:.2f}%" if hy_oas and hy_oas.value is not None else "n/a"
+        nfci_text = _format_number(nfci.value) if nfci else "n/a"
+        stress_text = _format_number(stlfsi.value) if stlfsi else "n/a"
+        lines.append(f"Credit/stress: HY OAS {hy_text}, NFCI {nfci_text}, STLFSI4 {stress_text}")
     if taiex or semi:
         lines.append(
             "台股收盤基準: "
@@ -589,6 +822,9 @@ def build_market_context_events(
                 "scheduled_time_local": config.scheduled_time_local,
                 "generated_at": generated_at,
                 "twse_codes": config.twse_codes,
+                "tw_yahoo_symbols": [asdict(item) for item in config.tw_yahoo_symbols],
+                "fred_enabled": config.fred_enabled,
+                "fred_series_ids": list(config.fred_series_ids) or [spec.series_id for spec in FRED_SERIES_SPECS],
                 "point_count": len(points),
                 "failures": [asdict(failure) for failure in failures],
             },

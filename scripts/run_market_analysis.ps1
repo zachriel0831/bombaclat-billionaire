@@ -1,7 +1,7 @@
 # Run scheduled market analysis generator (single-shot).
 param(
   [string]$EnvFile = ".env",
-  [ValidateSet("auto", "us_close", "pre_tw_open", "tw_close")]
+  [ValidateSet("auto", "us_close", "pre_tw_open", "tw_close", "macro_daily")]
   [string]$Slot = "auto",
   [switch]$Force,
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]

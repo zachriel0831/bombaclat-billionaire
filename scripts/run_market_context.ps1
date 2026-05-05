@@ -1,4 +1,4 @@
-# Collect pre-open market context and write directly to t_market_analyses.
+# Collect pre-open market context and write stored-only facts to t_relay_events.
 param(
   [string]$EnvFile = ".env",
   [string]$AnalysisSlot = "market_context_pre_tw_open",

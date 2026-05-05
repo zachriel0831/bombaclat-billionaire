@@ -38,6 +38,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 4. TWSE / MOPS listed-company announcements
 - Uses official TWSE openapi dataset `t187ap04_L` (`上市公司每日重大訊息`)
 - Tracks allowlisted listed-company codes from `TWSE_MOPS_TRACKED_CODES`
+- Current local tracked TWSE add-ons include `2485`, `3535`, `3715`, and `2351`; TPEx `4749` is handled by market-context Yahoo fallback, not the TWSE/MOPS listed-company feed
 - Writes normalized announcement events directly into `t_relay_events` through the crawler bridge
 
 5. US index tracker
@@ -67,9 +68,24 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Raw event JSON keeps `series_id`, `year`, `period`, `periodName`, `value`, `footnotes`, and normalized period / year-over-year metrics for traceability
 - BLS data is monthly and may be preliminary or revised; footnote codes are preserved in `raw_json.footnotes` and `raw_json.normalized_metrics.footnote_codes`
 
+8. FRED / Fed public macro-regime context
+- Uses FRED public CSV endpoint `https://fred.stlouisfed.org/graph/fredgraph.csv`
+- Runs inside `event_relay.market_context` and writes stored-only rows with `source=market_context:fred`
+- No API key is required
+- Default series cover:
+  - Fed path: `DFEDTARU`, `DFEDTARL`, `SOFR`, `DGS2`, `DGS10`, `T10Y2Y`
+  - Liquidity: `WALCL`, `RRPONTSYD`, `WTREGEN`, `WRESBAL`
+  - Financial conditions / stress: `NFCI`, `STLFSI4`
+  - Credit stress: `BAMLH0A0HYM2`, `BAMLC0A0CM`, `BAA10Y`
+  - Sentiment proxy: `VIXCLS`
+- Optional controls:
+  - `MARKET_CONTEXT_FRED_ENABLED=false`
+  - `MARKET_CONTEXT_FRED_SERIES_IDS=SOFR,DGS2,BAMLH0A0HYM2`
+
 ## Event Storage & Analysis Boundary
 - HTTP endpoints:
   - `POST /events`: compatibility/manual normalized event ingestion
+  - `POST /analysis/backfill`: operator-triggered stored analysis backfill
   - `GET /healthz`
 - Storage: MySQL
   - `t_relay_events`
@@ -84,6 +100,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Current behavior:
   - Crawler bridge owns normal source ingestion and writes event rows directly
   - `t_relay_events` is treated as event-only storage
+  - `t_relay_events` does not keep LINE delivery columns (`is_pushed`, `line_pushed_at`, `line_push_status`, `line_push_error`); Java owns delivery state outside this Python event table
   - Source/context facts must land in `t_relay_events` first; `t_market_analyses` is only for model-generated analysis after reading event windows
   - `t_trade_signals` is derived from `t_market_analyses.structured_json`; it is not a direct source-ingestion table
   - Signal review/risk gate and signal outcomes are independent from analysis generation
@@ -110,9 +127,13 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   3. Call OpenAI Responses API with web search enabled by default for current-fact verification
   4. Store the weekly text into `t_market_analyses`
   5. Leave user-facing delivery to the Java system
+- Output format:
+  - Weekly uses the same macro flow as daily analysis: `總經 Regime` -> `利率與流動性` -> `景氣循環` -> `市場情緒` -> `台股配置` -> `風險與資料缺口`
+  - `利率與流動性` should use bullets for dense market facts
 - Storage contract:
   - `analysis_date` uses the target Sunday delivery date like `2026-04-26`
   - `analysis_slot=weekly_tw_preopen`
+  - `scheduled_time_local=05:10` using the same `HH:MM` format as daily analyses
   - `raw_json.dimension=weekly`
 - Prompt snapshots:
   - `runtime/prompts/weekly_summary_system_prompt.txt`
@@ -132,6 +153,13 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `15:10` Asia/Taipei: collect Taiwan official market-flow facts as stored-only events into `t_relay_events`
   - `15:20` Asia/Taipei: collect Taiwan close context from same-day relay events into `t_relay_events`
   - `15:30` Asia/Taipei: Taiwan close review analysis
+- Calendar guard:
+  - Module: `src/event_relay/market_calendar.py`
+  - Built-in 2026 TWSE / NYSE closed dates are checked before any market-analysis LLM call.
+  - TW closed + relevant U.S. close session open: only `us_close` may run.
+  - Relevant U.S. close session closed + TW open: only `pre_tw_open` / `tw_close` may run; `pre_tw_open` must not receive stale `us_close` context.
+  - TW and relevant U.S. close session both closed: the `pre_tw_open` task is converted into `macro_daily` and remains Java-delivery eligible.
+  - Sunday: daily market analysis skips; weekly summary owns the day.
 - Flow:
   1. Read latest event context from `t_relay_events`
   2. Read latest DJIA / S&P 500 rows from `t_market_index_snapshots`
@@ -140,10 +168,27 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   5. Build Traditional Chinese prompts from existing macro + mobile-chat formatting skills
   6. Call OpenAI Responses API with web search enabled by default for current-fact verification
   7. Store generated text in `t_market_analyses`
-  8. Extract `structured_json.stock_watch` into `t_trade_signals` as `pending_review` rows
+  8. Set delivery eligibility in `push_enabled`: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`
+  9. Inject the latest stored `us_close` analysis as upstream context only when the relevant U.S. close session was open; if U.S. was closed, the Taiwan pre-open prompt intentionally has no `us_close` block
+  10. Extract `structured_json.stock_watch` into `t_trade_signals` as `pending_review` rows
+  11. For `pre_tw_open`, rank configured `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` tracked fallback tickers ahead of generic fallback rows when recent context exists; otherwise top up pending fallback signals from official TWSE tracked-stock context or recent `yfinance_taiwan` quote events only when fewer than five visible long swing/medium candidates exist
+  12. For `pre_tw_open`, read up to five buy-side short/medium-term rows from `t_trade_signals` and append a deterministic `## 今日個股觀察` section to the stored analysis text
+  13. For `macro_daily`, write macro-only analysis into `t_market_analyses` and do not create trade signals.
+- Pre-open text formatting:
+  - `raw_json.display_title` is date-only (`YYYY-MM-DD`) for downstream delivery titles
+  - Daily analysis uses the fixed macro flow: `總經 Regime` -> `利率與流動性` -> `景氣循環` -> `市場情緒` -> `台股配置` -> `風險與資料缺口`
+  - `利率與流動性` should use bullets for dense market facts
+  - Fallback stock rationales keep only `需開盤量價確認` as the repeated warning
+- Tracked-stock context:
+  - `MARKET_CONTEXT_TWSE_CODES` reads official TWSE close/margin rows for tracked listed stocks
+  - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` provides Yahoo Taiwan quote fallback for missing tracked stocks; current local additions are `2485.TW:兆赫`, `3535.TW:晶彩科`, `3715.TW:定穎投控`, `2351.TW:順德`, and `4749.TWO:新應材`
+  - Official TWSE context is preferred when both sources produce the same ticker; Yahoo fallback fills gaps such as TPEx `.TWO` symbols
 - Trade-signal boundary:
   - `t_trade_signals` stores analysis-derived Taiwan ticker ideas only
+  - `ticker` is the normalized tradable symbol; Taiwan signals use the 4-digit code without `.TW` / `.TWO`
   - Every signal keeps `analysis_id`, slot/date, ticker, strategy/direction, optional entry/stop/target JSON, and `source_event_ids`
+  - Internal `direction=long` means buy-side / 做多, not long-term holding; `entry_zone` is the entry area, `take_profit_zone` is the profit-taking exit area, and `invalidation` is rendered as 停損
+  - `quote_fallback_stock_watch` / `context_fallback_stock_watch` are degraded-mode or tracked-stock visibility signal sources only; configured `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` tickers are ranked ahead of generic fallback rows in the visible pre-open section, and review/risk gate still decides whether they are usable
   - `idempotency_key` suppresses duplicate signals for the same analysis/ticker/strategy
   - `t_signal_reviews` is reserved for risk gate / human / model-review decisions
   - `t_signal_outcomes` is reserved for later performance feedback
@@ -159,7 +204,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `raw_json.stored_only=true`
   - `raw_json.dimension=market_context`
   - `raw_json.event_type` is `market_context_point`, `market_context_collection`, or `tw_market_flow_dataset`
-  - current source families: Yahoo chart market snapshots, U.S. Treasury official yield curve XML, TWSE official OpenAPI index/stock/margin data, Taiwan official flow datasets from TWSE / TPEx / TAIFEX, and BLS official macro series
+  - current source families: Yahoo chart market snapshots, U.S. Treasury official yield curve XML, FRED public CSV macro-regime series, TWSE official OpenAPI index/stock/margin data, Taiwan official flow datasets from TWSE / TPEx / TAIFEX, and BLS official macro series
 - Prompt snapshots:
   - `runtime/prompts/market_analysis_<slot>_system_prompt.txt`
   - `runtime/prompts/market_analysis_<slot>_user_prompt.txt`
@@ -178,6 +223,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Every day 15:10 (Asia/Taipei, local machine timezone) for Taiwan official market-flow collection
   - Every day 15:20 (Asia/Taipei, local machine timezone) for Taiwan close context collection
   - Every day 00:10 (Asia/Taipei, local machine timezone) for retention cleanup
+  - Daily market-analysis tasks are still registered daily, but `market_calendar.py` may skip them or convert `pre_tw_open` into `macro_daily` on TW/US closed days.
 
 ## Source Expansion Backlog
 1. SEC EDGAR tracked filings
@@ -205,10 +251,15 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `powershell -ExecutionPolicy Bypass -File .\scripts\restart_live_services.ps1`
 - Run weekly summary once:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_weekly_summary.ps1 -Force`
+- Run weekly summary through HTTP:
+  - `'{"kind":"weekly","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
 - Run market analysis once:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot us_close -Force`
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force`
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot tw_close -Force`
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot macro_daily -Force`
+- Run market analysis through HTTP:
+  - `'{"kind":"market","slot":"pre_tw_open","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
 - Extract trade signals from existing structured analyses:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_trade_signal_extraction.ps1 -EnvFile .env -Days 14 -Limit 50`
 - Run market context once:

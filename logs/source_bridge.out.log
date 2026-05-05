@@ -1,0 +1,240 @@
+Starting source bridge (X stream + RSS polling + US index stored-only events -> direct-db)...
+Python executable: C:\Users\Zack Ou\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\python.exe
+Env file: D:\work_space\stock\data-collecting\.env
+X token preflight: resolved
+Event sink: direct-db
+Output log: D:\work_space\stock\data-collecting\runtime\logs\source-bridge-20260426-215748.out.log
+Error log: D:\work_space\stock\data-collecting\runtime\logs\source-bridge-20260426-215748.err.log
+2026-04-26 21:57:49,697 INFO mysql.connector - package: mysql.connector.plugins
+2026-04-26 21:57:49,697 INFO mysql.connector - plugin_name: caching_sha2_password
+2026-04-26 21:57:49,697 INFO mysql.connector - AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+2026-04-26 21:57:49,807 INFO __main__ - Bridge event sink: direct DB 127.0.0.1:3306/news_relay event_table=t_relay_events x_table=t_x_posts market_table=t_market_index_snapshots
+2026-04-26 21:57:49,808 INFO news_collector.collector - Enabled sources: official_rss
+2026-04-26 21:57:49,808 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 21:57:49,808 INFO news_collector.collector - Fetching source=official_rss
+2026-04-26 21:57:49,809 INFO __main__ - Bridge started event_sink=direct-db relay_url=http://127.0.0.1:18090/events
+2026-04-26 21:57:49,809 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/world/rss.xml
+2026-04-26 21:57:50,171 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/world/rss.xml items=1
+2026-04-26 21:57:50,172 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/business/rss.xml
+2026-04-26 21:57:50,228 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/business/rss.xml items=1
+2026-04-26 21:57:50,228 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/technology/rss.xml
+2026-04-26 21:57:50,477 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/technology/rss.xml items=1
+2026-04-26 21:57:50,477 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 21:57:50,833 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 21:57:50,833 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 21:57:51,406 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 21:57:51,406 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 21:57:51,996 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 21:57:51,996 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/world.xml
+2026-04-26 21:57:52,177 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/world.xml items=1
+2026-04-26 21:57:52,177 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/tech.xml
+2026-04-26 21:57:52,344 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/tech.xml items=1
+2026-04-26 21:57:52,345 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxbusiness.com/google-publisher/markets.xml
+2026-04-26 21:57:52,542 INFO news_collector.sources.x_accounts - X poll accounts=2 raw_tweets=15 output=15
+2026-04-26 21:57:52,545 INFO __main__ - [BRIDGE_X_BACKFILL_SUBMITTED] id=x-2048035037057048824 source=x:elonmusk url=https://x.com/elonmusk/status/2048035037057048824 status=duplicate
+2026-04-26 21:57:52,546 INFO __main__ - [BRIDGE_X_BACKFILL_SUBMITTED] id=x-2048039351863406736 source=x:elonmusk url=https://x.com/elonmusk/status/2048039351863406736 status=duplicate
+2026-04-26 21:57:52,547 INFO __main__ - [BRIDGE_X_BACKFILL_SUBMITTED] id=x-2048234907965526306 source=x:elonmusk url=https://x.com/elonmusk/status/2048234907965526306 status=duplicate
+2026-04-26 21:57:52,549 INFO __main__ - [BRIDGE_X_BACKFILL_SUBMITTED] id=x-2048271324577952130 source=x:elonmusk url=https://x.com/elonmusk/status/2048271324577952130 status=duplicate
+2026-04-26 21:57:52,556 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxbusiness.com/google-publisher/markets.xml items=1
+2026-04-26 21:57:52,557 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1004/rss.xml
+2026-04-26 21:57:52,559 INFO __main__ - [BRIDGE_X_BACKFILL_SUBMITTED] id=x-2048271866914083172 source=x:elonmusk url=https://x.com/elonmusk/status/2048271866914083172 status=duplicate
+2026-04-26 21:57:52,559 INFO __main__ - X startup backfill complete fetched=15 pushed=5 stored=0 duplicates=5 failed=0 dropped_by_date=10 dropped_by_topic=0
+2026-04-26 21:57:52,559 INFO __main__ - Starting X account stream accounts=https://x.com/elonmusk,https://x.com/realDonaldTrump
+2026-04-26 21:57:52,559 INFO news_collector.x_stream - X stream tracking query=(from:elonmusk OR from:realdonaldtrump) -is:reply -is:retweet
+2026-04-26 21:57:52,608 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1004/rss.xml items=1
+2026-04-26 21:57:52,608 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1006/rss.xml
+2026-04-26 21:57:52,649 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1006/rss.xml items=1
+2026-04-26 21:57:52,649 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1019/rss.xml
+2026-04-26 21:57:52,694 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1019/rss.xml items=1
+2026-04-26 21:57:52,694 INFO news_collector.collector - Fetched source=official_rss items=12 elapsed_ms=2887
+2026-04-26 21:57:52,695 INFO news_collector.collector - Fetch completed: total_items=12 deduped_items=12
+2026-04-26 21:57:52,695 INFO __main__ - Polling source=rss fetched=12
+2026-04-26 21:57:52,710 INFO news_collector.collector - Enabled sources: sec_filings
+2026-04-26 21:57:52,710 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 21:57:52,710 INFO news_collector.collector - Fetching source=sec_filings
+2026-04-26 21:57:53,108 INFO news_collector.x_stream - X stream cleaned old rules count=1
+2026-04-26 21:57:53,327 INFO news_collector.x_stream - X stream rule synced
+2026-04-26 21:57:56,113 INFO news_collector.collector - Fetched source=sec_filings items=5 elapsed_ms=3403
+2026-04-26 21:57:56,113 INFO news_collector.collector - Fetch completed: total_items=5 deduped_items=5
+2026-04-26 21:57:56,113 INFO __main__ - Polling source=sec fetched=5
+2026-04-26 21:57:56,115 INFO news_collector.collector - Enabled sources: twse_mops_announcements
+2026-04-26 21:57:56,115 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 21:57:56,115 INFO news_collector.collector - Fetching source=twse_mops_announcements
+2026-04-26 21:57:56,155 INFO news_collector.collector - Fetched source=twse_mops_announcements items=0 elapsed_ms=40
+2026-04-26 21:57:56,155 INFO news_collector.collector - Fetch completed: total_items=0 deduped_items=0
+2026-04-26 21:57:56,155 INFO __main__ - Polling source=twse fetched=0
+2026-04-26 21:57:56,155 INFO __main__ - Polling cycle complete accepted=11 stored=0 duplicates=11 failed=0 dropped_by_date=4 dropped_by_topic=2 next_in=300s
+2026-04-26 21:58:13,764 INFO news_collector.x_stream - X filtered stream connected
+2026-04-26 22:02:56,166 INFO news_collector.collector - Enabled sources: official_rss
+2026-04-26 22:02:56,166 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:02:56,167 INFO news_collector.collector - Fetching source=official_rss
+2026-04-26 22:02:56,168 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/world/rss.xml
+2026-04-26 22:02:56,953 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/world/rss.xml items=1
+2026-04-26 22:02:56,953 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/business/rss.xml
+2026-04-26 22:02:57,336 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/business/rss.xml items=1
+2026-04-26 22:02:57,337 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/technology/rss.xml
+2026-04-26 22:02:57,611 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/technology/rss.xml items=1
+2026-04-26 22:02:57,611 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:02:58,032 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:02:58,032 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:02:58,862 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:02:58,862 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:02:59,536 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:02:59,536 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/world.xml
+2026-04-26 22:02:59,780 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/world.xml items=1
+2026-04-26 22:02:59,780 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/tech.xml
+2026-04-26 22:02:59,920 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/tech.xml items=1
+2026-04-26 22:02:59,921 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxbusiness.com/google-publisher/markets.xml
+2026-04-26 22:03:00,247 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxbusiness.com/google-publisher/markets.xml items=1
+2026-04-26 22:03:00,247 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1004/rss.xml
+2026-04-26 22:03:00,363 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1004/rss.xml items=1
+2026-04-26 22:03:00,363 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1006/rss.xml
+2026-04-26 22:03:00,417 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1006/rss.xml items=1
+2026-04-26 22:03:00,417 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1019/rss.xml
+2026-04-26 22:03:00,565 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1019/rss.xml items=1
+2026-04-26 22:03:00,565 INFO news_collector.collector - Fetched source=official_rss items=12 elapsed_ms=4399
+2026-04-26 22:03:00,566 INFO news_collector.collector - Fetch completed: total_items=12 deduped_items=12
+2026-04-26 22:03:00,566 INFO __main__ - Polling source=rss fetched=12
+2026-04-26 22:03:00,590 INFO news_collector.collector - Enabled sources: sec_filings
+2026-04-26 22:03:00,590 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:03:00,590 INFO news_collector.collector - Fetching source=sec_filings
+2026-04-26 22:03:02,821 INFO news_collector.collector - Fetched source=sec_filings items=5 elapsed_ms=2230
+2026-04-26 22:03:02,821 INFO news_collector.collector - Fetch completed: total_items=5 deduped_items=5
+2026-04-26 22:03:02,821 INFO __main__ - Polling source=sec fetched=5
+2026-04-26 22:03:02,823 INFO news_collector.collector - Enabled sources: twse_mops_announcements
+2026-04-26 22:03:02,823 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:03:02,823 INFO news_collector.collector - Fetching source=twse_mops_announcements
+2026-04-26 22:03:03,131 INFO news_collector.collector - Fetched source=twse_mops_announcements items=0 elapsed_ms=308
+2026-04-26 22:03:03,131 INFO news_collector.collector - Fetch completed: total_items=0 deduped_items=0
+2026-04-26 22:03:03,131 INFO __main__ - Polling source=twse fetched=0
+2026-04-26 22:03:03,131 INFO __main__ - Polling cycle complete accepted=11 stored=0 duplicates=11 failed=0 dropped_by_date=4 dropped_by_topic=2 next_in=300s
+2026-04-26 22:08:03,147 INFO news_collector.collector - Enabled sources: official_rss
+2026-04-26 22:08:03,148 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:08:03,149 INFO news_collector.collector - Fetching source=official_rss
+2026-04-26 22:08:03,150 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/world/rss.xml
+2026-04-26 22:08:03,551 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/world/rss.xml items=1
+2026-04-26 22:08:03,551 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/business/rss.xml
+2026-04-26 22:08:05,151 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/business/rss.xml items=1
+2026-04-26 22:08:05,151 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/technology/rss.xml
+2026-04-26 22:08:05,475 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/technology/rss.xml items=1
+2026-04-26 22:08:05,475 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:08:05,802 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:08:05,802 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:08:06,334 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:08:06,334 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:08:07,135 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:08:07,135 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/world.xml
+2026-04-26 22:08:07,331 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/world.xml items=1
+2026-04-26 22:08:07,331 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/tech.xml
+2026-04-26 22:08:07,474 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/tech.xml items=1
+2026-04-26 22:08:07,474 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxbusiness.com/google-publisher/markets.xml
+2026-04-26 22:08:08,009 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxbusiness.com/google-publisher/markets.xml items=1
+2026-04-26 22:08:08,010 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1004/rss.xml
+2026-04-26 22:08:08,107 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1004/rss.xml items=1
+2026-04-26 22:08:08,107 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1006/rss.xml
+2026-04-26 22:08:08,763 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1006/rss.xml items=1
+2026-04-26 22:08:08,763 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1019/rss.xml
+2026-04-26 22:08:08,808 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1019/rss.xml items=1
+2026-04-26 22:08:08,808 INFO news_collector.collector - Fetched source=official_rss items=12 elapsed_ms=5658
+2026-04-26 22:08:08,808 INFO news_collector.collector - Fetch completed: total_items=12 deduped_items=12
+2026-04-26 22:08:08,808 INFO __main__ - Polling source=rss fetched=12
+2026-04-26 22:08:08,838 INFO news_collector.collector - Enabled sources: sec_filings
+2026-04-26 22:08:08,839 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:08:08,839 INFO news_collector.collector - Fetching source=sec_filings
+2026-04-26 22:08:11,349 INFO news_collector.collector - Fetched source=sec_filings items=5 elapsed_ms=2510
+2026-04-26 22:08:11,349 INFO news_collector.collector - Fetch completed: total_items=5 deduped_items=5
+2026-04-26 22:08:11,349 INFO __main__ - Polling source=sec fetched=5
+2026-04-26 22:08:11,351 INFO news_collector.collector - Enabled sources: twse_mops_announcements
+2026-04-26 22:08:11,351 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:08:11,351 INFO news_collector.collector - Fetching source=twse_mops_announcements
+2026-04-26 22:08:11,404 INFO news_collector.collector - Fetched source=twse_mops_announcements items=0 elapsed_ms=52
+2026-04-26 22:08:11,404 INFO news_collector.collector - Fetch completed: total_items=0 deduped_items=0
+2026-04-26 22:08:11,404 INFO __main__ - Polling source=twse fetched=0
+2026-04-26 22:08:11,404 INFO __main__ - Polling cycle complete accepted=11 stored=0 duplicates=11 failed=0 dropped_by_date=4 dropped_by_topic=2 next_in=300s
+2026-04-26 22:13:11,407 INFO news_collector.collector - Enabled sources: official_rss
+2026-04-26 22:13:11,407 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:13:11,407 INFO news_collector.collector - Fetching source=official_rss
+2026-04-26 22:13:11,408 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/world/rss.xml
+2026-04-26 22:13:11,736 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/world/rss.xml items=1
+2026-04-26 22:13:11,736 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/business/rss.xml
+2026-04-26 22:13:12,071 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/business/rss.xml items=1
+2026-04-26 22:13:12,071 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/technology/rss.xml
+2026-04-26 22:13:12,362 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/technology/rss.xml items=1
+2026-04-26 22:13:12,362 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:13:12,727 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:13:12,727 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:13:13,361 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:13:13,361 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:13:13,943 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:13:13,943 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/world.xml
+2026-04-26 22:13:14,574 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/world.xml items=1
+2026-04-26 22:13:14,574 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/tech.xml
+2026-04-26 22:13:15,238 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/tech.xml items=1
+2026-04-26 22:13:15,238 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxbusiness.com/google-publisher/markets.xml
+2026-04-26 22:13:15,773 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxbusiness.com/google-publisher/markets.xml items=1
+2026-04-26 22:13:15,773 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1004/rss.xml
+2026-04-26 22:13:15,837 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1004/rss.xml items=1
+2026-04-26 22:13:15,837 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1006/rss.xml
+2026-04-26 22:13:15,873 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1006/rss.xml items=1
+2026-04-26 22:13:15,873 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1019/rss.xml
+2026-04-26 22:13:15,913 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1019/rss.xml items=1
+2026-04-26 22:13:15,914 INFO news_collector.collector - Fetched source=official_rss items=12 elapsed_ms=4505
+2026-04-26 22:13:15,914 INFO news_collector.collector - Fetch completed: total_items=12 deduped_items=12
+2026-04-26 22:13:15,914 INFO __main__ - Polling source=rss fetched=12
+2026-04-26 22:13:15,931 INFO news_collector.collector - Enabled sources: sec_filings
+2026-04-26 22:13:15,931 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:13:15,932 INFO news_collector.collector - Fetching source=sec_filings
+2026-04-26 22:13:20,698 INFO news_collector.collector - Fetched source=sec_filings items=5 elapsed_ms=4766
+2026-04-26 22:13:20,699 INFO news_collector.collector - Fetch completed: total_items=5 deduped_items=5
+2026-04-26 22:13:20,699 INFO __main__ - Polling source=sec fetched=5
+2026-04-26 22:13:20,704 INFO news_collector.collector - Enabled sources: twse_mops_announcements
+2026-04-26 22:13:20,704 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:13:20,704 INFO news_collector.collector - Fetching source=twse_mops_announcements
+2026-04-26 22:13:20,748 INFO news_collector.collector - Fetched source=twse_mops_announcements items=0 elapsed_ms=44
+2026-04-26 22:13:20,749 INFO news_collector.collector - Fetch completed: total_items=0 deduped_items=0
+2026-04-26 22:13:20,749 INFO __main__ - Polling source=twse fetched=0
+2026-04-26 22:13:20,749 INFO __main__ - Polling cycle complete accepted=11 stored=0 duplicates=11 failed=0 dropped_by_date=4 dropped_by_topic=2 next_in=300s
+2026-04-26 22:18:20,750 INFO news_collector.collector - Enabled sources: official_rss
+2026-04-26 22:18:20,751 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:18:20,751 INFO news_collector.collector - Fetching source=official_rss
+2026-04-26 22:18:20,752 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/world/rss.xml
+2026-04-26 22:18:21,076 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/world/rss.xml items=1
+2026-04-26 22:18:21,076 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/business/rss.xml
+2026-04-26 22:18:21,388 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/business/rss.xml items=1
+2026-04-26 22:18:21,388 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/technology/rss.xml
+2026-04-26 22:18:21,985 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/technology/rss.xml items=1
+2026-04-26 22:18:21,985 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:18:22,422 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:18:22,422 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:18:23,297 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:18:23,297 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:18:23,864 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:18:23,864 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/world.xml
+2026-04-26 22:18:24,070 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/world.xml items=1
+2026-04-26 22:18:24,070 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/tech.xml
+2026-04-26 22:18:24,178 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/tech.xml items=1
+2026-04-26 22:18:24,178 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxbusiness.com/google-publisher/markets.xml
+2026-04-26 22:18:24,580 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxbusiness.com/google-publisher/markets.xml items=1
+2026-04-26 22:18:24,581 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1004/rss.xml
+2026-04-26 22:18:24,738 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1004/rss.xml items=1
+2026-04-26 22:18:24,738 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1006/rss.xml
+2026-04-26 22:18:25,458 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1006/rss.xml items=1
+2026-04-26 22:18:25,458 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1019/rss.xml
+2026-04-26 22:18:25,500 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1019/rss.xml items=1
+2026-04-26 22:18:25,500 INFO news_collector.collector - Fetched source=official_rss items=12 elapsed_ms=4749
+2026-04-26 22:18:25,501 INFO news_collector.collector - Fetch completed: total_items=12 deduped_items=12
+2026-04-26 22:18:25,501 INFO __main__ - Polling source=rss fetched=12
+2026-04-26 22:18:25,521 INFO __main__ - [BRIDGE_DB_STORED] id=1f8722a6421ffb0593c5 source=Latest World News on Fox News url=https://www.foxnews.com/world/world-leaders-condemn-unacceptable-violence-armed-attack-disrupts-wh-correspondents-dinner
+2026-04-26 22:18:25,537 INFO news_collector.collector - Enabled sources: sec_filings
+2026-04-26 22:18:25,538 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:18:25,538 INFO news_collector.collector - Fetching source=sec_filings
+2026-04-26 22:18:30,219 INFO news_collector.collector - Fetched source=sec_filings items=5 elapsed_ms=4681
+2026-04-26 22:18:30,219 INFO news_collector.collector - Fetch completed: total_items=5 deduped_items=5
+2026-04-26 22:18:30,219 INFO __main__ - Polling source=sec fetched=5
+2026-04-26 22:18:30,223 INFO news_collector.collector - Enabled sources: twse_mops_announcements
+2026-04-26 22:18:30,223 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:18:30,223 INFO news_collector.collector - Fetching source=twse_mops_announcements
+2026-04-26 22:18:30,272 INFO news_collector.collector - Fetched source=twse_mops_announcements items=0 elapsed_ms=49
+2026-04-26 22:18:30,273 INFO news_collector.collector - Fetch completed: total_items=0 deduped_items=0
+2026-04-26 22:18:30,273 INFO __main__ - Polling source=twse fetched=0
+2026-04-26 22:18:30,273 INFO __main__ - Polling cycle complete accepted=11 stored=1 duplicates=10 failed=0 dropped_by_date=4 dropped_by_topic=2 next_in=300s

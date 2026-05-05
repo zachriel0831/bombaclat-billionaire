@@ -40,6 +40,12 @@ from event_relay.event_enrichment import (
     annotate as rule_annotate,
     derive_news_impact,
 )
+from event_relay.market_calendar import (
+    MarketCalendarState,
+    allowed_analysis_slots,
+    resolve_market_calendar_state,
+)
+from event_relay.prompt_assets import PROMPT_ASSETS_VERSION
 from event_relay.rag import (
     DEFAULT_CANDIDATE_LIMIT as RAG_DEFAULT_CANDIDATE_LIMIT,
     DEFAULT_EMBEDDING_DIMENSIONS as RAG_DEFAULT_EMBEDDING_DIMENSIONS,
@@ -50,7 +56,11 @@ from event_relay.rag import (
     retrieve_similar_events,
 )
 from event_relay.service import MarketAnalysisRecord, MySqlEventStore
-from event_relay.trade_signals import build_trade_signals_from_analysis
+from event_relay.trade_signals import (
+    build_trade_signal_recommendation_section,
+    build_quote_event_trade_signals,
+    build_trade_signals_from_analysis,
+)
 from event_relay.weekly_summary import _call_llm, _load_secret_from_dpapi_file, _openai_web_search_enabled
 
 
@@ -60,8 +70,11 @@ MULTI_STAGE_PIPELINE_VERSION = PIPELINE_VERSION
 SLOTS = {
     "us_close": (5, 0),
     "pre_tw_open": (8, 0),
+    "macro_daily": (8, 5),
     "tw_close": (15, 30),
 }
+
+MACRO_DAILY_OWNER_SLOT = "pre_tw_open"
 
 
 @dataclass(frozen=True)
@@ -83,12 +96,34 @@ class MarketAnalysisConfig:
     provider: str = "openai"
 
 
+@dataclass(frozen=True)
+class SlotDecision:
+    """Resolved analysis slot plus calendar routing metadata."""
+
+    slot: str | None
+    requested_slot: str | None
+    skipped_reason: str | None
+    calendar_state: MarketCalendarState
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "slot": self.slot,
+            "requested_slot": self.requested_slot,
+            "skipped_reason": self.skipped_reason,
+            "calendar": self.calendar_state.to_dict(),
+        }
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Generate scheduled market analysis")
     parser.add_argument("--env-file", default=".env", help="Path to env file")
-    parser.add_argument("--slot", default="auto", choices=["auto", "us_close", "pre_tw_open", "tw_close"])
-    parser.add_argument("--force", action="store_true", help="Bypass schedule gate and run immediately")
+    parser.add_argument(
+        "--slot",
+        default="auto",
+        choices=["auto", "us_close", "pre_tw_open", "tw_close", "macro_daily"],
+    )
+    parser.add_argument("--force", action="store_true", help="Bypass time-window gate, not market-calendar guard")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser
 
@@ -172,8 +207,26 @@ def _load_config(args: argparse.Namespace) -> MarketAnalysisConfig:
     )
 
 
-def _resolve_slot(config: MarketAnalysisConfig, now_local: datetime) -> str | None:
-    """解析並決定 resolve slot 對應的資料或結果。"""
+def _preferred_tw_fallback_tickers_from_env() -> set[str]:
+    """Return tickers explicitly configured as Taiwan tracked-stock fallback."""
+    result: set[str] = set()
+    for raw in str(os.getenv("MARKET_CONTEXT_TW_YAHOO_SYMBOLS") or "").split(","):
+        entry = raw.strip()
+        if not entry:
+            continue
+        symbol = entry
+        for separator in (":", "|", "="):
+            if separator in symbol:
+                symbol = symbol.split(separator, 1)[0]
+                break
+        code = symbol.strip().upper().split(".", 1)[0]
+        if code.isdigit():
+            result.add(code)
+    return result
+
+
+def _resolve_time_slot_legacy_unused(config: MarketAnalysisConfig, now_local: datetime) -> str | None:
+    """Old weekend-only resolver kept inert by the refreshed calendar resolver below."""
     if config.slot != "auto":
         return config.slot
     # Weekend slot filtering:
@@ -197,12 +250,59 @@ def _resolve_slot(config: MarketAnalysisConfig, now_local: datetime) -> str | No
     return None
 
 
+def _resolve_time_slot(config: MarketAnalysisConfig, now_local: datetime) -> str | None:
+    """Resolve the requested slot from CLI args or the local schedule window."""
+    if config.slot != "auto":
+        return config.slot
+    for slot_name, (hour, minute) in SLOTS.items():
+        if slot_name == "macro_daily":
+            continue
+        target = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        delta = abs((now_local - target).total_seconds()) / 60.0
+        if delta <= float(config.window_minutes):
+            return slot_name
+    if config.force:
+        return "pre_tw_open"
+    return None
+
+
+def _resolve_slot_decision(config: MarketAnalysisConfig, now_local: datetime) -> SlotDecision:
+    """Apply schedule and TW / US holiday routing before any LLM call."""
+    calendar_state = resolve_market_calendar_state(now_local)
+    requested_slot = _resolve_time_slot(config, now_local)
+    if requested_slot is None:
+        return SlotDecision(None, None, "schedule", calendar_state)
+
+    allowed = allowed_analysis_slots(calendar_state)
+    # 中文：週日完全交給 weekly_summary，不讓 daily market-analysis 呼叫 LLM。
+    if not allowed:
+        return SlotDecision(None, requested_slot, "weekly_summary_only", calendar_state)
+
+    if requested_slot in allowed:
+        return SlotDecision(requested_slot, requested_slot, None, calendar_state)
+
+    # 中文：TW/US 都休市時，只讓早盤任務轉成 macro_daily，避免 us_close / 台股分析混跑。
+    if allowed == {"macro_daily"} and requested_slot == MACRO_DAILY_OWNER_SLOT:
+        return SlotDecision("macro_daily", requested_slot, None, calendar_state)
+
+    if requested_slot == "macro_daily":
+        return SlotDecision(None, requested_slot, "macro_daily_not_required", calendar_state)
+
+    return SlotDecision(None, requested_slot, "market_calendar", calendar_state)
+
+
+def _resolve_slot(config: MarketAnalysisConfig, now_local: datetime) -> str | None:
+    """Compatibility wrapper for tests and older callers."""
+    return _resolve_slot_decision(config, now_local).slot
+
+
 def _build_prompts(
     config: MarketAnalysisConfig,
     slot: str,
     now_local: datetime,
     events_json: str,
     market_json: str,
+    upstream_analysis_context: dict[str, Any] | None = None,
 ) -> tuple[str, str]:
     """建立 build prompts 對應的資料或結果。"""
     macro_skill = _load_text(config.skill_macro_path)
@@ -210,6 +310,9 @@ def _build_prompts(
     slot_instruction = {
         "us_close": "Focus on what the U.S. close implies for Taiwan's next session.",
         "pre_tw_open": "Focus on Taiwan pre-open positioning and what matters before 09:00.",
+        "macro_daily": (
+            "Focus on macro-only world context because both Taiwan and the relevant U.S. close session are closed."
+        ),
         "tw_close": (
             "Focus on Taiwan close review after 13:30 and next-session preparation. "
             "Use same-day market_context:tw_close and flow/disclosure events when present."
@@ -218,21 +321,26 @@ def _build_prompts(
     audience_instruction = (
         "The audience wants actionable Taiwan close review and next-session risk tracking."
         if slot == "tw_close"
+        else "The audience wants macro context only; avoid stock entry recommendations."
+        if slot == "macro_daily"
         else "The audience wants actionable Taiwan pre-open context from U.S. market moves."
     )
-    required_sections = (
-        "1) 台股收盤復盤：指數、成交量、權值股與盤勢情緒\n"
-        "2) 法人/期權/融資券：三大法人、期貨選擇權、融資券與籌碼風險\n"
-        "3) 類股輪動：強弱族群、題材延續性與資金移轉\n"
-        "4) 隔日觀察與風險：明日盤前關注、國際變數、關鍵價位或事件\n"
-        if slot == "tw_close"
-        else (
-            "1) 美股收盤重點\n"
-            "2) 對台股的可能影響\n"
-            "3) 需要留意的族群或事件\n"
-            "4) 風險與資料缺口\n"
-        )
+    required_sections = _regime_flow_sections()
+    section_guide = _regime_flow_guide()
+
+    has_us_close_context = bool(
+        slot == "pre_tw_open"
+        and upstream_analysis_context
+        and upstream_analysis_context.get("included")
     )
+    upstream_instruction = (
+        "For pre_tw_open, source=market_analysis:us_close is present; fold its key points into sections 1-2.\n"
+        if has_us_close_context
+        else "For pre_tw_open, do not infer U.S. close facts when the relevant U.S. session was closed or absent.\n"
+        if slot == "pre_tw_open"
+        else ""
+    )
+
     system_prompt = (
         "You are a Taiwan market strategist writing in Traditional Chinese.\n"
         "Use plain text only. Be concise, concrete, and avoid fabricating facts.\n"
@@ -251,21 +359,76 @@ def _build_prompts(
     user_prompt = (
         f"Generate one {slot} market analysis in Traditional Chinese.\n"
         f"{slot_instruction}\n"
+        "Do not include a bracketed title like [Market Analysis]; downstream title should be date-only.\n"
         "Required sections:\n"
         f"{required_sections}"
-        "Total length 220-700 Chinese characters.\n"
+        f"{section_guide}"
+        "Formatting rules:\n"
+        "- Section 2 利率與流動性 should use bullet lines when listing market facts.\n"
+        "- Use the exact section titles listed above.\n"
+        f"{_summary_length_instruction(slot)}\n"
         f"Now local time: {now_local.strftime('%Y-%m-%d %H:%M %Z')}\n"
         "Recent events JSON includes news and stored-only market_context facts from t_relay_events.\n"
         "This local context is not exhaustive; use web search when available to verify missing/current facts.\n"
+        "If evidence exists, explicitly cover Fed path, liquidity, credit stress, and sentiment/positioning; "
+        "keep data in bullets and keep paragraphs short.\n"
+        f"{upstream_instruction}"
         f"Recent events JSON:\n{events_json}\n\n"
         f"Recent market snapshot JSON:\n{market_json}\n"
     )
     return system_prompt, user_prompt
 
 
+def _summary_length_instruction(slot: str) -> str:
+    """Return the prompt length budget for each daily analysis slot."""
+    if slot == "pre_tw_open":
+        return "Total length 900-1700 Chinese characters."
+    if slot == "macro_daily":
+        return "Total length 650-1100 Chinese characters."
+    if slot == "tw_close":
+        return "Total length 650-1200 Chinese characters."
+    return "Total length 500-1100 Chinese characters."
+
+
+def _regime_flow_sections() -> str:
+    """Return the fixed yutinghao-style section order."""
+    return (
+        "1) 總經 Regime\n"
+        "2) 利率與流動性\n"
+        "3) 景氣循環\n"
+        "4) 市場情緒\n"
+        "5) 台股配置\n"
+        "6) 風險與資料缺口\n"
+    )
+
+
+def _regime_flow_guide() -> str:
+    """Explain how each section should reason without bloating the report."""
+    return (
+        "Reasoning flow:\n"
+        "- 總經 Regime: first define whether the market is in sticky inflation, disinflation, growth scare, liquidity easing, or credit stress.\n"
+        "- 利率與流動性: connect CPI/PCE/jobs/Fed path to 2Y/10Y, DXY, SOFR, Fed balance sheet, RRP, TGA, reserves, and credit spreads.\n"
+        "- 景氣循環: judge expansion/slowdown/soft landing/recession risk from consumption, labor, PMI/ISM, bank credit, earnings, and inventory.\n"
+        "- 市場情緒: decide whether price action is fundamentals-backed or positioning/chase-driven using VIX, SOX/Nasdaq, credit proxies, breadth, and news/X shocks.\n"
+        "- 台股配置: translate the chain into Taiwan sector tilt and stock-watch logic.\n"
+        "- 風險與資料缺口: state what could break the chain and what must be verified next.\n"
+    )
+
+
 def _normalize_text(text: str) -> str:
     """正規化 normalize text 對應的資料或結果。"""
     return "\n".join(line.rstrip() for line in text.strip().splitlines()).strip()[:4500]
+
+
+def _is_delivery_enabled_for_slot(slot: str, calendar_state: MarketCalendarState) -> bool:
+    """判斷此分析時段是否允許 Java 做對外觸達。"""
+    # 中文：push_enabled 只代表 Java 可推送，不代表 Python 會直接呼叫 LINE。
+    if slot in {"pre_tw_open", "macro_daily"}:
+        return True
+    if slot == "us_close":
+        # 中文：一般日 us_close 只當隔天台股早盤素材；只有 TW 休市且美股有交易時才開放推送。
+        return (not calendar_state.tw.is_trading_day) and calendar_state.us.is_trading_day
+    return False
 
 
 def _write_prompt_snapshots(system_prompt: str, user_prompt: str, slot: str) -> None:
@@ -312,6 +475,8 @@ def _compact_event_raw_json(source: str, value: str | None) -> Any:
         "event_count",
         "sources",
         "source_counts",
+        "fred_enabled",
+        "fred_series_ids",
     ):
         if key in parsed:
             compact[key] = parsed[key]
@@ -410,6 +575,66 @@ def _build_events_payload(store: MySqlEventStore, recent_events: list) -> list[d
         len(payload),
     )
     return payload
+
+
+def _build_upstream_analysis_context(
+    store: MySqlEventStore,
+    slot: str,
+    calendar_state: MarketCalendarState,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Add stored analyses that should be treated as upstream context."""
+    if slot != "pre_tw_open":
+        return [], {"included": False, "reason": "slot_not_pre_tw_open"}
+    if not calendar_state.us.is_trading_day:
+        # 中文：US 休市、TW 有交易時，台股早盤仍要產生，但不能塞舊的 us_close 進 prompt。
+        return [], {
+            "included": False,
+            "slot": "us_close",
+            "reason": "us_close_session_closed",
+            "us_close_session_date": calendar_state.us_close_session_date.isoformat(),
+        }
+
+    latest = store.fetch_latest_market_analysis("us_close")
+    if latest is None:
+        return [], {"included": False, "slot": "us_close", "reason": "not_found"}
+
+    summary = _normalize_text(latest.summary_text)[:3000]
+    context_meta = {
+        "included": True,
+        "slot": "us_close",
+        "analysis_id": latest.row_id,
+        "analysis_date": latest.analysis_date,
+        "scheduled_time_local": latest.scheduled_time_local,
+        "updated_at": latest.updated_at,
+    }
+    event = {
+        "id": f"analysis:{latest.row_id}",
+        "source": "market_analysis:us_close",
+        "title": f"Latest stored U.S. close analysis for Taiwan pre-open ({latest.analysis_date})",
+        "url": f"internal://market_analysis/{latest.row_id}",
+        "summary": summary,
+        "published_at": None,
+        "created_at": latest.updated_at,
+        "raw": context_meta,
+        "annotation": {
+            "entities": [{"kind": "market", "value": "US close"}],
+            "category": "market_move",
+            "importance": 0.95,
+            "sentiment": "neutral",
+            "annotator": "system",
+            "annotator_version": "upstream-analysis-v1",
+            "annotated_at": None,
+        },
+        "impact": {
+            "topic": "us_close_context",
+            "impact_region": "TW",
+            "impact_scope": "market",
+            "impact_direction": "mixed",
+            "confidence": "medium",
+            "data_gap": False,
+        },
+    }
+    return [event], context_meta
 
 
 def _pipeline_mode_from_env() -> str:
@@ -611,6 +836,46 @@ def _stage_telemetry(result: StageResult) -> dict[str, Any]:
     return payload
 
 
+def _aggregate_token_usage(
+    pipeline_telemetry: dict[str, Any] | None,
+    legacy_token_usage: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """REQ-016 — sum per-stage usage rows into a single token_usage block.
+
+    Walks ``pipeline_telemetry["stages"]`` for stage-level ``usage`` extras
+    (set by each stage's ``run()``) and adds the legacy fallback usage if the
+    legacy path was taken. Returns a stable schema even when no LLM call ran.
+    """
+    stages_usage: list[dict[str, Any]] = []
+    if isinstance(pipeline_telemetry, dict):
+        stages = pipeline_telemetry.get("stages")
+        if isinstance(stages, dict):
+            for stage_name, stage_payload in stages.items():
+                if not isinstance(stage_payload, dict):
+                    continue
+                usage = stage_payload.get("usage")
+                if isinstance(usage, dict):
+                    stages_usage.append({"stage": stage_name, **usage})
+    if legacy_token_usage:
+        stages_usage.append({"stage": "legacy_single_call", **legacy_token_usage})
+
+    total_prompt = sum(int(u.get("prompt_tokens") or 0) for u in stages_usage)
+    total_completion = sum(int(u.get("completion_tokens") or 0) for u in stages_usage)
+    total_cached = sum(int(u.get("cached_tokens") or 0) for u in stages_usage)
+    total_cache_creation = sum(int(u.get("cache_creation_tokens") or 0) for u in stages_usage)
+    cache_hit_ratio = (total_cached / total_prompt) if total_prompt > 0 else 0.0
+
+    return {
+        "prompt_tokens": total_prompt,
+        "completion_tokens": total_completion,
+        "cached_tokens": total_cached,
+        "cache_creation_tokens": total_cache_creation,
+        "cache_hit_ratio": round(cache_hit_ratio, 3),
+        "prompt_assets_version": PROMPT_ASSETS_VERSION,
+        "stages": stages_usage,
+    }
+
+
 def _retrieve_rag_examples(store: MySqlEventStore, events_payload: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """檢索 retrieve rag examples 對應的資料或結果。"""
     if not rag_enabled_from_env():
@@ -652,12 +917,21 @@ def _retrieve_rag_examples(store: MySqlEventStore, events_payload: list[dict[str
 def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
     """執行單次任務流程並回傳結果。"""
     now_local = datetime.now().astimezone()
-    slot = _resolve_slot(config, now_local)
-    if slot is None and not config.force:
-        logger.info("Market analysis skipped by schedule now=%s", now_local.isoformat())
-        return {"ok": True, "skipped": "schedule"}
+    slot_decision = _resolve_slot_decision(config, now_local)
+    slot = slot_decision.slot
     if slot is None:
-        slot = "pre_tw_open"
+        logger.info(
+            "Market analysis skipped reason=%s requested_slot=%s calendar=%s",
+            slot_decision.skipped_reason,
+            slot_decision.requested_slot,
+            slot_decision.calendar_state.to_dict(),
+        )
+        return {
+            "ok": True,
+            "skipped": slot_decision.skipped_reason or "schedule",
+            "requested_slot": slot_decision.requested_slot,
+            "calendar": slot_decision.calendar_state.to_dict(),
+        }
 
     if not config.api_key:
         raise RuntimeError(
@@ -674,6 +948,13 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
     recent_market_rows = store.fetch_recent_market_snapshots(hours=config.lookback_hours, limit=config.max_market_rows)
 
     events_payload = _build_events_payload(store, recent_events)
+    upstream_analysis_events, upstream_analysis_context = _build_upstream_analysis_context(
+        store,
+        slot,
+        slot_decision.calendar_state,
+    )
+    if upstream_analysis_events:
+        events_payload.extend(upstream_analysis_events)
     market_payload = [
         {
             "event_id": row.event_id,
@@ -697,6 +978,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
     summary_text: str | None = None
     structured_payload: dict[str, Any] | None = None
 
+    legacy_token_usage: dict[str, Any] | None = None
     if pipeline_mode in ("multi_stage", "auto"):
         summary_text, structured_payload, pipeline_telemetry = _run_multi_stage_pipeline(
             config=config,
@@ -723,29 +1005,44 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
             now_local=now_local,
             events_json=json.dumps(events_payload, ensure_ascii=False),
             market_json=json.dumps(market_payload, ensure_ascii=False),
+            upstream_analysis_context=upstream_analysis_context,
         )
         _write_prompt_snapshots(system_prompt, user_prompt, slot)
-        summary_text = _normalize_text(
-            _call_llm(
-                provider=config.provider,
-                api_base=config.api_base,
-                api_key=config.api_key,
-                model=config.model,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-            )
+        summary_text_raw, legacy_usage = _call_llm(
+            provider=config.provider,
+            api_base=config.api_base,
+            api_key=config.api_key,
+            model=config.model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
         )
+        summary_text = _normalize_text(summary_text_raw)
+        legacy_token_usage = legacy_usage.to_dict()
+
+    token_usage = _aggregate_token_usage(
+        pipeline_telemetry if used_multi_stage else None,
+        legacy_token_usage,
+    )
 
     logger.info(
-        "[MARKET_ANALYSIS_STORED_ONLY] slot=%s model=%s pipeline=%s",
+        "[MARKET_ANALYSIS_STORED_ONLY] slot=%s model=%s pipeline=%s tokens prompt=%d cached=%d cache_hit=%.3f",
         slot,
         config.model,
         "multi_stage" if used_multi_stage else "legacy",
+        token_usage.get("prompt_tokens", 0),
+        token_usage.get("cached_tokens", 0),
+        token_usage.get("cache_hit_ratio", 0.0),
     )
     logger.info("[MARKET_ANALYSIS_TEXT]\n%s", summary_text)
 
-    raw_dimension = "daily_tw_close" if slot == "tw_close" else "daily_market_analysis"
-    push_enabled = slot != "tw_close"
+    raw_dimension = (
+        "daily_tw_close"
+        if slot == "tw_close"
+        else "daily_macro"
+        if slot == "macro_daily"
+        else "daily_market_analysis"
+    )
+    push_enabled = _is_delivery_enabled_for_slot(slot, slot_decision.calendar_state)
     record = MarketAnalysisRecord(
         analysis_date=now_local.date().isoformat(),
         analysis_slot=slot,
@@ -763,7 +1060,9 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 # 用了哪些上下文來源、走哪種 pipeline、是否有 structured 結果。
                 "dimension": raw_dimension,
                 "slot": slot,
+                "display_title": now_local.date().isoformat(),
                 "generated_at": now_local.isoformat(),
+                "calendar_decision": slot_decision.to_dict(),
                 "events_used": len(events_payload),
                 "market_rows_used": len(market_payload),
                 "event_context_sources": sorted(
@@ -774,13 +1073,17 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                     }
                 ),
                 "direct_push_disabled": True,
+                "delivery_eligible": push_enabled,
+                "delivery_policy": "daily_pre_tw_open_macro_or_tw_holiday_us_close",
                 "delivery_owner": "java",
                 "python_push_removed": True,
                 "web_search_requested": config.provider == "openai" and _openai_web_search_enabled(),
+                "upstream_analysis_context": upstream_analysis_context,
                 "rag": rag_telemetry,
                 "pipeline_mode": "multi_stage" if used_multi_stage else "legacy",
                 "pipeline_stages": pipeline_telemetry,
                 "structured": structured_payload,
+                "token_usage": token_usage,
             },
             ensure_ascii=False,
         ),
@@ -792,32 +1095,87 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
     )
     analysis_id = store.upsert_market_analysis(record)
     trade_signals_count = 0
-    if used_multi_stage and analysis_id:
-        trade_signals = build_trade_signals_from_analysis(
-            analysis_id=analysis_id,
-            analysis_date=record.analysis_date,
-            analysis_slot=record.analysis_slot,
-            structured_payload=structured_payload,
-            pipeline_telemetry=pipeline_telemetry,
-        )
-        trade_signals_count = store.replace_trade_signals_for_analysis(analysis_id, trade_signals)
-        logger.info(
-            "[TRADE_SIGNALS_STORED] analysis_id=%s slot=%s count=%d status=pending_review",
-            analysis_id,
-            slot,
-            trade_signals_count,
-        )
+    trade_signal_recommendations_count = 0
+    if analysis_id:
+        trade_signals = []
+        structured_signals_count = 0
+        quote_fallback_added = 0
+        if used_multi_stage:
+            trade_signals = build_trade_signals_from_analysis(
+                analysis_id=analysis_id,
+                analysis_date=record.analysis_date,
+                analysis_slot=record.analysis_slot,
+                structured_payload=structured_payload,
+                pipeline_telemetry=pipeline_telemetry,
+            )
+            structured_signals_count = len(trade_signals)
+        if slot == "pre_tw_open":
+            preferred_fallback_tickers = _preferred_tw_fallback_tickers_from_env()
+            recommendation_tickers = {
+                signal.ticker
+                for signal in trade_signals
+                if signal.direction == "long" and signal.strategy_type in {"swing", "medium"}
+            }
+            fallback_signals = build_quote_event_trade_signals(
+                analysis_id=analysis_id,
+                analysis_date=record.analysis_date,
+                analysis_slot=record.analysis_slot,
+                events=recent_events,
+                max_signals=5,
+                preferred_tickers=preferred_fallback_tickers,
+            )
+            existing_tickers = {signal.ticker for signal in trade_signals}
+            for fallback_signal in fallback_signals:
+                if len(recommendation_tickers) >= 5 and fallback_signal.ticker not in preferred_fallback_tickers:
+                    break
+                if fallback_signal.ticker in existing_tickers:
+                    continue
+                trade_signals.append(fallback_signal)
+                existing_tickers.add(fallback_signal.ticker)
+                if fallback_signal.direction == "long" and fallback_signal.strategy_type in {"swing", "medium"}:
+                    recommendation_tickers.add(fallback_signal.ticker)
+                    quote_fallback_added += 1
+        if used_multi_stage or trade_signals:
+            trade_signals_count = store.replace_trade_signals_for_analysis(analysis_id, trade_signals)
+            source_label = "structured"
+            if quote_fallback_added and structured_signals_count:
+                source_label = "structured_plus_quote_fallback"
+            elif quote_fallback_added:
+                source_label = "quote_fallback"
+            logger.info(
+                "[TRADE_SIGNALS_STORED] analysis_id=%s slot=%s count=%d status=pending_review source=%s fallback_added=%d",
+                analysis_id,
+                slot,
+                trade_signals_count,
+                source_label,
+                quote_fallback_added,
+            )
+        if slot == "pre_tw_open":
+            recommendations = store.fetch_trade_signal_recommendations(analysis_id, limit=5)
+            trade_signal_recommendations_count = len(recommendations)
+            recommendation_section = build_trade_signal_recommendation_section(recommendations)
+            if recommendation_section:
+                summary_text = f"{summary_text.rstrip()}\n\n{recommendation_section}"
+                store.update_market_analysis_summary_text(analysis_id, summary_text)
+                logger.info(
+                    "[TRADE_SIGNAL_RECOMMENDATIONS_APPENDED] analysis_id=%s count=%d",
+                    analysis_id,
+                    trade_signal_recommendations_count,
+                )
     return {
         "ok": True,
         "slot": slot,
+        "requested_slot": slot_decision.requested_slot,
         "analysis_date": record.analysis_date,
         "events_used": record.events_used,
         "market_rows_used": record.market_rows_used,
         "rag_examples_used": len(rag_examples),
         "trade_signals_stored": trade_signals_count,
+        "trade_signal_recommendations": trade_signal_recommendations_count,
         "push_enabled": push_enabled,
         "pushed": 0,
         "model": config.model,
+        "calendar": slot_decision.calendar_state.to_dict(),
     }
 
 

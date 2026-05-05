@@ -85,7 +85,7 @@ def run(
         _write_prompt_snapshot(snapshot_dir, context.slot, system_prompt, user_prompt)
 
     try:
-        parsed, raw_text = call_llm_json(
+        parsed, raw_text, usage = call_llm_json(
             provider=context.provider,
             api_base=context.api_base,
             api_key=context.api_key,
@@ -123,6 +123,7 @@ def run(
             "bull_drivers": bull_drivers,
             "bear_drivers": bear_drivers,
             "elapsed_sec": round(elapsed, 3),
+            "usage": usage.to_dict(),
         },
     )
 

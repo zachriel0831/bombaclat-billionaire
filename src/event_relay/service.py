@@ -212,6 +212,29 @@ class MySqlEventStore:
         self._connect_database()
         self._create_tables_if_needed()
 
+    def _ensure_connection(self) -> None:
+        """Ensure the shared MySQL connection is alive before creating a cursor."""
+        if self._conn is None:
+            self._connect_database()
+            return
+
+        try:
+            self._conn.ping(reconnect=True, attempts=2, delay=1)
+        except Exception as exc:
+            logger.warning("MySQL connection unavailable; reconnecting: %s", exc)
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._connect_database()
+
+    def _cursor(self):
+        """Return a cursor after reconnecting stale idle MySQL connections."""
+        self._ensure_connection()
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+        return self._conn.cursor()
+
     def enqueue_event_if_new(self, event: RelayEvent) -> bool:
         """執行 enqueue event if new 方法的主要邏輯。"""
         if self._conn is None:
@@ -222,8 +245,8 @@ class MySqlEventStore:
         event_hash = self._event_hash_for_event(event)
         sql = (
             f"INSERT INTO {self._event_table} "
-            "(event_id, source, title, url, summary, published_at, event_hash, raw_json, is_pushed) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            "(event_id, source, title, url, summary, published_at, event_hash, raw_json) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
         )
         values = (
             event.event_id,
@@ -234,11 +257,10 @@ class MySqlEventStore:
             event.published_at,
             event_hash,
             json.dumps(event.raw, ensure_ascii=False),
-            1,
         )
 
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, values)
                 if event.source.lower().startswith("x:"):
@@ -272,7 +294,7 @@ class MySqlEventStore:
             "LIMIT %s"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, (safe_days, safe_limit))
                 rows = cur.fetchall()
@@ -318,7 +340,7 @@ class MySqlEventStore:
             f"WHERE event_row_id IN ({placeholders})"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, tuple(unique_ids))
                 rows = cur.fetchall()
@@ -382,7 +404,7 @@ class MySqlEventStore:
             str(annotator_version),
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, values)
                 self._conn.commit()
@@ -415,7 +437,7 @@ class MySqlEventStore:
             "LIMIT %s"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, (embedding_model, safe_days, safe_limit))
                 rows = cur.fetchall()
@@ -481,7 +503,7 @@ class MySqlEventStore:
             text_hash,
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, values)
                 self._conn.commit()
@@ -508,7 +530,7 @@ class MySqlEventStore:
             "LIMIT %s"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, (embedding_model, safe_limit))
                 rows = cur.fetchall()
@@ -562,7 +584,7 @@ class MySqlEventStore:
             "LIMIT %s"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, (embedding_model, safe_limit))
                 rows = cur.fetchall()
@@ -619,7 +641,7 @@ class MySqlEventStore:
             json.dumps(outcome_json or {"status": "unlabeled"}, ensure_ascii=False),
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, values)
                 self._conn.commit()
@@ -642,7 +664,7 @@ class MySqlEventStore:
             "LIMIT %s"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, (safe_hours, safe_limit))
                 rows = cur.fetchall()
@@ -694,6 +716,52 @@ class MySqlEventStore:
             # Column may have been added between our check and the ALTER; do not fail init.
             self._conn.rollback()
 
+    def _migrate_event_delivery_columns(self, cur: Any) -> None:
+        """Drop old LINE delivery fields from the event-only relay table."""
+        if self._conn is None:
+            return
+
+        try:
+            columns = self._fetch_table_columns(cur, self._event_table)
+            indexes = self._fetch_table_indexes(cur, self._event_table)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not inspect event table delivery columns: %s", exc)
+            return
+
+        try:
+            if "idx_push_queue" in indexes:
+                cur.execute(f"ALTER TABLE `{self._event_table}` DROP INDEX `idx_push_queue`")
+
+            for column_name in ("is_pushed", "line_pushed_at", "line_push_status", "line_push_error"):
+                if column_name in columns:
+                    cur.execute(f"ALTER TABLE `{self._event_table}` DROP COLUMN `{column_name}`")
+
+            indexes = self._fetch_table_indexes(cur, self._event_table)
+            if "idx_event_created" not in indexes:
+                cur.execute(f"ALTER TABLE `{self._event_table}` ADD INDEX `idx_event_created` (`created_at`)")
+            self._conn.commit()
+        except Exception as exc:  # noqa: BLE001
+            self._conn.rollback()
+            logger.warning("Event table delivery-column migration skipped: %s", exc)
+
+    def _fetch_table_columns(self, cur: Any, table_name: str) -> set[str]:
+        """Return column names for one table in the active MySQL database."""
+        cur.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = DATABASE() AND table_name = %s",
+            (table_name,),
+        )
+        return {str(row[0]) for row in cur.fetchall()}
+
+    def _fetch_table_indexes(self, cur: Any, table_name: str) -> set[str]:
+        """Return index names for one table in the active MySQL database."""
+        cur.execute(
+            "SELECT DISTINCT index_name FROM information_schema.statistics "
+            "WHERE table_schema = DATABASE() AND table_name = %s",
+            (table_name,),
+        )
+        return {str(row[0]) for row in cur.fetchall()}
+
     def upsert_market_analysis(self, record: MarketAnalysisRecord) -> int:
         """新增或更新 upsert market analysis 對應的資料或結果。"""
         if self._conn is None:
@@ -722,7 +790,7 @@ class MySqlEventStore:
         )
 
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(
                     sql,
@@ -754,7 +822,7 @@ class MySqlEventStore:
         safe_analysis_id = int(analysis_id)
         current_keys = [signal.signal_key for signal in signals]
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 for signal in signals:
                     self._upsert_trade_signal(cur, signal)
@@ -779,6 +847,71 @@ class MySqlEventStore:
             except Exception:
                 self._conn.rollback()
                 raise
+            finally:
+                cur.close()
+
+    def fetch_trade_signal_recommendations(self, analysis_id: int, *, limit: int = 5) -> list[dict[str, Any]]:
+        """Fetch short/medium-term long recommendations for one analysis."""
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+
+        safe_limit = max(1, min(int(limit), 20))
+        sql = (
+            "SELECT ticker, name, strategy_type, direction, confidence, entry_zone, "
+            "invalidation, take_profit_zone, holding_horizon, rationale, risk_notes, status "
+            f"FROM `{self._trade_signal_table}` "
+            "WHERE analysis_id=%s "
+            "AND direction='long' "
+            "AND strategy_type IN ('swing','medium') "
+            "AND status IN ('pending_review','new','watch') "
+            "ORDER BY "
+            "CASE signal_type WHEN 'context_fallback_stock_watch' THEN 1 WHEN 'quote_fallback_stock_watch' THEN 2 ELSE 3 END, "
+            "CASE confidence WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, "
+            "CASE strategy_type WHEN 'swing' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, "
+            "id ASC "
+            "LIMIT %s"
+        )
+        with self._lock:
+            cur = self._cursor()
+            try:
+                cur.execute(sql, (int(analysis_id), safe_limit))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            result.append(
+                {
+                    "ticker": str(row[0] or ""),
+                    "name": str(row[1] or "") or None,
+                    "strategy_type": str(row[2] or ""),
+                    "direction": str(row[3] or ""),
+                    "confidence": str(row[4] or "") or None,
+                    "entry_zone": row[5],
+                    "invalidation": row[6],
+                    "take_profit_zone": row[7],
+                    "holding_horizon": str(row[8] or "") or None,
+                    "rationale": str(row[9] or "") or None,
+                    "risk_notes": row[10],
+                    "status": str(row[11] or ""),
+                }
+            )
+        return result
+
+    def update_market_analysis_summary_text(self, analysis_id: int, summary_text: str) -> None:
+        """Update summary text after deterministic post-processing."""
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+
+        with self._lock:
+            cur = self._cursor()
+            try:
+                cur.execute(
+                    f"UPDATE `{self._analysis_table}` SET summary_text=%s WHERE id=%s",
+                    (summary_text, int(analysis_id)),
+                )
+                self._conn.commit()
             finally:
                 cur.close()
 
@@ -860,7 +993,7 @@ class MySqlEventStore:
             "raw_json=VALUES(raw_json)"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(
                     sql,
@@ -898,7 +1031,7 @@ class MySqlEventStore:
             "LIMIT 1"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, (analysis_slot,))
                 row = cur.fetchone()
@@ -932,7 +1065,7 @@ class MySqlEventStore:
             "LIMIT 1"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, (analysis_date, analysis_slot))
                 row = cur.fetchone()
@@ -971,7 +1104,7 @@ class MySqlEventStore:
             "LIMIT %s"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, (safe_days, safe_limit))
                 rows = cur.fetchall()
@@ -1002,7 +1135,7 @@ class MySqlEventStore:
             "WHERE DATE(created_at) <= %s"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(sql, (threshold_date,))
                 affected = int(cur.rowcount or 0)
@@ -1029,7 +1162,7 @@ class MySqlEventStore:
             "WHERE DATE(created_at) <= %s"
         )
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 cur.execute(delete_events_sql, (threshold_date,))
                 events_deleted = int(cur.rowcount or 0)
@@ -1085,11 +1218,10 @@ class MySqlEventStore:
           published_at VARCHAR(64) NULL,
           event_hash CHAR(40) NOT NULL,
           raw_json JSON NULL,
-          is_pushed TINYINT(1) NOT NULL DEFAULT 0,
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
           PRIMARY KEY (id),
           UNIQUE KEY uq_event_hash (event_hash),
-          KEY idx_push_queue (is_pushed, created_at)
+          KEY idx_event_created (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
         ddl_x = f"""
@@ -1311,7 +1443,7 @@ class MySqlEventStore:
           KEY idx_signal_outcome_status (status, evaluated_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
-        cur = self._conn.cursor()
+        cur = self._cursor()
         try:
             cur.execute(ddl_event)
             cur.execute(ddl_x)
@@ -1325,6 +1457,7 @@ class MySqlEventStore:
             cur.execute(ddl_signal_reviews)
             cur.execute(ddl_signal_outcomes)
             self._conn.commit()
+            self._migrate_event_delivery_columns(cur)
             self._migrate_analysis_structured_json(cur)
         finally:
             cur.close()
@@ -1414,7 +1547,7 @@ class MySqlEventStore:
 
         affected = 0
         with self._lock:
-            cur = self._conn.cursor()
+            cur = self._cursor()
             try:
                 affected = self._upsert_market_rows(
                     cur=cur,

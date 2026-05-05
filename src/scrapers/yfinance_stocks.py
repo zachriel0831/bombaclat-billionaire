@@ -67,6 +67,11 @@ WATCHLIST = {
         {"symbol": "2317.TW", "name": "鴻海"},
         {"symbol": "2454.TW", "name": "聯發科"},
         {"symbol": "2308.TW", "name": "台達電"},
+        {"symbol": "2485.TW", "name": "兆赫"},
+        {"symbol": "3535.TW", "name": "晶彩科"},
+        {"symbol": "3715.TW", "name": "定穎投控"},
+        {"symbol": "2351.TW", "name": "順德"},
+        {"symbol": "4749.TWO", "name": "新應材"},
         {"symbol": "0050.TW", "name": "元大台灣50"},
     ],
     "us": [

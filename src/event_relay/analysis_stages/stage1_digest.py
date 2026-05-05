@@ -50,10 +50,12 @@ def build_prompts(
         f"Slot: {slot}\n"
         f"Now local: {now_local_iso}\n\n"
         "Classify each event into one of: rate_decision, earnings, geopolitics, "
-        "supply_chain, regulation, macro_release, corporate_action, market_move, other.\n"
+        "supply_chain, regulation, macro_release, fed_path, liquidity, "
+        "credit_stress, sentiment_positioning, corporate_action, market_move, other.\n"
         "importance heuristic: 0.9+ for Fed / major central bank / war escalation / "
         "megacap earnings guide cut; 0.6-0.8 for other policy / sizable earnings / "
-        "macro release; 0.3-0.5 for routine corporate news; below 0.3 for color.\n"
+        "macro release / liquidity or credit stress shift; 0.3-0.5 for routine "
+        "corporate news; below 0.3 for color.\n"
         "sentiment is from a global risk-on/risk-off perspective.\n"
         "one_line_fact must not speculate; state what happened.\n"
         "Copy each event's id verbatim from the input.\n\n"
@@ -64,7 +66,8 @@ def build_prompts(
         "sentiment when the text gives clearer evidence. Never invent entities\n"
         "that are not in the title, summary, or annotation.\n\n"
         "Also populate market_snapshot with whatever US close / bond / FX / TW "
-        "session data is visible in the inputs; leave sub-objects empty if absent.\n\n"
+        "session / Fed path / liquidity / credit stress / sentiment-positioning "
+        "data is visible in the inputs; leave sub-objects empty if absent.\n\n"
         f"Events JSON:\n{events_json}\n\n"
         f"Market snapshot JSON:\n{market_snapshot_json}\n"
     )
@@ -98,7 +101,7 @@ def run(
         _write_prompt_snapshot(snapshot_dir, context.slot, system_prompt, user_prompt)
 
     try:
-        parsed, raw_text = call_llm_json(
+        parsed, raw_text, usage = call_llm_json(
             provider=context.provider,
             api_base=context.api_base,
             api_key=context.api_key,
@@ -130,7 +133,11 @@ def run(
         model=context.model,
         output=parsed,
         raw_text=raw_text,
-        extras={"event_count": event_count, "elapsed_sec": round(elapsed, 3)},
+        extras={
+            "event_count": event_count,
+            "elapsed_sec": round(elapsed, 3),
+            "usage": usage.to_dict(),
+        },
     )
 
 

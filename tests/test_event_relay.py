@@ -74,6 +74,96 @@ class _FixedDateTime(datetime):
         return value.astimezone(tz) if tz is not None else value
 
 
+class _FakeOperationalError(Exception):
+    """Fake connector operational error for stale-connection tests."""
+
+
+class _DeadConnection:
+    """Connection object that behaves like an idle-disconnected MySQL handle."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    def ping(self, **_kwargs):
+        raise _FakeOperationalError("MySQL Connection not available")
+
+    def close(self) -> None:
+        self.closed = True
+
+    def cursor(self):
+        raise AssertionError("stale connection cursor should not be used")
+
+
+class _LiveConnection:
+    """Connection object returned after reconnect."""
+
+    def __init__(self) -> None:
+        self.cursor_calls = 0
+
+    def ping(self, **_kwargs):
+        return None
+
+    def cursor(self):
+        self.cursor_calls += 1
+        return "cursor"
+
+
+class _ReconnectConnector:
+    """Minimal mysql.connector replacement for reconnect unit tests."""
+
+    IntegrityError = RuntimeError
+    OperationalError = _FakeOperationalError
+    InterfaceError = _FakeOperationalError
+
+    def __init__(self, connection: _LiveConnection) -> None:
+        self.connection = connection
+        self.connect_calls = 0
+
+    def connect(self, **_kwargs):
+        self.connect_calls += 1
+        return self.connection
+
+
+class _MigrationConnection:
+    """Fake connection used by event-table migration tests."""
+
+    def __init__(self) -> None:
+        self.commits = 0
+        self.rollbacks = 0
+
+    def commit(self) -> None:
+        self.commits += 1
+
+    def rollback(self) -> None:
+        self.rollbacks += 1
+
+
+class _MigrationCursor:
+    """Fake cursor that exposes legacy event table columns and indexes."""
+
+    def __init__(self) -> None:
+        self.executed: list[str] = []
+
+    def execute(self, sql: str, _params=None) -> None:
+        self.executed.append(sql)
+
+    def fetchall(self):
+        last_sql = self.executed[-1]
+        if "information_schema.columns" in last_sql:
+            return [
+                ("id",),
+                ("event_id",),
+                ("is_pushed",),
+                ("line_pushed_at",),
+                ("line_push_status",),
+                ("line_push_error",),
+                ("created_at",),
+            ]
+        if "information_schema.statistics" in last_sql:
+            return [("PRIMARY",), ("uq_event_hash",), ("idx_push_queue",)]
+        return []
+
+
 class LineEventRelayTests(unittest.TestCase):
     """封裝 Line Event Relay Tests 相關資料與行為。"""
     def test_load_relay_settings_storage_defaults_and_env(self) -> None:
@@ -158,6 +248,44 @@ class LineEventRelayTests(unittest.TestCase):
             processor._run_daily_retention_cleanup_if_due()
 
         self.assertEqual(fake_store.retention_calls, [])
+
+    def test_mysql_store_cursor_reconnects_stale_connection(self) -> None:
+        """Stale idle MySQL connections should reconnect before cursor creation."""
+        dead = _DeadConnection()
+        live = _LiveConnection()
+        connector = _ReconnectConnector(live)
+        store = MySqlEventStore.__new__(MySqlEventStore)
+        store._settings = _build_settings()
+        store._connector = connector
+        store._conn = dead
+
+        cursor = store._cursor()
+
+        self.assertEqual(cursor, "cursor")
+        self.assertTrue(dead.closed)
+        self.assertIs(store._conn, live)
+        self.assertEqual(connector.connect_calls, 1)
+        self.assertEqual(live.cursor_calls, 1)
+
+    def test_event_table_migration_drops_legacy_line_delivery_columns(self) -> None:
+        """t_relay_events should not keep old LINE delivery queue columns."""
+        conn = _MigrationConnection()
+        cur = _MigrationCursor()
+        store = MySqlEventStore.__new__(MySqlEventStore)
+        store._conn = conn
+        store._event_table = "t_relay_events"
+
+        store._migrate_event_delivery_columns(cur)
+
+        statements = "\n".join(cur.executed)
+        self.assertIn("DROP INDEX `idx_push_queue`", statements)
+        self.assertIn("DROP COLUMN `is_pushed`", statements)
+        self.assertIn("DROP COLUMN `line_pushed_at`", statements)
+        self.assertIn("DROP COLUMN `line_push_status`", statements)
+        self.assertIn("DROP COLUMN `line_push_error`", statements)
+        self.assertIn("ADD INDEX `idx_event_created` (`created_at`)", statements)
+        self.assertEqual(conn.commits, 1)
+        self.assertEqual(conn.rollbacks, 0)
 
     def test_is_older_than_days_true(self) -> None:
         """測試 test is older than days true 的預期行為。"""

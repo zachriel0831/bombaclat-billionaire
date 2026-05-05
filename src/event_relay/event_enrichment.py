@@ -25,6 +25,10 @@ CATEGORY_VALUES: tuple[str, ...] = (
     "supply_chain",
     "regulation",
     "macro_release",
+    "fed_path",
+    "liquidity",
+    "credit_stress",
+    "sentiment_positioning",
     "corporate_action",
     "other",
 )
@@ -276,6 +280,36 @@ _CATEGORY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
         ),
     ),
     (
+        "fed_path",
+        (
+            "fed target", "target range", "sofr", "2y", "front-end rate",
+            "rate path", "fedwatch", "policy rate",
+        ),
+    ),
+    (
+        "liquidity",
+        (
+            "federal reserve total assets", "reverse repo", "rrp",
+            "treasury general account", "reserve balances", "tga",
+            "liquidity", "walcl", "wresbal",
+        ),
+    ),
+    (
+        "credit_stress",
+        (
+            "credit spread", "option-adjusted spread", "high yield",
+            "baa corporate", "regional banking", "financial stress",
+            "bank credit", "cds",
+        ),
+    ),
+    (
+        "sentiment_positioning",
+        (
+            "vix", "financial conditions", "put/call", "aaii",
+            "positioning", "short interest", "risk proxy",
+        ),
+    ),
+    (
         "corporate_action",
         (
             "dividend", "buyback", "spin-off", "merger", "acquires",
@@ -332,7 +366,7 @@ _NUMBER_PATTERNS: tuple[str, ...] = (
 _NUMBER_RE = re.compile("|".join(_NUMBER_PATTERNS), re.IGNORECASE)
 
 _HIGH_IMPACT_CATEGORIES: frozenset[str] = frozenset(
-    {"rate_decision", "geopolitics", "macro_release"}
+    {"rate_decision", "geopolitics", "macro_release", "fed_path", "liquidity", "credit_stress"}
 )
 
 
@@ -447,16 +481,24 @@ def _extract_market_context_hint(raw_json: str | None) -> str:
         return ""
 
     parts: list[str] = []
-    for key in ("dataset_title", "event_type", "series_id", "periodName"):
+    for key in (
+        "dataset_title",
+        "event_type",
+        "series_id",
+        "periodName",
+        "source_family",
+        "dataset",
+    ):
         value = payload.get(key)
         if isinstance(value, str) and value:
             parts.append(value)
 
     point = payload.get("point")
     if isinstance(point, dict):
-        label = point.get("label")
-        if isinstance(label, str):
-            parts.append(label)
+        for key in ("name", "label", "category", "symbol", "source", "unit"):
+            value = point.get(key)
+            if isinstance(value, str) and value:
+                parts.append(value)
 
     events = payload.get("events")
     if isinstance(events, list):
@@ -481,6 +523,9 @@ TOPIC_VALUES: tuple[str, ...] = (
     "geopolitics",
     "macro",
     "central_bank",
+    "liquidity",
+    "credit_stress",
+    "sentiment_positioning",
     "semiconductor",
     "ai",
     "supply_chain",
@@ -535,6 +580,29 @@ _TOPIC_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
             "fomc", "federal reserve", "ecb", "boj", "pboc",
             "rate hike", "rate cut", "basis point", "powell", "lagarde",
             "聯準會", "美聯儲", "歐央", "日銀", "人行", "升息", "降息", "利率決議",
+        ),
+    ),
+    (
+        "liquidity",
+        (
+            "federal reserve total assets", "reverse repo", "rrp",
+            "treasury general account", "reserve balances", "liquidity",
+            "walcl", "wresbal", "wtregen", "rrpontsyd",
+        ),
+    ),
+    (
+        "credit_stress",
+        (
+            "credit spread", "option-adjusted spread", "high yield",
+            "baa corporate", "regional banking", "financial stress",
+            "bank credit", "bamlh0a0hym2", "bamlc0a0cm", "baa10y",
+        ),
+    ),
+    (
+        "sentiment_positioning",
+        (
+            "vix", "financial conditions", "positioning", "risk proxy",
+            "put/call", "aaii", "naaim", "vixcls", "nfci", "stlfsi4",
         ),
     ),
     (
@@ -624,9 +692,9 @@ _REGION_BY_COUNTRY: dict[str, str] = {
     "KR": "KR",
 }
 
-_HIGH_URGENCY_TOPICS: frozenset[str] = frozenset({"central_bank", "geopolitics"})
+_HIGH_URGENCY_TOPICS: frozenset[str] = frozenset({"central_bank", "geopolitics", "credit_stress"})
 _MEDIUM_URGENCY_TOPICS: frozenset[str] = frozenset(
-    {"macro", "semiconductor", "ai", "energy", "supply_chain"}
+    {"macro", "liquidity", "sentiment_positioning", "semiconductor", "ai", "energy", "supply_chain"}
 )
 
 

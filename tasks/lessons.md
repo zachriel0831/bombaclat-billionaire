@@ -235,3 +235,123 @@ This file is append-only. Add a new entry after any user correction to prevent r
 - Verification evidence:
   - `rg` confirmed primitive-short rules are present in global/project rule files
 - Status: active
+
+## LESSON-20260426-02
+- Date: 2026-04-26
+- Trigger (User correction): User pointed out `weekly_tw_preopen.scheduled_time_local` used `Sun 05:10` and should be unified.
+- What was wrong: Weekly analysis stored weekday text in `scheduled_time_local`, while daily analyses use `HH:MM`.
+- Root cause: I mixed delivery-day semantics into a time-only column instead of keeping weekday/date in `analysis_date`, `analysis_slot`, and `raw_json`.
+- New rule (always/never): Always store `t_market_analyses.scheduled_time_local` as `HH:MM` only; never include weekday prefixes.
+- Prevention checklist (before final response):
+  - [ ] Check existing column format before adding special-case values
+  - [ ] Keep date/day semantics in date or metadata fields
+  - [ ] Add a regression test for storage contracts the user corrects
+- Repo updates made:
+  - `src/event_relay/weekly_summary.py`
+  - `tests/test_weekly_summary.py`
+  - `README.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `tests.test_weekly_summary` passed
+  - Existing DB weekly rows were normalized to remove weekday prefixes
+- Status: active
+
+## LESSON-20260428-01
+- Date: 2026-04-28
+- Trigger (User correction): User clarified they only wanted an example of the new analysis format, not DB or workflow mutation.
+- What was wrong: I treated a request for a sample output as permission to patch runtime data and logic.
+- Root cause: I over-indexed on previous implementation-heavy turns and did not separate "show me an example" from "change the system".
+- New rule (always/never): When the user asks for a sample/example, answer with a sample only; never modify code, DB, services, or docs unless explicitly requested.
+- Prevention checklist (before final response):
+  - [ ] If the wording is "範例", "案例", or "樣子", do not mutate state
+  - [ ] If a live DB write seems useful, ask or skip it
+  - [ ] Keep example output clearly labeled as sample unless it is explicitly real data
+- Repo updates made:
+  - `tasks/lessons.md`
+- Verification evidence:
+  - User correction recorded
+- Status: active
+
+## LESSON-20260428-02
+- Date: 2026-04-28
+- Trigger (User correction): User pointed out the morning analysis still did not show recommended stocks or entry timing even though `t_trade_signals` had rows.
+- What was wrong: The analysis text could contain fewer than five candidates and did not clearly expose entry timing/conditions.
+- Root cause: I treated "signals exist" as sufficient instead of verifying the final user-facing `t_market_analyses.summary_text`.
+- New rule (always/never): For analysis-output changes, always verify the final stored analysis text, not only the intermediate tables.
+- Prevention checklist (before final response):
+  - [ ] Query the final `t_market_analyses.summary_text` after signal post-processing
+  - [ ] Confirm required visible sections and counts are present
+  - [ ] Do not call a requirement done when only intermediate storage passed
+- Repo updates made:
+  - `tasks/lessons.md`
+- Verification evidence:
+  - User correction recorded
+- Status: active
+
+## LESSON-20260429-01
+- Date: 2026-04-29
+- Trigger (User correction): User found 2026-04-28 `t_trade_signals` was empty and `## 5. Watchlist for Today` was missing.
+- What was wrong: I relied on `yfinance_taiwan` fallback input that was not actually collected, and the visible watchlist heading did not match the expected format.
+- Root cause: Verification stopped at unit tests and service health; it did not query the actual final DB rows for the target date.
+- New rule (always/never): For signal/watchlist changes, always verify `t_market_analyses`, `t_trade_signals`, and the final `summary_text` heading for the exact target date.
+- Prevention checklist (before final response):
+  - [ ] Query target-date `t_trade_signals` count
+  - [ ] Confirm fallback input source exists in `t_relay_events`
+  - [ ] Confirm final stored `summary_text` contains the expected watchlist heading
+- Repo updates made:
+  - `tasks/lessons.md`
+  - `src/event_relay/trade_signals.py`
+  - `tests/test_trade_signals.py`
+  - `tests/test_market_analysis.py`
+  - `README.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+- Verification evidence:
+  - DB query confirmed five `t_trade_signals` rows and `## 5. Watchlist for Today` for 2026-04-28 / 2026-04-29
+- Status: active
+
+## LESSON-20260430-01
+- Date: 2026-04-30
+- Trigger (User correction): User reviewed actual pre-open analysis output and requested simpler section titles, bullet market data, and less repetitive fallback wording.
+- What was wrong: The generated report was technically complete but not optimized for mobile readability; it mixed dense paragraphs, English watchlist wording, and repeated fallback boilerplate.
+- Root cause: I focused on data completeness and signal presence more than the final message shape.
+- New rule (always/never): For user-facing analysis text, verify readability rules: date-only title guidance, bullet market facts, exact Chinese section titles, and concise repeated boilerplate.
+- Prevention checklist (before final response):
+  - [ ] Check section titles match current user wording
+  - [ ] Check market data appears as bullets when it is mostly numeric
+  - [ ] Check fallback rationales do not repeat boilerplate
+- Repo updates made:
+  - `tasks/lessons.md`
+- Verification evidence:
+  - User correction recorded
+- Status: active
+
+## LESSON-20260504-01
+- Date: 2026-05-04
+- Trigger (User correction): User showed today's `今日個股觀察` output with ticker-only rows and missing locally requested tracked fallback stocks.
+- What was wrong: `structured_json.stock_watch` rows without `name` rendered as ticker-only, and configured tracked fallback stocks were skipped once the LLM already emitted five visible candidates.
+- Root cause: Verification focused on signal existence/count, not final visible stock names or configured tracked-stock inclusion priority.
+- New rule (always/never): Always verify final `今日個股觀察` text includes Chinese stock names and honors configured tracked fallback tickers when the user has requested specific stocks.
+- Prevention checklist (before final response):
+  - [ ] Check final rendered section, not only `t_trade_signals` count
+  - [ ] Confirm ticker-only rows are backfilled with Chinese names
+  - [ ] Confirm `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` tickers can surface even when structured output already has five ideas
+- Repo updates made:
+  - `src/event_relay/trade_signals.py`
+  - `src/event_relay/market_analysis.py`
+  - `src/event_relay/service.py`
+  - `tests/test_trade_signals.py`
+  - `tests/test_market_analysis.py`
+  - `README.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest tests.test_trade_signals -v` passed
+  - `python -m unittest tests.test_market_analysis -v` passed
+  - `python -m py_compile src\event_relay\trade_signals.py src\event_relay\market_analysis.py src\event_relay\service.py` passed
+  - `git diff --check -- ...` passed with CRLF warnings only
+- Status: active

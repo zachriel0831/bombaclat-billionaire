@@ -9,6 +9,7 @@ from event_relay.weekly_summary import (
     _call_llm,
     _call_openai_response,
     _analysis_date_key,
+    _compile_prompts,
     _extract_text_from_anthropic,
     _extract_text_from_response,
     _llm_timeout_seconds,
@@ -16,6 +17,7 @@ from event_relay.weekly_summary import (
     _openai_web_search_enabled,
     _resolve_llm_settings,
     _should_run_now,
+    _store_weekly_analysis,
     _week_key,
 )
 
@@ -102,21 +104,65 @@ class WeeklySummaryTests(unittest.TestCase):
         now_local = datetime(2026, 4, 26, 10, 0, 0, tzinfo=taipei)
         self.assertEqual(_analysis_date_key(now_local, self._config()), "2026-04-26")
 
+    def test_store_weekly_analysis_uses_hhmm_scheduled_time(self) -> None:
+        """weekly scheduled_time_local should match daily HH:MM format."""
+
+        class FakeStore:
+            def __init__(self) -> None:
+                self.record = None
+
+            def upsert_market_analysis(self, record):
+                self.record = record
+                return 1
+
+        taipei = timezone(timedelta(hours=8))
+        store = FakeStore()
+        _store_weekly_analysis(
+            store=store,
+            now_local=datetime(2026, 4, 25, 23, 0, 0, tzinfo=taipei),
+            config=self._config(),
+            message="summary",
+            events_used=3,
+        )
+
+        self.assertIsNotNone(store.record)
+        self.assertEqual(store.record.scheduled_time_local, "05:10")
+
+    def test_compile_prompts_uses_macro_regime_weekly_sections(self) -> None:
+        """Weekly prompt should follow the same macro-regime flow as daily analysis."""
+        with mock.patch("event_relay.weekly_summary._load_text", return_value=""):
+            _system_prompt, reusable_prompt = _compile_prompts(self._config())
+
+        self.assertIn("總經 Regime", reusable_prompt)
+        self.assertIn("利率與流動性", reusable_prompt)
+        self.assertIn("景氣循環", reusable_prompt)
+        self.assertIn("市場情緒", reusable_prompt)
+        self.assertIn("台股配置", reusable_prompt)
+        self.assertIn("風險與資料缺口", reusable_prompt)
+        self.assertIn("Section 2 利率與流動性", reusable_prompt)
+        self.assertNotIn("本週重點", reusable_prompt)
+
     def test_call_llm_routes_to_openai_by_default(self) -> None:
         """測試 test call llm routes to openai by default 的預期行為。"""
-        with mock.patch("event_relay.weekly_summary._call_openai_response", return_value="oai") as oai, \
-             mock.patch("event_relay.weekly_summary._call_anthropic_message", return_value="ant") as ant:
-            result = _call_llm("openai", "base", "key", "m", "sys", "usr")
-        self.assertEqual(result, "oai")
+        from event_relay.prompt_assets import TokenUsage
+        fake = TokenUsage(provider="openai", model="m")
+        with mock.patch("event_relay.weekly_summary._call_openai_response", return_value=("oai", fake)) as oai, \
+             mock.patch("event_relay.weekly_summary._call_anthropic_message", return_value=("ant", fake)) as ant:
+            text, usage = _call_llm("openai", "base", "key", "m", "sys", "usr")
+        self.assertEqual(text, "oai")
+        self.assertIs(usage, fake)
         oai.assert_called_once_with("base", "key", "m", "sys", "usr")
         ant.assert_not_called()
 
     def test_call_llm_routes_to_anthropic(self) -> None:
         """測試 test call llm routes to anthropic 的預期行為。"""
-        with mock.patch("event_relay.weekly_summary._call_openai_response", return_value="oai") as oai, \
-             mock.patch("event_relay.weekly_summary._call_anthropic_message", return_value="ant") as ant:
-            result = _call_llm("Anthropic", "base", "key", "m", "sys", "usr")
-        self.assertEqual(result, "ant")
+        from event_relay.prompt_assets import TokenUsage
+        fake = TokenUsage(provider="anthropic", model="m")
+        with mock.patch("event_relay.weekly_summary._call_openai_response", return_value=("oai", fake)) as oai, \
+             mock.patch("event_relay.weekly_summary._call_anthropic_message", return_value=("ant", fake)) as ant:
+            text, usage = _call_llm("Anthropic", "base", "key", "m", "sys", "usr")
+        self.assertEqual(text, "ant")
+        self.assertIs(usage, fake)
         ant.assert_called_once_with("base", "key", "m", "sys", "usr")
         oai.assert_not_called()
 
@@ -162,9 +208,9 @@ class WeeklySummaryTests(unittest.TestCase):
 
         with mock.patch.dict(os.environ, {"LLM_WEB_SEARCH_ENABLED": "true"}, clear=False), \
              mock.patch("event_relay.weekly_summary.urlopen", side_effect=fake_urlopen):
-            result = _call_openai_response("https://api.openai.com/v1", "key", "gpt-5", "sys", "usr")
+            text, _usage = _call_openai_response("https://api.openai.com/v1", "key", "gpt-5", "sys", "usr")
 
-        self.assertEqual(result, "ok")
+        self.assertEqual(text, "ok")
         payload = captured["payload"]
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload["tools"], [{"type": "web_search"}])
@@ -175,6 +221,8 @@ class WeeklySummaryTests(unittest.TestCase):
             self.assertEqual(_llm_timeout_seconds(), 180)
         with mock.patch.dict(os.environ, {"LLM_TIMEOUT_SECONDS": "3"}, clear=False):
             self.assertEqual(_llm_timeout_seconds(), 15)
+        with mock.patch.dict(os.environ, {"LLM_TIMEOUT_SECONDS": "999"}, clear=False):
+            self.assertEqual(_llm_timeout_seconds(), 600)
 
     def test_resolve_llm_settings_anthropic_branch(self) -> None:
         """測試 test resolve llm settings anthropic branch 的預期行為。"""

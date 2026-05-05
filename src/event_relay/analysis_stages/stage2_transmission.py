@@ -35,6 +35,7 @@ def build_prompts(
     slot_focus = {
         "us_close": "how the U.S. close transmits to the Taiwan next session.",
         "pre_tw_open": "what matters before 09:00 Taiwan open.",
+        "macro_daily": "macro-only world context when Taiwan and the relevant U.S. session are closed.",
         "tw_close": "how today's Taiwan close + US overnight context transmits to tomorrow.",
     }.get(slot, "market transmission to Taiwan equities.")
 
@@ -53,6 +54,9 @@ def build_prompts(
         "Rules:\n"
         "- Use only event IDs present in the stage1 digest.\n"
         "- path uses short arrows, e.g. 'FOMC dovish -> US 10y down -> tech lead -> TW semi beta'.\n"
+        "- Prefer explicit macro-regime paths when evidence exists: inflation/labor -> Fed path -> yields; "
+        "Fed balance sheet/RRP/TGA/reserves -> liquidity; credit spreads/banks -> risk appetite; "
+        "VIX/positioning proxies -> chase-or-fade risk.\n"
         "- strength 0.8+: high-confidence direct link; 0.4-0.7: conditional; <0.4: weak/speculative.\n"
         "- assumptions are the load-bearing conditions; list at least one.\n"
         "- Produce 1-5 chains total; deduplicate overlapping paths.\n\n"
@@ -92,7 +96,7 @@ def run(
         _write_prompt_snapshot(snapshot_dir, context.slot, system_prompt, user_prompt)
 
     try:
-        parsed, raw_text = call_llm_json(
+        parsed, raw_text, usage = call_llm_json(
             provider=context.provider,
             api_base=context.api_base,
             api_key=context.api_key,
@@ -129,6 +133,7 @@ def run(
             "chains_count": chains_count,
             "retrieved_examples_count": examples_count,
             "elapsed_sec": round(elapsed, 3),
+            "usage": usage.to_dict(),
         },
     )
 

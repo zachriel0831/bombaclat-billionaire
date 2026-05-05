@@ -17,6 +17,7 @@ Do not read every file by default. Load only the file needed for the current tas
 
 ## Decisions
 - `memory-bank/09-decisions/`: architecture and process decisions
+- `memory-bank/09-decisions/2026-04-30-market-calendar-guard.md`: daily analysis holiday routing decision
 
 ## Archived / On Demand
 - `memory-bank/archive/enterprise/40-agent-enterprise-readiness.md`: enterprise baseline for production agents

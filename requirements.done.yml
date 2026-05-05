@@ -675,3 +675,102 @@ tasks:
           記錄 taxonomy、derivation 規則、cluster 語意、deferred 工作
         - 26 個新單元測試（topic / region / scope / direction / urgency /
           confidence / contract / cluster_id），全測試 196 綠（170 → 196）
+
+  - id: REQ-024
+    title: "[交易訊號] 從 market_analysis 拆出推薦股 signal"
+    module: market_watch
+    status: done
+    trigger: schedule
+    priority: high
+    description: |
+      目標：把 t_market_analyses.structured_json 內的台股推薦名單拆成獨立交易訊號表，
+      讓後續 review、risk gate、decision、outcome 可以各自獨立追蹤。
+
+      已實作資料表：
+        - t_trade_signals：
+          analysis_id、analysis_date、analysis_slot、market、ticker、name、signal_type、
+          strategy_type、direction、confidence、entry_zone、invalidation、take_profit_zone、
+          holding_horizon、rationale、risk_notes、source_event_ids、status、idempotency_key、raw_json
+        - t_signal_reviews：
+          signal_id、review_type、status、reviewer、reason、risk_score、failed_rules、raw_json
+        - t_signal_outcomes:
+          signal_id、status、evaluated_at、entry_hit、stop_hit、target_hit、return_pct、
+          max_drawdown_pct、outcome_json
+
+      邊界：
+        - LLM 只產生 signal，不直接下單
+        - review / risk gate 必須獨立
+        - 每個 signal 都有 idempotency_key，避免重複處理
+        - 每個 signal 可回指原始 analysis 與 source_event_ids
+        - outcome 必須回寫，供後續評估模型品質
+    depends_on: [REQ-022]
+    acceptance:
+      - market_analysis 寫入 t_market_analyses 後會抽出 stock_watch / trade_ideas 到 t_trade_signals
+      - 只保留台股標的，非台股 signal 會略過
+      - 重跑同一 analysis 時用 signal_key / idempotency_key 去重
+      - 同一 analysis 舊的 pending/new/watch signal 會標成 superseded
+      - t_signal_reviews 與 t_signal_outcomes 已建表，但不與下單耦合
+      - 新增 backfill script 可從既有 t_market_analyses 補寫 t_trade_signals
+      - 新增單元測試覆蓋解析、去重、非台股略過、market_analysis 寫入路徑
+    notes: |
+      2026-04-26 已完成。這條取代原先 watchlist 版本，先建立「分析結果 -> 可審核交易訊號」鏈路。
+      驗證：focused tests 43 passed、full unittest 210 passed、DB 已建立三張表、backfill 寫入 1 筆 2330 pending_review signal。
+
+  - id: REQ-016
+    title: "[分析品質] Prompt caching + 靜態 skill 抽離，降低 token 消耗"
+    status: done
+    trigger: manual
+    priority: medium
+    description: |
+      現況：market_analysis._build_prompts() 每次 call 都把 macro skill + line format
+      skill 整份塞進 system prompt，這兩段幾乎不變，卻每次都計費。
+
+      目標：
+        1. Claude：改用 Anthropic prompt caching（cache_control: ephemeral），把
+           macro_skill + line_skill + 固定 evidence policy 標記為可快取 block，
+           TTL 5 分鐘內連續多 slot / 多 stage 能吃到 cache。
+        2. OpenAI：改走 Responses API 的 prompt caching（自動 prefix cache），
+           確保固定內容放在 prompt 最前段，並量測 cached_tokens 比例。
+        3. 抽出 src/event_relay/prompt_assets.py，集中管理不變的 system chunks
+           與版本號，避免散落在各 stage 檔。
+        4. 在 t_market_analyses.raw_json 記錄 prompt_tokens / cached_tokens / 成本估算。
+    depends_on: [REQ-012]
+    acceptance:
+      - Claude 呼叫帶 cache_control，驗證第二次 call 的 cache_read_input_tokens > 0
+      - OpenAI 呼叫記錄 cached_tokens，可從 raw_json.token_usage.cache_hit_ratio 做 7 天運維觀測
+      - prompt_assets.py 集中管理靜態 chunk + 版本號
+      - t_market_analyses.raw_json 新增 token_usage 欄位（prompt / completion / cached / est_cost_usd）
+      - 新增 unit tests 驗證 cache_control 欄位出現在 Anthropic request payload
+    notes: |
+      2026-04-22 新列。缺省模型配置（market_analysis.py SLOTS / _resolve_market_*_settings）
+      不動，僅換呼叫方式。Anthropic 至少 1024 tokens 才會快取，確認 skill 合併後長度
+      足夠；若不足可加入固定的 evidence policy / few-shot examples 湊齊。
+      2026-04-26 進入 review：
+        Phase A — 抽 prompt_assets：
+          - 新增 src/event_relay/prompt_assets.py，集中：
+              EVIDENCE_POLICY 靜態 preamble、PROMPT_ASSETS_VERSION 版號、
+              load_skill / compose_static_preamble、build_anthropic_system_blocks
+              （>= ~4000 chars 自動套 cache_control: ephemeral）、
+              TokenUsage dataclass + extract_usage_anthropic / extract_usage_openai
+        Phase B — 串 token usage：
+          - weekly_summary._call_llm / _call_anthropic_message / _call_openai_response
+            改回 (text, TokenUsage) tuple；Anthropic 大 system 自動切 list block + cache_control
+          - analysis_stages.llm_json.call_llm_json 改回 (parsed, raw_text, TokenUsage)；
+            _call_anthropic_tool 同樣支援 list system + cache_control
+          - 6 個 stage（stage1~4 + dual_view + critic）將 usage 寫入 extras["usage"]
+          - market_analysis._aggregate_token_usage 從 telemetry 聚合，寫入
+            raw_json.token_usage（prompt / completion / cached / cache_creation /
+            cache_hit_ratio / prompt_assets_version / per-stage stages[] ）
+          - legacy fallback 路徑也帶 usage
+        Phase C — tests：
+          - tests/test_prompt_assets.py 13 個（cache_control 出現在大 system payload、
+            小 system 不被切、explicit blocks pass through、usage 萃取、merge 計算）
+          - tests/test_market_analysis.py 補：legacy 模式 token_usage 落入 raw_json、
+            multi-stage 模式 4 個 stage usage 聚合驗證 cache_hit_ratio
+      2026-05-01 轉 done：
+        - 需求核心已完成：prompt_assets.py、Anthropic cache_control、OpenAI cached_tokens
+          usage 抽取、raw_json.token_usage、legacy/multi-stage usage 聚合。
+        - focused tests 通過：`python -m unittest tests.test_prompt_assets tests.test_market_analysis -v`
+          共 45 tests OK。
+        - 原「OpenAI 7 天平均 cache hit > 60%」屬正式環境運維 KPI；系統已提供
+          `raw_json.token_usage.cache_hit_ratio` 可觀測欄位，不再阻塞需求 done。

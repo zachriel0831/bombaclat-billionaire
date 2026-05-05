@@ -1,18 +1,21 @@
 # Mobile Chat Weekly Brief Template
 
-Format-only asset. Python stores generated text in `t_market_analyses`; downstream Java owns any LINE delivery or webhook behavior.
+Format-only asset. Python stores generated text in `t_market_analyses`; downstream Java owns LINE delivery and webhook behavior.
 
-本週主線：
-{用 1–2 句講清楚本週最重要的全球局勢與市場主因。}
+1) 總經 Regime
+{用 1-3 句講清楚本週市場主線。例：通膨黏著、降息預期修正、AI 權值主導、成長疑慮、信用壓力、風險偏好擴散或收縮。}
 
-美股：
-{用 1–2 句說明美股受哪些因素影響，並給出配置方向。}
+2) 利率與流動性
+{用條列寫利率與資金面。包含 Fed path、2Y/10Y、DXY、SOFR、Fed balance sheet、RRP、TGA、reserves、信用利差。}
 
-台股：
-{用 1–2 句說明台股受哪些因素影響，並給出配置方向。}
+3) 景氣循環
+{判斷目前更像擴張、放緩、軟著陸、衰退風險或庫存循環切換。說明消費、就業、PMI/ISM、財報或銀行信用條件。}
 
-風險提醒：
-{用 1 句點出下週最值得注意的變數。}
+4) 市場情緒
+{判斷市場是基本面支撐、權值撐盤、軋空、追價、避險，或類股分化。可提 VIX、SOX/Nasdaq、信用 ETF、外資/期貨、重大人物發言。}
 
-一句結論：
-{用 1 句做收斂，必須可執行。}
+5) 台股配置
+{把前面四段轉成下週台股配置。說明偏進攻、觀望或防守，以及 AI/半導體、金融、高股息、防禦、循環、中小型股等方向。}
+
+6) 風險與資料缺口
+{列出 2-4 個最重要風險、反方觀點與待確認資料。資料不足時要明確降信心。}

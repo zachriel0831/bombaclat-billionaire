@@ -23,6 +23,10 @@ _EVENT_CATEGORY_ENUM = [
     "supply_chain",
     "regulation",
     "macro_release",
+    "fed_path",
+    "liquidity",
+    "credit_stress",
+    "sentiment_positioning",
     "corporate_action",
     "market_move",
     "other",
@@ -31,6 +35,8 @@ _EVENT_CATEGORY_ENUM = [
 _SENTIMENT_ENUM = ["bullish", "bearish", "neutral"]
 _DIRECTION_ENUM = ["bullish", "bearish", "mixed"]
 _CONFIDENCE_ENUM = ["low", "medium", "high"]
+_NULLABLE_STRING = ["string", "null"]
+_NULLABLE_NUMBER_OR_STRING = ["number", "string", "null"]
 
 
 STAGE1_DIGEST_SCHEMA: dict[str, Any] = {
@@ -255,20 +261,61 @@ STAGE4_SYNTHESIS_SCHEMA: dict[str, Any] = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["ticker", "direction", "rationale"],
+                "required": [
+                    "ticker",
+                    "market",
+                    "name",
+                    "direction",
+                    "rationale",
+                    "strategy_type",
+                    "entry_zone",
+                    "invalidation",
+                    "take_profit_zone",
+                    "holding_horizon",
+                    "confidence",
+                    "risk_notes",
+                    "evidence_ids",
+                ],
                 "properties": {
                     "ticker": {"type": "string"},
-                    "market": {"type": "string"},
-                    "name": {"type": "string"},
+                    "market": {"type": _NULLABLE_STRING},
+                    "name": {"type": _NULLABLE_STRING},
                     "direction": {"type": "string", "enum": _DIRECTION_ENUM},
                     "rationale": {"type": "string"},
-                    "strategy_type": {"type": "string"},
-                    "entry_zone": {"type": ["object", "array", "string"]},
-                    "invalidation": {"type": ["object", "array", "string"]},
-                    "take_profit_zone": {"type": ["object", "array", "string"]},
-                    "holding_horizon": {"type": "string"},
-                    "confidence": {"type": "string", "enum": _CONFIDENCE_ENUM},
-                    "risk_notes": {"type": ["array", "string"]},
+                    "strategy_type": {"type": _NULLABLE_STRING},
+                    "entry_zone": {
+                        "type": ["object", "null"],
+                        "additionalProperties": False,
+                        "required": ["low", "high", "timing", "basis"],
+                        "properties": {
+                            "low": {"type": _NULLABLE_NUMBER_OR_STRING},
+                            "high": {"type": _NULLABLE_NUMBER_OR_STRING},
+                            "timing": {"type": _NULLABLE_STRING},
+                            "basis": {"type": _NULLABLE_STRING},
+                        },
+                    },
+                    "invalidation": {
+                        "type": ["object", "null"],
+                        "additionalProperties": False,
+                        "required": ["price", "basis"],
+                        "properties": {
+                            "price": {"type": _NULLABLE_NUMBER_OR_STRING},
+                            "basis": {"type": _NULLABLE_STRING},
+                        },
+                    },
+                    "take_profit_zone": {
+                        "type": ["object", "null"],
+                        "additionalProperties": False,
+                        "required": ["first", "second", "basis"],
+                        "properties": {
+                            "first": {"type": _NULLABLE_NUMBER_OR_STRING},
+                            "second": {"type": _NULLABLE_NUMBER_OR_STRING},
+                            "basis": {"type": _NULLABLE_STRING},
+                        },
+                    },
+                    "holding_horizon": {"type": _NULLABLE_STRING},
+                    "confidence": {"type": _NULLABLE_STRING},
+                    "risk_notes": {"type": "array", "items": {"type": "string"}},
                     "evidence_ids": {
                         "type": "array",
                         "items": {"type": ["integer", "string"]},

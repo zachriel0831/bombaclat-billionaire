@@ -2,8 +2,9 @@
 
 Threaded ``http.server`` exposing ``GET /healthz``, ``POST /events``
 (news/X/market_context ingest), ``POST /quote-snapshots`` (REQ-019 high-
-frequency quote rows), and ``POST /market-analysis/run`` (manual / scheduled
-analysis trigger). Routes delegate to ``RelayProcessor`` in ``service.py``.
+frequency quote rows), ``POST /market-analysis/run`` (legacy daily analysis
+trigger), and ``POST /analysis/backfill`` (operator-triggered daily / weekly
+analysis backfill). Routes delegate to ``RelayProcessor`` in ``service.py``.
 """
 
 from __future__ import annotations
@@ -21,7 +22,8 @@ from event_relay.service import RelayProcessor
 logger = logging.getLogger(__name__)
 
 
-_ALLOWED_MARKET_ANALYSIS_SLOTS = {"auto", "us_close", "pre_tw_open", "tw_close"}
+_ALLOWED_MARKET_ANALYSIS_SLOTS = {"auto", "us_close", "pre_tw_open", "tw_close", "macro_daily"}
+_ALLOWED_BACKFILL_KINDS = {"market", "weekly"}
 
 
 class RelayHttpServer(ThreadingHTTPServer):
@@ -63,6 +65,10 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/market-analysis/run":
             self._handle_market_analysis_run()
+            return
+
+        if path == "/analysis/backfill":
+            self._handle_analysis_backfill()
             return
 
         self._json_response(404, {"error": "not_found"})
@@ -111,14 +117,8 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
             return
         force = bool(payload.get("force", True))
 
-        from argparse import Namespace
-        from event_relay.market_analysis import _load_config, run_once
-
         try:
-            config = _load_config(
-                Namespace(env_file=self.server.env_file, force=force, slot=slot)
-            )
-            result = run_once(config)
+            result = self._run_market_analysis(slot=slot, force=force)
             self._json_response(200, result)
         except RuntimeError as exc:
             logger.warning("/market-analysis/run failed: %s", exc)
@@ -126,6 +126,76 @@ class RelayRequestHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             logger.exception("Unhandled error while running /market-analysis/run")
             self._json_response(500, {"error": str(exc)})
+
+    def _handle_analysis_backfill(self) -> None:
+        """Trigger daily or weekly analysis from curl / ops tools."""
+        try:
+            payload = self._read_json_body_optional()
+        except ValueError as exc:
+            self._json_response(400, {"error": str(exc)})
+            return
+
+        kind = self._coerce_backfill_kind(payload)
+        if kind not in _ALLOWED_BACKFILL_KINDS:
+            self._json_response(
+                400,
+                {
+                    "error": "invalid_kind",
+                    "allowed": sorted(_ALLOWED_BACKFILL_KINDS),
+                },
+            )
+            return
+
+        force = bool(payload.get("force", True))
+        try:
+            if kind == "weekly":
+                result = self._run_weekly_summary(force=force)
+            else:
+                slot = str(payload.get("slot") or "auto").strip().lower()
+                if slot not in _ALLOWED_MARKET_ANALYSIS_SLOTS:
+                    self._json_response(
+                        400,
+                        {
+                            "error": "invalid_slot",
+                            "allowed": sorted(_ALLOWED_MARKET_ANALYSIS_SLOTS),
+                        },
+                    )
+                    return
+                result = self._run_market_analysis(slot=slot, force=force)
+            self._json_response(200, {"ok": True, "kind": kind, "result": result})
+        except RuntimeError as exc:
+            logger.warning("/analysis/backfill failed kind=%s: %s", kind, exc)
+            self._json_response(400, {"error": str(exc), "kind": kind})
+        except Exception as exc:
+            logger.exception("Unhandled error while running /analysis/backfill kind=%s", kind)
+            self._json_response(500, {"error": str(exc), "kind": kind})
+
+    @staticmethod
+    def _coerce_backfill_kind(payload: dict[str, Any]) -> str:
+        """Normalize caller-friendly aliases into a backfill kind."""
+        raw = str(payload.get("kind") or payload.get("type") or payload.get("analysis_type") or "market")
+        kind = raw.strip().lower().replace("-", "_")
+        if kind in {"daily", "market_analysis", "market_analysis_run"}:
+            return "market"
+        if kind in {"weekly_summary", "weekly_tw_preopen"}:
+            return "weekly"
+        return kind
+
+    def _run_market_analysis(self, *, slot: str, force: bool) -> dict[str, Any]:
+        """Run the existing market-analysis single-shot path."""
+        from argparse import Namespace
+        from event_relay.market_analysis import _load_config, run_once
+
+        config = _load_config(Namespace(env_file=self.server.env_file, force=force, slot=slot))
+        return run_once(config)
+
+    def _run_weekly_summary(self, *, force: bool) -> dict[str, Any]:
+        """Run the existing weekly-summary single-shot path."""
+        from argparse import Namespace
+        from event_relay.weekly_summary import _load_weekly_config, run_once
+
+        config = _load_weekly_config(Namespace(env_file=self.server.env_file, force=force, dry_run=False))
+        return run_once(config)
 
     def log_message(self, fmt: str, *args: Any) -> None:
         """執行 log message 方法的主要邏輯。"""

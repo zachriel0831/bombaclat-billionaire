@@ -1,0 +1,67 @@
+Starting source bridge (X stream + RSS polling + US index stored-only events -> direct-db)...
+Python executable: C:\Users\Zack Ou\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\python.exe
+Env file: D:\work_space\stock\data-collecting\.env
+X token preflight: resolved
+Event sink: direct-db
+Output log: D:\work_space\stock\data-collecting\runtime\logs\source-bridge-20260426-222216.out.log
+Error log: D:\work_space\stock\data-collecting\runtime\logs\source-bridge-20260426-222216.err.log
+2026-04-26 22:22:17,065 INFO mysql.connector - package: mysql.connector.plugins
+2026-04-26 22:22:17,065 INFO mysql.connector - plugin_name: caching_sha2_password
+2026-04-26 22:22:17,065 INFO mysql.connector - AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+2026-04-26 22:22:17,179 INFO __main__ - Bridge event sink: direct DB 127.0.0.1:3306/news_relay event_table=t_relay_events x_table=t_x_posts market_table=t_market_index_snapshots
+2026-04-26 22:22:17,180 INFO news_collector.collector - Enabled sources: official_rss
+2026-04-26 22:22:17,180 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:22:17,180 INFO news_collector.collector - Fetching source=official_rss
+2026-04-26 22:22:17,181 INFO __main__ - Bridge started event_sink=direct-db relay_url=http://127.0.0.1:18090/events
+2026-04-26 22:22:17,182 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/world/rss.xml
+2026-04-26 22:22:17,619 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/world/rss.xml items=1
+2026-04-26 22:22:17,619 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/business/rss.xml
+2026-04-26 22:22:17,930 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/business/rss.xml items=1
+2026-04-26 22:22:17,930 INFO news_collector.sources.rss - RSS request feed=https://feeds.bbci.co.uk/news/technology/rss.xml
+2026-04-26 22:22:18,515 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.bbci.co.uk/news/technology/rss.xml items=1
+2026-04-26 22:22:18,515 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:22:18,870 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com%2Fworld+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:22:18,870 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:22:19,496 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+business+OR+markets+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:22:19,496 INFO news_collector.sources.rss - RSS request feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen
+2026-04-26 22:22:19,849 INFO news_collector.sources.x_accounts - X poll accounts=2 raw_tweets=15 output=15
+2026-04-26 22:22:19,854 INFO __main__ - [BRIDGE_X_BACKFILL_SUBMITTED] id=x-2048035037057048824 source=x:elonmusk url=https://x.com/elonmusk/status/2048035037057048824 status=duplicate
+2026-04-26 22:22:19,856 INFO __main__ - [BRIDGE_X_BACKFILL_SUBMITTED] id=x-2048039351863406736 source=x:elonmusk url=https://x.com/elonmusk/status/2048039351863406736 status=duplicate
+2026-04-26 22:22:19,858 INFO __main__ - [BRIDGE_X_BACKFILL_SUBMITTED] id=x-2048234907965526306 source=x:elonmusk url=https://x.com/elonmusk/status/2048234907965526306 status=duplicate
+2026-04-26 22:22:19,860 INFO __main__ - [BRIDGE_X_BACKFILL_SUBMITTED] id=x-2048271324577952130 source=x:elonmusk url=https://x.com/elonmusk/status/2048271324577952130 status=duplicate
+2026-04-26 22:22:19,863 INFO __main__ - [BRIDGE_X_BACKFILL_SUBMITTED] id=x-2048271866914083172 source=x:elonmusk url=https://x.com/elonmusk/status/2048271866914083172 status=duplicate
+2026-04-26 22:22:19,863 INFO __main__ - X startup backfill complete fetched=15 pushed=5 stored=0 duplicates=5 failed=0 dropped_by_date=10 dropped_by_topic=0
+2026-04-26 22:22:19,863 INFO __main__ - Starting X account stream accounts=https://x.com/elonmusk,https://x.com/realDonaldTrump
+2026-04-26 22:22:19,863 INFO news_collector.x_stream - X stream tracking query=(from:elonmusk OR from:realdonaldtrump) -is:reply -is:retweet
+2026-04-26 22:22:20,120 INFO news_collector.sources.rss - RSS parsed feed=https://news.google.com/rss/search?q=site%3Areuters.com+technology+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen items=1
+2026-04-26 22:22:20,120 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/world.xml
+2026-04-26 22:22:20,294 INFO news_collector.x_stream - X stream cleaned old rules count=1
+2026-04-26 22:22:20,336 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/world.xml items=1
+2026-04-26 22:22:20,336 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxnews.com/google-publisher/tech.xml
+2026-04-26 22:22:20,509 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxnews.com/google-publisher/tech.xml items=1
+2026-04-26 22:22:20,509 INFO news_collector.sources.rss - RSS request feed=https://moxie.foxbusiness.com/google-publisher/markets.xml
+2026-04-26 22:22:20,522 INFO news_collector.x_stream - X stream rule synced
+2026-04-26 22:22:20,881 INFO news_collector.sources.rss - RSS parsed feed=https://moxie.foxbusiness.com/google-publisher/markets.xml items=1
+2026-04-26 22:22:20,881 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1004/rss.xml
+2026-04-26 22:22:20,989 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1004/rss.xml items=1
+2026-04-26 22:22:20,989 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1006/rss.xml
+2026-04-26 22:22:21,030 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1006/rss.xml items=1
+2026-04-26 22:22:21,030 INFO news_collector.sources.rss - RSS request feed=https://feeds.npr.org/1019/rss.xml
+2026-04-26 22:22:21,105 INFO news_collector.sources.rss - RSS parsed feed=https://feeds.npr.org/1019/rss.xml items=1
+2026-04-26 22:22:21,105 INFO news_collector.collector - Fetched source=official_rss items=12 elapsed_ms=3924
+2026-04-26 22:22:21,105 INFO news_collector.collector - Fetch completed: total_items=12 deduped_items=12
+2026-04-26 22:22:21,105 INFO __main__ - Polling source=rss fetched=12
+2026-04-26 22:22:21,123 INFO news_collector.collector - Enabled sources: sec_filings
+2026-04-26 22:22:21,123 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:22:21,123 INFO news_collector.collector - Fetching source=sec_filings
+2026-04-26 22:22:24,652 INFO news_collector.collector - Fetched source=sec_filings items=5 elapsed_ms=3529
+2026-04-26 22:22:24,653 INFO news_collector.collector - Fetch completed: total_items=5 deduped_items=5
+2026-04-26 22:22:24,653 INFO __main__ - Polling source=sec fetched=5
+2026-04-26 22:22:24,654 INFO news_collector.collector - Enabled sources: twse_mops_announcements
+2026-04-26 22:22:24,654 INFO news_collector.collector - Starting fetch run: sources=1, limit_per_source=5
+2026-04-26 22:22:24,654 INFO news_collector.collector - Fetching source=twse_mops_announcements
+2026-04-26 22:22:24,767 INFO news_collector.collector - Fetched source=twse_mops_announcements items=0 elapsed_ms=111
+2026-04-26 22:22:24,767 INFO news_collector.collector - Fetch completed: total_items=0 deduped_items=0
+2026-04-26 22:22:24,767 INFO __main__ - Polling source=twse fetched=0
+2026-04-26 22:22:24,767 INFO __main__ - Polling cycle complete accepted=11 stored=0 duplicates=11 failed=0 dropped_by_date=4 dropped_by_topic=2 next_in=300s
+2026-04-26 22:22:40,899 INFO news_collector.x_stream - X filtered stream connected

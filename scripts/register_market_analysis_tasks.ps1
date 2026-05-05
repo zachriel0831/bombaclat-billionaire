@@ -162,12 +162,12 @@ function Register-TwCloseContextTask {
 
 Register-CollectorTask -TaskName $RagIndexerTaskName -ScriptPath $RagIndexerScript -At $RagIndexerAt -Description "Index recent relay events and market analyses for historical-case RAG."
 Register-CollectorTask -TaskName $BlsMacroTaskName -ScriptPath $BlsMacroScript -At $BlsMacroAt -Description "Collect BLS official macro facts into t_relay_events before U.S. close analysis."
-Register-MarketAnalysisTask -TaskName $UsCloseTaskName -Slot "us_close" -At $UsCloseAt -Description "Generate stored-only U.S. close analysis at 05:00 local time."
+Register-MarketAnalysisTask -TaskName $UsCloseTaskName -Slot "us_close" -At $UsCloseAt -Description "Generate U.S. close analysis at 05:00 local time; TW holidays with U.S. trading make it Java-delivery eligible."
 Register-MarketContextTask -TaskName $MarketContextTaskName -At $MarketContextAt -Description "Collect pre-open market context and store it as event-only facts before Taiwan open."
-Register-MarketAnalysisTask -TaskName $PreOpenTaskName -Slot "pre_tw_open" -At $PreOpenAt -Description "Generate stored-only Taiwan pre-open analysis at 08:00 local time."
+Register-MarketAnalysisTask -TaskName $PreOpenTaskName -Slot "pre_tw_open" -At $PreOpenAt -Description "Generate Taiwan pre-open analysis, or macro_daily when both TW and U.S. close session are closed."
 Register-CollectorTask -TaskName $TwMarketFlowTaskName -ScriptPath $TwMarketFlowScript -At $TwMarketFlowAt -Description "Collect Taiwan official market-flow facts into t_relay_events before Taiwan close context."
 Register-TwCloseContextTask -TaskName $TwCloseContextTaskName -At $TwCloseContextAt -Description "Collect Taiwan close context from relay events at 15:20 local time."
-Register-MarketAnalysisTask -TaskName $TwCloseTaskName -Slot "tw_close" -At $TwCloseAt -Description "Generate stored-only Taiwan close analysis at 15:30 local time."
+Register-MarketAnalysisTask -TaskName $TwCloseTaskName -Slot "tw_close" -At $TwCloseAt -Description "Generate stored-only Taiwan close analysis at 15:30 local time; market calendar guard may skip it."
 
 foreach ($obsoleteTaskName in @("NewsCollector-AnalysisPush-UsClose", "NewsCollector-AnalysisPush-PreTwOpen")) {
   if (Get-ScheduledTask -TaskName $obsoleteTaskName -ErrorAction SilentlyContinue) {

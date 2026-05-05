@@ -17,17 +17,39 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from event_relay.config import load_settings
+from event_relay.prompt_assets import TokenUsage
 from event_relay.service import MarketAnalysisRecord, MySqlEventStore
 
 
 logger = logging.getLogger(__name__)
 WEEKLY_ANALYSIS_SLOT = "weekly_tw_preopen"
 WEEKLY_PROMPT_VERSION = "weekly-summary-v1"
+WEEKLY_DELIVERY_TIME_LOCAL = "05:10"
+
+WEEKLY_REGIME_FLOW_SECTIONS = (
+    "1) 總經 Regime\n"
+    "2) 利率與流動性\n"
+    "3) 景氣循環\n"
+    "4) 市場情緒\n"
+    "5) 台股配置\n"
+    "6) 風險與資料缺口\n"
+)
+
+WEEKLY_REGIME_FLOW_GUIDE = (
+    "Reasoning flow:\n"
+    "- 總經 Regime: summarize what the market is trading this week, e.g. sticky inflation, disinflation, growth scare, liquidity easing, or credit stress.\n"
+    "- 利率與流動性: connect CPI/PCE/jobs/Fed path to 2Y/10Y, DXY, SOFR, Fed balance sheet, RRP, TGA, reserves, and credit spreads.\n"
+    "- 景氣循環: judge expansion/slowdown/soft landing/recession risk from consumption, labor, PMI/ISM, bank credit, earnings, and inventory.\n"
+    "- 市場情緒: decide whether price action is fundamentals-backed or positioning/chase-driven using VIX, SOX/Nasdaq, credit proxies, breadth, and news/X shocks.\n"
+    "- 台股配置: translate the weekly chain into Taiwan sector tilt and next-week stock-watch logic.\n"
+    "- 風險與資料缺口: list what could break the chain and what must be verified next week.\n"
+)
 
 
 @dataclass(frozen=True)
@@ -229,12 +251,13 @@ def _compile_prompts(config: WeeklySummaryConfig) -> tuple[str, str]:
         "The Events JSON is the local event-store context, not a complete list of everything that happened.\n"
         "Use web search when available to verify missing or current facts, and state any remaining gaps.\n"
         "Required sections:\n"
-        "1) 本週重點\n"
-        "2) 國際政治面\n"
-        "3) 財經科技面\n"
-        "4) 下週觀察\n"
-        "5) 風險提醒\n"
-        "Each section should be 1-3 sentences. Total length 320-800 Chinese characters.\n\n"
+        f"{WEEKLY_REGIME_FLOW_SECTIONS}"
+        f"{WEEKLY_REGIME_FLOW_GUIDE}"
+        "Formatting rules:\n"
+        "- Use the exact section titles listed above.\n"
+        "- Section 2 利率與流動性 should use bullets for dense market facts.\n"
+        "- Each section should be 1-3 bullets or one short paragraph.\n"
+        "- Total length 700-1200 Chinese characters. Keep it readable in mobile chat.\n\n"
         "Time range: {week_range}\n"
         "Events JSON:\n{events_json}\n"
     )
@@ -302,13 +325,32 @@ def _send_openai_response_request(url: str, api_key: str, payload: dict[str, Any
     req.add_header("Content-Type", "application/json")
     req.add_header("User-Agent", "news-collector-weekly-summary/1.0")
 
+    timeout_seconds = _llm_timeout_seconds(120)
+    started = time.perf_counter()
     try:
-        with urlopen(req, timeout=_llm_timeout_seconds(120)) as resp:
-            return resp.read().decode("utf-8", errors="replace")
+        with urlopen(req, timeout=timeout_seconds) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+        elapsed = time.perf_counter() - started
+        logger.info("[LLM_HTTP] provider=openai elapsed=%.2fs timeout=%ss status=ok", elapsed, timeout_seconds)
+        return body
     except HTTPError as exc:
+        elapsed = time.perf_counter() - started
         body = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+        logger.warning(
+            "[LLM_HTTP] provider=openai elapsed=%.2fs timeout=%ss status=http_error code=%s",
+            elapsed,
+            timeout_seconds,
+            exc.code,
+        )
         raise RuntimeError(f"OpenAI HTTPError status={exc.code} body={body[:800]}") from exc
     except URLError as exc:
+        elapsed = time.perf_counter() - started
+        logger.warning(
+            "[LLM_HTTP] provider=openai elapsed=%.2fs timeout=%ss status=url_error error=%s",
+            elapsed,
+            timeout_seconds,
+            exc,
+        )
         raise RuntimeError(f"OpenAI URLError: {exc}") from exc
 
 
@@ -320,8 +362,20 @@ def _should_retry_openai_without_web_search(error_message: str) -> bool:
     return any(token in lower for token in ("web_search", "tool", "tools"))
 
 
-def _call_openai_response(api_base: str, api_key: str, model: str, system_prompt: str, user_prompt: str) -> str:
-    """執行 call openai response 的主要流程。"""
+def _call_openai_response(
+    api_base: str,
+    api_key: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+) -> tuple[str, "TokenUsage"]:
+    """Call OpenAI Responses API; return ``(text, usage)``.
+
+    Static prefix-cache exploitation: ``instructions`` is left exactly as the
+    caller built it, so passing the static preamble as the leading section
+    means the Responses API will auto-cache it (no explicit flag needed).
+    """
+    from event_relay.prompt_assets import TokenUsage, extract_usage_openai
     url = f"{api_base.rstrip('/')}/responses"
     payload = {
         "model": model,
@@ -351,7 +405,8 @@ def _call_openai_response(api_base: str, api_key: str, model: str, system_prompt
     result = _extract_text_from_response(parsed)
     if not result:
         raise RuntimeError("OpenAI response has no output text")
-    return result.strip()
+    usage = extract_usage_openai(parsed, model)
+    return result.strip(), usage
 
 
 def _openai_model_supports_temperature(model: str) -> bool:
@@ -367,7 +422,7 @@ def _llm_timeout_seconds(default: int = 120) -> int:
         value = int(raw)
     except ValueError:
         return default
-    return max(15, min(value, 300))
+    return max(15, min(value, 600))
 
 
 def _extract_text_from_anthropic(resp_json: dict[str, Any]) -> str:
@@ -387,13 +442,41 @@ def _extract_text_from_anthropic(resp_json: dict[str, Any]) -> str:
     return "\n".join(chunks).strip()
 
 
-def _call_anthropic_message(api_base: str, api_key: str, model: str, system_prompt: str, user_prompt: str) -> str:
-    """執行 call anthropic message 的主要流程。"""
+def _call_anthropic_message(
+    api_base: str,
+    api_key: str,
+    model: str,
+    system_prompt: str | list[dict[str, Any]],
+    user_prompt: str,
+) -> tuple[str, "TokenUsage"]:
+    """Call Anthropic /v1/messages; return ``(text, usage)``.
+
+    ``system_prompt`` may be either a plain string or a list of content blocks
+    (REQ-016). Plain strings that are large enough are auto-wrapped into a
+    single cacheable block via ``build_anthropic_system_blocks`` so the
+    static prefix gets ``cache_control: {"type": "ephemeral"}``.
+    """
+    from event_relay.prompt_assets import (
+        TokenUsage,
+        build_anthropic_system_blocks,
+        extract_usage_anthropic,
+        is_cacheable,
+    )
     url = f"{api_base.rstrip('/')}/v1/messages"
+
+    if isinstance(system_prompt, str):
+        system_value: Any = (
+            build_anthropic_system_blocks(system_prompt)
+            if is_cacheable(system_prompt)
+            else system_prompt
+        )
+    else:
+        system_value = system_prompt
+
     payload = {
         "model": model,
         "max_tokens": 4096,
-        "system": system_prompt,
+        "system": system_value,
         "messages": [{"role": "user", "content": user_prompt}],
         "temperature": 0.2,
     }
@@ -403,27 +486,61 @@ def _call_anthropic_message(api_base: str, api_key: str, model: str, system_prom
     req.add_header("content-type", "application/json")
     req.add_header("user-agent", "news-collector-weekly-summary/1.0")
 
+    timeout_seconds = _llm_timeout_seconds(120)
+    started = time.perf_counter()
     try:
-        with urlopen(req, timeout=_llm_timeout_seconds(120)) as resp:
+        with urlopen(req, timeout=timeout_seconds) as resp:
             body = resp.read().decode("utf-8", errors="replace")
+        elapsed = time.perf_counter() - started
+        logger.info("[LLM_HTTP] provider=anthropic elapsed=%.2fs timeout=%ss status=ok", elapsed, timeout_seconds)
     except HTTPError as exc:
+        elapsed = time.perf_counter() - started
         body = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+        logger.warning(
+            "[LLM_HTTP] provider=anthropic elapsed=%.2fs timeout=%ss status=http_error code=%s",
+            elapsed,
+            timeout_seconds,
+            exc.code,
+        )
         raise RuntimeError(f"Anthropic HTTPError status={exc.code} body={body[:800]}") from exc
     except URLError as exc:
+        elapsed = time.perf_counter() - started
+        logger.warning(
+            "[LLM_HTTP] provider=anthropic elapsed=%.2fs timeout=%ss status=url_error error=%s",
+            elapsed,
+            timeout_seconds,
+            exc,
+        )
         raise RuntimeError(f"Anthropic URLError: {exc}") from exc
 
     parsed = json.loads(body)
     result = _extract_text_from_anthropic(parsed)
     if not result:
         raise RuntimeError("Anthropic response has no output text")
-    return result.strip()
+    usage = extract_usage_anthropic(parsed, model)
+    return result.strip(), usage
 
 
-def _call_llm(provider: str, api_base: str, api_key: str, model: str, system_prompt: str, user_prompt: str) -> str:
-    """執行 call llm 的主要流程。"""
+def _call_llm(
+    provider: str,
+    api_base: str,
+    api_key: str,
+    model: str,
+    system_prompt: str | list[dict[str, Any]],
+    user_prompt: str,
+) -> tuple[str, "TokenUsage"]:
+    """Provider-dispatch wrapper. Returns ``(text, usage)`` for both providers."""
     if (provider or "").strip().lower() == "anthropic":
         return _call_anthropic_message(api_base, api_key, model, system_prompt, user_prompt)
-    return _call_openai_response(api_base, api_key, model, system_prompt, user_prompt)
+    if isinstance(system_prompt, list):
+        # OpenAI Responses ``instructions`` is a string. Flatten the cacheable
+        # blocks back into a leading static prefix + dynamic suffix.
+        system_str = "\n\n".join(
+            block.get("text", "") for block in system_prompt if isinstance(block, dict)
+        )
+    else:
+        system_str = system_prompt
+    return _call_openai_response(api_base, api_key, model, system_str, user_prompt)
 
 
 def _normalize_line_text(text: str) -> str:
@@ -445,12 +562,13 @@ def _store_weekly_analysis(
         MarketAnalysisRecord(
             analysis_date=analysis_date,
             analysis_slot=WEEKLY_ANALYSIS_SLOT,
-            scheduled_time_local="Sun 05:10",
+            scheduled_time_local=WEEKLY_DELIVERY_TIME_LOCAL,
             model=config.model,
             prompt_version=WEEKLY_PROMPT_VERSION,
             summary_text=message,
             events_used=events_used,
             market_rows_used=0,
+            # 中文：週日只推週總結，因此 weekly_tw_preopen 永遠交給 Java relay 可推送。
             push_enabled=True,
             pushed=False,
             raw_json=json.dumps(
@@ -531,7 +649,7 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
     week_range = f"{config.lookback_days} days ending {now_local.strftime('%Y-%m-%d %H:%M %Z')}"
     user_prompt = reusable_prompt.format(week_range=week_range, events_json=json.dumps(events_payload, ensure_ascii=False))
 
-    summary_text = _call_llm(
+    summary_text, usage = _call_llm(
         provider=config.provider,
         api_base=config.api_base,
         api_key=config.api_key,
@@ -541,7 +659,13 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
     )
     message = _normalize_line_text(summary_text)
 
-    logger.info("[WEEKLY_SUMMARY_STORED_ONLY] model=%s", config.model)
+    logger.info(
+        "[WEEKLY_SUMMARY_STORED_ONLY] model=%s tokens prompt=%d completion=%d cached=%d",
+        config.model,
+        usage.prompt_tokens,
+        usage.completion_tokens,
+        usage.cached_tokens,
+    )
     logger.info("[WEEKLY_SUMMARY_TEXT]\n%s", message)
 
     _store_weekly_analysis(

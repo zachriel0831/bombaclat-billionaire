@@ -164,8 +164,16 @@
 - OpenAI runs request web search by default; if unavailable, the prompt must label missing context instead of fabricating
 3. Persist analysis output
 - Generated text is upserted into `t_market_analyses` by `(analysis_date, analysis_slot)`
+- `push_enabled` means Java delivery eligibility, not Python push execution
+- Daily delivery policy is `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`
+- `us_close` remains stored and is injected into the next Taiwan pre-open analysis context only when the relevant U.S. session was open; if U.S. was closed, the pre-open prompt has no `us_close` context
 - Structured stock recommendations are extracted into `t_trade_signals`
+- For `pre_tw_open`, configured `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` tracked fallback tickers are prioritized in the visible candidate section when recent context exists; otherwise official TWSE tracked-stock context or recent `yfinance_taiwan` quote events top up only when fewer than five visible long swing/medium candidates exist
 - New signals use `status=pending_review`; stale pending signals for the same analysis are marked `superseded`
+- `ticker` is normalized symbol text; Taiwan signals use 4-digit codes without `.TW` / `.TWO`
+- For `pre_tw_open`, up to five long `swing` / `medium` signals are read back from `t_trade_signals` and appended as `## 今日個股觀察` while preserving the full analysis text
+- Daily formatting uses date-only `raw_json.display_title` and the fixed flow `總經 Regime` -> `利率與流動性` -> `景氣循環` -> `市場情緒` -> `台股配置` -> `風險與資料缺口`
+- In that section, `direction=long` is rendered as `可做/建議觀察` plus the strategy label; `entry_zone` means entry area, `take_profit_zone` means profit-taking/exit area, and `invalidation` is rendered as `停損`
 - Do not create orders here. Risk gate / review and outcomes stay in `t_signal_reviews` and `t_signal_outcomes`
 - For existing rows, run `scripts/run_trade_signal_extraction.ps1 -EnvFile .env`
 4. Keep Python storage-only
@@ -176,7 +184,7 @@
 - Query `t_market_analyses` for the current `analysis_date`
 - Query `t_trade_signals` by `analysis_id` or `(analysis_date, analysis_slot)`
 - Query `t_relay_events` for recent `source LIKE 'market_context:%'`
-- Confirm `pushed=0`; Python does not contact LINE or create delivery jobs
+- Confirm rows exist as event/context facts only; Python does not contact LINE or create delivery jobs
 
 ## Workflow 4L: Historical-Case RAG Indexing
 1. Build the local RAG index
@@ -208,10 +216,28 @@
 4. Mark the row as weekly scope
 - Use `analysis_date=YYYY-MM-DD` for the target Sunday delivery date
 - Use `analysis_slot=weekly_tw_preopen`
+- Use `scheduled_time_local=05:10`; do not include weekday text in this column
 - Put `dimension=weekly` in `raw_json`
 5. Verify
 - Check scheduled task next run
 - Query `t_market_analyses` by the target Sunday `analysis_date`
+6. Manual backfill
+- Call the running relay service:
+  `'{"kind":"weekly","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
+- The call is synchronous and may wait for the LLM response.
+
+## Workflow 4D-1: Manual Analysis Backfill API
+1. Ensure relay service is running
+- `GET /healthz` should return `{"ok": true}`
+2. Backfill daily market analysis
+- `'{"kind":"market","slot":"pre_tw_open","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
+- Allowed slots: `auto`, `us_close`, `pre_tw_open`, `tw_close`, `macro_daily`
+3. Backfill weekly analysis
+- `'{"kind":"weekly","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
+4. Verify storage
+- Query `t_market_analyses` by `analysis_slot`
+- Weekly uses `analysis_slot=weekly_tw_preopen`
+- Daily market analysis also extracts recommendations to `t_trade_signals`
 
 ## Workflow 4E: SEC Tracked Filings Flow
 1. Define tracked universe
@@ -266,6 +292,7 @@
 - Yahoo chart snapshots: NASDAQ Composite, NASDAQ 100, SOX, VIX, DXY, WTI, Gold, and key semiconductor ADR/stocks
 - U.S. Treasury official daily yield curve XML: 2Y, 10Y, 30Y, and 10Y-2Y spread
 - TWSE official OpenAPI: index groups, tracked stocks, and margin balances
+- Taiwan tracked-stock Yahoo fallback from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS`; use `.TWO` for TPEx symbols such as `4749.TWO:新應材`
 3. Persist as event-only facts
 - Insert one stored-only event per context point into `t_relay_events`
 - Add one `market_context:collector` summary event for point/failure counts
@@ -322,6 +349,19 @@
 - Check `runtime/prompts/market_analysis_tw_close_*`
 - Query `t_relay_events` for `source='market_context:tw_close'`
 - Query `t_market_analyses` for `analysis_slot='tw_close'`
+
+## Workflow 4L: Market Calendar Guard
+1. Calendar source
+- `src/event_relay/market_calendar.py` contains built-in 2026 TWSE / NYSE full-closure dates.
+- The relevant U.S. close session date is Taiwan local date minus one day.
+2. Routing rules
+- Sunday: skip daily market analysis; weekly summary owns the day.
+- TW closed + relevant U.S. session open: only `us_close` runs.
+- Relevant U.S. session closed + TW open: only `pre_tw_open` / `tw_close` run, and `pre_tw_open` does not include stale `us_close`.
+- TW and relevant U.S. session both closed: `pre_tw_open` writes `macro_daily` with `push_enabled=1`.
+3. Verify
+- Run `python -m unittest tests.test_market_calendar tests.test_market_analysis -v`
+- Check `t_market_analyses.analysis_slot` for `macro_daily` on both-closed days.
 
 ## Workflow 5: Build a New Skill (Enterprise)
 1. Create skill folder from templates:

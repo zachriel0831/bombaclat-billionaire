@@ -47,6 +47,12 @@ def build_prompts(
         "- sector labels should use Taiwan-market vocabulary "
         "(e.g. 半導體上游, AI 供應鏈, 金控, 航運, 中小型股).\n"
         "- stock_watch tickers use 4-digit TWSE codes when known; omit rather than guess.\n"
+        "- For pre_tw_open, stock_watch should aim for five evidence-backed Taiwan tickers "
+        "suited to short/medium-term long setups; if fewer than five are supported, list the gap.\n"
+        "- When Fed path / liquidity / credit stress / sentiment-positioning events are present, "
+        "map them into Taiwan sector tilt before picking tickers: semis/AI beta, financials, "
+        "high-dividend defensives, cyclicals, and small-cap risk appetite.\n"
+        "- For macro_daily, keep stock_watch empty and focus on macro risks / data gaps.\n"
         "- risks: concrete things that could invalidate the setup.\n"
         "- data_gaps: what you would want to confirm next (e.g. overnight ADR, OTC 融資餘額).\n"
         "- Keep each list 0-6 items; quality over quantity.\n\n"
@@ -83,7 +89,7 @@ def run(
         _write_prompt_snapshot(snapshot_dir, context.slot, system_prompt, user_prompt)
 
     try:
-        parsed, raw_text = call_llm_json(
+        parsed, raw_text, usage = call_llm_json(
             provider=context.provider,
             api_base=context.api_base,
             api_key=context.api_key,
@@ -127,6 +133,7 @@ def run(
             "risks_count": risks_count,
             "data_gaps_count": gaps_count,
             "elapsed_sec": round(elapsed, 3),
+            "usage": usage.to_dict(),
         },
     )
 

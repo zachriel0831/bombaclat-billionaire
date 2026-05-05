@@ -1,7 +1,7 @@
 """Stage 4: Traditional-Chinese narrative + structured output.
 
 Consumes the outputs of stages 1-3 (and optional dual_view + critic) and
-produces (a) the final 220-700 character Chinese report written into
+produces (a) the final slot-specific Chinese report written into
 ``t_market_analyses.summary_text`` and (b) a schema-validated JSON object
 stored in ``t_market_analyses.structured_json``.
 
@@ -32,6 +32,7 @@ from event_relay.analysis_stages.schemas import (
     STAGE4_SYNTHESIS_SCHEMA,
     SchemaValidationError,
 )
+from event_relay.prompt_assets import TokenUsage
 from event_relay.weekly_summary import _call_llm
 
 
@@ -46,20 +47,43 @@ COUNTERPOINT_LINE_RE = re.compile(r"^主要反方觀點：(.+)$", re.MULTILINE)
 
 _VALID_CONFIDENCE = {"low", "medium", "high"}
 
-_SLOT_SECTIONS: dict[str, tuple[str, list[str]]] = {
+_REGIME_FLOW_SECTIONS = [
+    "總經 Regime",
+    "利率與流動性",
+    "景氣循環",
+    "市場情緒",
+    "台股配置",
+    "風險與資料缺口",
+]
+
+_SLOT_SECTIONS = {
     "us_close": (
-        "Focus on what the U.S. close implies for Taiwan's next session.",
-        ["美股收盤重點", "對台股的可能影響", "需要留意的族群或事件", "風險與資料缺口"],
+        "Focus on how the U.S. close changes the macro regime and Taiwan next-session setup.",
+        _REGIME_FLOW_SECTIONS,
     ),
     "pre_tw_open": (
-        "Focus on Taiwan pre-open positioning and what matters before 09:00.",
-        ["美股收盤重點", "對台股的可能影響", "需要留意的族群或事件", "風險與資料缺口"],
+        "Focus on Taiwan pre-open positioning before 09:00 through the macro-regime flow.",
+        _REGIME_FLOW_SECTIONS,
+    ),
+    "macro_daily": (
+        "Macro-only world context; both Taiwan and the relevant U.S. close session are closed.",
+        _REGIME_FLOW_SECTIONS,
     ),
     "tw_close": (
-        "Taiwan close review: summarise today's close and set up tomorrow.",
-        ["台股收盤復盤", "法人/期權/融資券", "類股輪動", "隔日觀察與風險"],
+        "Taiwan close review: diagnose today's close through macro regime, flows, sentiment, and next-session allocation.",
+        _REGIME_FLOW_SECTIONS,
     ),
 }
+
+_REGIME_FLOW_GUIDE = (
+    "Yutinghao-style flow:\n"
+    "1. 總經 Regime: define the current regime first, e.g. inflation sticky / disinflation / growth scare / liquidity easing / credit stress.\n"
+    "2. 利率與流動性: connect CPI/PCE/jobs/Fed path to 2Y/10Y, DXY, SOFR, Fed balance sheet, RRP, TGA, reserves, credit spreads.\n"
+    "3. 景氣循環: explain whether consumption, labor, PMI/ISM, bank credit, earnings, or inventory imply expansion, slowdown, soft landing, or recession risk.\n"
+    "4. 市場情緒: judge whether price action is fundamentals-backed or positioning/chase-driven using VIX, SOX/Nasdaq, credit proxies, breadth, and X/news shocks.\n"
+    "5. 台股配置: translate the above into Taiwan sector tilt and stock-watch logic; mention semis/AI, financials, defensives/high dividend, cyclicals, or small caps only when evidence supports it.\n"
+    "6. 風險與資料缺口: list what could break the chain and what must be verified next.\n"
+)
 
 
 def _structured_instructions() -> str:
@@ -67,8 +91,10 @@ def _structured_instructions() -> str:
     return (
         "Produce BOTH a Traditional-Chinese narrative AND a structured JSON view\n"
         "of the same analysis.\n"
-        "  - summary_text: 220-700 characters of Traditional Chinese plain text\n"
-        "    that follows the section list below. End summary_text with two\n"
+        "  - summary_text: Traditional Chinese plain text matching the length\n"
+        "    budget in the user prompt. Follow the section list below and preserve\n"
+        "    the flow: 總經 Regime -> 利率與流動性 -> 景氣循環 -> 市場情緒 -> 台股配置.\n"
+        "    End summary_text with two\n"
         "    final lines on their own:\n"
         "        信心等級：<low|medium|high>\n"
         "        主要反方觀點：<one sentence stating the strongest opposing view>\n"
@@ -85,8 +111,19 @@ def _structured_instructions() -> str:
         "    evidence supports them: market='TW', strategy_type\n"
         "    (intraday/swing/medium/watch), entry_zone, invalidation,\n"
         "    take_profit_zone, holding_horizon, confidence, risk_notes, and\n"
-        "    evidence_ids copied from stage3. If price levels are not evidenced,\n"
-        "    omit price fields instead of guessing.\n"
+        "    evidence_ids copied from stage3. All stock_watch keys are required\n"
+        "    by the structured schema; if price levels are not evidenced, set\n"
+        "    entry_zone / invalidation / take_profit_zone to null instead of\n"
+        "    guessing or omitting keys. Use [] for empty risk_notes.\n"
+        "    For pre_tw_open, use upstream U.S. close context if it appears in\n"
+        "    stage1, and aim for five buy-side candidates with direction\n"
+        "    bullish and strategy_type swing or medium. Use entry_zone as the\n"
+        "    planned entry area, take_profit_zone as profit-taking/exit area,\n"
+        "    and invalidation as stop/exit area. These are signals, not orders.\n"
+        "    If Fed path / liquidity / credit stress / sentiment-positioning\n"
+        "    context exists, include it in key_drivers and use it to justify\n"
+        "    whether Taiwan risk appetite should be chased, faded, or hedged.\n"
+        "    For macro_daily, keep stock_watch empty because markets are closed.\n"
         "  - risks / data_gaps: copy from stage3, dedupe.\n"
         "Do not introduce new facts beyond what stages 1-3 produced. Use the\n"
         "bull_case / bear_case / critic input to balance tone — if critic\n"
@@ -128,10 +165,19 @@ def build_prompts(
     user_lines = [
         f"Generate one {slot} market analysis in Traditional Chinese.",
         focus,
+        "Do not include a bracketed title like [Market Analysis]; downstream title should be date-only.",
         "Required sections (used inside summary_text):",
         numbered_sections,
-        "Total length 220-700 Chinese characters.",
+        _REGIME_FLOW_GUIDE,
+        _summary_length_instruction(slot),
         f"Now local time: {now_local_iso}",
+        "Keep readability: short paragraphs, bullet dense data, no wall-of-text blocks.",
+        "Each section should be 1-3 bullets or one short paragraph. Use bullets for numbers.",
+        "If evidence exists, explicitly cover Fed path, liquidity, credit stress, cycle data, and sentiment/positioning.",
+        "",
+        "Formatting rules:",
+        "- Section 2 利率與流動性 should use bullet lines when listing market facts.",
+        "- Use the exact section titles listed above.",
         "",
         "Use only claims supported by the stage outputs below. If a section",
         "has no supporting material, state the data gap rather than inventing.",
@@ -164,6 +210,17 @@ def build_prompts(
             ]
         )
     return system_prompt, "\n".join(user_lines)
+
+
+def _summary_length_instruction(slot: str) -> str:
+    """Return stage4 narrative length budget for each analysis slot."""
+    if slot == "pre_tw_open":
+        return "Total length 900-1700 Chinese characters."
+    if slot == "macro_daily":
+        return "Total length 650-1100 Chinese characters."
+    if slot == "tw_close":
+        return "Total length 650-1200 Chinese characters."
+    return "Total length 500-1100 Chinese characters."
 
 
 def run(
@@ -211,7 +268,7 @@ def run(
     if snapshot_dir is not None:
         _write_prompt_snapshot(snapshot_dir, context.slot, structured_system, structured_user)
 
-    parsed, summary_text, structured_error, fallback_error = _resolve_summary(
+    parsed, summary_text, structured_error, fallback_error, usage = _resolve_summary(
         context=context,
         structured_system=structured_system,
         structured_user=structured_user,
@@ -227,12 +284,15 @@ def run(
     if fallback_error is not None:
         elapsed = time.perf_counter() - started
         logger.error("[stage4_synthesis] failed elapsed=%.2fs error=%s", elapsed, fallback_error)
+        extras_err: dict[str, Any] = {"structured_error": structured_error or "unknown"}
+        if usage is not None:
+            extras_err["usage"] = usage.to_dict()
         return StageResult(
             name=STAGE_NAME,
             model=context.model,
             output=None,
             error=fallback_error,
-            extras={"structured_error": structured_error or "unknown"},
+            extras=extras_err,
         )
 
     summary_text = ensure_confidence_footer(
@@ -251,6 +311,8 @@ def run(
         "has_dual_view": dual_view_output is not None,
         "has_critic": critic_output is not None,
     }
+    if usage is not None:
+        extras["usage"] = usage.to_dict()
     if structured_error and structured_payload is None:
         extras["structured_fallback"] = structured_error[:200]
     logger.info(
@@ -340,9 +402,15 @@ def _resolve_summary(
     line_skill: str,
     dual_view_json: str | None,
     critic_json: str | None,
-) -> tuple[dict[str, Any] | None, str, str | None, str | None]:
-    """Run structured call, then fall back to text. Returns (parsed, summary, structured_err, fallback_err)."""
-    parsed, structured_error = _try_structured_call(
+) -> tuple[dict[str, Any] | None, str, str | None, str | None, "TokenUsage | None"]:
+    """Run structured call, then fall back to text.
+
+    Returns ``(parsed, summary, structured_err, fallback_err, usage)``. Usage
+    is from whichever call actually produced output (structured if it
+    succeeded, otherwise text fallback). ``None`` only when both paths failed
+    before yielding any usable response.
+    """
+    parsed, structured_error, usage = _try_structured_call(
         context=context,
         system_prompt=structured_system,
         user_prompt=structured_user,
@@ -353,10 +421,10 @@ def _resolve_summary(
         parsed = None
 
     if parsed is not None:
-        return parsed, summary_text, structured_error, None
+        return parsed, summary_text, structured_error, None, usage
 
     try:
-        summary_text = _run_text_fallback(
+        summary_text, fallback_usage = _run_text_fallback(
             context=context,
             slot=slot,
             stage1_json=stage1_json,
@@ -368,8 +436,8 @@ def _resolve_summary(
             critic_json=critic_json,
         )
     except Exception as exc:  # noqa: BLE001
-        return None, "", structured_error, str(exc)
-    return None, summary_text, structured_error, None
+        return None, "", structured_error, str(exc), usage
+    return None, summary_text, structured_error, None, fallback_usage
 
 
 def _try_structured_call(
@@ -377,10 +445,10 @@ def _try_structured_call(
     context: StageContext,
     system_prompt: str,
     user_prompt: str,
-) -> tuple[dict[str, Any] | None, str | None]:
-    """執行 try structured call 的主要流程。"""
+) -> tuple[dict[str, Any] | None, str | None, "TokenUsage | None"]:
+    """Try structured-output call. Return (parsed, error, usage)."""
     try:
-        parsed, _raw_text = call_llm_json(
+        parsed, _raw_text, usage = call_llm_json(
             provider=context.provider,
             api_base=context.api_base,
             api_key=context.api_key,
@@ -390,13 +458,13 @@ def _try_structured_call(
             schema=STAGE4_SYNTHESIS_SCHEMA,
             schema_name=_SCHEMA_NAME,
         )
-        return parsed, None
+        return parsed, None, usage
     except SchemaValidationError as exc:
         logger.warning("[stage4_synthesis] structured output failed schema; falling back to text. %s", exc)
-        return None, f"schema_failed: {exc}"
+        return None, f"schema_failed: {exc}", None
     except Exception as exc:  # noqa: BLE001 - fall back to legacy text call
         logger.warning("[stage4_synthesis] structured call failed (%s); falling back to text.", exc)
-        return None, f"call_failed: {exc}"
+        return None, f"call_failed: {exc}", None
 
 
 def _run_text_fallback(
@@ -410,8 +478,8 @@ def _run_text_fallback(
     line_skill: str,
     dual_view_json: str | None,
     critic_json: str | None,
-) -> str:
-    """執行 run text fallback 的主要流程。"""
+) -> tuple[str, "TokenUsage"]:
+    """Text-fallback call. Return ``(text, usage)``."""
     text_system, text_user = build_prompts(
         slot=slot,
         now_local_iso=context.now_local.isoformat(),
@@ -424,7 +492,7 @@ def _run_text_fallback(
         dual_view_json=dual_view_json,
         critic_json=critic_json,
     )
-    raw_text = _call_llm(
+    raw_text, usage = _call_llm(
         provider=context.provider,
         api_base=context.api_base,
         api_key=context.api_key,
@@ -432,7 +500,7 @@ def _run_text_fallback(
         system_prompt=text_system,
         user_prompt=text_user,
     )
-    return _normalize(raw_text)
+    return _normalize(raw_text), usage
 
 
 def _normalize(text: str) -> str:
