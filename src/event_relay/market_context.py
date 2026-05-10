@@ -17,13 +17,14 @@ import io
 import json
 import logging
 import os
+import re
 import sys
 from typing import Any
 from xml.etree import ElementTree as ET
 
 from event_relay.config import load_settings
 from event_relay.service import MySqlEventStore, RelayEvent
-from news_collector.http_client import http_get_json, http_get_text
+from news_collector.http_client import http_get_json, http_get_json_with_headers, http_get_text
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,20 @@ logger = logging.getLogger(__name__)
 PROMPT_VERSION = "market-context-v1"
 DEFAULT_ANALYSIS_SLOT = "market_context_pre_tw_open"
 DEFAULT_SCHEDULED_TIME = "07:20"
+SCORECARD_VERSION = "market-scorecard-v1"
+SCORECARD_SCALE = "-2=risk-off / stress, 0=mixed or insufficient, +2=supportive / risk-on"
+SCORECARD_DIMENSIONS = (
+    "breadth_health",
+    "ai_capex_quality",
+    "energy_shock_risk",
+    "credit_stress",
+    "liquidity_impulse",
+)
+AI_CAPEX_DEFAULT_TICKERS = ("MSFT", "GOOGL", "META", "AMZN")
+SEC_TICKER_MAP_URL = "https://www.sec.gov/files/company_tickers.json"
+SEC_COMPANY_FACTS_URL_TEMPLATE = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
+EIA_CRUDE_STOCKS_URL = "https://api.eia.gov/v2/petroleum/stoc/wstk/data/"
+EIA_CRUDE_STOCKS_SERIES = "WCESTUS1"
 
 YAHOO_MARKET_SYMBOLS = (
     ("%5EIXIC", "NASDAQ Composite", "us_equity_index", "https://finance.yahoo.com/quote/%5EIXIC"),
@@ -56,6 +71,14 @@ YAHOO_MARKET_SYMBOLS = (
     ("IWM", "iShares Russell 2000 ETF", "small_cap_proxy", "https://finance.yahoo.com/quote/IWM"),
 )
 
+BREADTH_YAHOO_SYMBOLS = (
+    ("SPY", "SPDR S&P 500 ETF", "cap_weight_proxy", "https://finance.yahoo.com/quote/SPY"),
+    ("RSP", "Invesco S&P 500 Equal Weight ETF", "equal_weight_proxy", "https://finance.yahoo.com/quote/RSP"),
+    ("QQQ", "Invesco QQQ Trust", "nasdaq_cap_weight_proxy", "https://finance.yahoo.com/quote/QQQ"),
+    ("QQEW", "First Trust Nasdaq-100 Equal Weighted Index Fund", "nasdaq_equal_weight_proxy", "https://finance.yahoo.com/quote/QQEW"),
+    ("IWM", "iShares Russell 2000 ETF", "small_cap_proxy", "https://finance.yahoo.com/quote/IWM"),
+)
+
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 
 TWSE_INDEX_NAMES = (
@@ -77,6 +100,11 @@ class MarketContextConfig:
     tw_yahoo_symbols: tuple["TaiwanYahooSymbol", ...] = ()
     fred_enabled: bool = True
     fred_series_ids: tuple[str, ...] = ()
+    market_breadth_enabled: bool = True
+    ai_capex_enabled: bool = True
+    ai_capex_tickers: tuple[str, ...] = AI_CAPEX_DEFAULT_TICKERS
+    oil_supply_enabled: bool = True
+    scorecard_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -115,6 +143,20 @@ FRED_SERIES_SPECS: tuple[FredSeriesSpec, ...] = (
 )
 
 FRED_SERIES_BY_ID = {spec.series_id: spec for spec in FRED_SERIES_SPECS}
+
+ENERGY_FRED_SERIES_SPECS: tuple[FredSeriesSpec, ...] = (
+    FredSeriesSpec("DCOILWTICO", "WTI crude oil spot price", "oil_price", "usd_per_barrel"),
+    FredSeriesSpec("DCOILBRENTEU", "Brent crude oil spot price", "oil_price", "usd_per_barrel"),
+)
+
+SEC_CAPEX_CONCEPTS = (
+    "PaymentsToAcquirePropertyPlantAndEquipment",
+    "PaymentsToAcquireProductiveAssets",
+)
+SEC_OPERATING_CASH_FLOW_CONCEPTS = (
+    "NetCashProvidedByUsedInOperatingActivities",
+    "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
+)
 
 
 @dataclass(frozen=True)
@@ -158,6 +200,13 @@ def _load_config(args: argparse.Namespace) -> MarketContextConfig:
     code_text = os.getenv("MARKET_CONTEXT_TWSE_CODES") or os.getenv("TWSE_MOPS_TRACKED_CODES") or ""
     twse_codes = [x.strip() for x in code_text.split(",") if x.strip()]
     fred_series_ids = _parse_csv_env(os.getenv("MARKET_CONTEXT_FRED_SERIES_IDS"))
+    ai_capex_tickers = tuple(
+        ticker
+        for ticker in (
+            _normalize_us_ticker(item) for item in _parse_csv_env(os.getenv("MARKET_CONTEXT_AI_CAPEX_TICKERS"))
+        )
+        if ticker
+    ) or AI_CAPEX_DEFAULT_TICKERS
     return MarketContextConfig(
         env_file=args.env_file,
         analysis_slot=(os.getenv("MARKET_CONTEXT_ANALYSIS_SLOT") or args.analysis_slot).strip() or DEFAULT_ANALYSIS_SLOT,
@@ -168,6 +217,11 @@ def _load_config(args: argparse.Namespace) -> MarketContextConfig:
         tw_yahoo_symbols=_parse_tw_yahoo_symbols(os.getenv("MARKET_CONTEXT_TW_YAHOO_SYMBOLS")),
         fred_enabled=_env_bool("MARKET_CONTEXT_FRED_ENABLED", True),
         fred_series_ids=tuple(fred_series_ids),
+        market_breadth_enabled=_env_bool("MARKET_CONTEXT_BREADTH_ENABLED", True),
+        ai_capex_enabled=_env_bool("MARKET_CONTEXT_AI_CAPEX_ENABLED", True),
+        ai_capex_tickers=ai_capex_tickers,
+        oil_supply_enabled=_env_bool("MARKET_CONTEXT_OIL_SUPPLY_ENABLED", True),
+        scorecard_enabled=_env_bool("MARKET_CONTEXT_SCORECARD_ENABLED", True),
     )
 
 
@@ -182,6 +236,14 @@ def _env_bool(name: str, default: bool) -> bool:
 def _parse_csv_env(text: str | None) -> list[str]:
     """Parse comma-separated env values."""
     return [item.strip() for item in str(text or "").split(",") if item.strip()]
+
+
+def _normalize_us_ticker(raw: str | None) -> str | None:
+    """Normalize a U.S. ticker symbol for SEC/Yahoo lookups."""
+    text = (raw or "").strip().upper()
+    if not text or not re.fullmatch(r"[A-Z0-9][A-Z0-9.\-]{0,14}", text):
+        return None
+    return text
 
 
 def _tw_yahoo_symbol_code(symbol: str) -> str:
@@ -283,6 +345,139 @@ def _parse_yahoo_chart_payload(
         url=url,
         raw={"meta": meta},
     )
+
+
+def _parse_yahoo_daily_series(payload: dict[str, Any], label: str, url: str) -> dict[str, Any] | None:
+    """Parse a Yahoo daily chart payload into clean close-price history."""
+    result = ((payload.get("chart") or {}).get("result") or [None])[0]
+    if not isinstance(result, dict):
+        return None
+
+    meta = result.get("meta") if isinstance(result.get("meta"), dict) else {}
+    timestamps = result.get("timestamp") if isinstance(result.get("timestamp"), list) else []
+    indicators = result.get("indicators") if isinstance(result.get("indicators"), dict) else {}
+    quote_obj = ((indicators.get("quote") or [None])[0]) if isinstance(indicators.get("quote"), list) else None
+    if not isinstance(quote_obj, dict):
+        return None
+
+    closes: list[tuple[int | None, float]] = []
+    for index, raw_close in enumerate(quote_obj.get("close") or []):
+        close = _to_float(raw_close)
+        if close is None:
+            continue
+        timestamp = timestamps[index] if index < len(timestamps) and isinstance(timestamps[index], int) else None
+        closes.append((timestamp, close))
+
+    if not closes:
+        return None
+
+    symbol = str(meta.get("symbol") or label).strip()
+    return {
+        "symbol": symbol,
+        "label": label,
+        "url": url,
+        "currency": str(meta.get("currency") or "USD"),
+        "as_of": _epoch_to_iso(closes[-1][0] or meta.get("regularMarketTime")),
+        "closes": closes,
+    }
+
+
+def _series_return_percent(series: dict[str, Any], sessions: int) -> float | None:
+    """Return percent change over an approximate number of trading sessions."""
+    closes = series.get("closes") if isinstance(series, dict) else None
+    if not isinstance(closes, list) or len(closes) < 2:
+        return None
+    latest = _to_float(closes[-1][1])
+    start_index = max(0, len(closes) - max(int(sessions), 1) - 1)
+    start = _to_float(closes[start_index][1])
+    if latest is None or start in {None, 0}:
+        return None
+    return (latest - start) / start * 100.0
+
+
+def _market_breadth_spread_point(
+    left: dict[str, Any],
+    right: dict[str, Any],
+    *,
+    symbol: str,
+    name: str,
+) -> MarketContextPoint | None:
+    """Build a relative breadth proxy from two ETF return series."""
+    left_1d = _series_return_percent(left, 1)
+    right_1d = _series_return_percent(right, 1)
+    if left_1d is None or right_1d is None:
+        return None
+
+    left_1m = _series_return_percent(left, 21)
+    right_1m = _series_return_percent(right, 21)
+    left_3m = _series_return_percent(left, 63)
+    right_3m = _series_return_percent(right, 63)
+    one_month_spread = (left_1m - right_1m) if left_1m is not None and right_1m is not None else None
+    three_month_spread = (left_3m - right_3m) if left_3m is not None and right_3m is not None else None
+    value = left_1d - right_1d
+
+    return MarketContextPoint(
+        source="market_breadth",
+        category="market_breadth",
+        name=name,
+        symbol=symbol,
+        value=value,
+        previous_value=one_month_spread,
+        change=three_month_spread,
+        change_percent=None,
+        unit="pct_point",
+        as_of=str(left.get("as_of") or right.get("as_of") or ""),
+        url=str(left.get("url") or right.get("url") or ""),
+        raw={
+            "left_symbol": left.get("symbol"),
+            "right_symbol": right.get("symbol"),
+            "left_1d_return_pct": left_1d,
+            "right_1d_return_pct": right_1d,
+            "one_day_spread_pct_point": value,
+            "one_month_spread_pct_point": one_month_spread,
+            "three_month_spread_pct_point": three_month_spread,
+            "interpretation": "Positive means broader/equal-weight or smaller-cap participation is outperforming the cap-weight benchmark.",
+        },
+    )
+
+
+def fetch_market_breadth_points(timeout_seconds: int) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
+    """Fetch ETF relative-return proxies for market breadth health."""
+    series_by_symbol: dict[str, dict[str, Any]] = {}
+    failures: list[SourceFailure] = []
+    for symbol, label, _category, url in BREADTH_YAHOO_SYMBOLS:
+        try:
+            payload = http_get_json(
+                f"https://query2.finance.yahoo.com/v8/finance/chart/{symbol}",
+                params={"interval": "1d", "range": "3mo"},
+                timeout=timeout_seconds,
+            )
+            series = _parse_yahoo_daily_series(payload, label, url)
+            if series is None:
+                failures.append(SourceFailure(source=f"market_breadth:{symbol}", error="empty daily chart payload"))
+            else:
+                series_by_symbol[symbol] = series
+        except Exception as exc:
+            failures.append(SourceFailure(source=f"market_breadth:{symbol}", error=str(exc)))
+
+    points: list[MarketContextPoint] = []
+    pairs = (
+        ("RSP", "SPY", "RSP-SPY", "S&P 500 equal-weight participation spread"),
+        ("QQEW", "QQQ", "QQEW-QQQ", "Nasdaq 100 equal-weight participation spread"),
+        ("IWM", "SPY", "IWM-SPY", "Small-cap relative participation spread"),
+    )
+    for left_symbol, right_symbol, symbol, name in pairs:
+        left = series_by_symbol.get(left_symbol)
+        right = series_by_symbol.get(right_symbol)
+        if not left or not right:
+            failures.append(SourceFailure(source=f"market_breadth:{symbol}", error="missing component series"))
+            continue
+        point = _market_breadth_spread_point(left, right, symbol=symbol, name=name)
+        if point is None:
+            failures.append(SourceFailure(source=f"market_breadth:{symbol}", error="not enough close history"))
+        else:
+            points.append(point)
+    return points, failures
 
 
 def fetch_yahoo_market_points(timeout_seconds: int) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
@@ -499,6 +694,302 @@ def fetch_fred_points(
     return points, failures
 
 
+def _point_with_source(point: MarketContextPoint, source: str) -> MarketContextPoint:
+    """Clone a context point while preserving the existing event payload contract."""
+    return MarketContextPoint(
+        source=source,
+        category=point.category,
+        name=point.name,
+        symbol=point.symbol,
+        value=point.value,
+        previous_value=point.previous_value,
+        change=point.change,
+        change_percent=point.change_percent,
+        unit=point.unit,
+        as_of=point.as_of,
+        url=point.url,
+        raw=point.raw,
+    )
+
+
+def _parse_eia_crude_stocks_payload(payload: dict[str, Any]) -> MarketContextPoint | None:
+    """Parse EIA v2 weekly crude stocks response into one inventory point."""
+    response = payload.get("response") if isinstance(payload, dict) else None
+    rows = response.get("data") if isinstance(response, dict) else None
+    if not isinstance(rows, list):
+        return None
+
+    observations: list[tuple[str, float, dict[str, Any]]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        period = str(row.get("period") or "").strip()
+        value = _to_float(row.get("value"))
+        if period and value is not None:
+            observations.append((period, value, row))
+    observations.sort(key=lambda item: item[0])
+    if not observations:
+        return None
+
+    as_of, value, raw = observations[-1]
+    previous = observations[-2][1] if len(observations) >= 2 else None
+    change = (value - previous) if previous is not None else None
+    change_percent = (change / previous * 100.0) if change is not None and previous not in {None, 0} else None
+    return MarketContextPoint(
+        source="eia",
+        category="oil_inventory",
+        name="U.S. crude oil stocks excluding SPR",
+        symbol=EIA_CRUDE_STOCKS_SERIES,
+        value=value,
+        previous_value=previous,
+        change=change,
+        change_percent=change_percent,
+        unit="thousand_barrels",
+        as_of=as_of,
+        url="https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=W&n=PET&s=WCESTUS1",
+        raw={"series": EIA_CRUDE_STOCKS_SERIES, "record": raw},
+    )
+
+
+def fetch_eia_crude_stocks_point(timeout_seconds: int) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
+    """Fetch EIA weekly crude stocks when a free EIA API key is configured."""
+    api_key = (os.getenv("EIA_API_KEY") or "").strip()
+    if not api_key:
+        return [], [SourceFailure(source=f"eia:{EIA_CRUDE_STOCKS_SERIES}", error="EIA_API_KEY is required for crude inventory context")]
+    try:
+        payload = http_get_json(
+            EIA_CRUDE_STOCKS_URL,
+            params={
+                "api_key": api_key,
+                "frequency": "weekly",
+                "data[0]": "value",
+                "facets[series][]": EIA_CRUDE_STOCKS_SERIES,
+                "sort[0][column]": "period",
+                "sort[0][direction]": "desc",
+                "length": 2,
+            },
+            timeout=max(timeout_seconds, 15),
+        )
+        point = _parse_eia_crude_stocks_payload(payload)
+        if point is None:
+            return [], [SourceFailure(source=f"eia:{EIA_CRUDE_STOCKS_SERIES}", error="empty EIA crude stocks payload")]
+        return [point], []
+    except Exception as exc:
+        return [], [SourceFailure(source=f"eia:{EIA_CRUDE_STOCKS_SERIES}", error=str(exc))]
+
+
+def fetch_oil_supply_demand_points(timeout_seconds: int) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
+    """Fetch FRED/EIA oil price and inventory facts for energy-shock scoring."""
+    points: list[MarketContextPoint] = []
+    failures: list[SourceFailure] = []
+    for spec in ENERGY_FRED_SERIES_SPECS:
+        try:
+            text = http_get_text(
+                FRED_CSV_URL,
+                params={"id": spec.series_id},
+                timeout=max(timeout_seconds, 15),
+            )
+            point = _parse_fred_csv(text, spec)
+            if point is None:
+                failures.append(SourceFailure(source=f"fred_energy:{spec.series_id}", error="empty FRED CSV payload"))
+            else:
+                points.append(_point_with_source(point, "fred_energy"))
+        except Exception as exc:
+            failures.append(SourceFailure(source=f"fred_energy:{spec.series_id}", error=str(exc)))
+
+    eia_points, eia_failures = fetch_eia_crude_stocks_point(timeout_seconds)
+    points.extend(eia_points)
+    failures.extend(eia_failures)
+
+    brent = _find(points, "DCOILBRENTEU")
+    wti = _find(points, "DCOILWTICO")
+    if brent and wti and brent.value is not None and wti.value is not None:
+        spread = brent.value - wti.value
+        previous_spread = (
+            brent.previous_value - wti.previous_value
+            if brent.previous_value is not None and wti.previous_value is not None
+            else None
+        )
+        change = (spread - previous_spread) if previous_spread is not None else None
+        points.append(
+            MarketContextPoint(
+                source="fred_energy",
+                category="oil_supply_demand",
+                name="Brent-WTI spread",
+                symbol="BRENT-WTI",
+                value=spread,
+                previous_value=previous_spread,
+                change=change,
+                change_percent=None,
+                unit="usd_per_barrel",
+                as_of=brent.as_of or wti.as_of,
+                url="https://fred.stlouisfed.org/series/DCOILBRENTEU",
+                raw={
+                    "brent_value": brent.value,
+                    "wti_value": wti.value,
+                    "brent_as_of": brent.as_of,
+                    "wti_as_of": wti.as_of,
+                    "interpretation": "Wider Brent-WTI spread can flag regional supply tightness or logistics stress.",
+                },
+            )
+        )
+    return points, failures
+
+
+def _load_sec_ticker_map(user_agent: str, timeout_seconds: int) -> dict[str, dict[str, str]]:
+    """Load SEC's official ticker-to-CIK mapping."""
+    payload = http_get_json_with_headers(
+        SEC_TICKER_MAP_URL,
+        timeout=timeout_seconds,
+        headers={"User-Agent": user_agent, "Accept": "application/json"},
+    )
+    result: dict[str, dict[str, str]] = {}
+    for value in payload.values():
+        if not isinstance(value, dict):
+            continue
+        ticker = _normalize_us_ticker(str(value.get("ticker") or ""))
+        cik = str(value.get("cik_str") or "").strip()
+        title = str(value.get("title") or "").strip()
+        if ticker and cik and title:
+            result[ticker] = {"cik": cik.zfill(10), "title": title}
+    return result
+
+
+def _sec_usd_fact_records(payload: dict[str, Any], concept_names: tuple[str, ...]) -> list[dict[str, Any]]:
+    """Extract normalized USD XBRL facts for one or more us-gaap concepts."""
+    us_gaap = ((payload.get("facts") or {}).get("us-gaap") or {}) if isinstance(payload.get("facts"), dict) else {}
+    records: list[dict[str, Any]] = []
+    for concept in concept_names:
+        concept_obj = us_gaap.get(concept) if isinstance(us_gaap, dict) else None
+        units = concept_obj.get("units") if isinstance(concept_obj, dict) else None
+        entries = units.get("USD") if isinstance(units, dict) else None
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            form = str(entry.get("form") or "").upper()
+            if form not in {"10-Q", "10-K", "20-F", "40-F"}:
+                continue
+            value = _to_float(entry.get("val"))
+            end = str(entry.get("end") or "").strip()
+            filed = str(entry.get("filed") or "").strip()
+            if value is None or not end:
+                continue
+            records.append(
+                {
+                    "concept": concept,
+                    "value": value,
+                    "end": end,
+                    "filed": filed,
+                    "fy": entry.get("fy"),
+                    "fp": entry.get("fp"),
+                    "form": form,
+                    "frame": entry.get("frame"),
+                }
+            )
+    records.sort(key=lambda row: (str(row.get("end") or ""), str(row.get("filed") or "")), reverse=True)
+    return records
+
+
+def _latest_sec_fact(payload: dict[str, Any], concept_names: tuple[str, ...]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Return latest and previous SEC USD fact records."""
+    records = _sec_usd_fact_records(payload, concept_names)
+    if not records:
+        return None, None
+    latest = records[0]
+    previous = next((row for row in records[1:] if row.get("end") != latest.get("end")), None)
+    return latest, previous
+
+
+def _build_ai_capex_point(
+    ticker: str,
+    company_title: str,
+    cik: str,
+    payload: dict[str, Any],
+) -> MarketContextPoint | None:
+    """Build one AI-capex proxy point from SEC companyfacts."""
+    capex, previous_capex = _latest_sec_fact(payload, SEC_CAPEX_CONCEPTS)
+    if capex is None:
+        return None
+
+    ocf, _previous_ocf = _latest_sec_fact(payload, SEC_OPERATING_CASH_FLOW_CONCEPTS)
+    value = abs(float(capex["value"]))
+    previous_value = abs(float(previous_capex["value"])) if previous_capex is not None else None
+    change = (value - previous_value) if previous_value is not None else None
+    change_percent = (change / previous_value * 100.0) if change is not None and previous_value not in {None, 0} else None
+    operating_cash_flow = float(ocf["value"]) if ocf is not None else None
+    free_cash_flow = (operating_cash_flow - value) if operating_cash_flow is not None else None
+
+    return MarketContextPoint(
+        source="sec_companyfacts",
+        category="ai_capex",
+        name=f"{ticker} AI capex proxy",
+        symbol=ticker,
+        value=value,
+        previous_value=previous_value,
+        change=change,
+        change_percent=change_percent,
+        unit="usd",
+        as_of=str(capex.get("filed") or capex.get("end") or ""),
+        url=SEC_COMPANY_FACTS_URL_TEMPLATE.format(cik=cik),
+        raw={
+            "ticker": ticker,
+            "company_title": company_title,
+            "cik": cik,
+            "capex_fact": capex,
+            "previous_capex_fact": previous_capex,
+            "operating_cash_flow_fact": ocf,
+            "operating_cash_flow": operating_cash_flow,
+            "free_cash_flow_proxy": free_cash_flow,
+            "guardrail": "This is a companyfacts capex proxy, not a perfect AI-only capex split.",
+        },
+    )
+
+
+def fetch_ai_capex_points(
+    timeout_seconds: int,
+    tickers: tuple[str, ...],
+) -> tuple[list[MarketContextPoint], list[SourceFailure]]:
+    """Fetch hyperscaler capex proxies from SEC companyfacts."""
+    user_agent = (os.getenv("SEC_USER_AGENT") or "").strip()
+    if not user_agent:
+        return [], [SourceFailure(source="sec_companyfacts:ai_capex", error="SEC_USER_AGENT is required for SEC EDGAR access")]
+
+    try:
+        ticker_map = _load_sec_ticker_map(user_agent, timeout_seconds)
+    except Exception as exc:
+        return [], [SourceFailure(source="sec_companyfacts:ticker_map", error=str(exc))]
+
+    points: list[MarketContextPoint] = []
+    failures: list[SourceFailure] = []
+    seen: set[str] = set()
+    for raw_ticker in tickers:
+        ticker = _normalize_us_ticker(raw_ticker)
+        if not ticker or ticker in seen:
+            continue
+        seen.add(ticker)
+        company = ticker_map.get(ticker)
+        if company is None:
+            failures.append(SourceFailure(source=f"sec_companyfacts:{ticker}", error="ticker not found in SEC mapping"))
+            continue
+        cik = company["cik"]
+        try:
+            payload = http_get_json_with_headers(
+                SEC_COMPANY_FACTS_URL_TEMPLATE.format(cik=cik),
+                timeout=max(timeout_seconds, 15),
+                headers={"User-Agent": user_agent, "Accept": "application/json"},
+            )
+            point = _build_ai_capex_point(ticker, company["title"], cik, payload)
+            if point is None:
+                failures.append(SourceFailure(source=f"sec_companyfacts:{ticker}", error="capex fact not found"))
+            else:
+                points.append(point)
+        except Exception as exc:
+            failures.append(SourceFailure(source=f"sec_companyfacts:{ticker}", error=str(exc)))
+    return points, failures
+
+
 def _twse_index_point(row: dict[str, Any]) -> MarketContextPoint | None:
     """執行 twse index point 的主要流程。"""
     name = str(row.get("指數") or "").strip()
@@ -632,6 +1123,18 @@ def collect_market_context(config: MarketContextConfig) -> tuple[list[MarketCont
     fred_failures: list[SourceFailure] = []
     if config.fred_enabled:
         fred_points, fred_failures = fetch_fred_points(config.timeout_seconds, config.fred_series_ids)
+    breadth_points: list[MarketContextPoint] = []
+    breadth_failures: list[SourceFailure] = []
+    if config.market_breadth_enabled:
+        breadth_points, breadth_failures = fetch_market_breadth_points(config.timeout_seconds)
+    ai_capex_points: list[MarketContextPoint] = []
+    ai_capex_failures: list[SourceFailure] = []
+    if config.ai_capex_enabled:
+        ai_capex_points, ai_capex_failures = fetch_ai_capex_points(config.timeout_seconds, config.ai_capex_tickers)
+    oil_points: list[MarketContextPoint] = []
+    oil_failures: list[SourceFailure] = []
+    if config.oil_supply_enabled:
+        oil_points, oil_failures = fetch_oil_supply_demand_points(config.timeout_seconds)
     twse_points, twse_failures = fetch_twse_points(config.timeout_seconds, config.twse_codes)
     official_twse_stock_codes = {
         point.symbol for point in twse_points if point.category == "tw_tracked_stock" and point.symbol
@@ -646,6 +1149,9 @@ def collect_market_context(config: MarketContextConfig) -> tuple[list[MarketCont
         (yahoo_points, yahoo_failures),
         (treasury_points, treasury_failures),
         (fred_points, fred_failures),
+        (breadth_points, breadth_failures),
+        (ai_capex_points, ai_capex_failures),
+        (oil_points, oil_failures),
         (twse_points, twse_failures),
         (tw_yahoo_points, tw_yahoo_failures),
     ):
@@ -669,7 +1175,7 @@ def _find(points: list[MarketContextPoint], name: str) -> MarketContextPoint | N
     return None
 
 
-def build_summary(points: list[MarketContextPoint], failures: list[SourceFailure], now_local: datetime) -> str:
+def _build_summary_legacy(points: list[MarketContextPoint], failures: list[SourceFailure], now_local: datetime) -> str:
     """建立 build summary 對應的資料或結果。"""
     ndx = _find(points, "NASDAQ 100")
     sox = _find(points, "PHLX Semiconductor")
@@ -719,6 +1225,550 @@ def build_summary(points: list[MarketContextPoint], failures: list[SourceFailure
         lines.append(f"追蹤股: 2330 收 {tsm.value:.2f} 變動 {change_text}")
     lines.append(f"資料點: {len(points)}；來源錯誤: {len(failures)}")
     return "\n".join(lines)[:4500]
+
+
+def _fmt_pp(value: float | None) -> str:
+    """Format percentage-point values for compact summaries."""
+    if value is None:
+        return "n/a"
+    return f"{value:+.2f}pp"
+
+
+def _fmt_usd_billion(value: float | None) -> str:
+    """Format USD values as billions when possible."""
+    if value is None:
+        return "n/a"
+    return f"${value / 1_000_000_000:.1f}B"
+
+
+def _first_by_category(points: list[MarketContextPoint], category: str) -> MarketContextPoint | None:
+    """Return the first point in a category."""
+    for point in points:
+        if point.category == category:
+            return point
+    return None
+
+
+def build_summary(points: list[MarketContextPoint], failures: list[SourceFailure], now_local: datetime) -> str:
+    """Build clean Traditional Chinese summary text for the analysis prompt."""
+    ndx = _find(points, "NASDAQ 100")
+    sox = _find(points, "PHLX Semiconductor")
+    vix = _find(points, "VIX")
+    us10 = _find(points, "US Treasury 10Y")
+    spread = _find(points, "US10Y2Y")
+    fed_upper = _find(points, "DFEDTARU")
+    rrp = _find(points, "RRPONTSYD")
+    reserves = _find(points, "WRESBAL")
+    hy_oas = _find(points, "BAMLH0A0HYM2")
+    nfci = _find(points, "NFCI")
+    stlfsi = _find(points, "STLFSI4")
+    rsp_spy = _find(points, "RSP-SPY")
+    qqew_qqq = _find(points, "QQEW-QQQ")
+    iwm_spy = _find(points, "IWM-SPY")
+    wti = _find(points, "DCOILWTICO")
+    brent = _find(points, "DCOILBRENTEU")
+    brent_wti = _find(points, "BRENT-WTI")
+    crude_stocks = _find(points, "WCESTUS1")
+    tracked_tw_stock = _first_by_category(points, "tw_tracked_stock")
+    ai_points = [point for point in points if point.category == "ai_capex"]
+
+    lines = [f"市場情境資料 {now_local.date().isoformat()}"]
+    if ndx or sox or vix:
+        vix_text = f"{vix.value:.2f}" if vix and vix.value is not None else "n/a"
+        lines.append(
+            "美股/風險: "
+            f"NDX {_fmt_pct(ndx.change_percent if ndx else None)}, "
+            f"SOX {_fmt_pct(sox.change_percent if sox else None)}, "
+            f"VIX {vix_text}"
+        )
+    if us10 or spread:
+        us10_text = f"{us10.value:.2f}%" if us10 and us10.value is not None else "n/a"
+        spread_text = f"{spread.value:.0f}bp" if spread and spread.value is not None else "n/a"
+        lines.append(f"利率: US10Y {us10_text}, 10Y-2Y {spread_text}")
+    if fed_upper or rrp or reserves:
+        fed_text = f"{fed_upper.value:.2f}%" if fed_upper and fed_upper.value is not None else "n/a"
+        rrp_text = _format_number(rrp.value) if rrp else "n/a"
+        reserves_text = _format_number(reserves.value) if reserves else "n/a"
+        lines.append(f"Fed/liquidity: target upper {fed_text}, RRP {rrp_text}, reserves {reserves_text}")
+    if hy_oas or nfci or stlfsi:
+        hy_text = f"{hy_oas.value:.2f}%" if hy_oas and hy_oas.value is not None else "n/a"
+        nfci_text = _format_number(nfci.value) if nfci else "n/a"
+        stress_text = _format_number(stlfsi.value) if stlfsi else "n/a"
+        lines.append(f"Credit/stress: HY OAS {hy_text}, NFCI {nfci_text}, STLFSI4 {stress_text}")
+    if rsp_spy or qqew_qqq or iwm_spy:
+        lines.append(
+            "市場廣度: "
+            f"RSP-SPY {_fmt_pp(rsp_spy.value if rsp_spy else None)}, "
+            f"QQEW-QQQ {_fmt_pp(qqew_qqq.value if qqew_qqq else None)}, "
+            f"IWM-SPY {_fmt_pp(iwm_spy.value if iwm_spy else None)}"
+        )
+    if ai_points:
+        sample = ", ".join(f"{point.symbol} {_fmt_usd_billion(point.value)}" for point in ai_points[:4])
+        lines.append(f"AI capex: {sample}; SEC companyfacts capex proxy, not pure AI-only spend")
+    if wti or brent or brent_wti or crude_stocks:
+        wti_text = f"{wti.value:.2f}" if wti and wti.value is not None else "n/a"
+        brent_text = f"{brent.value:.2f}" if brent and brent.value is not None else "n/a"
+        spread_text = f"{brent_wti.value:.2f}" if brent_wti and brent_wti.value is not None else "n/a"
+        stock_text = _format_number(crude_stocks.value) if crude_stocks else "n/a"
+        lines.append(f"油價/供需: WTI {wti_text}, Brent {brent_text}, Brent-WTI {spread_text}, US crude stocks ex-SPR {stock_text}")
+    if tracked_tw_stock:
+        change_text = f"{tracked_tw_stock.change:+.2f}" if tracked_tw_stock.change is not None else "n/a"
+        value_text = f"{tracked_tw_stock.value:.2f}" if tracked_tw_stock.value is not None else "n/a"
+        lines.append(f"台股追蹤: {tracked_tw_stock.symbol} {tracked_tw_stock.name} 收盤 {value_text}, 變動 {change_text}")
+
+    lines.append(f"資料點: {len(points)}; 資料缺口: {len(failures)}")
+    if failures:
+        sample_failures = "; ".join(f"{failure.source}: {failure.error}" for failure in failures[:3])
+        lines.append(f"需補資料: {sample_failures}")
+    return "\n".join(lines)[:4500]
+
+
+def _clamp_score(value: int) -> int:
+    """Clamp deterministic scorecard values to the documented -2..+2 scale."""
+    return max(-2, min(2, int(value)))
+
+
+def _threshold_score(value: float | None, *, pos2: float, pos1: float, neg1: float, neg2: float) -> int:
+    """Convert one continuous indicator into a bounded score."""
+    if value is None:
+        return 0
+    if value >= pos2:
+        return 2
+    if value >= pos1:
+        return 1
+    if value <= neg2:
+        return -2
+    if value <= neg1:
+        return -1
+    return 0
+
+
+def _point_date(value: str | None):
+    """Parse a point ``as_of`` value into a date without making bad data fatal."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+    except ValueError:
+        pass
+    if len(text) >= 10:
+        try:
+            return datetime.fromisoformat(text[:10]).date()
+        except ValueError:
+            return None
+    return None
+
+
+def _freshness(points: list[MarketContextPoint], now_local: datetime) -> dict[str, Any]:
+    """Summarise freshness for one scorecard dimension."""
+    dates = [parsed for point in points if (parsed := _point_date(point.as_of)) is not None]
+    if not dates:
+        return {"status": "missing", "newest_as_of": None, "age_days": None}
+    newest = max(dates)
+    age_days = (now_local.date() - newest).days
+    if age_days <= 1:
+        status = "fresh"
+    elif age_days <= 7:
+        status = "recent"
+    else:
+        status = "stale"
+    return {"status": status, "newest_as_of": newest.isoformat(), "age_days": age_days}
+
+
+def _scorecard_dimension(
+    *,
+    name: str,
+    score: int,
+    label: str,
+    meaning: str,
+    points: list[MarketContextPoint],
+    evidence: list[str],
+    counter_evidence: list[str],
+    missing_data: list[str],
+    now_local: datetime,
+) -> dict[str, Any]:
+    """Build one deterministic scorecard dimension payload."""
+    source_symbols = []
+    for point in points:
+        if point.symbol and point.symbol not in source_symbols:
+            source_symbols.append(point.symbol)
+    return {
+        "name": name,
+        "score": _clamp_score(score),
+        "label": label,
+        "meaning": meaning,
+        "evidence": evidence[:8] or ["無足夠資料"],
+        "counter_evidence": counter_evidence[:6] or ["未見明確反向訊號"],
+        "missing_data": missing_data[:8],
+        "freshness": _freshness(points, now_local),
+        "source_symbols": source_symbols,
+        "source_count": len(points),
+    }
+
+
+def _scorecard_points(points: list[MarketContextPoint], symbols: tuple[str, ...]) -> list[MarketContextPoint]:
+    """Return scorecard input points by symbol, preserving requested order."""
+    result: list[MarketContextPoint] = []
+    for symbol in symbols:
+        point = _find(points, symbol)
+        if point is not None:
+            result.append(point)
+    return result
+
+
+def _breadth_score(points: list[MarketContextPoint], now_local: datetime) -> dict[str, Any]:
+    """Score market breadth: positive means broader participation."""
+    breadth_points = _scorecard_points(points, ("RSP-SPY", "QQEW-QQQ", "IWM-SPY"))
+    values = [point.value for point in breadth_points if point.value is not None]
+    average = sum(values) / len(values) if values else None
+    score = _threshold_score(average, pos2=0.75, pos1=0.25, neg1=-0.25, neg2=-0.75)
+    evidence = [
+        f"{point.symbol}: 1D {_fmt_pp(point.value)}, 1M {_fmt_pp(point.previous_value)}, 3M {_fmt_pp(point.change)}"
+        for point in breadth_points
+    ]
+    counter = []
+    if score > 0:
+        counter = [f"{point.symbol} 仍收斂 {_fmt_pp(point.value)}" for point in breadth_points if point.value is not None and point.value < -0.25]
+    elif score < 0:
+        counter = [f"{point.symbol} 仍擴散 {_fmt_pp(point.value)}" for point in breadth_points if point.value is not None and point.value > 0.25]
+    missing = [
+        f"missing breadth proxy {symbol}"
+        for symbol in ("RSP-SPY", "QQEW-QQQ", "IWM-SPY")
+        if _find(points, symbol) is None
+    ]
+    return _scorecard_dimension(
+        name="breadth_health",
+        score=score,
+        label="市場廣度擴散" if score > 0 else "市場廣度收斂" if score < 0 else "市場廣度中性",
+        meaning="+2=等權/小型股明顯跟上，-2=漲勢高度集中",
+        points=breadth_points,
+        evidence=evidence,
+        counter_evidence=counter,
+        missing_data=missing,
+        now_local=now_local,
+    )
+
+
+def _ai_capex_score(points: list[MarketContextPoint], now_local: datetime) -> dict[str, Any]:
+    """Score AI capex quality: positive means spending is better funded by cash flow."""
+    ai_points = [point for point in points if point.category == "ai_capex"]
+    positive_fcf = 0
+    negative_fcf = 0
+    high_growth = 0
+    evidence: list[str] = []
+    counter: list[str] = []
+    missing: list[str] = []
+    for point in ai_points:
+        free_cash_flow = _to_float(point.raw.get("free_cash_flow_proxy")) if isinstance(point.raw, dict) else None
+        if free_cash_flow is not None and free_cash_flow >= 0:
+            positive_fcf += 1
+        elif free_cash_flow is not None:
+            negative_fcf += 1
+        if point.change_percent is not None and point.change_percent > 50:
+            high_growth += 1
+            counter.append(f"{point.symbol} capex 成長偏快 {point.change_percent:+.1f}%")
+        if free_cash_flow is None:
+            missing.append(f"{point.symbol} free_cash_flow_proxy missing")
+        evidence.append(
+            f"{point.symbol}: capex {_fmt_usd_billion(point.value)}, "
+            f"YoY {_fmt_pct(point.change_percent)}, FCF proxy {_fmt_usd_billion(free_cash_flow)}"
+        )
+
+    if not ai_points:
+        score = 0
+        missing.append("SEC companyfacts AI capex proxy missing")
+    else:
+        score = 0
+        if positive_fcf >= max(1, len(ai_points) - 1):
+            score += 1
+        if len(ai_points) >= 3 and positive_fcf == len(ai_points) and high_growth <= 1:
+            score += 1
+        if negative_fcf >= 2:
+            score -= 2
+        elif negative_fcf == 1:
+            score -= 1
+        if high_growth >= max(2, len(ai_points) // 2 + 1) and positive_fcf < len(ai_points):
+            score -= 1
+    return _scorecard_dimension(
+        name="ai_capex_quality",
+        score=score,
+        label="AI capex 品質較佳" if score > 0 else "AI capex 資金壓力較高" if score < 0 else "AI capex 品質待確認",
+        meaning="+2=capex 由營運現金流支撐，-2=支出成長快且現金流緩衝不足",
+        points=ai_points,
+        evidence=evidence,
+        counter_evidence=counter,
+        missing_data=missing,
+        now_local=now_local,
+    )
+
+
+def _energy_score(points: list[MarketContextPoint], now_local: datetime) -> dict[str, Any]:
+    """Score energy shock risk: positive means lower shock pressure."""
+    energy_points = _scorecard_points(points, ("DCOILWTICO", "DCOILBRENTEU", "BRENT-WTI", EIA_CRUDE_STOCKS_SERIES))
+    wti = _find(points, "DCOILWTICO")
+    brent = _find(points, "DCOILBRENTEU")
+    brent_wti = _find(points, "BRENT-WTI")
+    crude_stocks = _find(points, EIA_CRUDE_STOCKS_SERIES)
+    price_values = [point.value for point in (wti, brent) if point is not None and point.value is not None]
+    high_price = max(price_values) if price_values else None
+    score = 0
+    if high_price is not None:
+        if high_price >= 130 or (brent_wti and brent_wti.value is not None and brent_wti.value >= 15):
+            score = -2
+        elif high_price >= 100 or (brent_wti and brent_wti.value is not None and brent_wti.value >= 8):
+            score = -1
+        elif high_price <= 70:
+            score = 2
+        elif high_price <= 80 and (not brent_wti or brent_wti.value is None or brent_wti.value < 5):
+            score = 1
+    if crude_stocks and crude_stocks.change is not None:
+        if crude_stocks.change < -5000 and high_price is not None and high_price >= 90:
+            score -= 1
+        elif crude_stocks.change > 5000 and (high_price is None or high_price < 100):
+            score += 1
+    evidence = [
+        f"WTI {_format_number(wti.value)}" if wti else "WTI missing",
+        f"Brent {_format_number(brent.value)}" if brent else "Brent missing",
+        f"Brent-WTI {_format_number(brent_wti.value)}" if brent_wti else "Brent-WTI missing",
+    ]
+    if crude_stocks:
+        evidence.append(f"US crude stocks ex-SPR {_format_number(crude_stocks.value)}, change {_format_number(crude_stocks.change)}")
+    counter = []
+    if score < 0 and crude_stocks and crude_stocks.change is not None and crude_stocks.change > 0:
+        counter.append(f"庫存增加 {_format_number(crude_stocks.change)}，可部分緩衝油價壓力")
+    if score > 0 and crude_stocks and crude_stocks.change is not None and crude_stocks.change < 0:
+        counter.append(f"庫存下滑 {_format_number(crude_stocks.change)}，低油價訊號仍需保守")
+    missing = [
+        label
+        for point, label in (
+            (wti, "WTI price missing"),
+            (brent, "Brent price missing"),
+            (crude_stocks, "EIA crude inventory missing"),
+        )
+        if point is None
+    ]
+    return _scorecard_dimension(
+        name="energy_shock_risk",
+        score=score,
+        label="能源衝擊風險較低" if score > 0 else "能源衝擊風險升高" if score < 0 else "能源衝擊風險中性",
+        meaning="+2=油價/價差壓力低，-2=油價或供需緊張足以壓估值",
+        points=energy_points,
+        evidence=evidence,
+        counter_evidence=counter,
+        missing_data=missing,
+        now_local=now_local,
+    )
+
+
+def _credit_score(points: list[MarketContextPoint], now_local: datetime) -> dict[str, Any]:
+    """Score credit stress: positive means credit/financial conditions are calm."""
+    credit_points = _scorecard_points(points, ("BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "NFCI", "STLFSI4"))
+    hy_oas = _find(points, "BAMLH0A0HYM2")
+    corp_oas = _find(points, "BAMLC0A0CM")
+    baa_spread = _find(points, "BAA10Y")
+    nfci = _find(points, "NFCI")
+    stlfsi = _find(points, "STLFSI4")
+    score = 0
+    if (hy_oas and hy_oas.value is not None and hy_oas.value >= 5.0) or (
+        stlfsi and stlfsi.value is not None and stlfsi.value >= 1.0
+    ) or (nfci and nfci.value is not None and nfci.value >= 0.5):
+        score = -2
+    elif (hy_oas and hy_oas.value is not None and hy_oas.value >= 3.5) or (
+        stlfsi and stlfsi.value is not None and stlfsi.value > 0
+    ) or (nfci and nfci.value is not None and nfci.value > 0):
+        score = -1
+    elif (
+        hy_oas and hy_oas.value is not None and hy_oas.value <= 3.0
+        and nfci and nfci.value is not None and nfci.value < 0
+        and stlfsi and stlfsi.value is not None and stlfsi.value < 0
+    ):
+        score = 2 if stlfsi.value <= -0.5 else 1
+    evidence = [
+        f"HY OAS {_format_number(hy_oas.value)}%" if hy_oas else "HY OAS missing",
+        f"Corp OAS {_format_number(corp_oas.value)}%" if corp_oas else "Corp OAS missing",
+        f"BAA10Y {_format_number(baa_spread.value)}%" if baa_spread else "BAA10Y missing",
+        f"NFCI {_format_number(nfci.value)}" if nfci else "NFCI missing",
+        f"STLFSI4 {_format_number(stlfsi.value)}" if stlfsi else "STLFSI4 missing",
+    ]
+    counter = []
+    if score > 0:
+        counter = [item for item in evidence if "missing" not in item and any(token in item for token in ("BAA10Y", "Corp OAS"))]
+    elif score < 0 and hy_oas and hy_oas.value is not None and hy_oas.value < 3.5:
+        counter.append(f"HY OAS {_format_number(hy_oas.value)}% 尚未進入壓力區")
+    missing = [item for item in evidence if item.endswith("missing")]
+    return _scorecard_dimension(
+        name="credit_stress",
+        score=score,
+        label="信用壓力低" if score > 0 else "信用壓力升高" if score < 0 else "信用壓力中性",
+        meaning="+2=信用/金融條件寬鬆，-2=信用利差或壓力指數進入警戒",
+        points=credit_points,
+        evidence=evidence,
+        counter_evidence=counter,
+        missing_data=missing,
+        now_local=now_local,
+    )
+
+
+def _liquidity_score(points: list[MarketContextPoint], now_local: datetime) -> dict[str, Any]:
+    """Score liquidity impulse: positive means marginal liquidity support."""
+    liquidity_points = _scorecard_points(points, ("RRPONTSYD", "WRESBAL", "WTREGEN", "WALCL"))
+    raw_score = 0
+    evidence: list[str] = []
+    counter: list[str] = []
+    for point in liquidity_points:
+        change = point.change
+        evidence.append(f"{point.symbol}: level {_format_number(point.value)}, change {_format_number(change)} {point.unit}")
+        if change is None:
+            continue
+        if point.symbol == "RRPONTSYD":
+            raw_score += 1 if change < 0 else -1 if change > 0 else 0
+        elif point.symbol == "WTREGEN":
+            raw_score += 1 if change < 0 else -1 if change > 0 else 0
+        elif point.symbol in {"WRESBAL", "WALCL"}:
+            raw_score += 1 if change > 0 else -1 if change < 0 else 0
+    score = 2 if raw_score >= 2 else 1 if raw_score == 1 else -2 if raw_score <= -2 else -1 if raw_score == -1 else 0
+    if score > 0:
+        counter = [
+            f"{point.symbol} 方向偏緊 change {_format_number(point.change)}"
+            for point in liquidity_points
+            if point.change is not None
+            and ((point.symbol in {"WRESBAL", "WALCL"} and point.change < 0) or (point.symbol in {"RRPONTSYD", "WTREGEN"} and point.change > 0))
+        ]
+    elif score < 0:
+        counter = [
+            f"{point.symbol} 方向偏寬 change {_format_number(point.change)}"
+            for point in liquidity_points
+            if point.change is not None
+            and ((point.symbol in {"WRESBAL", "WALCL"} and point.change > 0) or (point.symbol in {"RRPONTSYD", "WTREGEN"} and point.change < 0))
+        ]
+    missing = [
+        f"missing liquidity series {symbol}"
+        for symbol in ("RRPONTSYD", "WRESBAL", "WTREGEN", "WALCL")
+        if _find(points, symbol) is None
+    ]
+    return _scorecard_dimension(
+        name="liquidity_impulse",
+        score=score,
+        label="流動性脈衝偏寬" if score > 0 else "流動性脈衝偏緊" if score < 0 else "流動性脈衝中性",
+        meaning="+2=準備金/資產負債表或 RRP/TGA 變化支持風險資產，-2=邊際流動性收縮",
+        points=liquidity_points,
+        evidence=evidence,
+        counter_evidence=counter,
+        missing_data=missing,
+        now_local=now_local,
+    )
+
+
+def _scorecard_regime_hint(dimensions: dict[str, dict[str, Any]], overall_score: int) -> str:
+    """Translate scorecard totals into a compact regime hint."""
+    if overall_score >= 4:
+        return "總體條件偏支持風險資產，但仍需檢查估值與個股基本面。"
+    if overall_score <= -4:
+        return "總體條件偏防守，分析應優先處理壓力來源與下行情境。"
+    severe = [name for name, payload in dimensions.items() if int(payload.get("score") or 0) <= -2]
+    if severe:
+        return f"總分接近中性，但 {', '.join(severe)} 有單點壓力，需放進反證段落。"
+    return "總體條件混合，應把支持與反證並列，不用單一新聞決定方向。"
+
+
+def _scorecard_hash(scorecard: dict[str, Any]) -> str:
+    """Hash stable scorecard content for relay-event idempotency."""
+    basis = {
+        "version": scorecard.get("schema_version"),
+        "overall_score": scorecard.get("overall_score"),
+        "dimensions": {
+            name: {
+                "score": payload.get("score"),
+                "evidence": payload.get("evidence"),
+                "freshness": payload.get("freshness"),
+                "source_symbols": payload.get("source_symbols"),
+            }
+            for name, payload in (scorecard.get("dimensions") or {}).items()
+            if isinstance(payload, dict)
+        },
+    }
+    return hashlib.sha1(json.dumps(basis, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+
+
+def build_market_scorecard(
+    points: list[MarketContextPoint],
+    failures: list[SourceFailure],
+    now_local: datetime,
+) -> dict[str, Any]:
+    """Build the deterministic daily market-context scorecard."""
+    dimensions = {
+        "breadth_health": _breadth_score(points, now_local),
+        "ai_capex_quality": _ai_capex_score(points, now_local),
+        "energy_shock_risk": _energy_score(points, now_local),
+        "credit_stress": _credit_score(points, now_local),
+        "liquidity_impulse": _liquidity_score(points, now_local),
+    }
+    overall_score = sum(int(payload.get("score") or 0) for payload in dimensions.values())
+    scorecard: dict[str, Any] = {
+        "schema_version": SCORECARD_VERSION,
+        "scale": SCORECARD_SCALE,
+        "as_of": now_local.isoformat(),
+        "overall_score": overall_score,
+        "regime_hint": _scorecard_regime_hint(dimensions, overall_score),
+        "dimensions": dimensions,
+        "source_failures": [asdict(failure) for failure in failures[:20]],
+    }
+    scorecard["input_hash"] = _scorecard_hash(scorecard)
+    return scorecard
+
+
+def _scorecard_summary(scorecard: dict[str, Any]) -> str:
+    """Render a compact Chinese scorecard summary for prompt input."""
+    dimensions = scorecard.get("dimensions") if isinstance(scorecard.get("dimensions"), dict) else {}
+    lines = [
+        f"市場 scorecard 總分 {int(scorecard.get('overall_score') or 0):+d}; {scorecard.get('regime_hint') or ''}".strip()
+    ]
+    for name in SCORECARD_DIMENSIONS:
+        payload = dimensions.get(name) if isinstance(dimensions, dict) else None
+        if not isinstance(payload, dict):
+            continue
+        evidence = "; ".join(str(item) for item in (payload.get("evidence") or [])[:2])
+        counter = "; ".join(str(item) for item in (payload.get("counter_evidence") or [])[:1])
+        freshness = payload.get("freshness") if isinstance(payload.get("freshness"), dict) else {}
+        lines.append(
+            f"{name}: {int(payload.get('score') or 0):+d} | {payload.get('label')} | "
+            f"依據: {evidence or 'n/a'} | 反證: {counter or 'n/a'} | 新鮮度: {freshness.get('status', 'n/a')}"
+        )
+    return "\n".join(lines)[:4500]
+
+
+def _scorecard_to_event(
+    scorecard: dict[str, Any],
+    config: MarketContextConfig,
+    generated_at: str,
+    now_local: datetime,
+) -> RelayEvent:
+    """Convert the deterministic scorecard into a stored-only relay event."""
+    overall_score = int(scorecard.get("overall_score") or 0)
+    return RelayEvent(
+        event_id=_stable_event_id(
+            "scorecard",
+            config.analysis_slot,
+            now_local.date().isoformat(),
+            scorecard.get("input_hash"),
+        ),
+        source="market_context:scorecard",
+        title=f"Market scorecard {now_local.date().isoformat()} overall {overall_score:+d}",
+        url=f"internal://market_context/scorecard/{config.analysis_slot}/{now_local.date().isoformat()}",
+        summary=_scorecard_summary(scorecard),
+        published_at=generated_at,
+        log_only=False,
+        raw={
+            "stored_only": True,
+            "event_type": "market_context_scorecard",
+            "dimension": "market_context",
+            "slot": config.analysis_slot,
+            "scheduled_time_local": config.scheduled_time_local,
+            "generated_at": generated_at,
+            "scorecard": scorecard,
+        },
+    )
 
 
 def _stable_event_id(*parts: Any) -> str:
@@ -802,9 +1852,12 @@ def build_market_context_events(
 ) -> list[RelayEvent]:
     """建立 build market context events 對應的資料或結果。"""
     generated_at = now_local.isoformat()
+    scorecard = build_market_scorecard(points, failures, now_local) if config.scorecard_enabled else None
     # collector summary event 是整包 context 的索引入口：
     # 單點資料看細節，summary event 看本輪抓了多少點、哪幾個來源失敗。
     events = [_point_to_event(point, config, generated_at) for point in points]
+    if scorecard is not None:
+        events.append(_scorecard_to_event(scorecard, config, generated_at, now_local))
     events.append(
         RelayEvent(
             event_id=_stable_event_id("summary", config.analysis_slot, now_local.date().isoformat()),
@@ -825,6 +1878,21 @@ def build_market_context_events(
                 "tw_yahoo_symbols": [asdict(item) for item in config.tw_yahoo_symbols],
                 "fred_enabled": config.fred_enabled,
                 "fred_series_ids": list(config.fred_series_ids) or [spec.series_id for spec in FRED_SERIES_SPECS],
+                "market_breadth_enabled": config.market_breadth_enabled,
+                "ai_capex_enabled": config.ai_capex_enabled,
+                "ai_capex_tickers": list(config.ai_capex_tickers),
+                "oil_supply_enabled": config.oil_supply_enabled,
+                "scorecard_enabled": config.scorecard_enabled,
+                "scorecard_input_hash": scorecard.get("input_hash") if scorecard else None,
+                "scorecard_overall_score": scorecard.get("overall_score") if scorecard else None,
+                "scorecard_dimension_scores": {
+                    name: payload.get("score")
+                    for name, payload in ((scorecard or {}).get("dimensions") or {}).items()
+                    if isinstance(payload, dict)
+                },
+                "oil_supply_series_ids": [spec.series_id for spec in ENERGY_FRED_SERIES_SPECS],
+                "eia_crude_stocks_series": EIA_CRUDE_STOCKS_SERIES,
+                "eia_api_key_configured": bool((os.getenv("EIA_API_KEY") or "").strip()),
                 "point_count": len(points),
                 "failures": [asdict(failure) for failure in failures],
             },

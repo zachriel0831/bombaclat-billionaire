@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from event_relay.market_analysis import (
+    _apply_provider_context_policy,
     _build_prompts,
     _compact_event_raw_json,
     _load_config,
@@ -238,6 +239,24 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertNotIn("raw", compact["point"])
         self.assertIsNone(ignored)
 
+    def test_compact_event_raw_json_keeps_scorecard(self) -> None:
+        raw = json.dumps(
+            {
+                "event_type": "market_context_scorecard",
+                "dimension": "market_context",
+                "scorecard": {
+                    "overall_score": 3,
+                    "dimensions": {"breadth_health": {"score": 1}},
+                },
+            },
+            ensure_ascii=False,
+        )
+
+        compact = _compact_event_raw_json("market_context:scorecard", raw)
+
+        self.assertEqual(compact["event_type"], "market_context_scorecard")
+        self.assertEqual(compact["scorecard"]["overall_score"], 3)
+
     def test_build_prompts_contains_required_sections(self) -> None:
         """測試 test build prompts contains required sections 的預期行為。"""
         config = SimpleNamespace(skill_macro_path="", skill_line_format_path="")
@@ -326,7 +345,117 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertEqual(raw["slot"], "tw_close")
         self.assertEqual(raw["display_title"], "2026-04-30")
         self.assertIn("market_context:tw_close", raw["event_context_sources"])
+        self.assertTrue(raw["context_pack"]["enabled"])
         self.assertFalse(result["push_enabled"])
+
+    def test_run_once_context_pack_keeps_scorecard_and_official_data(self) -> None:
+        captured: dict[str, str] = {}
+        news_events = [
+            SummaryEvent(
+                row_id=1000 + index,
+                source="reuters",
+                title=f"high importance news {index}",
+                url=f"https://example.com/news/{index}",
+                summary="news",
+                published_at="2026-04-30T00:00:00+00:00",
+                created_at="2026-04-30 00:00:00",
+                raw_json=None,
+            )
+            for index in range(10)
+        ]
+        scorecard_raw = json.dumps(
+            {
+                "stored_only": True,
+                "event_type": "market_context_scorecard",
+                "dimension": "market_context",
+                "scorecard": {
+                    "overall_score": 1,
+                    "dimensions": {"breadth_health": {"score": 1}},
+                },
+            },
+            ensure_ascii=False,
+        )
+        summary_events = [
+            *news_events,
+            SummaryEvent(
+                row_id=1,
+                source="market_context:scorecard",
+                title="Market scorecard overall +1",
+                url="internal://market_context/scorecard",
+                summary="市場 scorecard",
+                published_at="2026-04-30T07:20:00+08:00",
+                created_at="2026-04-30 07:20:00",
+                raw_json=scorecard_raw,
+            ),
+            SummaryEvent(
+                row_id=2,
+                source="market_context:collector",
+                title="Market context collected",
+                url="internal://market_context/collector",
+                summary="市場情境資料",
+                published_at="2026-04-30T07:20:00+08:00",
+                created_at="2026-04-30 07:20:00",
+                raw_json=json.dumps({"event_type": "market_context_collection", "dimension": "market_context"}, ensure_ascii=False),
+            ),
+            SummaryEvent(
+                row_id=3,
+                source="sec:NVDA",
+                title="NVDA 10-Q",
+                url="https://sec.gov/nvda",
+                summary="official filing",
+                published_at="2026-04-30T00:00:00+00:00",
+                created_at="2026-04-30 00:00:00",
+                raw_json=None,
+            ),
+        ]
+        config = SimpleNamespace(
+            env_file=".env",
+            model="test-model",
+            api_base="https://example.test",
+            api_key="test-key",
+            api_key_file=".secrets/test.dpapi",
+            skill_macro_path="",
+            skill_line_format_path="",
+            lookback_hours=24,
+            max_events=5,
+            max_market_rows=2,
+            context_pack_enabled=True,
+            context_pack_candidate_limit=30,
+            window_minutes=25,
+            force=True,
+            slot="pre_tw_open",
+            provider="openai",
+        )
+
+        def _fake_call_llm(*_args, **kwargs):
+            captured["user_prompt"] = kwargs["user_prompt"]
+            return "analysis", _FAKE_LEGACY_USAGE
+
+        _FakeAnalysisStore.records = []
+        _FakeAnalysisStore.signals = []
+        _FakeAnalysisStore.updated_summaries = []
+        _FakeAnalysisStore.summary_events = summary_events
+        _FakeAnalysisStore.latest_us_close = None
+        try:
+            with patch.dict(os.environ, {"MARKET_ANALYSIS_PIPELINE": "legacy"}, clear=False):
+                with patch("event_relay.market_analysis.load_settings", return_value=SimpleNamespace(mysql_enabled=True)):
+                    with patch("event_relay.market_analysis.MySqlEventStore", _FakeAnalysisStore):
+                        with patch("event_relay.market_analysis._write_prompt_snapshots", return_value=None):
+                            with patch("event_relay.market_analysis._call_llm", side_effect=_fake_call_llm):
+                                with patch("event_relay.market_analysis.datetime", _FixedDateTime):
+                                    result = run_once(config)
+        finally:
+            _FakeAnalysisStore.summary_events = None
+
+        self.assertTrue(result["ok"])
+        self.assertIn("market_context:scorecard", captured["user_prompt"])
+        self.assertIn("market_context:collector", captured["user_prompt"])
+        self.assertIn("sec:NVDA", captured["user_prompt"])
+        record = _FakeAnalysisStore.records[0]
+        self.assertLessEqual(record.events_used, 5)
+        raw = json.loads(record.raw_json)
+        self.assertTrue(raw["context_pack"]["guaranteed_buckets"]["scorecard"]["satisfied"])
+        self.assertGreaterEqual(raw["context_pack"]["selected_counts"]["official_data"], 1)
 
     def test_run_once_us_close_is_stored_but_not_delivery_enabled(self) -> None:
         """一般台股交易日的美股收盤分析只做早盤素材。"""
@@ -602,9 +731,11 @@ class MarketAnalysisTests(unittest.TestCase):
         """測試 test load config prefers market analysis env 的預期行為。"""
         old_model = os.environ.get("MARKET_ANALYSIS_MODEL")
         old_provider = os.environ.get("LLM_PROVIDER")
+        old_router = os.environ.get("MARKET_ANALYSIS_MODEL_ROUTER_ENABLED")
         try:
             os.environ["MARKET_ANALYSIS_MODEL"] = "gpt-5-mini"
-            os.environ.pop("LLM_PROVIDER", None)
+            os.environ["MARKET_ANALYSIS_MODEL_ROUTER_ENABLED"] = "0"
+            os.environ["LLM_PROVIDER"] = "openai"
             args = SimpleNamespace(env_file=".env", force=False, slot="auto")
 
             config = _load_config(args)
@@ -620,17 +751,28 @@ class MarketAnalysisTests(unittest.TestCase):
                 os.environ.pop("LLM_PROVIDER", None)
             else:
                 os.environ["LLM_PROVIDER"] = old_provider
+            if old_router is None:
+                os.environ.pop("MARKET_ANALYSIS_MODEL_ROUTER_ENABLED", None)
+            else:
+                os.environ["MARKET_ANALYSIS_MODEL_ROUTER_ENABLED"] = old_router
 
     def test_load_config_switches_to_anthropic(self) -> None:
         """測試 test load config switches to anthropic 的預期行為。"""
         snapshot = {
             k: os.environ.get(k)
-            for k in ("LLM_PROVIDER", "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "MARKET_ANALYSIS_MODEL")
+            for k in (
+                "LLM_PROVIDER",
+                "ANTHROPIC_API_KEY",
+                "ANTHROPIC_MODEL",
+                "MARKET_ANALYSIS_MODEL",
+                "MARKET_ANALYSIS_MODEL_ROUTER_ENABLED",
+            )
         }
         try:
             os.environ["LLM_PROVIDER"] = "anthropic"
             os.environ["ANTHROPIC_API_KEY"] = "sk-ant-test"
             os.environ["ANTHROPIC_MODEL"] = "claude-sonnet-4-6"
+            os.environ["MARKET_ANALYSIS_MODEL_ROUTER_ENABLED"] = "0"
             os.environ.pop("MARKET_ANALYSIS_MODEL", None)
             args = SimpleNamespace(env_file=".env", force=False, slot="auto")
 
@@ -646,6 +788,107 @@ class MarketAnalysisTests(unittest.TestCase):
                     os.environ.pop(k, None)
                 else:
                     os.environ[k] = v
+
+    def test_load_config_model_router_falls_back_to_anthropic(self) -> None:
+        """Quota-aware router can switch provider before analysis."""
+        env = {
+            "LLM_PROVIDER": "openai",
+            "MARKET_ANALYSIS_OPENAI_API_KEY": "sk-openai-test",
+            "ANTHROPIC_API_KEY": "sk-ant-test",
+            "MARKET_ANALYSIS_MODEL": "gpt-expensive",
+            "ANTHROPIC_MODEL": "claude-backup",
+            "MARKET_ANALYSIS_OPENAI_MONTHLY_BUDGET_USD": "10",
+            "MARKET_ANALYSIS_ANTHROPIC_MONTHLY_BUDGET_USD": "10",
+            "MARKET_ANALYSIS_OPENAI_ADMIN_KEY": "openai-admin",
+            "MARKET_ANALYSIS_ANTHROPIC_ADMIN_KEY": "anthropic-admin",
+            "MARKET_ANALYSIS_MODEL_ROUTER_ENABLED": "1",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            with patch("event_relay.llm_quota_router.fetch_openai_month_to_date_cost_usd", return_value=10.5):
+                with patch("event_relay.llm_quota_router.fetch_anthropic_month_to_date_cost_usd", return_value=1.0):
+                    args = SimpleNamespace(env_file=".env", force=False, slot="auto")
+
+                    config = _load_config(args)
+
+        self.assertEqual(config.provider, "anthropic")
+        self.assertEqual(config.model, "claude-backup")
+        self.assertEqual(config.api_key, "sk-ant-test")
+        self.assertEqual((config.model_router or {})["selected_provider"], "anthropic")
+
+    def test_load_config_model_router_defaults_openai_primary(self) -> None:
+        """Market analysis prefers OpenAI even if global LLM_PROVIDER points at Claude."""
+        env = {
+            "LLM_PROVIDER": "anthropic",
+            "MARKET_ANALYSIS_OPENAI_API_KEY": "sk-openai-test",
+            "ANTHROPIC_API_KEY": "sk-ant-test",
+            "MARKET_ANALYSIS_MODEL": "gpt-primary",
+            "ANTHROPIC_MODEL": "claude-secondary",
+            "MARKET_ANALYSIS_MODEL_ROUTER_ENABLED": "1",
+            "MARKET_ANALYSIS_PRIMARY_PROVIDER": "",
+            "MARKET_ANALYSIS_PROVIDER_ORDER": "",
+            "MARKET_ANALYSIS_OPENAI_MONTHLY_BUDGET_USD": "",
+            "MARKET_ANALYSIS_ANTHROPIC_MONTHLY_BUDGET_USD": "",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            args = SimpleNamespace(env_file=".env", force=False, slot="auto")
+
+            config = _load_config(args)
+
+        self.assertEqual(config.provider, "openai")
+        self.assertEqual(config.model, "gpt-primary")
+        self.assertEqual((config.model_router or {})["provider_order"][:2], ["openai", "anthropic"])
+
+    def test_anthropic_context_policy_compacts_prompt_payloads(self) -> None:
+        """Claude fallback gets smaller prompt payloads while preserving scorecard context."""
+        long_summary = "x" * 240
+        events = [
+            {
+                "id": 1,
+                "source": "market_context:scorecard",
+                "title": "scorecard",
+                "summary": long_summary,
+                "url": "https://example.test/scorecard",
+                "published_at": "2026-05-07",
+                "raw": {"event_type": "market_context_scorecard", "scorecard": {"dimensions": {"breadth_health": {"score": -1}}}},
+                "annotation": {"importance": 0.1, "category": "market_context", "sentiment": "neutral"},
+            }
+        ]
+        events.extend(
+            {
+                "id": idx,
+                "source": "rss",
+                "title": f"event {idx}",
+                "summary": long_summary,
+                "url": f"https://example.test/{idx}",
+                "published_at": "2026-05-07",
+                "raw": {"huge": "y" * 500},
+                "annotation": {"importance": float(idx % 5), "category": "macro", "sentiment": "neutral"},
+            }
+            for idx in range(2, 14)
+        )
+        env = {
+            "MARKET_ANALYSIS_ANTHROPIC_MAX_EVENTS": "10",
+            "MARKET_ANALYSIS_ANTHROPIC_MAX_MARKET_ROWS": "1",
+            "MARKET_ANALYSIS_ANTHROPIC_RAG_K": "1",
+            "MARKET_ANALYSIS_ANTHROPIC_EVENT_SUMMARY_CHARS": "120",
+        }
+
+        with patch.dict(os.environ, env, clear=False):
+            compact_events, compact_market, compact_rag, telemetry = _apply_provider_context_policy(
+                provider="anthropic",
+                events_payload=events,
+                market_payload=[{"event_id": "m1", "quote_url": "https://quote", "symbol": "SPY"}, {"event_id": "m2"}],
+                rag_examples=[{"event_id": "r1", "title": "rag", "summary": long_summary}, {"event_id": "r2"}],
+            )
+
+        self.assertEqual(telemetry["mode"], "anthropic_compact")
+        self.assertEqual(len(compact_events), 10)
+        self.assertEqual(len(compact_market), 1)
+        self.assertEqual(len(compact_rag), 1)
+        self.assertEqual(compact_events[0]["source"], "market_context:scorecard")
+        self.assertIn("scorecard", compact_events[0]["raw"])
+        self.assertNotIn("url", compact_events[0])
+        self.assertTrue(compact_events[0]["summary"].endswith("..."))
 
 
 class MultiStagePipelineTests(unittest.TestCase):
@@ -676,6 +919,8 @@ class MultiStagePipelineTests(unittest.TestCase):
         stage_side_effects: dict,
         summary_events: list[SummaryEvent] | None = None,
         latest_us_close=None,
+        slot: str = "pre_tw_open",
+        now: datetime | None = None,
     ) -> tuple[dict, list]:
         """執行 run 方法的主要邏輯。"""
         _FakeAnalysisStore.records = []
@@ -684,6 +929,11 @@ class MultiStagePipelineTests(unittest.TestCase):
         _FakeAnalysisStore.summary_events = summary_events
         _FakeAnalysisStore.latest_us_close = latest_us_close
         from event_relay import market_analysis as module
+        config = self._base_config()
+        config.slot = slot
+        old_now = _FixedDateTime.current
+        if now is not None:
+            _FixedDateTime.current = now
 
         patches = [
             patch("event_relay.market_analysis.load_settings", return_value=SimpleNamespace(mysql_enabled=True)),
@@ -696,8 +946,11 @@ class MultiStagePipelineTests(unittest.TestCase):
         for stage_target, side_effect in stage_side_effects.items():
             patches.append(patch(stage_target, side_effect=side_effect))
 
-        with _nested(*patches):
-            result = module.run_once(self._base_config())
+        try:
+            with _nested(*patches):
+                result = module.run_once(config)
+        finally:
+            _FixedDateTime.current = old_now
         return result, _FakeAnalysisStore.records
 
     def test_legacy_mode_skips_pipeline(self) -> None:
@@ -800,20 +1053,20 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(raw["upstream_analysis_context"]["reason"], "us_close_session_closed")
 
     def test_legacy_mode_appends_quote_fallback_trade_signal_section(self) -> None:
-        """Legacy fallback still appends buy candidates from quote events."""
+        """Legacy fallback still appends fixed-pool watch rows from quote events."""
         quote_events = [
             SummaryEvent(
                 row_id=901,
                 source="yfinance_taiwan",
-                title="[2026-04-24] 聯發科 (2454.TW) 2435.00 ▲9.93%",
-                url="https://finance.yahoo.com/quote/2454.TW",
+                title="[2026-04-24] 長榮 (2603.TW) 220.00 ▲2.50%",
+                url="https://finance.yahoo.com/quote/2603.TW",
                 summary=json.dumps(
                     {
-                        "symbol": "2454.TW",
-                        "name": "聯發科",
-                        "price": 2435.0,
-                        "prev_close": 2215.0,
-                        "change_pct": 9.93,
+                        "symbol": "2603.TW",
+                        "name": "長榮",
+                        "price": 220.0,
+                        "prev_close": 214.5,
+                        "change_pct": 2.5,
                         "volume": 21684950,
                     },
                     ensure_ascii=False,
@@ -832,14 +1085,14 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(result["trade_signals_stored"], 1)
         self.assertEqual(result["trade_signal_recommendations"], 1)
         signal = _FakeAnalysisStore.signals[0][1][0]
-        self.assertEqual(signal.ticker, "2454")
+        self.assertEqual(signal.ticker, "2603")
         self.assertEqual(signal.signal_type, "quote_fallback_stock_watch")
         self.assertEqual(signal.strategy_type, "swing")
         self.assertEqual(_FakeAnalysisStore.updated_summaries[0][0], 777)
         self.assertIn("legacy fallback text", _FakeAnalysisStore.updated_summaries[0][1])
         self.assertIn("## 今日個股觀察", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("短中線推薦買進候選", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("2454 聯發科", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertIn("固定五檔監控池", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertIn("2603 長榮", _FakeAnalysisStore.updated_summaries[0][1])
 
     def test_multi_stage_happy_path(self) -> None:
         """測試 test multi stage happy path 的預期行為。"""
@@ -904,7 +1157,9 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(records[0].summary_text, "多階段報告內容")
         raw = json.loads(records[0].raw_json)
         self.assertEqual(raw["pipeline_mode"], "multi_stage")
-        self.assertEqual(raw["pipeline_stages"]["pipeline_version"], "multi-stage-v2")
+        self.assertEqual(raw["pipeline_stages"]["pipeline_version"], "multi-stage-v3")
+        self.assertIn("stage0", raw["pipeline_stages"]["stages"])
+        self.assertIn("claim_verifier", raw)
         self.assertTrue(raw["pipeline_stages"]["stages"]["stage4"]["ok"])
         self.assertEqual(raw["structured"]["sentiment"], "neutral")
         self.assertIsNotNone(records[0].structured_json)
@@ -996,23 +1251,131 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(json.loads(signal.source_event_ids_json), [101])
         self.assertEqual(_FakeAnalysisStore.updated_summaries[0][0], 777)
         self.assertIn("## 今日個股觀察", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("短中線推薦買進候選", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertIn("固定五檔監控池", _FakeAnalysisStore.updated_summaries[0][1])
         self.assertNotIn("進場時點", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("可做波段", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertIn("波段觀察", _FakeAnalysisStore.updated_summaries[0][1])
         self.assertIn("進場 low:600, high:610", _FakeAnalysisStore.updated_summaries[0][1])
         self.assertIn("停利 first:630", _FakeAnalysisStore.updated_summaries[0][1])
         self.assertIn("停損 price:590", _FakeAnalysisStore.updated_summaries[0][1])
 
+    def test_us_close_appends_recommendations_and_fills_missing_levels(self) -> None:
+        """U.S. close delivery should show priced fixed-pool rows when quote evidence exists."""
+        from event_relay.analysis_stages.context import StageResult
+
+        quote_events = [
+            _quote_event(901, "2603.TW", "長榮", 220.0, 6.14, 1000000)
+        ]
+        stage_side_effects = {
+            "event_relay.analysis_stages.stage1_digest.run": _return(
+                StageResult(name="stage1_digest", model="m", output={"events": [{"id": 901}], "market_snapshot": {}})
+            ),
+            "event_relay.analysis_stages.stage2_transmission.run": _return(
+                StageResult(name="stage2_transmission", model="m", output={"chains": []})
+            ),
+            "event_relay.analysis_stages.stage3_tw_mapping.run": _return(
+                StageResult(
+                    name="stage3_tw_mapping",
+                    model="m",
+                    output={
+                        "sector_watch": [],
+                        "stock_watch": [
+                            {
+                                "ticker": "2603",
+                                "direction": "bullish",
+                                "rationale": "AI demand and SOX strength support a swing setup",
+                                "evidence_ids": [901],
+                            }
+                        ],
+                        "risks": [],
+                        "data_gaps": [],
+                    },
+                )
+            ),
+            "event_relay.analysis_stages.stage_dual_view.run": _return(
+                StageResult(name="stage_dual_view", model="m", output={"bull_case": {}, "bear_case": {}})
+            ),
+            "event_relay.analysis_stages.stage_critic.run": _return(
+                StageResult(
+                    name="stage_critic",
+                    model="m",
+                    output={
+                        "issues": [],
+                        "suggestions": [],
+                        "top_counterpoint": "TSM leadership is still required.",
+                        "confidence_recommendation": "medium",
+                    },
+                )
+            ),
+            "event_relay.analysis_stages.stage4_synthesis.run": _return(
+                StageResult(
+                    name="stage4_synthesis",
+                    model="m",
+                    output={
+                        "summary_text": "U.S. close report",
+                        "structured": {
+                            "summary_text": "U.S. close report",
+                            "headline": "AI setup",
+                            "sentiment": "bullish",
+                            "confidence": "medium",
+                            "key_drivers": ["SOX strength"],
+                            "tw_sector_watch": [],
+                            "stock_watch": [
+                                {
+                                    "ticker": "2603",
+                                    "market": "TW",
+                                    "name": None,
+                                    "direction": "bullish",
+                                    "rationale": "AI demand and SOX strength support a swing setup",
+                                    "strategy_type": "swing",
+                                    "entry_zone": None,
+                                    "invalidation": None,
+                                    "take_profit_zone": None,
+                                    "holding_horizon": None,
+                                    "confidence": "medium",
+                                    "risk_notes": [],
+                                    "evidence_ids": [901],
+                                }
+                            ],
+                            "risks": [],
+                            "data_gaps": [],
+                        },
+                    },
+                )
+            ),
+        }
+
+        result, _records = self._run(
+            pipeline_env="multi_stage",
+            stage_side_effects=stage_side_effects,
+            summary_events=quote_events,
+            slot="us_close",
+            now=datetime(2026, 5, 9, 1, 0, 0, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(result["trade_signals_stored"], 1)
+        self.assertEqual(result["trade_signal_recommendations"], 1)
+        signal = _FakeAnalysisStore.signals[0][1][0]
+        self.assertEqual(signal.ticker, "2603")
+        self.assertIsNotNone(signal.entry_zone_json)
+        self.assertIsNotNone(signal.invalidation_json)
+        self.assertIsNotNone(signal.take_profit_zone_json)
+        self.assertEqual(json.loads(signal.entry_zone_json)["low"], 216.5)
+        self.assertEqual(_FakeAnalysisStore.updated_summaries[0][0], 777)
+        self.assertIn("U.S. close report", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertIn("low:", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertIn("first:", _FakeAnalysisStore.updated_summaries[0][1])
+
     def test_multi_stage_tops_up_pre_open_recommendations_to_five(self) -> None:
-        """structured 推薦不足 5 檔時，用近期台股報價事件補滿。"""
+        """structured 觀察不足 5 檔時，只用固定池報價事件補滿。"""
         from event_relay.analysis_stages.context import StageResult
 
         quote_events = [
             _quote_event(901, "2330.TW", "台積電", 600, 1.1, 1000),
-            _quote_event(902, "2454.TW", "聯發科", 1200, 2.5, 900),
-            _quote_event(903, "2308.TW", "台達電", 420, 0.4, 800),
-            _quote_event(904, "2317.TW", "鴻海", 160, -0.3, 700),
-            _quote_event(905, "0050.TW", "元大台灣50", 180, 0.0, 600),
+            _quote_event(902, "2603.TW", "長榮", 220, 2.5, 900),
+            _quote_event(903, "1605.TW", "華新", 42, 0.4, 800),
+            _quote_event(904, "4956.TWO", "光鋐", 58, 0.0, 600),
+            _quote_event(905, "2882.TW", "國泰金", 70, -0.3, 700),
+            _quote_event(906, "2454.TW", "聯發科", 1200, 9.0, 9000),
         ]
         stage_side_effects = {
             "event_relay.analysis_stages.stage1_digest.run": _return(
@@ -1064,22 +1427,23 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(result["trade_signal_recommendations"], 5)
         self.assertEqual(result["trade_signals_stored"], 5)
         stored_signals = _FakeAnalysisStore.signals[0][1]
-        self.assertEqual([signal.ticker for signal in stored_signals], ["2330", "2454", "2308", "0050", "2317"])
-        self.assertIn("2317 鴻海", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertEqual([signal.ticker for signal in stored_signals], ["2330", "2603", "1605", "4956", "2882"])
+        self.assertIn("2882 國泰金", _FakeAnalysisStore.updated_summaries[0][1])
         self.assertIn("2330 台積電", _FakeAnalysisStore.updated_summaries[0][1])
         self.assertNotIn("進場時點", _FakeAnalysisStore.updated_summaries[0][1])
 
-    def test_multi_stage_keeps_preferred_tracked_fallback_visible_when_structured_has_five(self) -> None:
-        """User-configured tracked fallback stocks can still surface when LLM already emitted five ideas."""
+    def test_multi_stage_keeps_fixed_pool_fallback_visible_when_structured_has_outside_tickers(self) -> None:
+        """Configured fallback can only surface fixed-pool tickers."""
         from event_relay.analysis_stages.context import StageResult
 
-        preferred_env = "2485.TW:兆赫,3535.TW:晶彩科,3715.TW:定穎投控,2351.TW:順德,4749.TWO:新應材"
+        preferred_env = "2603.TW:長榮,1605.TW:華新,4956.TWO:光鋐,4749.TWO:新應材"
         quote_events = [
-            _market_context_quote_event(910, "2485.TW", "兆赫", 22, 0.2, 100),
-            _market_context_quote_event(911, "3535.TW", "晶彩科", 90, -0.1, 100),
-            _market_context_quote_event(912, "3715.TW", "定穎投控", 75, 0.0, 100),
-            _market_context_quote_event(913, "2351.TW", "順德", 110, -0.2, 100),
+            _market_context_quote_event(910, "2603.TW", "長榮", 220, 0.2, 100),
+            _market_context_quote_event(911, "1605.TW", "華新", 42, -0.1, 100),
+            _market_context_quote_event(912, "4956.TWO", "光鋐", 58, 0.0, 100),
             _market_context_quote_event(914, "4749.TWO", "新應材", 205, 0.1, 100),
+            _market_context_quote_event(915, "2882.TW", "國泰金", 70, 0.05, 100),
+            _market_context_quote_event(916, "2454.TW", "聯發科", 1200, 9.0, 9000),
         ]
         structured_stock_watch = [
             {"ticker": "2330", "market": "TW", "direction": "bullish", "strategy_type": "swing"},
@@ -1127,16 +1491,18 @@ class MultiStagePipelineTests(unittest.TestCase):
                 summary_events=quote_events,
             )
 
-        self.assertEqual(result["trade_signals_stored"], 10)
+        self.assertEqual(result["trade_signals_stored"], 5)
         self.assertEqual(result["trade_signal_recommendations"], 5)
         stored_tickers = [signal.ticker for signal in _FakeAnalysisStore.signals[0][1]]
-        self.assertEqual(stored_tickers[-5:], ["2485", "4749", "3715", "3535", "2351"])
+        self.assertEqual(stored_tickers, ["2330", "2603", "4956", "1605", "2882"])
         rendered = _FakeAnalysisStore.updated_summaries[0][1]
-        self.assertIn("1. 2485 兆赫", rendered)
-        self.assertIn("2. 4749 新應材", rendered)
-        self.assertIn("3. 3715 定穎投控", rendered)
-        self.assertIn("4. 3535 晶彩科", rendered)
-        self.assertIn("5. 2351 順德", rendered)
+        self.assertIn("1. 2603 長榮", rendered)
+        self.assertIn("2. 4956 光鋐", rendered)
+        self.assertIn("3. 1605 華新", rendered)
+        self.assertIn("4. 2882 國泰金", rendered)
+        self.assertNotIn("4749 新應材", rendered)
+        self.assertNotIn("2454 聯發科", rendered)
+        self.assertIn("5. 2330 台積電", rendered)
 
     def test_multi_stage_text_fallback_leaves_structured_none(self) -> None:
         """測試 test multi stage text fallback leaves structured none 的預期行為。"""

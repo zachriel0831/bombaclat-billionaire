@@ -7,6 +7,7 @@ from collections.abc import Iterable
 import hashlib
 import json
 import logging
+import os
 import re
 import sys
 from typing import Any
@@ -30,8 +31,19 @@ _DIRECTION_MAP = {
 }
 _DEFAULT_ENTRY_TIMING = "09:05後，確認價格落在進場區且量能未失守；不追開盤急拉"
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+_SUSPECT_STOCK_NAME_RE = re.compile(r"[?\ufffd\ue000-\uf8ff]")
+_DEFAULT_EXCLUDED_TICKERS = "4749"
+FIXED_MARKET_ANALYSIS_WATCH_POOL: dict[str, dict[str, str]] = {
+    "2330": {"name": "台積電", "market": "TWSE", "sector": "半導體（晶圓）"},
+    "2603": {"name": "長榮", "market": "TWSE", "sector": "航運"},
+    "2882": {"name": "國泰金", "market": "TWSE", "sector": "金融"},
+    "1605": {"name": "華新", "market": "TWSE", "sector": "傳產（電纜）"},
+    "4956": {"name": "光鋐", "market": "TPEx", "sector": "半導體封測"},
+}
+_FIXED_MARKET_ANALYSIS_TICKERS = frozenset(FIXED_MARKET_ANALYSIS_WATCH_POOL)
 _TW_STOCK_NAME_BY_TICKER = {
     "0050": "元大台灣50",
+    "1605": "華新",
     "2308": "台達電",
     "2317": "鴻海",
     "2330": "台積電",
@@ -46,6 +58,8 @@ _TW_STOCK_NAME_BY_TICKER = {
     "3711": "日月光投控",
     "3715": "定穎投控",
     "4749": "新應材",
+    "2603": "長榮",
+    "4956": "光鋐",
 }
 
 
@@ -70,6 +84,10 @@ def build_trade_signals_from_analysis(
     for item in raw_items:
         ticker = _normalize_ticker(item.get("ticker") or item.get("symbol"))
         if not ticker:
+            continue
+        if is_excluded_trade_signal_ticker(ticker):
+            continue
+        if not is_fixed_market_analysis_watch_ticker(ticker):
             continue
         market = _normalize_market(item.get("market"))
         if market not in _TW_MARKETS:
@@ -151,19 +169,29 @@ def build_quote_event_trade_signals(
 ) -> list[TradeSignalRecord]:
     """Build fallback long signals from recent Taiwan quote/context events.
 
-    This is only used when the LLM pipeline cannot produce structured
-    ``stock_watch`` rows. Signals remain pending review; they are not orders.
+    This is used for delivery-eligible U.S. close and Taiwan pre-open reports
+    to provide deterministic reference levels when structured ``stock_watch``
+    rows are missing or incomplete. Signals remain pending review; they are
+    not orders.
     """
-    if analysis_slot != "pre_tw_open":
+    if analysis_slot not in {"pre_tw_open", "us_close"}:
         return []
 
-    preferred = _normalize_ticker_set(preferred_tickers)
+    excluded = excluded_trade_signal_tickers_from_env()
+    fixed_pool = set(_FIXED_MARKET_ANALYSIS_TICKERS) - excluded
+    preferred = _normalize_ticker_set(preferred_tickers) & fixed_pool
+    if not preferred:
+        preferred = set(fixed_pool)
     candidates: dict[str, dict[str, Any]] = {}
     for event in events:
         candidate = _fallback_candidate_from_event(event)
         if candidate is None:
             continue
         ticker = str(candidate["ticker"])
+        if ticker in excluded:
+            continue
+        if ticker not in fixed_pool:
+            continue
         current = candidates.get(ticker)
         event_row_id = candidate.get("event_row_id")
         if current is None or _safe_int(event_row_id) > _safe_int(current.get("event_row_id")):
@@ -177,7 +205,7 @@ def build_quote_event_trade_signals(
             int(item.get("volume") or 0),
         ),
         reverse=True,
-    )[: max(1, min(int(max_signals), 5))]
+    )[: max(1, min(int(max_signals), len(_FIXED_MARKET_ANALYSIS_TICKERS)))]
 
     signals: list[TradeSignalRecord] = []
     for item in ranked:
@@ -244,7 +272,7 @@ def build_quote_event_trade_signals(
                 rationale=_clean_fallback_rationale(item.get("rationale")),
                 risk_notes_json=json.dumps(
                     [
-                        "LLM structured output unavailable or fewer than five candidates",
+                        "Fixed-pool quote/context fallback; not a model-selected ticker",
                         "Must pass independent review and risk gate",
                     ],
                     ensure_ascii=False,
@@ -402,18 +430,25 @@ def sync_trade_signals_from_recent_analyses(
 
 def build_trade_signal_recommendation_section(recommendations: list[dict[str, Any]]) -> str:
     """Build a deterministic report section from stored trade-signal rows."""
-    lines = ["## 今日個股觀察", "短中線推薦買進候選（t_trade_signals）"]
+    lines = ["## 今日個股觀察", "固定五檔監控池（t_trade_signals）"]
     if not recommendations:
-        lines.append("資料缺口：目前沒有可用的 long swing/medium 候選；不可硬湊下單。")
+        lines.append("資料缺口：目前固定五檔沒有可用的 swing/medium 觀察條件；不可硬湊下單。")
         return "\n".join(lines)
 
+    visible_recommendations = [
+        item
+        for item in recommendations
+        if not is_excluded_trade_signal_ticker(item.get("ticker"))
+        and is_fixed_market_analysis_watch_ticker(item.get("ticker"))
+    ]
     rendered = 0
-    for idx, item in enumerate(recommendations[:5], start=1):
+    for idx, item in enumerate(visible_recommendations[:5], start=1):
         ticker = str(item.get("ticker") or "").strip()
         if not ticker:
             continue
         rendered += 1
-        name = _resolve_stock_name(ticker, item.get("name"))
+        raw_name = _clean_text(item.get("name"))
+        name = _resolve_stock_name(ticker, raw_name)
         label = f"{ticker} {name}" if name else ticker
         strategy = _clean_text(item.get("strategy_type")) or "swing/medium"
         confidence = _clean_text(item.get("confidence")) or "unknown"
@@ -421,14 +456,18 @@ def build_trade_signal_recommendation_section(recommendations: list[dict[str, An
         take_profit = _format_zone(item.get("take_profit_zone")) or "待盤中確認"
         invalidation = _format_zone(item.get("invalidation")) or "待盤中確認"
         rationale = _clean_text(item.get("rationale")) or "依早盤分析訊號"
+        if raw_name and name and raw_name != name and _SUSPECT_STOCK_NAME_RE.search(raw_name):
+            rationale = rationale.replace(raw_name, name)
         lines.append(
             f"{idx}. {label}｜{_format_action_label(strategy, confidence)}｜"
             f"進場 {entry}｜停利 {take_profit}｜停損 {invalidation}｜信心 {confidence}｜{rationale}"
         )
     if rendered == 0:
-        lines.append("資料缺口：目前沒有可用的 long swing/medium 候選；不可硬湊下單。")
-    elif rendered < 5:
-        lines.append(f"資料缺口：目前符合 long swing/medium 的候選只有 {rendered} 檔，未硬湊滿 5 檔。")
+        lines.append("資料缺口：目前固定五檔沒有可用的 swing/medium 觀察條件；不可硬湊下單。")
+    elif rendered < len(_FIXED_MARKET_ANALYSIS_TICKERS):
+        lines.append(
+            f"資料缺口：固定五檔目前只有 {rendered} 檔具備可呈現條件；其餘維持觀察，不以其他 ticker 替補。"
+        )
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
@@ -510,12 +549,35 @@ def _normalize_ticker_set(values: Iterable[Any] | None) -> set[str]:
     return result
 
 
+def excluded_trade_signal_tickers_from_env() -> set[str]:
+    """Return tickers that should never appear in visible stock analysis."""
+    raw = os.getenv("MARKET_ANALYSIS_EXCLUDED_TICKERS")
+    if raw is None:
+        raw = _DEFAULT_EXCLUDED_TICKERS
+    values = [part for part in re.split(r"[,;\s]+", raw) if part]
+    return _normalize_ticker_set(values)
+
+
+def is_excluded_trade_signal_ticker(value: Any) -> bool:
+    ticker = _normalize_ticker(value)
+    return bool(ticker and ticker in excluded_trade_signal_tickers_from_env())
+
+
+def is_fixed_market_analysis_watch_ticker(value: Any) -> bool:
+    ticker = _normalize_ticker(value)
+    return bool(ticker and ticker in _FIXED_MARKET_ANALYSIS_TICKERS)
+
+
 def _resolve_stock_name(ticker: Any, value: Any = None) -> str | None:
     """Prefer a Traditional Chinese stock name when the row only has a ticker."""
     provided = _clean_text(value)
     normalized = _normalize_ticker(ticker)
     canonical = _TW_STOCK_NAME_BY_TICKER.get(normalized or "")
-    if canonical and (not provided or not _CJK_RE.search(provided)):
+    if canonical and (
+        not provided
+        or _SUSPECT_STOCK_NAME_RE.search(provided)
+        or not _CJK_RE.search(provided)
+    ):
         return canonical
     return provided
 
@@ -692,9 +754,11 @@ def _format_strategy_label(value: str) -> str:
 
 
 def _format_action_label(strategy: str, confidence: str) -> str:
-    """Render a buy-side signal as a natural action phrase."""
-    prefix = "建議觀察" if (confidence or "").strip().lower() == "low" else "可做"
-    return f"{prefix}{_format_strategy_label(strategy)}"
+    """Render a fixed-pool watch row without recommendation wording."""
+    label = _format_strategy_label(strategy)
+    if (confidence or "").strip().lower() == "low":
+        return f"低信心{label}觀察"
+    return f"{label}觀察"
 
 
 def _format_zone(value: Any) -> str | None:

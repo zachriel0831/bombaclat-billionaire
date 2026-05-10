@@ -6,10 +6,12 @@ from event_relay.rag import (
     build_event_text,
     embed_text,
     index_recent_documents,
+    outcome_score_from_json,
     retrieve_similar_events,
 )
 from event_relay.service import (
     AnalysisEmbeddingSource,
+    StoredAnalysisEmbedding,
     StoredEventEmbedding,
     SummaryEvent,
 )
@@ -24,6 +26,19 @@ class _CandidateStore:
     def fetch_event_embedding_candidates(self, *, embedding_model: str, limit: int) -> list[StoredEventEmbedding]:
         """抓取 fetch event embedding candidates 對應的資料或結果。"""
         return self._candidates[:limit]
+
+
+class _HybridCandidateStore(_CandidateStore):
+    def __init__(
+        self,
+        candidates: list[StoredEventEmbedding],
+        analyses: list[StoredAnalysisEmbedding],
+    ) -> None:
+        super().__init__(candidates)
+        self._analyses = analyses
+
+    def fetch_analysis_embedding_candidates(self, *, embedding_model: str, limit: int) -> list[StoredAnalysisEmbedding]:
+        return self._analyses[:limit]
 
 
 def _candidate(row_id: int, title: str, summary: str = "") -> StoredEventEmbedding:
@@ -42,6 +57,29 @@ def _candidate(row_id: int, title: str, summary: str = "") -> StoredEventEmbeddi
         embedding_dim=128,
         embedding=embed_text(text),
         text_hash="hash",
+    )
+
+
+def _analysis_candidate(
+    analysis_id: int,
+    summary: str,
+    *,
+    slot: str = "pre_tw_open",
+    outcome_json: dict | None = None,
+) -> StoredAnalysisEmbedding:
+    text = "\n".join([slot, summary])
+    return StoredAnalysisEmbedding(
+        analysis_id=analysis_id,
+        analysis_date="2026-04-20",
+        analysis_slot=slot,
+        summary_text=summary,
+        raw_json=None,
+        updated_at="2026-04-20 08:00:00",
+        embedding_model="local-hash-v1",
+        embedding_dim=128,
+        embedding=embed_text(text),
+        text_hash="hash",
+        outcome_json=outcome_json,
     )
 
 
@@ -103,6 +141,37 @@ class RagRetrievalTests(unittest.TestCase):
         )
 
         self.assertTrue(all(example.event_row_id != 1 for example in examples))
+
+    def test_retrieve_similar_events_uses_hybrid_analysis_outcome_score(self) -> None:
+        store = _HybridCandidateStore(
+            [_candidate(10, "Fed cut supports semiconductors", "Tech rallies")],
+            [
+                _analysis_candidate(
+                    201,
+                    "Fed cut supported Taiwan semiconductors and later hit target.",
+                    outcome_json={"status": "target_hit"},
+                )
+            ],
+        )
+
+        examples = retrieve_similar_events(
+            store,
+            [{"id": 1, "source": "reuters", "title": "Fed cuts rates", "summary": "Semiconductor stocks rally"}],
+            k=2,
+            min_similarity=-1.0,
+            analysis_slot="pre_tw_open",
+        )
+
+        self.assertEqual(len(examples), 2)
+        self.assertTrue(any(example.kind == "analysis" for example in examples))
+        analysis = next(example for example in examples if example.kind == "analysis")
+        self.assertEqual(analysis.outcome_score, 0.9)
+        self.assertGreater(analysis.hybrid_score, 0)
+
+    def test_outcome_score_from_json_maps_status_and_return(self) -> None:
+        self.assertEqual(outcome_score_from_json({"status": "target_hit"}), 0.9)
+        self.assertEqual(outcome_score_from_json({"status": "stop_hit"}), 0.1)
+        self.assertEqual(outcome_score_from_json({"realized_return_pct": 3.5}), 0.75)
 
 
 class _IndexStore:

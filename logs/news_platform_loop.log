@@ -1,0 +1,922 @@
+2026-05-09 14:27:51,920 INFO news_platform - News-platform ready: db=news_platform sources=['ltn:society', 'ettoday:society', 'tvbs:society', 'cna:society', 'ebc:society']
+2026-05-09 14:27:52,090 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 14:27:52,148 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 14:27:52,289 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 14:27:53,198 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 14:27:53,207 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 14:27:53,275 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-09 14:42:53,366 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 14:42:53,381 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 14:42:53,584 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 14:42:54,444 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 14:42:54,483 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 14:42:54,574 INFO news_platform - Cycle complete fetched=100 stored=6 duplicates=94 failed=0
+Building prefix dict from the default dictionary ...
+2026-05-09 14:42:55,039 DEBUG jieba - Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\ZACKOU~1\AppData\Local\Temp\jieba.cache
+2026-05-09 14:42:55,040 DEBUG jieba - Loading model from cache C:\Users\ZACKOU~1\AppData\Local\Temp\jieba.cache
+Loading model cost 0.541 seconds.
+2026-05-09 14:42:55,580 DEBUG jieba - Loading model cost 0.541 seconds.
+Prefix dict has been built successfully.
+2026-05-09 14:42:55,580 DEBUG jieba - Prefix dict has been built successfully.
+2026-05-09 14:42:55,595 INFO news_platform - Keyword pass scanned=6 updated=6 failed=0
+2026-05-09 14:57:55,645 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 14:57:55,840 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 14:57:55,874 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 14:57:56,739 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 14:57:56,785 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 14:57:56,870 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-09 14:57:56,879 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-09 15:12:56,917 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 15:12:56,937 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 15:12:57,113 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 15:12:58,017 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 15:12:58,075 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 15:12:58,185 INFO news_platform - Cycle complete fetched=100 stored=10 duplicates=90 failed=0
+2026-05-09 15:12:58,287 INFO news_platform - Keyword pass scanned=10 updated=10 failed=0
+2026-05-09 15:27:58,354 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 15:27:58,562 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 15:27:58,601 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 15:27:58,656 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 15:27:59,453 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 15:27:59,523 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-09 15:27:59,547 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-09 15:42:59,585 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 15:42:59,599 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 15:42:59,771 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 15:42:59,863 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 15:43:00,661 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 15:43:00,731 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-09 15:43:00,762 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-09 15:58:00,800 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 15:58:00,842 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 15:58:00,940 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 15:58:01,052 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 15:58:01,944 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 15:58:02,018 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-09 16:13:02,153 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 16:13:02,345 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 16:13:02,359 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 16:13:03,240 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 16:13:03,321 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 16:13:03,440 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-09 16:13:03,530 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-09 16:28:03,605 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 16:28:03,802 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 16:28:03,876 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 16:28:04,680 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 16:28:04,722 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 16:28:04,837 INFO news_platform - Cycle complete fetched=100 stored=12 duplicates=88 failed=0
+2026-05-09 16:28:05,009 INFO news_platform - Keyword pass scanned=12 updated=12 failed=0
+2026-05-09 16:43:05,113 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 16:43:05,123 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 16:43:05,210 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 16:43:06,210 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 16:43:06,246 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 16:43:06,361 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-09 16:58:06,455 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 16:58:06,464 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 16:58:06,687 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 16:58:07,517 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 16:58:07,565 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 16:58:07,676 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-09 16:58:07,754 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-09 17:13:07,890 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 17:13:08,068 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 17:13:08,128 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 17:13:08,971 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 17:13:09,003 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 17:13:09,154 INFO news_platform - Cycle complete fetched=100 stored=6 duplicates=94 failed=0
+2026-05-09 17:13:09,218 INFO news_platform - Keyword pass scanned=6 updated=6 failed=0
+2026-05-09 17:28:09,320 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 17:28:09,512 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 17:28:10,397 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 17:28:10,452 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 17:28:11,098 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 17:28:11,246 INFO news_platform - Cycle complete fetched=100 stored=9 duplicates=91 failed=0
+2026-05-09 17:28:11,350 INFO news_platform - Keyword pass scanned=9 updated=9 failed=0
+2026-05-09 17:43:11,464 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 17:43:11,478 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 17:43:11,555 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 17:43:12,542 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 17:43:12,579 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 17:43:12,715 INFO news_platform - Cycle complete fetched=100 stored=8 duplicates=92 failed=0
+2026-05-09 17:43:12,862 INFO news_platform - Keyword pass scanned=8 updated=8 failed=0
+2026-05-09 17:58:12,960 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 17:58:13,152 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 17:58:13,196 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 17:58:13,257 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 17:58:14,081 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 17:58:14,212 INFO news_platform - Cycle complete fetched=100 stored=6 duplicates=94 failed=0
+2026-05-09 17:58:14,329 INFO news_platform - Keyword pass scanned=6 updated=6 failed=0
+2026-05-09 18:13:14,474 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 18:13:14,483 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 18:13:14,656 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 18:13:14,702 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 18:13:15,584 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 18:13:15,698 INFO news_platform - Cycle complete fetched=100 stored=8 duplicates=92 failed=0
+2026-05-09 18:13:15,820 INFO news_platform - Keyword pass scanned=8 updated=8 failed=0
+2026-05-09 18:28:15,860 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 18:28:16,066 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 18:28:16,115 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 18:28:16,120 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 18:28:17,022 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 18:28:17,122 INFO news_platform - Cycle complete fetched=100 stored=10 duplicates=90 failed=0
+2026-05-09 18:28:17,227 INFO news_platform - Keyword pass scanned=10 updated=10 failed=0
+2026-05-09 18:43:17,385 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 18:43:17,479 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 18:43:17,971 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 18:43:18,359 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 18:43:18,394 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 18:43:18,462 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-09 18:43:18,472 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-09 18:58:18,511 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 18:58:18,540 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 18:58:18,760 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 18:58:18,802 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 18:58:19,649 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 18:58:19,725 INFO news_platform - Cycle complete fetched=100 stored=10 duplicates=90 failed=0
+2026-05-09 18:58:19,794 INFO news_platform - Keyword pass scanned=10 updated=10 failed=0
+2026-05-09 19:13:19,832 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 19:13:19,958 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 19:13:20,066 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 19:13:20,102 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 19:13:20,941 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 19:13:21,006 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-09 19:28:21,052 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 19:28:21,250 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 19:28:21,260 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 19:28:21,329 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 19:28:22,159 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 19:28:22,228 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-09 19:28:22,240 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-09 19:43:22,286 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 19:43:22,327 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 19:43:22,519 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 19:43:23,462 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 19:43:23,579 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 19:43:23,649 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-09 19:43:23,659 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-09 19:58:23,726 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 19:58:23,759 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 19:58:23,935 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 19:58:24,009 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 19:58:24,802 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 19:58:24,909 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-09 19:58:24,918 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-09 20:13:24,965 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 20:13:25,174 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 20:13:25,266 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 20:13:25,314 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 20:13:26,060 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 20:13:26,129 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-09 20:13:26,159 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-09 20:28:26,198 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 20:28:26,311 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 20:28:26,440 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 20:28:26,475 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 20:28:27,279 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 20:28:27,346 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-09 20:28:27,353 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-09 20:43:27,401 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 20:43:27,431 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 20:43:27,501 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 20:43:27,628 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 20:43:28,516 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 20:43:28,592 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-09 20:43:28,595 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-09 20:58:28,644 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 20:58:28,657 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 20:58:28,847 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 20:58:28,932 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 20:58:29,730 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 20:58:29,794 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-09 20:58:29,807 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-09 21:13:29,928 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 21:13:30,012 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 21:13:30,100 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 21:13:30,156 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 21:13:31,050 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 21:13:31,156 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-09 21:13:31,226 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-09 21:28:31,268 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 21:28:31,319 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 21:28:31,507 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 21:28:32,348 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 21:28:32,503 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 21:28:32,575 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-09 21:28:32,589 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-09 21:43:32,641 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 21:43:32,663 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 21:43:32,745 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 21:43:33,672 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 21:43:33,718 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 21:43:33,803 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-09 21:58:33,874 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 21:58:33,900 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 21:58:34,073 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 21:58:34,123 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 21:58:34,892 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 21:58:34,982 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-09 22:13:35,134 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 22:13:35,145 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 22:13:35,230 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 22:13:35,357 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 22:13:36,281 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 22:13:36,419 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-09 22:13:36,561 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-09 22:28:36,615 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 22:28:36,811 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 22:28:36,860 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 22:28:37,728 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 22:28:37,846 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 22:28:37,954 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-09 22:28:38,010 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-09 22:43:38,058 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 22:43:38,114 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 22:43:38,160 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 22:43:39,144 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 22:43:39,252 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 22:43:39,345 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-09 22:58:39,475 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 22:58:39,536 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 22:58:39,677 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 22:58:39,701 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 22:58:40,608 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 22:58:40,743 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-09 22:58:40,778 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-09 23:13:40,933 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 23:13:41,006 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 23:13:41,152 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 23:13:42,014 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 23:13:42,055 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 23:13:42,169 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-09 23:28:42,347 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 23:28:42,435 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 23:28:42,893 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 23:28:43,410 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 23:28:43,445 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 23:28:43,590 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-09 23:28:43,635 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-09 23:43:43,787 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 23:43:43,969 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 23:43:44,057 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 23:43:44,839 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 23:43:45,226 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 23:43:45,388 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-09 23:43:45,440 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-09 23:58:45,594 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-09 23:58:45,748 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-09 23:58:45,826 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-09 23:58:45,829 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-09 23:58:46,722 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-09 23:58:46,856 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 00:13:47,072 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 00:13:47,153 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 00:13:48,131 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 00:13:48,168 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 00:13:48,671 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 00:13:48,830 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 00:13:48,914 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 00:28:49,075 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 00:28:49,263 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 00:28:49,365 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 00:28:50,127 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 00:28:50,179 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 00:28:50,352 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 00:43:50,483 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 00:43:50,671 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 00:43:50,967 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 00:43:51,549 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 00:43:51,603 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 00:43:51,723 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 00:58:51,865 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 00:58:52,076 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 00:58:52,086 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 00:58:52,919 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 00:58:52,992 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 00:58:53,103 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 00:58:53,190 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 01:13:53,358 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 01:13:53,460 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 01:13:53,819 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 01:13:54,317 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 01:13:54,364 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 01:13:54,437 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 01:28:54,484 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 01:28:54,729 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 01:28:55,564 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 01:28:55,606 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 01:28:56,237 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 01:28:56,309 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 01:43:56,430 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 01:43:56,544 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 01:43:57,433 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 01:43:57,487 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 01:43:57,847 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 01:43:57,914 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 01:58:58,004 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 01:58:58,182 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 01:58:58,202 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 01:58:59,056 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 01:58:59,087 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 01:58:59,152 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 02:13:59,201 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 02:13:59,399 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 02:13:59,407 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 02:14:00,278 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 02:14:00,325 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 02:14:00,395 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 02:14:00,435 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 02:29:00,472 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 02:29:00,669 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 02:29:00,675 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 02:29:01,573 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 02:29:01,620 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 02:29:01,686 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 02:44:01,722 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 02:44:01,956 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 02:44:02,834 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 02:44:02,878 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 02:44:03,497 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 02:44:03,567 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 02:59:03,612 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 02:59:03,782 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 02:59:03,788 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 02:59:03,904 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 02:59:04,698 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 02:59:04,763 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 03:14:04,803 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 03:14:04,904 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 03:14:04,992 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 03:14:05,036 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 03:14:05,917 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 03:14:05,990 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 03:29:06,035 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 03:29:06,236 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 03:29:06,245 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 03:29:06,288 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 03:29:07,144 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 03:29:07,214 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 03:44:07,287 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 03:44:07,410 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 03:44:07,447 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 03:44:07,533 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 03:44:08,441 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 03:44:08,526 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 03:59:08,573 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 03:59:08,797 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 03:59:08,807 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 03:59:09,694 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 03:59:09,733 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 03:59:09,798 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 04:14:09,847 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 04:14:09,978 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 04:14:10,046 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 04:14:10,089 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 04:14:10,142 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 04:14:10,211 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 04:29:10,284 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 04:29:10,464 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 04:29:10,513 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 04:29:10,549 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 04:29:10,552 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 04:29:10,620 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 04:44:10,654 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 04:44:10,811 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 04:44:10,836 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 04:44:11,709 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 04:44:11,768 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 04:44:11,838 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 04:59:11,877 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 04:59:12,054 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 04:59:12,084 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 04:59:12,109 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 04:59:12,175 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 04:59:12,237 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 05:14:12,275 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 05:14:12,448 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 05:14:12,556 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 05:14:13,381 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 05:14:13,417 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 05:14:13,483 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 05:29:13,553 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 05:29:13,734 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 05:29:13,751 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 05:29:14,580 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 05:29:14,643 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 05:29:14,707 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 05:44:14,780 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 05:44:14,907 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 05:44:14,957 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 05:44:15,843 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 05:44:15,890 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 05:44:15,988 INFO news_platform - Cycle complete fetched=100 stored=8 duplicates=92 failed=0
+2026-05-10 05:44:16,112 INFO news_platform - Keyword pass scanned=8 updated=8 failed=0
+2026-05-10 05:59:16,219 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 05:59:16,253 WARNING news_platform.sources.sitemap_news - Sitemap parse failed source=ebc:society error=no element found: line 1, column 0
+2026-05-10 05:59:16,253 WARNING news_platform.sources.sitemap_news - Sitemap empty source=ebc:society url=https://news.ebc.net.tw/sitemap/realtime.xml
+2026-05-10 05:59:16,253 WARNING news_platform.pipeline - Fetched source=ebc:society items=0 (verify feed is alive)
+2026-05-10 05:59:16,317 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 05:59:16,396 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 05:59:17,320 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 05:59:17,384 INFO news_platform - Cycle complete fetched=80 stored=0 duplicates=80 failed=0
+2026-05-10 06:14:17,433 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 06:14:17,597 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 06:14:17,675 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 06:14:17,680 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 06:14:18,550 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 06:14:18,614 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 06:29:18,649 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 06:29:18,846 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 06:29:18,901 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 06:29:18,906 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 06:29:19,788 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 06:29:19,854 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 06:44:19,935 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 06:44:20,100 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 06:44:20,148 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 06:44:20,977 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 06:44:21,014 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 06:44:21,081 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 06:59:21,128 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 06:59:21,204 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 06:59:21,411 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 06:59:22,216 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 06:59:22,512 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 06:59:22,581 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 06:59:22,608 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 07:14:22,645 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 07:14:22,744 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 07:14:22,947 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 07:14:23,783 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 07:14:23,802 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 07:14:23,866 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 07:29:23,906 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 07:29:24,077 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 07:29:24,111 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 07:29:24,147 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 07:29:24,188 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 07:29:24,252 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 07:44:24,288 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 07:44:24,362 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 07:44:24,503 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 07:44:24,588 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 07:44:24,788 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 07:44:24,852 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 07:59:24,922 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 07:59:25,066 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 07:59:25,125 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 07:59:25,179 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 07:59:26,053 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 07:59:26,123 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 08:14:26,164 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 08:14:26,270 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 08:14:26,479 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 08:14:27,277 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 08:14:29,095 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 08:14:29,162 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 08:29:29,207 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 08:29:29,359 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 08:29:29,404 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 08:29:29,449 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 08:29:30,336 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 08:29:30,401 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 08:29:30,424 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 08:44:30,466 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 08:44:30,642 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 08:44:31,540 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 08:44:31,604 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 08:44:31,980 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 08:44:32,047 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 08:44:32,072 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 08:59:32,119 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 08:59:32,192 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 08:59:33,198 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 08:59:33,240 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 08:59:33,632 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 08:59:33,705 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 09:14:33,745 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 09:14:33,909 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 09:14:33,964 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 09:14:34,023 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 09:14:34,893 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 09:14:34,961 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 09:14:34,983 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 09:29:35,026 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 09:29:35,190 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 09:29:35,244 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 09:29:35,318 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 09:29:36,130 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 09:29:36,233 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-10 09:29:36,272 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-10 09:44:36,307 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 09:44:36,475 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 09:44:36,590 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 09:44:37,418 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 09:44:37,878 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 09:44:37,945 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 09:44:37,967 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 09:59:38,004 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 09:59:38,230 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 09:59:38,247 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 09:59:39,086 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 09:59:39,155 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 09:59:39,224 INFO news_platform - Cycle complete fetched=100 stored=8 duplicates=92 failed=0
+2026-05-10 09:59:39,342 INFO news_platform - Keyword pass scanned=8 updated=8 failed=0
+2026-05-10 10:14:39,383 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 10:14:39,552 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 10:14:39,657 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 10:14:39,682 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 10:14:40,466 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 10:14:40,532 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 10:29:40,570 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 10:29:40,618 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 10:29:40,738 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 10:29:40,862 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 10:29:41,649 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 10:29:41,719 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 10:29:41,779 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 10:44:41,823 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 10:44:41,998 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 10:44:42,055 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 10:44:42,928 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 10:44:42,979 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 10:44:43,048 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 10:44:43,086 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 10:59:43,133 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 10:59:43,298 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 10:59:43,366 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 10:59:44,259 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 10:59:44,814 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 10:59:44,885 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 10:59:44,928 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 11:14:44,965 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 11:14:45,107 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 11:14:45,173 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 11:14:45,223 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 11:14:45,255 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 11:14:45,320 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 11:14:45,326 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 11:29:45,501 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 11:29:45,659 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 11:29:45,669 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 11:29:45,746 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 11:29:46,548 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 11:29:46,712 INFO news_platform - Cycle complete fetched=100 stored=7 duplicates=93 failed=0
+2026-05-10 11:29:46,903 INFO news_platform - Keyword pass scanned=7 updated=7 failed=0
+2026-05-10 11:44:47,046 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 11:44:47,200 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 11:44:47,272 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 11:44:47,273 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 11:44:47,314 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 11:44:47,491 INFO news_platform - Cycle complete fetched=100 stored=14 duplicates=86 failed=0
+2026-05-10 11:44:47,721 INFO news_platform - Keyword pass scanned=14 updated=14 failed=0
+2026-05-10 11:59:47,817 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 11:59:47,891 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 11:59:48,018 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 11:59:48,898 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 11:59:48,957 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 11:59:49,084 INFO news_platform - Cycle complete fetched=100 stored=5 duplicates=95 failed=0
+2026-05-10 11:59:49,214 INFO news_platform - Keyword pass scanned=5 updated=5 failed=0
+2026-05-10 12:14:49,373 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 12:14:49,530 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 12:14:49,631 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 12:14:50,458 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 12:14:50,484 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 12:14:50,653 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 12:14:50,769 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 12:29:50,893 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 12:29:50,958 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 12:29:51,128 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 12:29:51,166 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 12:29:52,004 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 12:29:52,131 INFO news_platform - Cycle complete fetched=100 stored=6 duplicates=94 failed=0
+2026-05-10 12:29:52,274 INFO news_platform - Keyword pass scanned=6 updated=6 failed=0
+2026-05-10 12:44:52,463 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 12:44:52,518 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 12:44:52,716 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 12:44:53,521 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 12:44:53,569 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 12:44:53,794 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 12:44:53,949 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 12:59:54,103 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 12:59:54,257 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 12:59:54,399 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 12:59:55,174 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 12:59:55,206 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 12:59:55,349 INFO news_platform - Cycle complete fetched=100 stored=9 duplicates=91 failed=0
+2026-05-10 12:59:55,521 INFO news_platform - Keyword pass scanned=9 updated=9 failed=0
+2026-05-10 13:14:55,589 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 13:14:55,636 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 13:14:55,822 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 13:14:55,841 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 13:14:55,851 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 13:14:55,935 INFO news_platform - Cycle complete fetched=100 stored=13 duplicates=87 failed=0
+2026-05-10 13:14:56,076 INFO news_platform - Keyword pass scanned=13 updated=13 failed=0
+2026-05-10 13:29:56,129 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 13:29:56,183 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 13:29:56,210 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 13:29:56,362 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 13:29:57,265 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 13:29:57,331 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 13:29:57,368 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 13:44:57,422 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 13:44:57,482 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 13:44:57,527 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 13:44:58,513 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 13:44:58,554 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 13:44:58,626 INFO news_platform - Cycle complete fetched=100 stored=5 duplicates=95 failed=0
+2026-05-10 13:44:58,661 INFO news_platform - Keyword pass scanned=5 updated=5 failed=0
+2026-05-10 13:59:58,716 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 13:59:58,900 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 13:59:59,794 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 13:59:59,837 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 14:00:00,333 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 14:00:00,406 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 14:00:00,421 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 14:15:00,458 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 14:15:00,545 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 14:15:00,581 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 14:15:00,719 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 14:15:01,630 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 14:15:01,706 INFO news_platform - Cycle complete fetched=100 stored=19 duplicates=81 failed=0
+2026-05-10 14:15:01,818 INFO news_platform - Keyword pass scanned=19 updated=19 failed=0
+2026-05-10 14:30:01,949 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 14:30:02,041 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 14:30:02,266 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 14:30:02,995 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 14:30:03,068 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 14:30:03,180 INFO news_platform - Cycle complete fetched=100 stored=8 duplicates=92 failed=0
+2026-05-10 14:30:03,343 INFO news_platform - Keyword pass scanned=8 updated=8 failed=0
+2026-05-10 14:45:03,482 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 14:45:03,553 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 14:45:03,699 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 14:45:04,538 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 14:45:04,575 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 14:45:04,692 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 14:45:04,788 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 15:00:04,889 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 15:00:04,946 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 15:00:05,934 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 15:00:05,987 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 15:00:06,774 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 15:00:06,856 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 15:00:06,923 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 15:15:07,015 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 15:15:07,076 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 15:15:07,165 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 15:15:08,143 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 15:15:08,205 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 15:15:08,320 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 15:15:08,385 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 15:30:08,424 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 15:30:08,476 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 15:30:08,652 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 15:30:08,658 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 15:30:08,730 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 15:30:08,791 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 15:30:08,831 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 15:45:08,870 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 15:45:09,073 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 15:45:09,094 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 15:45:09,968 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 15:45:09,997 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 15:45:10,068 INFO news_platform - Cycle complete fetched=100 stored=5 duplicates=95 failed=0
+2026-05-10 15:45:10,114 INFO news_platform - Keyword pass scanned=5 updated=5 failed=0
+2026-05-10 16:00:10,173 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 16:00:10,204 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 16:00:10,241 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 16:00:11,307 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 16:00:11,321 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 16:00:11,407 INFO news_platform - Cycle complete fetched=100 stored=6 duplicates=94 failed=0
+2026-05-10 16:00:11,482 INFO news_platform - Keyword pass scanned=6 updated=6 failed=0
+2026-05-10 16:15:11,529 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 16:15:11,629 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 16:15:12,042 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 16:15:12,600 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 16:15:12,635 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 16:15:12,701 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 16:15:12,712 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 16:30:12,785 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 16:30:12,974 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 16:30:13,411 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 16:30:13,850 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 16:30:13,893 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 16:30:13,966 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 16:30:13,987 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 16:45:14,045 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 16:45:14,235 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 16:45:14,341 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 16:45:14,344 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 16:45:15,157 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 16:45:15,239 INFO news_platform - Cycle complete fetched=100 stored=13 duplicates=87 failed=0
+2026-05-10 16:45:15,338 INFO news_platform - Keyword pass scanned=13 updated=13 failed=0
+2026-05-10 17:00:15,356 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 17:00:15,542 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 17:00:16,489 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 17:00:16,535 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 17:00:16,798 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 17:00:16,866 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 17:00:16,902 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 17:15:16,945 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 17:15:16,991 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 17:15:17,035 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 17:15:17,272 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 17:15:18,038 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 17:15:18,105 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 17:15:18,119 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 17:30:18,153 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 17:30:18,212 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 17:30:18,283 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 17:30:19,280 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 17:30:19,283 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 17:30:19,354 INFO news_platform - Cycle complete fetched=100 stored=5 duplicates=95 failed=0
+2026-05-10 17:30:19,391 INFO news_platform - Keyword pass scanned=5 updated=5 failed=0
+2026-05-10 17:45:19,433 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 17:45:19,607 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 17:45:19,681 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 17:45:19,724 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 17:45:20,515 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 17:45:20,586 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 17:45:20,612 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 18:00:20,665 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 18:00:20,864 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 18:00:21,781 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 18:00:21,798 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 18:00:21,961 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 18:00:22,029 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-10 18:00:22,043 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-10 18:15:22,080 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 18:15:22,248 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 18:15:22,370 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 18:15:22,650 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 18:15:23,176 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 18:15:23,247 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 18:15:23,255 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 18:30:23,301 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 18:30:23,442 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 18:30:23,572 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 18:30:23,670 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 18:30:24,796 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 18:30:24,868 INFO news_platform - Cycle complete fetched=100 stored=8 duplicates=92 failed=0
+2026-05-10 18:30:24,918 INFO news_platform - Keyword pass scanned=8 updated=8 failed=0
+2026-05-10 18:45:24,955 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 18:45:25,057 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 18:45:25,165 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 18:45:25,202 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 18:45:25,250 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 18:45:25,364 INFO news_platform - Cycle complete fetched=100 stored=16 duplicates=84 failed=0
+2026-05-10 18:45:25,437 INFO news_platform - Keyword pass scanned=16 updated=16 failed=0
+2026-05-10 19:00:25,511 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 19:00:25,728 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 19:00:25,762 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 19:00:26,590 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 19:00:26,662 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 19:00:26,734 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-10 19:00:26,755 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-10 19:15:26,803 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 19:15:26,904 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 19:15:27,092 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 19:15:27,939 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 19:15:27,991 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 19:15:28,060 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 19:15:28,093 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 19:30:28,118 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 19:30:28,261 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 19:30:28,362 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 19:30:29,269 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 19:30:29,312 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 19:30:29,379 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-10 19:30:29,392 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-10 19:45:29,414 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 19:45:29,626 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 19:45:29,666 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 19:45:30,532 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 19:45:30,572 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 19:45:30,642 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-10 19:45:30,654 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-10 20:00:30,696 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 20:00:30,930 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 20:00:31,032 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 20:00:31,824 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 20:00:31,869 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 20:00:31,938 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 20:00:31,962 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 20:15:32,004 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 20:15:32,204 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 20:15:32,262 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 20:15:33,043 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 20:15:33,044 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 20:15:33,128 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-10 20:15:33,144 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-10 20:30:33,194 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 20:30:33,359 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 20:30:33,401 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 20:30:33,476 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 20:30:34,276 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 20:30:34,342 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 20:30:34,348 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 20:45:34,375 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 20:45:34,585 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 20:45:34,647 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 20:45:35,411 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 20:45:35,450 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 20:45:35,510 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-10 21:00:35,550 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 21:00:35,707 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 21:00:35,722 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 21:00:36,575 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 21:00:36,617 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 21:00:36,730 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-10 21:00:36,743 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-10 21:15:36,862 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 21:15:36,892 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 21:15:37,068 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 21:15:37,812 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 21:15:37,819 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 21:15:37,892 INFO news_platform - Cycle complete fetched=100 stored=6 duplicates=94 failed=0
+2026-05-10 21:15:37,939 INFO news_platform - Keyword pass scanned=6 updated=6 failed=0
+2026-05-10 21:30:37,975 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 21:30:38,078 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 21:30:38,183 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 21:30:38,990 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 21:30:39,044 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 21:30:39,111 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 21:30:39,131 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 21:45:39,204 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 21:45:39,275 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 21:45:39,413 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 21:45:40,178 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 21:45:40,228 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 21:45:40,323 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 21:45:40,346 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 22:00:40,384 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 22:00:40,491 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 22:00:40,587 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 22:00:41,390 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 22:00:41,407 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 22:00:41,480 INFO news_platform - Cycle complete fetched=100 stored=1 duplicates=99 failed=0
+2026-05-10 22:00:41,496 INFO news_platform - Keyword pass scanned=1 updated=1 failed=0
+2026-05-10 22:15:41,538 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 22:15:41,666 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 22:15:42,256 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 22:15:42,645 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 22:15:42,717 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 22:15:42,785 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 22:15:42,812 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 22:30:42,853 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 22:30:42,958 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 22:30:43,210 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 22:30:43,969 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 22:30:44,025 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 22:30:44,140 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 22:30:44,164 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 22:45:44,242 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 22:45:44,268 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 22:45:44,350 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 22:45:45,314 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 22:45:45,368 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 22:45:45,438 INFO news_platform - Cycle complete fetched=100 stored=2 duplicates=98 failed=0
+2026-05-10 22:45:45,451 INFO news_platform - Keyword pass scanned=2 updated=2 failed=0
+2026-05-10 23:00:45,519 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 23:00:45,558 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 23:00:45,626 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 23:00:46,616 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 23:00:46,693 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 23:00:46,792 INFO news_platform - Cycle complete fetched=100 stored=9 duplicates=91 failed=0
+2026-05-10 23:00:46,862 INFO news_platform - Keyword pass scanned=9 updated=9 failed=0
+2026-05-10 23:15:46,920 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 23:15:47,110 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 23:15:47,996 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 23:15:48,112 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 23:15:48,471 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 23:15:48,538 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 23:15:48,553 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-10 23:30:48,576 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 23:30:48,649 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 23:30:48,710 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 23:30:49,708 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 23:30:49,769 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 23:30:49,839 INFO news_platform - Cycle complete fetched=100 stored=4 duplicates=96 failed=0
+2026-05-10 23:30:49,863 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-10 23:45:49,912 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-10 23:45:49,931 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-10 23:45:50,030 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-10 23:45:51,033 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-10 23:45:51,073 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-10 23:45:51,148 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-10 23:45:51,161 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-11 00:00:51,294 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-11 00:00:51,492 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-11 00:00:51,506 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-11 00:00:51,534 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-11 00:00:52,404 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-11 00:00:52,504 INFO news_platform - Cycle complete fetched=100 stored=0 duplicates=100 failed=0
+2026-05-11 00:15:52,608 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-11 00:15:52,709 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-11 00:15:52,826 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-11 00:15:53,695 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-11 00:15:53,722 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-11 00:15:53,876 INFO news_platform - Cycle complete fetched=100 stored=3 duplicates=97 failed=0
+2026-05-11 00:15:53,954 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0

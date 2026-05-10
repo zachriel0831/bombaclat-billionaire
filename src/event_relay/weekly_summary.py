@@ -29,26 +29,22 @@ from event_relay.service import MarketAnalysisRecord, MySqlEventStore
 
 logger = logging.getLogger(__name__)
 WEEKLY_ANALYSIS_SLOT = "weekly_tw_preopen"
-WEEKLY_PROMPT_VERSION = "weekly-summary-v1"
+WEEKLY_PROMPT_VERSION = "weekly-summary-three-section-v1"
 WEEKLY_DELIVERY_TIME_LOCAL = "05:10"
 
-WEEKLY_REGIME_FLOW_SECTIONS = (
-    "1) 總經 Regime\n"
-    "2) 利率與流動性\n"
-    "3) 景氣循環\n"
-    "4) 市場情緒\n"
-    "5) 台股配置\n"
-    "6) 風險與資料缺口\n"
+WEEKLY_SECTION_TITLES = (
+    "週總經",
+    "下週台股配置",
+    "下週觀察清單",
 )
 
-WEEKLY_REGIME_FLOW_GUIDE = (
-    "Reasoning flow:\n"
-    "- 總經 Regime: summarize what the market is trading this week, e.g. sticky inflation, disinflation, growth scare, liquidity easing, or credit stress.\n"
-    "- 利率與流動性: connect CPI/PCE/jobs/Fed path to 2Y/10Y, DXY, SOFR, Fed balance sheet, RRP, TGA, reserves, and credit spreads.\n"
-    "- 景氣循環: judge expansion/slowdown/soft landing/recession risk from consumption, labor, PMI/ISM, bank credit, earnings, and inventory.\n"
-    "- 市場情緒: decide whether price action is fundamentals-backed or positioning/chase-driven using VIX, SOX/Nasdaq, credit proxies, breadth, and news/X shocks.\n"
-    "- 台股配置: translate the weekly chain into Taiwan sector tilt and next-week stock-watch logic.\n"
-    "- 風險與資料缺口: list what could break the chain and what must be verified next week.\n"
+WEEKLY_SECTION_LIST = "".join(f"{idx}) {title}\n" for idx, title in enumerate(WEEKLY_SECTION_TITLES, start=1))
+
+WEEKLY_SECTION_GUIDE = (
+    "Section contract:\n"
+    "- 週總經: synthesize the week into one macro regime. Connect politics/geopolitics, Fed path, inflation/labor, USD/rates, liquidity, credit, oil, and risk appetite into one causal chain.\n"
+    "- 下週台股配置: translate that chain into Taiwan market stance. Cover sector weights such as semis/AI, financials, defensives/high dividend, cyclicals, and small caps only when evidence supports them. This is weekly allocation, not intraday trading.\n"
+    "- 下週觀察清單: provide a concrete checklist for next week: key data/releases, market levels/proxies, policy/geopolitical triggers, Taiwan flow/foreign positioning items, and confirmation/invalidating signals.\n"
 )
 
 
@@ -251,13 +247,17 @@ def _compile_prompts(config: WeeklySummaryConfig) -> tuple[str, str]:
         "The Events JSON is the local event-store context, not a complete list of everything that happened.\n"
         "Use web search when available to verify missing or current facts, and state any remaining gaps.\n"
         "Required sections:\n"
-        f"{WEEKLY_REGIME_FLOW_SECTIONS}"
-        f"{WEEKLY_REGIME_FLOW_GUIDE}"
+        f"{WEEKLY_SECTION_LIST}"
+        f"{WEEKLY_SECTION_GUIDE}"
         "Formatting rules:\n"
         "- Use the exact section titles listed above.\n"
-        "- Section 2 利率與流動性 should use bullets for dense market facts.\n"
-        "- Each section should be 1-3 bullets or one short paragraph.\n"
-        "- Total length 700-1200 Chinese characters. Keep it readable in mobile chat.\n\n"
+        "- 週總經 should be the regime thesis, not a list of unrelated headlines.\n"
+        "- 下週台股配置 should translate the regime into sector/positioning bias.\n"
+        "- 下週觀察清單 should be a concrete checklist with confirmation and invalidation signals.\n"
+        "- Each section must connect evidence -> mechanism -> Taiwan implication.\n"
+        "- Weekly reports should not output intraday entry / take-profit / stop-loss prices.\n"
+        "- If evidence is insufficient, name the data gap and lower confidence.\n"
+        "- Total length 1200-2200 Chinese characters. Keep it readable in mobile chat.\n\n"
         "Time range: {week_range}\n"
         "Events JSON:\n{events_json}\n"
     )
@@ -555,6 +555,7 @@ def _store_weekly_analysis(
     config: WeeklySummaryConfig,
     message: str,
     events_used: int,
+    usage: TokenUsage | None = None,
 ) -> None:
     """執行 store weekly analysis 的主要流程。"""
     analysis_date = _analysis_date_key(now_local, config)
@@ -579,6 +580,8 @@ def _store_weekly_analysis(
                     "scheduled_weekday": config.weekday,
                     "scheduled_time": f"{config.hour:02d}:{config.minute:02d}",
                     "events_used": events_used,
+                    "section_contract": list(WEEKLY_SECTION_TITLES),
+                    "token_usage": usage.to_dict() if usage is not None else None,
                     "delivery_owner": "java",
                     "python_push_removed": True,
                     "web_search_requested": config.provider == "openai" and _openai_web_search_enabled(),
@@ -674,6 +677,7 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
         config=config,
         message=message,
         events_used=len(events),
+        usage=usage,
     )
     _mark_sent_this_week(state_file, run_key)
     return {

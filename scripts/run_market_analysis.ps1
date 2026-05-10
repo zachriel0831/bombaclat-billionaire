@@ -28,3 +28,4 @@ if ($Force) {
 }
 
 & python @cmdArgs
+exit $LASTEXITCODE

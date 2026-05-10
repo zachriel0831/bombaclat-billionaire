@@ -11,7 +11,7 @@ this module reads them and writes analysis output, never the reverse.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 import json
 import logging
@@ -29,12 +29,15 @@ from event_relay.analysis_stages import (
     stage1_digest,
     stage2_transmission,
     stage3_tw_mapping,
+    stage0_thesis_selector,
     stage4_synthesis,
     stage_critic,
     stage_dual_view,
 )
+from event_relay.claim_verifier import verify_claim_coverage
 from event_relay.analysis_stages.schemas import assert_evidence_ids_covered
 from event_relay.config import load_settings
+from event_relay.context_pack_builder import CONTEXT_PACK_VERSION, build_context_pack
 from event_relay.event_enrichment import (
     EventAnnotation,
     annotate as rule_annotate,
@@ -44,6 +47,11 @@ from event_relay.market_calendar import (
     MarketCalendarState,
     allowed_analysis_slots,
     resolve_market_calendar_state,
+)
+from event_relay.llm_quota_router import (
+    LlmRouteCandidate,
+    router_enabled_from_env,
+    select_market_analysis_model,
 )
 from event_relay.prompt_assets import PROMPT_ASSETS_VERSION
 from event_relay.rag import (
@@ -55,11 +63,13 @@ from event_relay.rag import (
     rag_enabled_from_env,
     retrieve_similar_events,
 )
-from event_relay.service import MarketAnalysisRecord, MySqlEventStore
+from event_relay.service import MarketAnalysisRecord, MySqlEventStore, TradeSignalRecord
 from event_relay.trade_signals import (
     build_trade_signal_recommendation_section,
     build_quote_event_trade_signals,
     build_trade_signals_from_analysis,
+    is_excluded_trade_signal_ticker,
+    is_fixed_market_analysis_watch_ticker,
 )
 from event_relay.weekly_summary import _call_llm, _load_secret_from_dpapi_file, _openai_web_search_enabled
 
@@ -67,6 +77,7 @@ from event_relay.weekly_summary import _call_llm, _load_secret_from_dpapi_file, 
 logger = logging.getLogger(__name__)
 PROMPT_VERSION = "market-analysis-v1"
 MULTI_STAGE_PIPELINE_VERSION = PIPELINE_VERSION
+PROVIDER_CONTEXT_POLICY_VERSION = "provider-context-policy-v1"
 SLOTS = {
     "us_close": (5, 0),
     "pre_tw_open": (8, 0),
@@ -75,6 +86,7 @@ SLOTS = {
 }
 
 MACRO_DAILY_OWNER_SLOT = "pre_tw_open"
+RECOMMENDATION_SECTION_SLOTS = {"pre_tw_open", "us_close"}
 
 
 @dataclass(frozen=True)
@@ -94,6 +106,9 @@ class MarketAnalysisConfig:
     force: bool
     slot: str
     provider: str = "openai"
+    context_pack_enabled: bool = True
+    context_pack_candidate_limit: int = 0
+    model_router: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -136,6 +151,14 @@ def _load_text(path: str) -> str:
         return ""
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    """Read a bool env var with permissive true/false handling."""
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
 def _resolve_market_anthropic_settings() -> tuple[str, str, str, str, str | None]:
     """解析並決定 resolve market anthropic settings 對應的資料或結果。"""
     api_key_file = (os.getenv("ANTHROPIC_API_KEY_FILE") or ".secrets/anthropic_api_key.dpapi").strip()
@@ -173,14 +196,133 @@ def _resolve_market_openai_settings() -> tuple[str, str, str, str, str | None]:
     return "openai", model, api_base, api_key_file, api_key or None
 
 
+def _env_csv(name: str) -> list[str]:
+    """Read comma-separated env values, preserving order."""
+    raw = os.getenv(name) or ""
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _candidate_variants(
+    *,
+    provider: str,
+    model: str,
+    api_base: str,
+    api_key_file: str,
+    api_key: str | None,
+    model_env_names: tuple[str, ...],
+) -> list[LlmRouteCandidate]:
+    """Build provider candidates from configured primary and fallback models."""
+    models: list[str] = []
+    for name in model_env_names:
+        models.extend(_env_csv(name))
+    if not models:
+        models = [model]
+    elif model not in models:
+        models.insert(0, model)
+
+    seen: set[str] = set()
+    result: list[LlmRouteCandidate] = []
+    for item in models:
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(
+            LlmRouteCandidate(
+                provider=provider,
+                model=item,
+                api_base=api_base,
+                api_key_file=api_key_file,
+                api_key=api_key,
+            )
+        )
+    return result
+
+
+def _primary_provider_for_market_analysis(provider_env: str) -> str:
+    """OpenAI is the default market-analysis primary; Claude is fallback."""
+    if not router_enabled_from_env():
+        return provider_env
+    raw_primary = (os.getenv("MARKET_ANALYSIS_PRIMARY_PROVIDER") or "").strip()
+    if raw_primary:
+        return raw_primary.lower()
+    provider_order = _env_csv("MARKET_ANALYSIS_PROVIDER_ORDER")
+    if provider_order:
+        return provider_order[0].lower()
+    return "openai"
+
+
 def _load_config(args: argparse.Namespace) -> MarketAnalysisConfig:
     """載入 load config 對應的資料或結果。"""
     load_settings(args.env_file)
     provider_env = (os.getenv("LLM_PROVIDER") or "openai").strip().lower()
-    if provider_env == "anthropic":
-        provider, model, api_base, api_key_file, api_key = _resolve_market_anthropic_settings()
+    openai_provider, openai_model, openai_api_base, openai_key_file, openai_api_key = _resolve_market_openai_settings()
+    anthropic_provider, anthropic_model, anthropic_api_base, anthropic_key_file, anthropic_api_key = (
+        _resolve_market_anthropic_settings()
+    )
+    primary_provider = _primary_provider_for_market_analysis(provider_env)
+    if primary_provider == "anthropic":
+        provider, model, api_base, api_key_file, api_key = (
+            anthropic_provider,
+            anthropic_model,
+            anthropic_api_base,
+            anthropic_key_file,
+            anthropic_api_key,
+        )
     else:
-        provider, model, api_base, api_key_file, api_key = _resolve_market_openai_settings()
+        provider, model, api_base, api_key_file, api_key = (
+            openai_provider,
+            openai_model,
+            openai_api_base,
+            openai_key_file,
+            openai_api_key,
+        )
+
+    openai_candidates = _candidate_variants(
+        provider=openai_provider,
+        model=openai_model,
+        api_base=openai_api_base,
+        api_key_file=openai_key_file,
+        api_key=openai_api_key,
+        model_env_names=("MARKET_ANALYSIS_OPENAI_MODELS",),
+    )
+    anthropic_candidates = _candidate_variants(
+        provider=anthropic_provider,
+        model=anthropic_model,
+        api_base=anthropic_api_base,
+        api_key_file=anthropic_key_file,
+        api_key=anthropic_api_key,
+        model_env_names=("MARKET_ANALYSIS_ANTHROPIC_MODELS", "ANTHROPIC_MODELS"),
+    )
+    preferred_candidates = anthropic_candidates if primary_provider == "anthropic" else openai_candidates
+    alternative_candidates = (
+        [*openai_candidates, *anthropic_candidates]
+        if primary_provider == "anthropic"
+        else [*anthropic_candidates, *openai_candidates]
+    )
+    route = select_market_analysis_model(
+        preferred=preferred_candidates[0],
+        alternatives=alternative_candidates,
+    )
+    selected = route.selected
+    provider, model, api_base, api_key_file, api_key = (
+        selected.provider,
+        selected.model,
+        selected.api_base,
+        selected.api_key_file,
+        selected.api_key,
+    )
+    if route.enabled:
+        logger.info(
+            "Market analysis model router selected provider=%s model=%s fallback=%s",
+            provider,
+            model,
+            route.fallback_reason,
+        )
+    max_events = max(20, int(os.getenv("MARKET_ANALYSIS_MAX_EVENTS", "120")))
+    context_pack_candidate_limit = max(
+        max_events,
+        int(os.getenv("MARKET_ANALYSIS_CONTEXT_PACK_CANDIDATE_LIMIT", str(max_events * 3))),
+    )
     return MarketAnalysisConfig(
         env_file=args.env_file,
         model=model,
@@ -198,12 +340,15 @@ def _load_config(args: argparse.Namespace) -> MarketAnalysisConfig:
             or "skills/line-brief-format-skill/line-weekly-brief.md"
         ).strip(),
         lookback_hours=max(6, int(os.getenv("MARKET_ANALYSIS_LOOKBACK_HOURS", "24"))),
-        max_events=max(20, int(os.getenv("MARKET_ANALYSIS_MAX_EVENTS", "120"))),
+        max_events=max_events,
         max_market_rows=max(2, int(os.getenv("MARKET_ANALYSIS_MAX_MARKET_ROWS", "24"))),
         window_minutes=max(5, int(os.getenv("MARKET_ANALYSIS_WINDOW_MINUTES", "25"))),
         force=bool(args.force),
         slot=args.slot,
         provider=provider,
+        context_pack_enabled=_env_bool("MARKET_ANALYSIS_CONTEXT_PACK_ENABLED", True),
+        context_pack_candidate_limit=context_pack_candidate_limit,
+        model_router=route.to_dict(),
     )
 
 
@@ -223,6 +368,51 @@ def _preferred_tw_fallback_tickers_from_env() -> set[str]:
         if code.isdigit():
             result.add(code)
     return result
+
+
+def _should_emit_recommendation_section(slot: str) -> bool:
+    """Return whether stored signals should be appended to the report text."""
+    return slot in RECOMMENDATION_SECTION_SLOTS
+
+
+def _merge_reference_levels_from_fallbacks(
+    signals: list[TradeSignalRecord],
+    fallback_signals: list[TradeSignalRecord],
+) -> tuple[list[TradeSignalRecord], int]:
+    """Fill missing price-reference levels on structured signals.
+
+    LLM stock_watch rows often name the right ticker but leave entry/exit
+    fields null. Quote/context fallback rows are deterministic reference
+    levels from recent Taiwan prices, so copy only missing fields from the
+    matching ticker while preserving the model's thesis and signal type.
+    """
+    fallback_by_ticker = {signal.ticker: signal for signal in fallback_signals}
+    merged: list[TradeSignalRecord] = []
+    filled = 0
+    for signal in signals:
+        fallback = fallback_by_ticker.get(signal.ticker)
+        if fallback is None:
+            merged.append(signal)
+            continue
+
+        updates: dict[str, Any] = {}
+        if not signal.entry_zone_json and fallback.entry_zone_json:
+            updates["entry_zone_json"] = fallback.entry_zone_json
+        if not signal.invalidation_json and fallback.invalidation_json:
+            updates["invalidation_json"] = fallback.invalidation_json
+        if not signal.take_profit_zone_json and fallback.take_profit_zone_json:
+            updates["take_profit_zone_json"] = fallback.take_profit_zone_json
+        if not signal.holding_horizon and fallback.holding_horizon:
+            updates["holding_horizon"] = fallback.holding_horizon
+        if not signal.confidence and fallback.confidence:
+            updates["confidence"] = fallback.confidence
+
+        if updates:
+            filled += 1
+            merged.append(replace(signal, **updates))
+        else:
+            merged.append(signal)
+    return merged, filled
 
 
 def _resolve_time_slot_legacy_unused(config: MarketAnalysisConfig, now_local: datetime) -> str | None:
@@ -477,9 +667,20 @@ def _compact_event_raw_json(source: str, value: str | None) -> Any:
         "source_counts",
         "fred_enabled",
         "fred_series_ids",
+        "market_breadth_enabled",
+        "ai_capex_enabled",
+        "oil_supply_enabled",
+        "scorecard_enabled",
+        "scorecard_input_hash",
+        "scorecard_overall_score",
+        "scorecard_dimension_scores",
     ):
         if key in parsed:
             compact[key] = parsed[key]
+
+    scorecard = parsed.get("scorecard")
+    if isinstance(scorecard, dict):
+        compact["scorecard"] = scorecard
 
     point = parsed.get("point")
     if isinstance(point, dict):
@@ -575,6 +776,210 @@ def _build_events_payload(store: MySqlEventStore, recent_events: list) -> list[d
         len(payload),
     )
     return payload
+
+
+def _int_env(name: str, default: int, *, minimum: int = 0, maximum: int | None = None) -> int:
+    raw = os.getenv(name)
+    try:
+        value = int(raw) if raw is not None and raw.strip() != "" else default
+    except ValueError:
+        value = default
+    value = max(minimum, value)
+    if maximum is not None:
+        value = min(value, maximum)
+    return value
+
+
+def _provider_context_mode(provider: str) -> str:
+    if str(provider or "").strip().lower() != "anthropic":
+        return "full"
+    return (os.getenv("MARKET_ANALYSIS_ANTHROPIC_CONTEXT_MODE") or "compact").strip().lower()
+
+
+def _apply_provider_context_policy(
+    *,
+    provider: str,
+    events_payload: list[dict[str, Any]],
+    market_payload: list[dict[str, Any]],
+    rag_examples: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    """Shrink prompt context only for Anthropic fallback to avoid large-context limits."""
+    mode = _provider_context_mode(provider)
+    if mode in {"", "full", "off", "disabled"}:
+        return events_payload, market_payload, rag_examples, {
+            "version": PROVIDER_CONTEXT_POLICY_VERSION,
+            "provider": provider,
+            "mode": "full",
+            "enabled": False,
+            "events_input": len(events_payload),
+            "events_output": len(events_payload),
+            "market_rows_input": len(market_payload),
+            "market_rows_output": len(market_payload),
+            "rag_input": len(rag_examples),
+            "rag_output": len(rag_examples),
+        }
+
+    max_events = _int_env("MARKET_ANALYSIS_ANTHROPIC_MAX_EVENTS", 55, minimum=10)
+    max_market_rows = _int_env("MARKET_ANALYSIS_ANTHROPIC_MAX_MARKET_ROWS", 12, minimum=0)
+    max_rag = _int_env("MARKET_ANALYSIS_ANTHROPIC_RAG_K", 2, minimum=0)
+    summary_chars = _int_env("MARKET_ANALYSIS_ANTHROPIC_EVENT_SUMMARY_CHARS", 500, minimum=120, maximum=2000)
+
+    selected_events = _select_events_for_compact_context(events_payload, max_events=max_events)
+    compact_events = [_compact_event_for_anthropic(event, summary_chars=summary_chars) for event in selected_events]
+    compact_market = [_compact_market_row_for_anthropic(row) for row in market_payload[:max_market_rows]]
+    compact_rag = [_compact_rag_for_anthropic(example, summary_chars=summary_chars) for example in rag_examples[:max_rag]]
+    telemetry = {
+        "version": PROVIDER_CONTEXT_POLICY_VERSION,
+        "provider": provider,
+        "mode": "anthropic_compact",
+        "enabled": True,
+        "events_input": len(events_payload),
+        "events_output": len(compact_events),
+        "market_rows_input": len(market_payload),
+        "market_rows_output": len(compact_market),
+        "rag_input": len(rag_examples),
+        "rag_output": len(compact_rag),
+        "summary_chars": summary_chars,
+        "preserve_rules": ["scorecard", "market_context", "official_sources", "high_importance"],
+    }
+    return compact_events, compact_market, compact_rag, telemetry
+
+
+def _select_events_for_compact_context(
+    events_payload: list[dict[str, Any]],
+    *,
+    max_events: int,
+) -> list[dict[str, Any]]:
+    ranked = sorted(
+        enumerate(events_payload),
+        key=lambda item: (_compact_event_rank(item[1]), item[0]),
+    )
+    selected_indices = sorted(index for index, _event in ranked[:max_events])
+    return [events_payload[index] for index in selected_indices]
+
+
+def _compact_event_rank(event: dict[str, Any]) -> tuple[int, float]:
+    source = str(event.get("source") or "").lower()
+    annotation = event.get("annotation") if isinstance(event.get("annotation"), dict) else {}
+    try:
+        importance = float(annotation.get("importance") or 0.0)
+    except (TypeError, ValueError):
+        importance = 0.0
+    if source == "market_context:scorecard":
+        return (0, -importance)
+    if source.startswith("market_context:"):
+        return (1, -importance)
+    if source.startswith(("fed:", "bls:", "eia:", "treasury:", "sec:", "twse_mops:", "twse:", "tpex:", "taifex:")):
+        return (2, -importance)
+    if source.startswith("market_analysis:"):
+        return (3, -importance)
+    return (4, -importance)
+
+
+def _compact_event_for_anthropic(event: dict[str, Any], *, summary_chars: int) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "id": event.get("id"),
+        "source": event.get("source"),
+        "title": _trim_text(event.get("title"), 240),
+        "summary": _trim_text(event.get("summary"), summary_chars),
+        "published_at": event.get("published_at"),
+    }
+    annotation = event.get("annotation") if isinstance(event.get("annotation"), dict) else None
+    if annotation:
+        out["annotation"] = {
+            "category": annotation.get("category"),
+            "sentiment": annotation.get("sentiment"),
+            "importance": annotation.get("importance"),
+            "entities": (annotation.get("entities") or [])[:8] if isinstance(annotation.get("entities"), list) else [],
+        }
+    raw = _compact_raw_for_anthropic(str(event.get("source") or ""), event.get("raw"))
+    if raw:
+        out["raw"] = raw
+    impact = event.get("impact") if isinstance(event.get("impact"), dict) else None
+    if impact:
+        out["impact"] = {
+            key: impact.get(key)
+            for key in ("summary", "market_relevance", "tw_relevance", "confidence")
+            if impact.get(key) is not None
+        }
+    return out
+
+
+def _compact_raw_for_anthropic(source: str, raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    if source == "market_context:scorecard":
+        return {
+            "event_type": raw.get("event_type"),
+            "dimension": raw.get("dimension"),
+            "scorecard": _shrink_json(raw.get("scorecard"), max_depth=5),
+        }
+    keep_keys = (
+        "event_type",
+        "dimension",
+        "category",
+        "metric",
+        "symbol",
+        "label",
+        "value",
+        "change",
+        "change_pct",
+        "as_of",
+        "generated_at",
+        "source",
+        "data_freshness",
+    )
+    compact = {key: _shrink_json(raw.get(key), max_depth=3) for key in keep_keys if key in raw}
+    return compact or None
+
+
+def _compact_market_row_for_anthropic(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "event_id": row.get("event_id"),
+        "source": row.get("source"),
+        "trade_date": row.get("trade_date"),
+        "session": row.get("session"),
+        "symbol": row.get("symbol"),
+        "label": row.get("label"),
+        "open_price": row.get("open_price"),
+        "last_price": row.get("last_price"),
+        "recorded_price": row.get("recorded_price"),
+        "created_at": row.get("created_at"),
+    }
+
+
+def _compact_rag_for_anthropic(example: dict[str, Any], *, summary_chars: int) -> dict[str, Any]:
+    return {
+        "kind": example.get("kind"),
+        "event_id": example.get("event_id"),
+        "analysis_id": example.get("analysis_id"),
+        "source": example.get("source"),
+        "title": _trim_text(example.get("title"), 180),
+        "summary": _trim_text(example.get("summary"), summary_chars),
+        "similarity": example.get("similarity"),
+        "metadata_score": example.get("metadata_score"),
+        "outcome_score": example.get("outcome_score"),
+        "hybrid_score": example.get("hybrid_score"),
+    }
+
+
+def _trim_text(value: Any, limit: int) -> str:
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "..."
+
+
+def _shrink_json(value: Any, *, max_depth: int) -> Any:
+    if max_depth <= 0:
+        return _trim_text(value, 160)
+    if isinstance(value, dict):
+        return {str(key): _shrink_json(item, max_depth=max_depth - 1) for key, item in list(value.items())[:30]}
+    if isinstance(value, list):
+        return [_shrink_json(item, max_depth=max_depth - 1) for item in value[:10]]
+    if isinstance(value, str):
+        return _trim_text(value, 500)
+    return value
 
 
 def _build_upstream_analysis_context(
@@ -689,12 +1094,26 @@ def _run_multi_stage_pipeline(
         len(market_payload),
     )
 
-    # 多階段流程採「任何 stage 失敗就整體回退」策略，
-    # 但每段 telemetry 仍保留下來，方便日後知道到底是在哪一層斷掉。
+    stage0 = stage0_thesis_selector.run(
+        context=ctx,
+        events_payload=events_payload,
+        market_payload=market_payload,
+        snapshot_dir=snapshot_dir,
+    )
+    telemetry["stages"]["stage0"] = _stage_telemetry(stage0)
+    stage0_output = stage0.output if stage0.ok() and isinstance(stage0.output, dict) else {
+        "core_tensions": [],
+        "selection_notes": ["stage0 unavailable"],
+    }
+    telemetry["core_tensions"] = stage0_output.get("core_tensions") or []
+
+    # 多階段流程採「任何關鍵 LLM stage 失敗就整體回退」策略；
+    # deterministic stage0 失敗時降級為空 thesis，不阻塞整條分析。
     stage1 = stage1_digest.run(
         context=ctx,
         events_payload=events_payload,
         market_payload=market_payload,
+        stage0_output=stage0_output,
         snapshot_dir=snapshot_dir,
     )
     telemetry["stages"]["stage1"] = _stage_telemetry(stage1)
@@ -709,6 +1128,7 @@ def _run_multi_stage_pipeline(
     stage2 = stage2_transmission.run(
         context=ctx,
         stage1_output=stage1.output,
+        stage0_output=stage0_output,
         retrieved_examples=rag_examples or [],
         snapshot_dir=snapshot_dir,
     )
@@ -784,6 +1204,7 @@ def _run_multi_stage_pipeline(
     line_skill = _load_text(config.skill_line_format_path)
     stage4 = stage4_synthesis.run(
         context=ctx,
+        stage0_output=stage0_output,
         stage1_output=stage1.output,
         stage2_output=stage2.output,
         stage3_output=stage3.output,
@@ -876,12 +1297,20 @@ def _aggregate_token_usage(
     }
 
 
-def _retrieve_rag_examples(store: MySqlEventStore, events_payload: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _retrieve_rag_examples(
+    store: MySqlEventStore,
+    events_payload: list[dict[str, Any]],
+    *,
+    slot: str | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """檢索 retrieve rag examples 對應的資料或結果。"""
     if not rag_enabled_from_env():
         return [], {"enabled": False, "examples_count": 0}
 
     embedding_model = (os.getenv("RAG_EMBEDDING_MODEL") or RAG_DEFAULT_EMBEDDING_MODEL).strip()
+    vector_weight = float(os.getenv("MARKET_ANALYSIS_RAG_VECTOR_WEIGHT", "0.62"))
+    metadata_weight = float(os.getenv("MARKET_ANALYSIS_RAG_METADATA_WEIGHT", "0.25"))
+    outcome_weight = float(os.getenv("MARKET_ANALYSIS_RAG_OUTCOME_WEIGHT", "0.13"))
     try:
         examples = retrieve_similar_events(
             store,
@@ -897,12 +1326,36 @@ def _retrieve_rag_examples(store: MySqlEventStore, events_payload: list[dict[str
                 16,
                 int(os.getenv("RAG_EMBEDDING_DIMENSIONS", str(RAG_DEFAULT_EMBEDDING_DIMENSIONS))),
             ),
+            metadata_filter_threshold=float(os.getenv("MARKET_ANALYSIS_RAG_METADATA_FILTER_THRESHOLD", "0.10")),
+            vector_weight=vector_weight,
+            metadata_weight=metadata_weight,
+            outcome_weight=outcome_weight,
+            include_analysis_examples=_env_bool("MARKET_ANALYSIS_RAG_INCLUDE_ANALYSES", True),
+            analysis_slot=slot,
         )
         prompt_examples = [example.to_prompt_dict() for example in examples]
         return prompt_examples, {
             "enabled": True,
+            "mode": "hybrid",
             "embedding_model": embedding_model,
             "examples_count": len(prompt_examples),
+            "weights": {
+                "vector": vector_weight,
+                "metadata": metadata_weight,
+                "outcome": outcome_weight,
+            },
+            "score_components": [
+                {
+                    "kind": item.get("kind"),
+                    "event_id": item.get("event_id"),
+                    "analysis_id": item.get("analysis_id"),
+                    "similarity": item.get("similarity"),
+                    "metadata_score": item.get("metadata_score"),
+                    "outcome_score": item.get("outcome_score"),
+                    "hybrid_score": item.get("hybrid_score"),
+                }
+                for item in prompt_examples
+            ],
         }
     except Exception as exc:  # noqa: BLE001
         logger.warning("RAG retrieval failed; continuing without historical examples: %s", exc)
@@ -944,7 +1397,12 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
 
     store = MySqlEventStore(relay_settings)
     store.initialize()
-    recent_events = store.fetch_recent_summary_events(days=1, limit=config.max_events)
+    context_pack_enabled = bool(getattr(config, "context_pack_enabled", True))
+    context_candidate_limit = int(
+        getattr(config, "context_pack_candidate_limit", 0) or config.max_events
+    )
+    recent_event_limit = max(config.max_events, context_candidate_limit) if context_pack_enabled else config.max_events
+    recent_events = store.fetch_recent_summary_events(days=1, limit=recent_event_limit)
     recent_market_rows = store.fetch_recent_market_snapshots(hours=config.lookback_hours, limit=config.max_market_rows)
 
     events_payload = _build_events_payload(store, recent_events)
@@ -955,6 +1413,16 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
     )
     if upstream_analysis_events:
         events_payload.extend(upstream_analysis_events)
+    if context_pack_enabled:
+        events_payload, context_pack_telemetry = build_context_pack(events_payload, max_events=config.max_events)
+    else:
+        context_pack_telemetry = {
+            "version": CONTEXT_PACK_VERSION,
+            "enabled": False,
+            "input_count": len(events_payload),
+            "output_count": len(events_payload),
+            "max_events": config.max_events,
+        }
     market_payload = [
         {
             "event_id": row.event_id,
@@ -971,7 +1439,13 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         }
         for row in recent_market_rows
     ]
-    rag_examples, rag_telemetry = _retrieve_rag_examples(store, events_payload)
+    rag_examples, rag_telemetry = _retrieve_rag_examples(store, events_payload, slot=slot)
+    events_payload, market_payload, rag_examples, provider_context_policy = _apply_provider_context_policy(
+        provider=config.provider,
+        events_payload=events_payload,
+        market_payload=market_payload,
+        rag_examples=rag_examples,
+    )
 
     pipeline_mode = _pipeline_mode_from_env()
     pipeline_telemetry: dict[str, Any] | None = None
@@ -1018,6 +1492,15 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         )
         summary_text = _normalize_text(summary_text_raw)
         legacy_token_usage = legacy_usage.to_dict()
+
+    claim_verification = verify_claim_coverage(
+        summary_text=summary_text or "",
+        structured_payload=structured_payload,
+        events_payload=events_payload,
+        market_payload=market_payload,
+    )
+    if pipeline_telemetry is not None:
+        pipeline_telemetry["claim_verifier"] = claim_verification
 
     token_usage = _aggregate_token_usage(
         pipeline_telemetry if used_multi_stage else None,
@@ -1078,8 +1561,12 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 "delivery_owner": "java",
                 "python_push_removed": True,
                 "web_search_requested": config.provider == "openai" and _openai_web_search_enabled(),
+                "model_router": getattr(config, "model_router", None),
                 "upstream_analysis_context": upstream_analysis_context,
+                "context_pack": context_pack_telemetry,
+                "provider_context_policy": provider_context_policy,
                 "rag": rag_telemetry,
+                "claim_verifier": claim_verification,
                 "pipeline_mode": "multi_stage" if used_multi_stage else "legacy",
                 "pipeline_stages": pipeline_telemetry,
                 "structured": structured_payload,
@@ -1109,13 +1596,9 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 pipeline_telemetry=pipeline_telemetry,
             )
             structured_signals_count = len(trade_signals)
-        if slot == "pre_tw_open":
+        reference_levels_filled = 0
+        if _should_emit_recommendation_section(slot):
             preferred_fallback_tickers = _preferred_tw_fallback_tickers_from_env()
-            recommendation_tickers = {
-                signal.ticker
-                for signal in trade_signals
-                if signal.direction == "long" and signal.strategy_type in {"swing", "medium"}
-            }
             fallback_signals = build_quote_event_trade_signals(
                 analysis_id=analysis_id,
                 analysis_date=record.analysis_date,
@@ -1124,8 +1607,20 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 max_signals=5,
                 preferred_tickers=preferred_fallback_tickers,
             )
+            trade_signals, reference_levels_filled = _merge_reference_levels_from_fallbacks(
+                trade_signals,
+                fallback_signals,
+            )
+            recommendation_tickers = {
+                signal.ticker
+                for signal in trade_signals
+                if not is_excluded_trade_signal_ticker(signal.ticker)
+                if signal.direction == "long" and signal.strategy_type in {"swing", "medium"}
+            }
             existing_tickers = {signal.ticker for signal in trade_signals}
             for fallback_signal in fallback_signals:
+                if is_excluded_trade_signal_ticker(fallback_signal.ticker):
+                    continue
                 if len(recommendation_tickers) >= 5 and fallback_signal.ticker not in preferred_fallback_tickers:
                     break
                 if fallback_signal.ticker in existing_tickers:
@@ -1135,6 +1630,11 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 if fallback_signal.direction == "long" and fallback_signal.strategy_type in {"swing", "medium"}:
                     recommendation_tickers.add(fallback_signal.ticker)
                     quote_fallback_added += 1
+            trade_signals = [
+                signal
+                for signal in trade_signals
+                if not is_excluded_trade_signal_ticker(signal.ticker)
+            ]
         if used_multi_stage or trade_signals:
             trade_signals_count = store.replace_trade_signals_for_analysis(analysis_id, trade_signals)
             source_label = "structured"
@@ -1143,16 +1643,22 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
             elif quote_fallback_added:
                 source_label = "quote_fallback"
             logger.info(
-                "[TRADE_SIGNALS_STORED] analysis_id=%s slot=%s count=%d status=pending_review source=%s fallback_added=%d",
+                "[TRADE_SIGNALS_STORED] analysis_id=%s slot=%s count=%d status=pending_review source=%s fallback_added=%d reference_levels_filled=%d",
                 analysis_id,
                 slot,
                 trade_signals_count,
                 source_label,
                 quote_fallback_added,
+                reference_levels_filled,
             )
-        if slot == "pre_tw_open":
-            recommendations = store.fetch_trade_signal_recommendations(analysis_id, limit=5)
-            trade_signal_recommendations_count = len(recommendations)
+        if _should_emit_recommendation_section(slot):
+            recommendations = [
+                row
+                for row in store.fetch_trade_signal_recommendations(analysis_id, limit=10)
+                if not is_excluded_trade_signal_ticker(row.get("ticker"))
+                and is_fixed_market_analysis_watch_ticker(row.get("ticker"))
+            ]
+            trade_signal_recommendations_count = min(len(recommendations), 5)
             recommendation_section = build_trade_signal_recommendation_section(recommendations)
             if recommendation_section:
                 summary_text = f"{summary_text.rstrip()}\n\n{recommendation_section}"
@@ -1167,6 +1673,8 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         "slot": slot,
         "requested_slot": slot_decision.requested_slot,
         "analysis_date": record.analysis_date,
+        "provider": config.provider,
+        "model": config.model,
         "events_used": record.events_used,
         "market_rows_used": record.market_rows_used,
         "rag_examples_used": len(rag_examples),

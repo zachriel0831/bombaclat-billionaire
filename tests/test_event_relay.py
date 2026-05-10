@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import os
 from pathlib import Path
+import threading
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -122,6 +123,48 @@ class _ReconnectConnector:
     def connect(self, **_kwargs):
         self.connect_calls += 1
         return self.connection
+
+
+class _QueryCaptureCursor:
+    """Fake cursor that captures the recent-event query."""
+
+    def __init__(self) -> None:
+        self.executed: list[tuple[str, tuple]] = []
+        self.closed = False
+
+    def execute(self, sql: str, params=None) -> None:
+        self.executed.append((sql, tuple(params or ())))
+
+    def fetchall(self):
+        return [
+            (
+                123,
+                "event-123",
+                "official_rss",
+                "Title",
+                "https://example.com/a",
+                "Summary",
+                "2026-05-09T01:00:00+00:00",
+                "2026-05-09 09:00:00",
+                "{}",
+            )
+        ]
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _QueryCaptureConnection:
+    """Fake connection that returns the capture cursor."""
+
+    def __init__(self, cursor: _QueryCaptureCursor) -> None:
+        self.cursor_obj = cursor
+
+    def ping(self, **_kwargs):
+        return None
+
+    def cursor(self):
+        return self.cursor_obj
 
 
 class _MigrationConnection:
@@ -266,6 +309,22 @@ class LineEventRelayTests(unittest.TestCase):
         self.assertIs(store._conn, live)
         self.assertEqual(connector.connect_calls, 1)
         self.assertEqual(live.cursor_calls, 1)
+
+    def test_recent_summary_events_forces_primary_index(self) -> None:
+        """Recent event context should avoid filesort over large raw_json rows."""
+        cur = _QueryCaptureCursor()
+        store = MySqlEventStore.__new__(MySqlEventStore)
+        store._conn = _QueryCaptureConnection(cur)
+        store._event_table = "t_relay_events"
+        store._lock = threading.RLock()
+
+        rows = store.fetch_recent_summary_events(days=1, limit=360)
+
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(cur.closed)
+        self.assertIn("FORCE INDEX (PRIMARY)", cur.executed[0][0])
+        self.assertIn("ORDER BY id DESC", cur.executed[0][0])
+        self.assertEqual(cur.executed[0][1], (1, 360))
 
     def test_event_table_migration_drops_legacy_line_delivery_columns(self) -> None:
         """t_relay_events should not keep old LINE delivery queue columns."""

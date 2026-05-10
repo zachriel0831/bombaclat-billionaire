@@ -71,7 +71,6 @@ WATCHLIST = {
         {"symbol": "3535.TW", "name": "晶彩科"},
         {"symbol": "3715.TW", "name": "定穎投控"},
         {"symbol": "2351.TW", "name": "順德"},
-        {"symbol": "4749.TWO", "name": "新應材"},
         {"symbol": "0050.TW", "name": "元大台灣50"},
     ],
     "us": [

@@ -56,17 +56,17 @@ tasks:
 
   # ── 模組：Analysis Engine ────────────────────────────────────────────
   - id: REQ-022
-    title: "[分析輸出] 交易導向 market_analysis：產出候選標的、區間、失效點、風險"
+    title: "[分析輸出] market_analysis 固定五檔觀察：產出觀察區間、失效點、風險"
     module: analysis_engine
     status: pending
     trigger: schedule
     priority: high
     description: |
-      目標：把現有 market_analysis 從「宏觀摘要」升級到「可被 watchlist 與 decision layer
-      直接消費的交易導向分析結果」。
+      目標：把現有 market_analysis 從「宏觀摘要」升級到「可被固定監控池、watchlist 與 decision layer
+      直接消費的觀察型分析結果」。
 
       新增 structured output 欄位建議：
-        - trade_ideas[]:
+        - stock_watch[]:
           { ticker, market, direction, thesis, catalysts[], entry_zone, invalidation,
             tp_zone, holding_horizon, confidence, evidence_refs[] }
         - market_bias:
@@ -75,14 +75,19 @@ tasks:
           { scenario, probability, trigger, expected_sectors, invalidation }
 
       規則：
-        - 所有 trade idea 都必須帶 evidence_refs，能回指 t_relay_events / context source
+        - 所有 stock_watch row 都必須帶 evidence_refs，能回指 t_relay_events / context source
         - 若本地事件不足，模型可用 web search 補證據，但必須標記 external_verified 與 data_gap
-        - 只產生「候選想法」，不得直接下 order
+        - 只產生固定五檔觀察條件，不得直接下 order，也不得推薦固定池以外台股
+      2026-05-11 amendment:
+        market_analysis stock output is a fixed watch pool, not model-selected recommendations.
+        Allowed Taiwan tickers are 2330, 2603, 2882, 1605, and 4956 only.
+        If evidence is insufficient, output data_gap / neutral watch state instead of substituting another ticker.
     depends_on: [REQ-012, REQ-013, REQ-017, REQ-018, REQ-019, REQ-020, REQ-021]
     acceptance:
-      - t_market_analyses.structured_json 新增 trade_ideas / market_bias / scenario_matrix
-      - 每個 trade idea 都具 ticker、方向、進場區、失效點、催化、風險、evidence_refs
-      - pre_tw_open / tw_close / weekly_tw_preopen 三個 slot 都可輸出交易導向結構
+      - t_market_analyses.structured_json 新增 stock_watch / market_bias / scenario_matrix
+      - 每個 stock_watch row 都具 ticker、方向、進場區、失效點、催化、風險、evidence_refs
+      - stock_watch ticker 只允許 2330、2603、2882、1605、4956
+      - pre_tw_open / tw_close / weekly_tw_preopen 三個 slot 都可輸出觀察型結構
       - 新增測試覆蓋 schema 驗證、無資料降級、web search 補證據標記
       - 後續 watchlist / decision 流程可直接讀 structured_json，不需要再解析自由文字
     notes: |
@@ -161,7 +166,7 @@ tasks:
 
       既有輸入：
         - t_trade_signals：
-          由 REQ-024 建立，保存 analysis-derived candidate signals
+          由 REQ-024 建立，保存 fixed-pool watch signals
 
       建議資料表：
         - t_trade_decisions：
@@ -176,6 +181,9 @@ tasks:
         3. 做風控檢查（曝險、黑名單、冷卻期、持倉衝突）
         4. 產生 decision
         5. 依模式決定是否需要人工批准才可轉成 order intent
+      2026-05-11 amendment:
+        t_trade_signals rows derived from market_analysis are fixed-pool watch rows.
+        Stock monitor and decision layers must not treat them as free-form model recommendations.
     depends_on: [REQ-024, REQ-025]
     acceptance:
       - 建立 decision / risk limit schema 與基本 service

@@ -11,6 +11,7 @@ from event_relay.prompt_assets import TokenUsage
 # exact numbers.
 _FAKE_USAGE = TokenUsage(provider="openai", model="gpt-test", prompt_tokens=100, completion_tokens=50)
 from event_relay.analysis_stages.schemas import (
+    STAGE0_THESIS_SELECTOR_SCHEMA,
     STAGE1_DIGEST_SCHEMA,
     STAGE2_TRANSMISSION_SCHEMA,
     STAGE3_TW_MAPPING_SCHEMA,
@@ -22,6 +23,7 @@ from event_relay.analysis_stages.schemas import (
     validate_against_schema,
 )
 from event_relay.analysis_stages import (
+    stage0_thesis_selector,
     stage1_digest,
     stage2_transmission,
     stage3_tw_mapping,
@@ -74,6 +76,25 @@ _VALID_STAGE3 = {
 
 class SchemaValidationTests(unittest.TestCase):
     """封裝 Schema Validation Tests 相關資料與行為。"""
+    def test_stage0_accepts_valid_payload(self) -> None:
+        validate_against_schema(
+            {
+                "core_tensions": [
+                    {
+                        "id": "thesis-1",
+                        "thesis": "流動性支撐但油價壓力升高",
+                        "bullish_force": "liquidity +2",
+                        "bearish_force": "energy -2",
+                        "why_now": "scorecard divergence",
+                        "evidence_ids": [1],
+                        "scorecard_dimensions": ["liquidity_impulse", "energy_shock_risk"],
+                    }
+                ],
+                "selection_notes": ["selected"],
+            },
+            STAGE0_THESIS_SELECTOR_SCHEMA,
+        )
+
     def test_stage1_accepts_valid_payload(self) -> None:
         """測試 test stage1 accepts valid payload 的預期行為。"""
         validate_against_schema(_VALID_STAGE1, STAGE1_DIGEST_SCHEMA)
@@ -236,6 +257,33 @@ class StageRunnerFallbackTests(unittest.TestCase):
             now_local=datetime(2026, 4, 22, 7, 30, tzinfo=timezone.utc),
         )
 
+    def test_stage0_selects_scorecard_core_tension(self) -> None:
+        scorecard = {
+            "dimensions": {
+                "liquidity_impulse": {"score": 2},
+                "energy_shock_risk": {"score": -2},
+            }
+        }
+        result = stage0_thesis_selector.run(
+            context=self._context(),
+            events_payload=[
+                {
+                    "id": 9,
+                    "source": "market_context:scorecard",
+                    "title": "scorecard",
+                    "summary": "scorecard",
+                    "raw": {"scorecard": scorecard},
+                }
+            ],
+            market_payload=[],
+        )
+
+        self.assertTrue(result.ok())
+        tensions = result.output["core_tensions"]
+        self.assertEqual(len(tensions), 1)
+        self.assertIn("流動性", tensions[0]["thesis"])
+        self.assertIn("能源", tensions[0]["thesis"])
+
     def test_stage1_returns_error_result_on_llm_failure(self) -> None:
         """測試 test stage1 returns error result on llm failure 的預期行為。"""
         with patch(
@@ -274,10 +322,15 @@ class StageRunnerFallbackTests(unittest.TestCase):
             return _VALID_STAGE2, "raw", _FAKE_USAGE
 
         with patch("event_relay.analysis_stages.stage2_transmission.call_llm_json", side_effect=fake_call):
-            result = stage2_transmission.run(context=self._context(), stage1_output=_VALID_STAGE1)
+            result = stage2_transmission.run(
+                context=self._context(),
+                stage1_output=_VALID_STAGE1,
+                stage0_output={"core_tensions": [{"thesis": "流動性支撐但能源壓力升高"}]},
+            )
 
         self.assertTrue(result.ok())
         self.assertIn("Fed cut policy rate", captured["user_prompt"])
+        self.assertIn("流動性支撐但能源壓力升高", captured["user_prompt"])
 
     def test_stage2_includes_retrieved_examples_in_prompt(self) -> None:
         """測試 test stage2 includes retrieved examples in prompt 的預期行為。"""
@@ -376,6 +429,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("市場情緒", user_prompt)
         self.assertIn("台股配置", user_prompt)
         self.assertIn("Section 2 利率與流動性", user_prompt)
+        self.assertIn("Stage0 core tensions JSON", user_prompt)
         self.assertIn("date-only", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
 

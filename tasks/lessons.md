@@ -27,6 +27,88 @@ This file is append-only. Add a new entry after any user correction to prevent r
 
 <!-- Add new lessons below this line -->
 
+## LESSON-20260511-03
+- Date: 2026-05-11
+- Trigger (User correction): User asked to temporarily classify unclassified news as general society news.
+- What was wrong: Rule no-hit rows were stored as `topics_json=[]`, creating a visible unclassified bucket.
+- Root cause: The first implementation optimized for later LLM fallback review, not frontend/category completeness.
+- New rule (always/never): Always provide a visible fallback topic for processed news rows; use `general_social_news` / 一般社會新聞 when no specific topic matches.
+- Prevention checklist (before final response):
+  - [ ] Confirm processed rows have non-empty `topics_json`
+  - [ ] Keep fallback rows distinguishable with `source=rule_fallback` or `source=llm_fallback`
+  - [ ] Verify live DB counts after backfill
+- Repo updates made:
+  - `src/news_platform/topics.py`
+  - `src/news_platform/topic_worker.py`
+  - `src/news_platform/topic_llm_worker.py`
+  - `src/news_platform/store.py`
+  - `tests/test_news_platform_topic_worker.py`
+  - `tests/test_news_platform_topic_llm_worker.py`
+  - `tests/test_news_platform_store_topics.py`
+  - `README.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `memory-bank/09-decisions/2026-05-11-news-platform-topic-classification.md`
+  - `memory-bank/09-decisions/2026-05-11-news-platform-llm-topic-fallback.md`
+  - `spec/news-topic-classification-*.md`
+  - `tasks/todo.md`
+- Verification evidence:
+  - `$env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_news_platform_*.py" -v` passed
+  - `$env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m compileall -q src/news_platform tests/test_news_platform_topic_worker.py tests/test_news_platform_topic_llm_worker.py tests/test_news_platform_store_topics.py` passed
+  - `git diff --check -- <changed news_platform/docs/spec/task files>` passed with CRLF warnings only
+  - Live DB update converted 498 rows; count query shows empty_topics=0 and general_social_news=498
+- Status: active
+
+## LESSON-20260511-02
+- Date: 2026-05-11
+- Trigger (User correction): User noticed `t_news_articles` did not appear to have the topic column and asked to execute SQL/backfill old rows.
+- What was wrong: I had implemented migration/backfill code but had not verified the live MySQL schema or run the historical backfill.
+- Root cause: Verification stopped at local tests and docs instead of checking the runtime DB after a schema/data-flow change.
+- New rule (always/never): Always verify live schema and run required historical backfill after adding DB columns/workers when the user expects deployed data to be visible.
+- Prevention checklist (before final response):
+  - [ ] Query `INFORMATION_SCHEMA.COLUMNS` for new DB columns
+  - [ ] Run worker/backfill against live rows when requested
+  - [ ] Report processed/unprocessed counts from the live table
+- Repo updates made:
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - Live DB columns include `topics_json`, `topic_classified_by`, `topic_classified_at`
+  - Topic worker output: scanned=575 updated=575 failed=0
+  - Live count query: 575 classified rows, 0 missing topics, 77 rule hits, 498 rule no-hit rows
+- Status: active
+
+## LESSON-20260511-01
+- Date: 2026-05-11
+- Trigger (User correction): User clarified `market_analysis` should fixed-connect five Taiwan stocks and should not let the model recommend tickers.
+- What was wrong: Existing specs still described free-form recommendations, candidate top-up, and generic fallback ticker selection.
+- Root cause: `stock_watch` and `t_trade_signals` were documented as recommendation discovery instead of a fixed monitoring pool.
+- New rule (always/never): Always treat `market_analysis` stock output as the fixed pool `2330`, `2603`, `2882`, `1605`, `4956`; never present it as model-selected recommendations.
+- Prevention checklist (before final response):
+  - [ ] Check README / memory-bank / requirements / spec wording says fixed watch pool
+  - [ ] Confirm old tracked fallback tickers are absent from specs
+  - [ ] Explicitly separate fixed watch rows from stock monitor triggers and orders
+- Repo updates made:
+  - `README.md`
+  - `requirements.yml`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `memory-bank/09-decisions/`
+  - `spec/market-analysis-fixed-watchlist-*.md`
+  - `src/event_relay/analysis_stages/`
+  - `src/event_relay/trade_signals.py`
+  - `src/event_relay/market_analysis.py`
+  - `src/event_relay/service.py`
+  - `tests/test_trade_signals.py`
+  - `tests/test_market_analysis.py`
+  - `tasks/todo.md`
+- Verification evidence:
+  - `$env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m unittest tests.test_trade_signals tests.test_analysis_stages tests.test_market_analysis -v` passed
+  - `$env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m compileall -q src/event_relay tests/test_trade_signals.py tests/test_analysis_stages.py tests/test_market_analysis.py` passed
+  - `rg` old tracked tickers / old free-form recommendation phrases returned no matches in active specs/docs
+  - `git diff --check -- <changed docs/spec files>` passed with CRLF warnings only
+- Status: active
+
 ## LESSON-20260305-01
 - Date: 2026-03-05
 - Trigger (User correction): User requested persistent correction memory and explicit pattern in `tasks/lessons.md`.
@@ -353,5 +435,54 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `python -m unittest tests.test_trade_signals -v` passed
   - `python -m unittest tests.test_market_analysis -v` passed
   - `python -m py_compile src\event_relay\trade_signals.py src\event_relay\market_analysis.py src\event_relay\service.py` passed
+  - `git diff --check -- ...` passed with CRLF warnings only
+- Status: active
+
+## LESSON-20260505-01
+- Date: 2026-05-05
+- Trigger (User correction): User showed `4749` rendered as mojibake in the final `今日個股觀察` section.
+- What was wrong: The local `.env` tracked-stock names were mojibake, and final rendering trusted stored DB names/rationales when they contained `?`-style corruption.
+- Root cause: Name backfill only handled missing or non-CJK names; mojibake strings can still contain CJK code points, so they bypassed canonical ticker mapping.
+- New rule (always/never): Always treat `?`, replacement characters, or private-use characters in known stock names as suspect and backfill from canonical ticker mapping before final output.
+- Prevention checklist (before final response):
+  - [ ] Check `.env` tracked-stock labels with `rg`, not only repo docs/tests
+  - [ ] Verify final DB `summary_text` line for the reported ticker
+  - [ ] Replace suspect stored names in both label and rationale rendering
+- Repo updates made:
+  - `.env`
+  - `src/event_relay/trade_signals.py`
+  - `tests/test_trade_signals.py`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest tests.test_trade_signals -v` passed
+  - `python -m unittest tests.test_market_analysis.MultiStagePipelineTests.test_multi_stage_keeps_preferred_tracked_fallback_visible_when_structured_has_five -v` passed
+  - Latest DB `pre_tw_open` summary line confirmed `4749 新應材`
+- Status: active
+
+## LESSON-20260507-01
+- Date: 2026-05-07
+- Trigger (User correction): User asked to remove 新應材 from individual-stock analysis.
+- What was wrong: 4749 could still surface through structured `stock_watch`, Yahoo/context fallback rows, or existing stored recommendations.
+- Root cause: Previous guardrails prioritized configured fallback tickers but had no visible-output exclusion list.
+- New rule (always/never): Always apply `MARKET_ANALYSIS_EXCLUDED_TICKERS` to structured signals, quote/context fallback, and final rendered recommendations before exposing `今日個股觀察`.
+- Prevention checklist (before final response):
+  - [ ] Check excluded tickers are filtered before storage and before final rendered section
+  - [ ] Fetch more than five recommendation rows before rendering so an excluded ticker does not consume a visible slot
+  - [ ] Keep source data traceable but remove excluded names from user-facing stock analysis
+- Repo updates made:
+  - `src/event_relay/trade_signals.py`
+  - `src/event_relay/market_analysis.py`
+  - `src/scrapers/yfinance_stocks.py`
+  - `tests/test_trade_signals.py`
+  - `tests/test_market_analysis.py`
+  - `README.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest tests.test_trade_signals tests.test_market_analysis -v` passed
+  - `python -m py_compile src\event_relay\trade_signals.py src\event_relay\market_analysis.py src\scrapers\yfinance_stocks.py` passed
   - `git diff --check -- ...` passed with CRLF warnings only
 - Status: active

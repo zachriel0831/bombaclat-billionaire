@@ -22,6 +22,7 @@ from event_relay.config import load_settings, parse_bool
 from event_relay.service import (
     AnalysisEmbeddingSource,
     MySqlEventStore,
+    StoredAnalysisEmbedding,
     StoredEventEmbedding,
     SummaryEvent,
 )
@@ -34,6 +35,38 @@ DEFAULT_EMBEDDING_DIMENSIONS = 128
 DEFAULT_MIN_SIMILARITY = 0.22
 DEFAULT_RAG_K = 5
 DEFAULT_CANDIDATE_LIMIT = 500
+DEFAULT_METADATA_FILTER_THRESHOLD = 0.10
+DEFAULT_VECTOR_WEIGHT = 0.62
+DEFAULT_METADATA_WEIGHT = 0.25
+DEFAULT_OUTCOME_WEIGHT = 0.13
+DOMAIN_TOPICS = {
+    "ai",
+    "bank",
+    "brent",
+    "capex",
+    "chip",
+    "cpi",
+    "credit",
+    "earnings",
+    "energy",
+    "fed",
+    "inflation",
+    "jobs",
+    "labor",
+    "liquidity",
+    "nvidia",
+    "oil",
+    "ppi",
+    "rate",
+    "rates",
+    "semiconductor",
+    "tariff",
+    "treasury",
+    "tsm",
+    "wti",
+    "yield",
+    "yields",
+}
 
 
 class EventEmbeddingStore(Protocol):
@@ -60,10 +93,16 @@ class RagExample:
     published_at: str | None
     created_at: str
     similarity: float
+    kind: str = "event"
+    metadata_score: float = 0.0
+    outcome_score: float = 0.5
+    hybrid_score: float = 0.0
+    analysis_id: int | None = None
 
     def to_prompt_dict(self) -> dict[str, Any]:
         """轉換 to prompt dict 對應的資料或結果。"""
-        return {
+        payload = {
+            "kind": self.kind,
             "event_id": self.event_row_id,
             "source": self.source,
             "title": self.title,
@@ -71,7 +110,26 @@ class RagExample:
             "published_at": self.published_at,
             "created_at": self.created_at,
             "similarity": round(float(self.similarity), 4),
+            "metadata_score": round(float(self.metadata_score), 4),
+            "outcome_score": round(float(self.outcome_score), 4),
+            "hybrid_score": round(float(self.hybrid_score), 4),
         }
+        if self.analysis_id is not None:
+            payload["analysis_id"] = self.analysis_id
+        return payload
+
+
+@dataclass(frozen=True)
+class MetadataProfile:
+    """Small metadata fingerprint used for hybrid RAG filtering."""
+    source_families: frozenset[str]
+    categories: frozenset[str]
+    tickers: frozenset[str]
+    topics: frozenset[str]
+    slots: frozenset[str]
+
+    def has_filter_terms(self) -> bool:
+        return bool(self.categories or self.tickers or self.topics or self.slots)
 
 
 def text_hash(text: str) -> str:
@@ -181,6 +239,144 @@ def build_query_text(query_events: list[dict[str, Any]]) -> str:
     return "\n\n".join(build_event_text(event) for event in query_events[:30]).strip()
 
 
+def metadata_profile_from_event(event: dict[str, Any] | StoredEventEmbedding | StoredAnalysisEmbedding) -> MetadataProfile:
+    """Extract a compact metadata profile for hybrid RAG ranking."""
+    if isinstance(event, dict):
+        source = str(event.get("source") or "")
+        title = str(event.get("title") or "")
+        summary = str(event.get("summary") or "")
+        annotation = event.get("annotation") if isinstance(event.get("annotation"), dict) else {}
+        raw = event.get("raw") if isinstance(event.get("raw"), dict) else {}
+        categories = {
+            str(annotation.get("category") or "").strip().lower(),
+            str(raw.get("event_type") or "").strip().lower(),
+            str(raw.get("dimension") or "").strip().lower(),
+        }
+        slots = {str(raw.get("slot") or "").strip().lower()}
+    elif isinstance(event, StoredAnalysisEmbedding):
+        source = f"market_analysis:{event.analysis_slot}"
+        title = event.analysis_slot
+        summary = event.summary_text
+        categories = {"analysis"}
+        slots = {event.analysis_slot.lower()}
+    else:
+        source = event.source
+        title = event.title
+        summary = event.summary
+        categories = set()
+        slots = set()
+
+    text = f"{source}\n{title}\n{summary}"
+    return MetadataProfile(
+        source_families=frozenset(filter(None, {_source_family(source)})),
+        categories=frozenset(item for item in categories if item),
+        tickers=frozenset(_extract_tickers(text)),
+        topics=frozenset(token for token in tokenize(text) if token in DOMAIN_TOPICS),
+        slots=frozenset(item for item in slots if item),
+    )
+
+
+def build_query_metadata(query_events: list[dict[str, Any]]) -> MetadataProfile:
+    """Merge metadata profiles from the current prompt context."""
+    families: set[str] = set()
+    categories: set[str] = set()
+    tickers: set[str] = set()
+    topics: set[str] = set()
+    slots: set[str] = set()
+    for event in query_events[:60]:
+        profile = metadata_profile_from_event(event)
+        families.update(profile.source_families)
+        categories.update(profile.categories)
+        tickers.update(profile.tickers)
+        topics.update(profile.topics)
+        slots.update(profile.slots)
+    return MetadataProfile(
+        source_families=frozenset(families),
+        categories=frozenset(categories),
+        tickers=frozenset(tickers),
+        topics=frozenset(topics),
+        slots=frozenset(slots),
+    )
+
+
+def metadata_match_score(query: MetadataProfile, candidate: MetadataProfile) -> float:
+    """Score metadata overlap on a 0..1 scale."""
+    score = 0.0
+    score += 0.10 if query.source_families & candidate.source_families else 0.0
+    score += 0.25 if query.categories & candidate.categories else 0.0
+    score += 0.30 if query.tickers & candidate.tickers else 0.0
+    score += min(0.25, 0.10 * len(query.topics & candidate.topics))
+    score += 0.10 if query.slots & candidate.slots else 0.0
+    return max(0.0, min(1.0, score))
+
+
+def outcome_score_from_json(outcome_json: dict[str, Any] | None) -> float:
+    """Map stored outcome metadata to a 0..1 retrieval prior."""
+    if not isinstance(outcome_json, dict):
+        return 0.5
+    for key in ("outcome_score", "score"):
+        raw_score = _to_float(outcome_json.get(key))
+        if raw_score is not None:
+            return max(0.0, min(1.0, raw_score if raw_score <= 1 else raw_score / 100.0))
+    status = str(outcome_json.get("status") or "").strip().lower()
+    if status in {"success", "win", "won", "profitable", "target_hit", "good"}:
+        return 0.9
+    if status in {"failed", "failure", "loss", "lost", "stop_hit", "bad"}:
+        return 0.1
+    if outcome_json.get("target_hit") is True:
+        return 0.9
+    if outcome_json.get("stop_hit") is True:
+        return 0.1
+    realized = _to_float(outcome_json.get("realized_return_pct"))
+    if realized is not None:
+        if realized >= 8:
+            return 0.9
+        if realized >= 2:
+            return 0.75
+        if realized > 0:
+            return 0.60
+        if realized > -2:
+            return 0.40
+        return 0.20
+    return 0.5
+
+
+def _source_family(source: str) -> str:
+    """Coarsen source names for metadata matching."""
+    text = source.strip().lower()
+    if text.startswith("market_context:"):
+        return "market_context"
+    if text.startswith("market_analysis:"):
+        return "market_analysis"
+    if text.startswith(("sec:", "twse_mops:", "fed:", "bls:", "eia:", "treasury:")):
+        return "official"
+    if text.startswith(("x:", "twitter:", "tweet:")):
+        return "social"
+    if any(name in text for name in ("reuters", "bloomberg", "bbc", "cnbc", "rss", "news")):
+        return "news"
+    return text.split(":", 1)[0] if text else ""
+
+
+def _extract_tickers(text: str) -> set[str]:
+    """Extract common US/TW ticker-like tokens for metadata filtering."""
+    tickers = {match.upper() for match in re.findall(r"\b\d{4}(?:\.TW|\.TWO)?\b", text, flags=re.IGNORECASE)}
+    tickers.update(
+        match.upper()
+        for match in re.findall(r"\b[A-Z]{2,5}\b", text)
+        if match.upper() not in {"THE", "AND", "FOR", "WITH", "FROM", "THIS", "THAT"}
+    )
+    return tickers
+
+
+def _to_float(value: Any) -> float | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    try:
+        return float(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def retrieve_similar_events(
     store: EventEmbeddingStore,
     query_events: list[dict[str, Any]],
@@ -190,8 +386,14 @@ def retrieve_similar_events(
     candidate_limit: int = DEFAULT_CANDIDATE_LIMIT,
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     dimensions: int = DEFAULT_EMBEDDING_DIMENSIONS,
+    metadata_filter_threshold: float = DEFAULT_METADATA_FILTER_THRESHOLD,
+    vector_weight: float = DEFAULT_VECTOR_WEIGHT,
+    metadata_weight: float = DEFAULT_METADATA_WEIGHT,
+    outcome_weight: float = DEFAULT_OUTCOME_WEIGHT,
+    include_analysis_examples: bool = True,
+    analysis_slot: str | None = None,
 ) -> list[RagExample]:
-    """檢索 retrieve similar events 對應的資料或結果。"""
+    """Retrieve hybrid-ranked historical event/analysis examples."""
     query_text = build_query_text(query_events)
     if not query_text:
         return []
@@ -202,34 +404,158 @@ def retrieve_similar_events(
         if isinstance(event, dict) and str(event.get("id") or "").isdigit()
     }
     query_embedding = embed_text(query_text, dimensions=dimensions)
-    candidates = store.fetch_event_embedding_candidates(
+    query_metadata = build_query_metadata(query_events)
+    event_candidates = store.fetch_event_embedding_candidates(
         embedding_model=embedding_model,
         limit=max(int(candidate_limit), int(k), 1),
     )
 
     scored: list[RagExample] = []
-    for candidate in candidates:
+    for candidate in event_candidates:
         if candidate.event_row_id in excluded_ids:
             continue
-        score = cosine_similarity(query_embedding, candidate.embedding)
-        if score < float(min_similarity):
-            continue
-        scored.append(
-            RagExample(
-                event_row_id=candidate.event_row_id,
-                event_id=candidate.event_id,
-                source=candidate.source,
-                title=candidate.title,
-                summary=candidate.summary,
-                url=candidate.url,
-                published_at=candidate.published_at,
-                created_at=candidate.created_at,
-                similarity=score,
-            )
+        example = _score_event_candidate(
+            candidate,
+            query_embedding=query_embedding,
+            query_metadata=query_metadata,
+            min_similarity=min_similarity,
+            metadata_filter_threshold=metadata_filter_threshold,
+            vector_weight=vector_weight,
+            metadata_weight=metadata_weight,
+            outcome_weight=outcome_weight,
         )
+        if example is not None:
+            scored.append(example)
 
-    scored.sort(key=lambda item: (item.similarity, item.event_row_id), reverse=True)
+    if include_analysis_examples:
+        fetch_analyses = getattr(store, "fetch_analysis_embedding_candidates", None)
+        if callable(fetch_analyses):
+            analysis_candidates = fetch_analyses(
+                embedding_model=embedding_model,
+                limit=max(int(candidate_limit // 4), int(k), 1),
+            )
+            for candidate in analysis_candidates:
+                if analysis_slot and candidate.analysis_slot and candidate.analysis_slot != analysis_slot:
+                    continue
+                example = _score_analysis_candidate(
+                    candidate,
+                    query_embedding=query_embedding,
+                    query_metadata=query_metadata,
+                    min_similarity=min_similarity,
+                    metadata_filter_threshold=metadata_filter_threshold,
+                    vector_weight=vector_weight,
+                    metadata_weight=metadata_weight,
+                    outcome_weight=outcome_weight,
+                )
+                if example is not None:
+                    scored.append(example)
+
+    scored.sort(key=lambda item: (item.hybrid_score, item.similarity, item.outcome_score, item.event_row_id), reverse=True)
     return scored[: max(int(k), 0)]
+
+
+def _score_event_candidate(
+    candidate: StoredEventEmbedding,
+    *,
+    query_embedding: list[float],
+    query_metadata: MetadataProfile,
+    min_similarity: float,
+    metadata_filter_threshold: float,
+    vector_weight: float,
+    metadata_weight: float,
+    outcome_weight: float,
+) -> RagExample | None:
+    semantic_score = cosine_similarity(query_embedding, candidate.embedding)
+    if semantic_score < float(min_similarity):
+        return None
+    metadata_score = metadata_match_score(query_metadata, metadata_profile_from_event(candidate))
+    if query_metadata.has_filter_terms() and metadata_score < float(metadata_filter_threshold):
+        return None
+    outcome_score = outcome_score_from_json(candidate.outcome_json)
+    hybrid_score = _hybrid_score(
+        semantic_score,
+        metadata_score,
+        outcome_score,
+        vector_weight=vector_weight,
+        metadata_weight=metadata_weight,
+        outcome_weight=outcome_weight,
+    )
+    return RagExample(
+        event_row_id=candidate.event_row_id,
+        event_id=candidate.event_id,
+        source=candidate.source,
+        title=candidate.title,
+        summary=candidate.summary,
+        url=candidate.url,
+        published_at=candidate.published_at,
+        created_at=candidate.created_at,
+        similarity=semantic_score,
+        metadata_score=metadata_score,
+        outcome_score=outcome_score,
+        hybrid_score=hybrid_score,
+    )
+
+
+def _score_analysis_candidate(
+    candidate: StoredAnalysisEmbedding,
+    *,
+    query_embedding: list[float],
+    query_metadata: MetadataProfile,
+    min_similarity: float,
+    metadata_filter_threshold: float,
+    vector_weight: float,
+    metadata_weight: float,
+    outcome_weight: float,
+) -> RagExample | None:
+    semantic_score = cosine_similarity(query_embedding, candidate.embedding)
+    if semantic_score < float(min_similarity):
+        return None
+    metadata_score = metadata_match_score(query_metadata, metadata_profile_from_event(candidate))
+    if query_metadata.has_filter_terms() and metadata_score < float(metadata_filter_threshold):
+        return None
+    outcome_score = outcome_score_from_json(candidate.outcome_json)
+    hybrid_score = _hybrid_score(
+        semantic_score,
+        metadata_score,
+        outcome_score,
+        vector_weight=vector_weight,
+        metadata_weight=metadata_weight,
+        outcome_weight=outcome_weight,
+    )
+    return RagExample(
+        event_row_id=candidate.analysis_id,
+        event_id=f"analysis-{candidate.analysis_id}",
+        source=f"market_analysis:{candidate.analysis_slot}",
+        title=f"Historical {candidate.analysis_slot} analysis {candidate.analysis_date}",
+        summary=candidate.summary_text[:1200],
+        url=f"internal://market_analysis/{candidate.analysis_id}",
+        published_at=candidate.analysis_date,
+        created_at=candidate.updated_at,
+        similarity=semantic_score,
+        kind="analysis",
+        metadata_score=metadata_score,
+        outcome_score=outcome_score,
+        hybrid_score=hybrid_score,
+        analysis_id=candidate.analysis_id,
+    )
+
+
+def _hybrid_score(
+    semantic_score: float,
+    metadata_score: float,
+    outcome_score: float,
+    *,
+    vector_weight: float,
+    metadata_weight: float,
+    outcome_weight: float,
+) -> float:
+    total_weight = max(0.0001, float(vector_weight) + float(metadata_weight) + float(outcome_weight))
+    semantic_component = max(0.0, min(1.0, (float(semantic_score) + 1.0) / 2.0))
+    return (
+        semantic_component * float(vector_weight)
+        + max(0.0, min(1.0, float(metadata_score))) * float(metadata_weight)
+        + max(0.0, min(1.0, float(outcome_score))) * float(outcome_weight)
+    ) / total_weight
 
 
 def index_recent_documents(

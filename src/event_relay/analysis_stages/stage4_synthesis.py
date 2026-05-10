@@ -81,7 +81,7 @@ _REGIME_FLOW_GUIDE = (
     "2. 利率與流動性: connect CPI/PCE/jobs/Fed path to 2Y/10Y, DXY, SOFR, Fed balance sheet, RRP, TGA, reserves, credit spreads.\n"
     "3. 景氣循環: explain whether consumption, labor, PMI/ISM, bank credit, earnings, or inventory imply expansion, slowdown, soft landing, or recession risk.\n"
     "4. 市場情緒: judge whether price action is fundamentals-backed or positioning/chase-driven using VIX, SOX/Nasdaq, credit proxies, breadth, and X/news shocks.\n"
-    "5. 台股配置: translate the above into Taiwan sector tilt and stock-watch logic; mention semis/AI, financials, defensives/high dividend, cyclicals, or small caps only when evidence supports it.\n"
+    "5. 台股配置: translate the above into Taiwan sector tilt and fixed-pool stock-watch logic; mention semis/AI, financials, shipping, cable/copper, or small semis only when evidence supports it.\n"
     "6. 風險與資料缺口: list what could break the chain and what must be verified next.\n"
 )
 
@@ -105,8 +105,11 @@ def _structured_instructions() -> str:
         "    multiple high-severity issues, or risks dominate; use high only\n"
         "    when multiple independent chains agree and critic is clean.\n"
         "  - key_drivers: short bullets naming the top 2-4 events / forces.\n"
-        "  - tw_sector_watch / stock_watch: copy the sector / ticker buckets\n"
-        "    from stage3, restated tersely. Use stage3.direction values.\n"
+        "  - tw_sector_watch / stock_watch: copy the sector / fixed-pool ticker\n"
+        "    buckets from stage3, restated tersely. Use stage3.direction values.\n"
+        "    stock_watch is not a model recommendation list. Allowed tickers\n"
+        "    are exactly: 2330 台積電, 2603 長榮, 2882 國泰金, 1605 華新,\n"
+        "    4956 光鋐. Never add any other Taiwan ticker.\n"
         "    For each stock_watch item, add execution-neutral fields when\n"
         "    evidence supports them: market='TW', strategy_type\n"
         "    (intraday/swing/medium/watch), entry_zone, invalidation,\n"
@@ -115,9 +118,15 @@ def _structured_instructions() -> str:
         "    by the structured schema; if price levels are not evidenced, set\n"
         "    entry_zone / invalidation / take_profit_zone to null instead of\n"
         "    guessing or omitting keys. Use [] for empty risk_notes.\n"
-        "    For pre_tw_open, use upstream U.S. close context if it appears in\n"
-        "    stage1, and aim for five buy-side candidates with direction\n"
-        "    bullish and strategy_type swing or medium. Use entry_zone as the\n"
+        "    For pre_tw_open and delivery-eligible us_close, use upstream U.S.\n"
+        "    close / Stage1 Taiwan quote context when present, and fill only\n"
+        "    fixed-pool watch rows with direction bullish or mixed and\n"
+        "    strategy_type swing, medium, or watch. If Stage1 includes Taiwan close\n"
+        "    prices for a stock, provide evidence-backed reference levels in\n"
+        "    entry_zone, invalidation, and take_profit_zone with a basis string;\n"
+        "    otherwise leave those fields null. If a fixed-pool ticker has no\n"
+        "    evidence, leave it out and state the data gap; do not substitute.\n"
+        "    Use entry_zone as the\n"
         "    planned entry area, take_profit_zone as profit-taking/exit area,\n"
         "    and invalidation as stop/exit area. These are signals, not orders.\n"
         "    If Fed path / liquidity / credit stress / sentiment-positioning\n"
@@ -141,6 +150,7 @@ def build_prompts(
     macro_skill: str,
     line_skill: str,
     structured: bool,
+    stage0_json: str = "{}",
     dual_view_json: str | None = None,
     critic_json: str | None = None,
 ) -> tuple[str, str]:
@@ -173,7 +183,10 @@ def build_prompts(
         f"Now local time: {now_local_iso}",
         "Keep readability: short paragraphs, bullet dense data, no wall-of-text blocks.",
         "Each section should be 1-3 bullets or one short paragraph. Use bullets for numbers.",
+        "Depth requirement: each major section should connect evidence -> market mechanism -> Taiwan implication.",
+        "If stock_watch is non-empty, summary_text must only name fixed-pool tickers and state the condition that confirms or invalidates each visible setup.",
         "If evidence exists, explicitly cover Fed path, liquidity, credit stress, cycle data, and sentiment/positioning.",
+        "Answer the selected stage0 core tensions directly before moving into stock implications.",
         "",
         "Formatting rules:",
         "- Section 2 利率與流動性 should use bullet lines when listing market facts.",
@@ -190,6 +203,8 @@ def build_prompts(
         user_lines.extend(["", _structured_instructions()])
     user_lines.extend(
         [
+            "",
+            f"Stage0 core tensions JSON:\n{stage0_json}",
             "",
             f"Stage1 digest JSON:\n{stage1_json}",
             "",
@@ -220,7 +235,7 @@ def _summary_length_instruction(slot: str) -> str:
         return "Total length 650-1100 Chinese characters."
     if slot == "tw_close":
         return "Total length 650-1200 Chinese characters."
-    return "Total length 500-1100 Chinese characters."
+    return "Total length 900-1600 Chinese characters."
 
 
 def run(
@@ -231,6 +246,7 @@ def run(
     stage3_output: dict[str, Any],
     macro_skill: str,
     line_skill: str,
+    stage0_output: dict[str, Any] | None = None,
     snapshot_dir: Path | None = None,
     dual_view_output: dict[str, Any] | None = None,
     critic_output: dict[str, Any] | None = None,
@@ -248,6 +264,7 @@ def run(
     started = time.perf_counter()
 
     stage1_json = json.dumps(stage1_output, ensure_ascii=False)
+    stage0_json = json.dumps(stage0_output or {}, ensure_ascii=False)
     stage2_json = json.dumps(stage2_output, ensure_ascii=False)
     stage3_json = json.dumps(stage3_output, ensure_ascii=False)
     dual_view_json = json.dumps(dual_view_output, ensure_ascii=False) if dual_view_output else None
@@ -256,6 +273,7 @@ def run(
     structured_system, structured_user = build_prompts(
         slot=context.slot,
         now_local_iso=context.now_local.isoformat(),
+        stage0_json=stage0_json,
         stage1_json=stage1_json,
         stage2_json=stage2_json,
         stage3_json=stage3_json,
@@ -274,6 +292,7 @@ def run(
         structured_user=structured_user,
         slot=context.slot,
         stage1_json=stage1_json,
+        stage0_json=stage0_json,
         stage2_json=stage2_json,
         stage3_json=stage3_json,
         macro_skill=macro_skill,
@@ -395,6 +414,7 @@ def _resolve_summary(
     structured_system: str,
     structured_user: str,
     slot: str,
+    stage0_json: str,
     stage1_json: str,
     stage2_json: str,
     stage3_json: str,
@@ -427,6 +447,7 @@ def _resolve_summary(
         summary_text, fallback_usage = _run_text_fallback(
             context=context,
             slot=slot,
+            stage0_json=stage0_json,
             stage1_json=stage1_json,
             stage2_json=stage2_json,
             stage3_json=stage3_json,
@@ -471,6 +492,7 @@ def _run_text_fallback(
     *,
     context: StageContext,
     slot: str,
+    stage0_json: str,
     stage1_json: str,
     stage2_json: str,
     stage3_json: str,
@@ -483,6 +505,7 @@ def _run_text_fallback(
     text_system, text_user = build_prompts(
         slot=slot,
         now_local_iso=context.now_local.isoformat(),
+        stage0_json=stage0_json,
         stage1_json=stage1_json,
         stage2_json=stage2_json,
         stage3_json=stage3_json,

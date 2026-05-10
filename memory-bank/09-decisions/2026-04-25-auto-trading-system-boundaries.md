@@ -57,7 +57,7 @@ reads. Cross-layer writes go through service interfaces, never raw SQL.
 | `t_watchlist_trigger_events` | Python market_watch | "entry zone hit", "invalidation breached" events | REQ-024 |
 | `t_strategy_kb` | Python decision_engine | strategy templates (breakout, pullback, event-driven, ...) | REQ-025 |
 | `t_strategy_symbol_overrides` | Python decision_engine | per-symbol allow/deny, position cap, earnings blackout | REQ-025 |
-| `t_trade_signals` | Python decision_engine | candidate signals derived from analysis + watchlist triggers | REQ-026 |
+| `t_trade_signals` | Python decision_engine | watch/signal rows derived from fixed-pool analysis + watchlist triggers | REQ-026 |
 | `t_trade_decisions` | Python decision_engine | signal → strategy match → risk check → approval status | REQ-026 |
 | `t_risk_limits` | Python decision_engine | global / strategy / symbol risk caps and switches | REQ-026 |
 | `t_order_intents` | Python order_execution | approved decisions converted to broker-agnostic intent | REQ-027 |
@@ -65,6 +65,10 @@ reads. Cross-layer writes go through service interfaces, never raw SQL.
 | `t_order_events` | Python order_execution | order lifecycle audit (submit / replace / cancel / reject) | REQ-027 |
 | `t_fills` | Python order_execution | partial / full fills | REQ-027 |
 | `t_positions` | Python order_execution | symbol-level position with cost / pnl | REQ-027 |
+
+2026-05-11 amendment: the `market_analysis` v1 watchlist seed is fixed to
+`2330`, `2603`, `2882`, `1605`, and `4956`. LLM output may annotate these
+symbols, but must not expand the watchlist with model-selected Taiwan tickers.
 
 Hard rules that follow from the table ownership:
 

@@ -4,30 +4,31 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Migrate local DPAPI secrets to plaintext `.env` values for Windows-to-Mac setup.
-- Requested by: User
-- Start date: 2026-05-04
-- Scope: Convert local X/OpenAI/Anthropic DPAPI-backed secrets into `.env` plaintext variables without printing secret values.
+- Task: Route rule-unclassified news articles to `general_social_news` / 一般社會新聞.
+- Requested by: user
+- Start date: 2026-05-11
+- Scope: Code fallback behavior, docs/spec updates, tests, and live DB update for existing `topics_json=[]` rows.
 
 ## Plan
-- [x] Confirm current secret storage and cross-platform behavior.
-- [x] Identify DPAPI-backed secret files and target `.env` keys.
-- [x] Write decrypted values into `.env` without logging secret content.
-- [x] Comment out existing `*_FILE` DPAPI env references.
-- [x] Verify key presence without printing values.
+- [x] Inspect current topic worker, LLM fallback worker, store SQL, docs, and tests.
+- [x] Add reusable general-social fallback topic.
+- [x] Update rule and LLM fallback workers to write general-social when no topic matches.
+- [x] Keep LLM fallback eligible for rule fallback rows if enabled later.
+- [x] Update docs/specs/tests.
+- [x] Run tests and update live DB rows.
+- [x] Verify live counts.
 
 ## Progress Notes
-- 2026-05-04 - DPAPI files are Windows-only and cannot be decrypted on Mac.
-- 2026-05-04 - First PowerShell migration attempt failed on invalid `return foreach` syntax before writing `.env`.
-- 2026-05-04 - Wrote plaintext `X_BEARER_TOKEN`, `OPENAI_API_KEY`, `WEEKLY_SUMMARY_OPENAI_API_KEY`, `MARKET_ANALYSIS_OPENAI_API_KEY`, and `ANTHROPIC_API_KEY` to `.env`.
-- 2026-05-04 - Existing DPAPI file env refs were commented out; file refs that did not exist were left absent.
+- 2026-05-11: Existing empty rows are `topics_json=[]` with `topic_classified_by='rule'`; target is no visible unclassified bucket.
+- 2026-05-11: Live DB update converted 498 empty-topic rows to `general_social_news`.
 
 ## Verification
-- [x] Plaintext keys present in `.env`
-- [x] DPAPI `*_FILE` entries inactive
-- [x] No secret values printed
+- [x] news_platform topic tests pass.
+- [x] live DB no longer has `JSON_LENGTH(topics_json)=0`.
+- [x] live DB has `general_social_news` rows for previous no-hit articles.
+- [x] `git diff --check -- <changed news_platform/docs/spec/task files>`
 
 ## Review Summary
 - Outcome: complete
-- Evidence: presence/length check confirmed five plaintext keys; active DPAPI file refs are inactive; no secret values were printed.
-- Open risks: `.env` is plaintext but gitignored; `.secrets/*.dpapi` files were kept as Windows-only backup copies.
+- Evidence: 67 news_platform tests OK; compileall OK; diff check OK with CRLF warnings only; live DB updated 498 rows; counts now total=575, missing_topics=0, empty_topics=0, general_social_news=498, specific_topics=77.
+- Open risks: LLM refinement remains disabled unless `NEWSPF_TOPIC_LLM_ENABLED=true` or manual `--llm-topic-fallback` is run.

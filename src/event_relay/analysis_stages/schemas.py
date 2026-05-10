@@ -35,8 +35,50 @@ _EVENT_CATEGORY_ENUM = [
 _SENTIMENT_ENUM = ["bullish", "bearish", "neutral"]
 _DIRECTION_ENUM = ["bullish", "bearish", "mixed"]
 _CONFIDENCE_ENUM = ["low", "medium", "high"]
+_FIXED_TW_STOCK_WATCH_TICKERS = ["2330", "2603", "2882", "1605", "4956"]
 _NULLABLE_STRING = ["string", "null"]
 _NULLABLE_NUMBER_OR_STRING = ["number", "string", "null"]
+
+
+STAGE0_THESIS_SELECTOR_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["core_tensions", "selection_notes"],
+    "properties": {
+        "core_tensions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "id",
+                    "thesis",
+                    "bullish_force",
+                    "bearish_force",
+                    "why_now",
+                    "evidence_ids",
+                    "scorecard_dimensions",
+                ],
+                "properties": {
+                    "id": {"type": "string"},
+                    "thesis": {"type": "string"},
+                    "bullish_force": {"type": "string"},
+                    "bearish_force": {"type": "string"},
+                    "why_now": {"type": "string"},
+                    "evidence_ids": {
+                        "type": "array",
+                        "items": {"type": ["integer", "string"]},
+                    },
+                    "scorecard_dimensions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                },
+            },
+        },
+        "selection_notes": {"type": "array", "items": {"type": "string"}},
+    },
+}
 
 
 STAGE1_DIGEST_SCHEMA: dict[str, Any] = {
@@ -136,7 +178,7 @@ STAGE3_TW_MAPPING_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
                 "required": ["ticker", "direction", "rationale", "evidence_ids"],
                 "properties": {
-                    "ticker": {"type": "string"},
+                    "ticker": {"type": "string", "enum": _FIXED_TW_STOCK_WATCH_TICKERS},
                     "direction": {"type": "string", "enum": _DIRECTION_ENUM},
                     "rationale": {"type": "string"},
                     "evidence_ids": {
@@ -277,7 +319,7 @@ STAGE4_SYNTHESIS_SCHEMA: dict[str, Any] = {
                     "evidence_ids",
                 ],
                 "properties": {
-                    "ticker": {"type": "string"},
+                    "ticker": {"type": "string", "enum": _FIXED_TW_STOCK_WATCH_TICKERS},
                     "market": {"type": _NULLABLE_STRING},
                     "name": {"type": _NULLABLE_STRING},
                     "direction": {"type": "string", "enum": _DIRECTION_ENUM},

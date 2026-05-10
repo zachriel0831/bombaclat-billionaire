@@ -117,12 +117,13 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertIn("review/risk gate required", first[0].raw_json)
 
     def test_skips_non_tw_market_and_invalid_ticker(self) -> None:
-        """只保留台股格式的推薦。"""
+        """只保留固定監控池內的台股。"""
         structured = {
             "stock_watch": [
                 {"ticker": "NVDA", "market": "US", "direction": "bullish", "rationale": "AI"},
                 {"ticker": "bad ticker prose", "market": "TW", "direction": "bullish", "rationale": "bad"},
-                {"ticker": "2454", "direction": "mixed", "rationale": "watch only"},
+                {"ticker": "2454", "direction": "mixed", "rationale": "outside fixed pool"},
+                {"ticker": "2603", "direction": "mixed", "rationale": "watch only"},
             ]
         }
 
@@ -134,16 +135,16 @@ class TradeSignalExtractionTests(unittest.TestCase):
         )
 
         self.assertEqual(len(signals), 1)
-        self.assertEqual(signals[0].ticker, "2454")
+        self.assertEqual(signals[0].ticker, "2603")
         self.assertEqual(signals[0].direction, "watch")
 
     def test_known_tickers_fill_missing_chinese_names(self) -> None:
         """LLM structured rows only carrying ticker still get visible Chinese names."""
         structured = {
             "stock_watch": [
-                {"ticker": "3711", "direction": "bullish", "strategy_type": "swing", "rationale": "HBM"},
-                {"ticker": "2382", "name": "Quanta", "direction": "bullish", "strategy_type": "swing"},
-                {"ticker": "3231", "direction": "bullish", "strategy_type": "medium"},
+                {"ticker": "2603", "direction": "bullish", "strategy_type": "swing", "rationale": "freight"},
+                {"ticker": "1605", "name": "Walsin", "direction": "bullish", "strategy_type": "swing"},
+                {"ticker": "4956", "direction": "bullish", "strategy_type": "medium"},
             ]
         }
 
@@ -154,8 +155,8 @@ class TradeSignalExtractionTests(unittest.TestCase):
             structured_payload=structured,
         )
 
-        self.assertEqual([signal.ticker for signal in signals], ["3711", "2382", "3231"])
-        self.assertEqual([signal.name for signal in signals], ["日月光投控", "廣達", "緯創"])
+        self.assertEqual([signal.ticker for signal in signals], ["2603", "1605", "4956"])
+        self.assertEqual([signal.name for signal in signals], ["長榮", "華新", "光鋐"])
 
     def test_sync_recent_analyses_backfills_store(self) -> None:
         """backfill 會讀 structured_json 並呼叫 store upsert。"""
@@ -187,9 +188,9 @@ class TradeSignalExtractionTests(unittest.TestCase):
         )
 
         self.assertIn("## 今日個股觀察", text)
-        self.assertIn("短中線推薦買進候選", text)
+        self.assertIn("固定五檔監控池", text)
         self.assertIn("2330 台積電", text)
-        self.assertIn("可做波段", text)
+        self.assertIn("波段觀察", text)
         self.assertNotIn("做多｜波段", text)
         self.assertNotIn("direction=long", text)
         self.assertNotIn("進場時點", text)
@@ -198,8 +199,8 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertIn("停損 price:590", text)
         self.assertNotIn("basis", text)
 
-    def test_quote_fallback_accepts_flat_and_negative_quotes_for_top_up(self) -> None:
-        """Fallback 可用持平/小跌報價補滿 5 檔，但信心較低。"""
+    def test_quote_fallback_accepts_flat_and_negative_quotes_for_fixed_pool(self) -> None:
+        """Fallback 只補固定五檔，包含持平/小跌報價。"""
         events = [
             SimpleNamespace(
                 row_id=200 + idx,
@@ -217,11 +218,12 @@ class TradeSignalExtractionTests(unittest.TestCase):
             )
             for idx, (symbol, name, price, change_pct, volume) in enumerate(
                 [
-                    ("2454.TW", "聯發科", 1200, 2.5, 900),
+                    ("2454.TW", "聯發科", 1200, 9.0, 9000),
+                    ("2603.TW", "長榮", 220, 2.5, 900),
                     ("2330.TW", "台積電", 600, 1.1, 1000),
-                    ("2308.TW", "台達電", 420, 0.4, 800),
-                    ("0050.TW", "元大台灣50", 180, 0.0, 600),
-                    ("2317.TW", "鴻海", 160, -0.3, 700),
+                    ("1605.TW", "華新", 42, 0.4, 800),
+                    ("4956.TWO", "光鋐", 58, 0.0, 600),
+                    ("2882.TW", "國泰金", 70, -0.3, 700),
                 ]
             )
         ]
@@ -234,7 +236,7 @@ class TradeSignalExtractionTests(unittest.TestCase):
             max_signals=5,
         )
 
-        self.assertEqual([signal.ticker for signal in signals], ["2454", "2330", "2308", "0050", "2317"])
+        self.assertEqual([signal.ticker for signal in signals], ["2603", "2330", "1605", "4956", "2882"])
         self.assertEqual(len(signals), 5)
         self.assertIn("timing", signals[0].entry_zone_json)
         self.assertIn("最新台股報價下跌 0.30%", signals[-1].rationale)
@@ -283,8 +285,8 @@ class TradeSignalExtractionTests(unittest.TestCase):
             "point": {
                 "source": "yahoo_chart",
                 "category": "tw_tracked_stock",
-                "symbol": "4749.TWO",
-                "name": "新應材",
+                "symbol": "4956.TWO",
+                "name": "光鋐",
                 "value": 205.5,
                 "previous_value": 200.0,
                 "change": 5.5,
@@ -311,12 +313,12 @@ class TradeSignalExtractionTests(unittest.TestCase):
         )
 
         self.assertEqual(len(signals), 1)
-        self.assertEqual(signals[0].ticker, "4749")
+        self.assertEqual(signals[0].ticker, "4956")
         self.assertIn("yahoo_chart_tracked_stock_fallback", signals[0].raw_json)
         self.assertIn("市場情境報價上漲", signals[0].rationale)
 
-    def test_quote_fallback_prefers_configured_tracked_stocks(self) -> None:
-        """Configured local tracked stocks rank ahead of generic quote candidates."""
+    def test_quote_fallback_prefers_configured_fixed_pool_stocks(self) -> None:
+        """Configured fixed-pool stocks rank ahead of other fixed-pool rows."""
         events = [
             SimpleNamespace(
                 row_id=400 + idx,
@@ -341,11 +343,10 @@ class TradeSignalExtractionTests(unittest.TestCase):
                 [
                     ("2454.TW", "聯發科", 1200, 9.0, 9000),
                     ("2330.TW", "台積電", 600, 8.0, 8000),
-                    ("2485.TW", "兆赫", 22, 0.2, 100),
-                    ("3535.TW", "晶彩科", 90, -0.1, 100),
-                    ("3715.TW", "定穎投控", 75, 0.0, 100),
-                    ("2351.TW", "順德", 110, -0.2, 100),
-                    ("4749.TWO", "新應材", 205, 0.1, 100),
+                    ("2603.TW", "長榮", 220, 0.2, 100),
+                    ("1605.TW", "華新", 42, -0.1, 100),
+                    ("4956.TWO", "光鋐", 58, 0.0, 100),
+                    ("2882.TW", "國泰金", 70, 0.05, 100),
                 ]
             )
         ]
@@ -356,11 +357,11 @@ class TradeSignalExtractionTests(unittest.TestCase):
             analysis_slot="pre_tw_open",
             events=events,
             max_signals=5,
-            preferred_tickers={"2485", "3535", "3715", "2351", "4749"},
+            preferred_tickers={"2603", "1605", "4956", "4749"},
         )
 
-        self.assertEqual([signal.ticker for signal in signals], ["2485", "4749", "3715", "3535", "2351"])
-        self.assertEqual([signal.name for signal in signals], ["兆赫", "新應材", "定穎投控", "晶彩科", "順德"])
+        self.assertEqual([signal.ticker for signal in signals], ["2603", "4956", "1605", "2330", "2882"])
+        self.assertEqual([signal.name for signal in signals], ["長榮", "光鋐", "華新", "台積電", "國泰金"])
 
     def test_recommendation_section_backfills_missing_names(self) -> None:
         """Final visible section backfills names even for existing ticker-only DB rows."""
@@ -374,17 +375,43 @@ class TradeSignalExtractionTests(unittest.TestCase):
                     "rationale": "AI",
                 },
                 {
-                    "ticker": "3711",
+                    "ticker": "2603",
                     "strategy_type": "swing",
                     "direction": "long",
                     "confidence": "low",
-                    "rationale": "HBM",
+                    "rationale": "freight",
                 },
             ]
         )
 
         self.assertIn("1. 2330 台積電", text)
-        self.assertIn("2. 3711 日月光投控", text)
+        self.assertIn("2. 2603 長榮", text)
+
+    def test_recommendation_section_excludes_blocked_ticker(self) -> None:
+        """Final visible section excludes blocked tickers such as 4749."""
+        text = build_trade_signal_recommendation_section(
+            [
+                {
+                    "ticker": "4749",
+                    "name": "?\u8139???",
+                    "strategy_type": "swing",
+                    "direction": "long",
+                    "confidence": "medium",
+                    "rationale": "?\u8139??? market context",
+                },
+                {
+                    "ticker": "2330",
+                    "strategy_type": "swing",
+                    "direction": "long",
+                    "confidence": "low",
+                    "rationale": "AI",
+                },
+            ]
+        )
+
+        self.assertNotIn("4749", text)
+        self.assertIn("1. 2330 台積電", text)
+        self.assertNotIn("?\u8139???", text)
 
 
 if __name__ == "__main__":

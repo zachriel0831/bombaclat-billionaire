@@ -1,7 +1,7 @@
 """Multi-stage market analysis pipeline.
 
 Pipeline:
-    stage1_digest -> stage2_transmission -> stage3_tw_mapping
+    stage0_thesis_selector -> stage1_digest -> stage2_transmission -> stage3_tw_mapping
         -> stage_dual_view -> stage_critic -> stage4_synthesis
 
 Each stage is a pure function: it takes JSON-serialisable input and the shared
@@ -19,6 +19,7 @@ runs with whatever inputs are available.
 from event_relay.analysis_stages.context import StageContext, StageResult
 from event_relay.analysis_stages.llm_json import call_llm_json, JsonModeUnavailable
 from event_relay.analysis_stages.schemas import (
+    STAGE0_THESIS_SELECTOR_SCHEMA,
     STAGE1_DIGEST_SCHEMA,
     STAGE2_TRANSMISSION_SCHEMA,
     STAGE3_TW_MAPPING_SCHEMA,
@@ -33,6 +34,7 @@ __all__ = [
     "StageResult",
     "call_llm_json",
     "JsonModeUnavailable",
+    "STAGE0_THESIS_SELECTOR_SCHEMA",
     "STAGE1_DIGEST_SCHEMA",
     "STAGE2_TRANSMISSION_SCHEMA",
     "STAGE3_TW_MAPPING_SCHEMA",
@@ -42,4 +44,4 @@ __all__ = [
     "validate_against_schema",
 ]
 
-PIPELINE_VERSION = "multi-stage-v2"
+PIPELINE_VERSION = "multi-stage-v3"

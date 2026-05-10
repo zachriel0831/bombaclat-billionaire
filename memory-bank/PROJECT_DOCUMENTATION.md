@@ -10,6 +10,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Main packages:
   - `src/news_collector`: source ingestion + bridge
   - `src/event_relay`: event storage API (`/events`), MySQL persistence, retention cleanup, weekly summary, market analysis, and market context modules
+  - `src/news_platform`: separate Taiwan society-news collection pipeline with keyword extraction and deterministic issue classification
 - Main services:
   1. `news_collector.relay_bridge`
   2. `event_relay.main` (event relay API for `/events`)
@@ -38,7 +39,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 4. TWSE / MOPS listed-company announcements
 - Uses official TWSE openapi dataset `t187ap04_L` (`上市公司每日重大訊息`)
 - Tracks allowlisted listed-company codes from `TWSE_MOPS_TRACKED_CODES`
-- Current local tracked TWSE add-ons include `2485`, `3535`, `3715`, and `2351`; TPEx `4749` is handled by market-context Yahoo fallback, not the TWSE/MOPS listed-company feed
+- Market analysis uses a fixed five-stock watch pool: `2330` 台積電, `2603` 長榮, `2882` 國泰金, `1605` 華新, and TPEx `4956` 光鋐.
 - Writes normalized announcement events directly into `t_relay_events` through the crawler bridge
 
 5. US index tracker
@@ -81,6 +82,52 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Optional controls:
   - `MARKET_CONTEXT_FRED_ENABLED=false`
   - `MARKET_CONTEXT_FRED_SERIES_IDS=SOFR,DGS2,BAMLH0A0HYM2`
+
+9. Structural market context modules
+- Runs inside `event_relay.market_context` and writes stored-only rows into `t_relay_events`
+- Market breadth:
+  - Uses Yahoo daily chart ETF proxies for `RSP-SPY`, `QQEW-QQQ`, and `IWM-SPY`
+  - Stores daily spread as `value`, one-month spread as `previous_value`, and three-month spread as `change`
+  - Uses `source=market_context:market_breadth`
+- AI capex:
+  - Uses official SEC ticker mapping and `data.sec.gov/api/xbrl/companyfacts/CIK##########.json`
+  - Default tickers: `MSFT,GOOGL,META,AMZN`; override with `MARKET_CONTEXT_AI_CAPEX_TICKERS`
+  - Requires `SEC_USER_AGENT`; missing user agent is recorded as an explicit source failure
+  - Stores capex as a companyfacts proxy, not a pure AI-only capex split, with `source=market_context:sec_companyfacts`
+- Oil supply/demand:
+  - Uses FRED series for WTI `DCOILWTICO` and Brent `DCOILBRENTEU`
+  - Uses EIA v2 weekly petroleum stocks API for U.S. crude stocks excluding SPR `WCESTUS1` when `EIA_API_KEY` is configured
+  - Adds derived `BRENT-WTI` spread point
+  - Uses `source=market_context:fred_energy` for prices/spread and `source=market_context:eia` for inventory
+- Scorecard:
+  - Uses the collected market-context points to emit one deterministic `source=market_context:scorecard` row
+  - Stores `breadth_health`, `ai_capex_quality`, `energy_shock_risk`, `credit_stress`, and `liquidity_impulse` on a -2..+2 scale
+  - Raw JSON includes score, evidence, counter-evidence, missing data, and freshness per dimension
+- Optional controls:
+  - `MARKET_CONTEXT_BREADTH_ENABLED=false`
+  - `MARKET_CONTEXT_AI_CAPEX_ENABLED=false`
+  - `MARKET_CONTEXT_OIL_SUPPLY_ENABLED=false`
+  - `MARKET_CONTEXT_SCORECARD_ENABLED=false`
+
+10. Taiwan society news platform
+- Runs in `src/news_platform` and is separate from `event_relay`
+- Reads Taiwan society RSS/sitemap sources defined in `news_platform.registry`
+- Writes article rows to independent MySQL tables controlled by `NEWSPF_MYSQL_*`
+- Storage contract:
+  - `t_news_sources`: source metadata
+  - `t_news_articles`: article rows with `article_id`, `source_id`, title/url/summary, timestamps, `tags_json`, `raw_json`, `keywords_json`, `topics_json`, `topic_classified_by`, `topic_classified_at`, `ttl_at`
+  - `keywords_json`: output of `KeywordWorker` as `[{kw, score}, ...]`
+  - `topics_json`: ordered `[{topic_id, label, score, source, ...}, ...]`; `source` is `rule`, `llm`, `rule_fallback`, or `llm_fallback`
+  - `topic_classified_by`: `rule` after deterministic classification, `llm` after LLM fallback, NULL before topic classification
+  - `topic_classified_at`: UTC timestamp for the latest topic classification write
+- Data flow:
+  1. crawler writes raw article rows
+  2. `KeywordWorker` fills `keywords_json`
+  3. `TopicWorker` reads rows where `topics_json IS NULL AND keywords_json IS NOT NULL`
+  4. deterministic classifier writes up to three specific topic hits into `topics_json`; no-hit rows become `general_social_news` / 一般社會新聞 with `source=rule_fallback`, `topic_classified_by=rule`
+  5. Optional `TopicLlmFallbackWorker` can refine rule fallback rows where the first topic is `general_social_news` and `topic_classified_by` is NULL or `rule`
+  6. LLM fallback calls OpenAI first (`gpt-5-nano` by default), then Anthropic Claude Haiku if OpenAI is unavailable; it writes either one `source=llm` topic or keeps `general_social_news` with `source=llm_fallback`, `topic_classified_by=llm`
+- MVP keeps topic classifications embedded on `t_news_articles`; a normalized article-topic relation table is deferred until timeline/query workloads require it
 
 ## Event Storage & Analysis Boundary
 - HTTP endpoints:
@@ -128,13 +175,16 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   4. Store the weekly text into `t_market_analyses`
   5. Leave user-facing delivery to the Java system
 - Output format:
-  - Weekly uses the same macro flow as daily analysis: `總經 Regime` -> `利率與流動性` -> `景氣循環` -> `市場情緒` -> `台股配置` -> `風險與資料缺口`
-  - `利率與流動性` should use bullets for dense market facts
+  - Weekly uses the section contract `週總經` -> `下週台股配置` -> `下週觀察清單`
+  - Each section should connect evidence -> mechanism -> Taiwan implication
+  - Weekly reports are allocation/watchlist briefs and should not output intraday entry / take-profit / stop-loss prices
 - Storage contract:
   - `analysis_date` uses the target Sunday delivery date like `2026-04-26`
   - `analysis_slot=weekly_tw_preopen`
   - `scheduled_time_local=05:10` using the same `HH:MM` format as daily analyses
   - `raw_json.dimension=weekly`
+  - `raw_json.section_contract=["週總經","下週台股配置","下週觀察清單"]`
+  - `raw_json.token_usage` records provider/model/token telemetry when an LLM call completes
 - Prompt snapshots:
   - `runtime/prompts/weekly_summary_system_prompt.txt`
   - `runtime/prompts/weekly_summary_reusable_prompt.txt`
@@ -164,16 +214,21 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   1. Read latest event context from `t_relay_events`
   2. Read latest DJIA / S&P 500 rows from `t_market_index_snapshots`
   3. Include stored-only `market_context:*` raw event payloads in the prompt event window
-  4. Retrieve similar historical events from `t_event_embeddings` for stage2 transmission analogues when available
-  5. Build Traditional Chinese prompts from existing macro + mobile-chat formatting skills
-  6. Call OpenAI Responses API with web search enabled by default for current-fact verification
-  7. Store generated text in `t_market_analyses`
-  8. Set delivery eligibility in `push_enabled`: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`
-  9. Inject the latest stored `us_close` analysis as upstream context only when the relevant U.S. close session was open; if U.S. was closed, the Taiwan pre-open prompt intentionally has no `us_close` block
-  10. Extract `structured_json.stock_watch` into `t_trade_signals` as `pending_review` rows
-  11. For `pre_tw_open`, rank configured `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` tracked fallback tickers ahead of generic fallback rows when recent context exists; otherwise top up pending fallback signals from official TWSE tracked-stock context or recent `yfinance_taiwan` quote events only when fewer than five visible long swing/medium candidates exist
-  12. For `pre_tw_open`, read up to five buy-side short/medium-term rows from `t_trade_signals` and append a deterministic `## 今日個股觀察` section to the stored analysis text
-  13. For `macro_daily`, write macro-only analysis into `t_market_analyses` and do not create trade signals.
+  3a. Select provider/model with `src/event_relay/llm_quota_router.py`; scheduled market analysis is OpenAI-primary by default and Anthropic/Claude fallback second, with Admin API month-to-date cost checks used when keys and monthly budgets are configured
+  4. Build a quota-managed context pack in `src/event_relay/context_pack_builder.py`; scorecard, market context, and important official data are selected before general news/social rows
+  5. Retrieve hybrid historical examples from `t_event_embeddings` and `t_analysis_embeddings` for stage2 transmission analogues when available; metadata filter, vector similarity, and outcome score are all part of ranking
+  6. Run deterministic `stage0_thesis_selector` to choose 1-2 core tensions that all LLM stages must answer
+  7. Build Traditional Chinese prompts from existing macro + mobile-chat formatting skills
+  8. Call OpenAI Responses API or Anthropic Messages API according to the selected route; OpenAI web search is enabled by default for current-fact verification
+  8a. If the selected provider is Anthropic, apply `provider-context-policy-v1` compact context before prompting to reduce event rows, market rows, RAG examples, and raw JSON detail while preserving scorecard, market context, official sources, and high-importance events
+  8b. Run `claim_verifier` on the final output to check whether numbers, dates, and tickers have supporting evidence in the prompt context
+  8c. Store generated text in `t_market_analyses`; `raw_json.model_router`, `raw_json.provider_context_policy`, `raw_json.rag`, `raw_json.pipeline_stages`, and `raw_json.claim_verifier` hold routing/retrieval/stage/evidence telemetry
+  9. Set delivery eligibility in `push_enabled`: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`
+  10. Inject the latest stored `us_close` analysis as upstream context only when the relevant U.S. close session was open; if U.S. was closed, the Taiwan pre-open prompt intentionally has no `us_close` block
+  11. Extract fixed-pool `structured_json.stock_watch` rows into `t_trade_signals` as `pending_review` rows
+  12. For delivery-visible `pre_tw_open` and TW-holiday `us_close`, use only the fixed market-analysis pool: `2330`, `2603`, `2882`, `1605`, `4956`. The model must not introduce substitute Taiwan tickers.
+  13. Fill missing fixed-pool signal reference levels from deterministic quote/context rows when evidence exists, then append a deterministic `## 今日個股觀察` section as a watch/monitor view, not a free-form recommendation list.
+  14. For `macro_daily`, write macro-only analysis into `t_market_analyses` and do not create trade signals.
 - Pre-open text formatting:
   - `raw_json.display_title` is date-only (`YYYY-MM-DD`) for downstream delivery titles
   - Daily analysis uses the fixed macro flow: `總經 Regime` -> `利率與流動性` -> `景氣循環` -> `市場情緒` -> `台股配置` -> `風險與資料缺口`
@@ -181,21 +236,23 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Fallback stock rationales keep only `需開盤量價確認` as the repeated warning
 - Tracked-stock context:
   - `MARKET_CONTEXT_TWSE_CODES` reads official TWSE close/margin rows for tracked listed stocks
-  - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` provides Yahoo Taiwan quote fallback for missing tracked stocks; current local additions are `2485.TW:兆赫`, `3535.TW:晶彩科`, `3715.TW:定穎投控`, `2351.TW:順德`, and `4749.TWO:新應材`
-  - Official TWSE context is preferred when both sources produce the same ticker; Yahoo fallback fills gaps such as TPEx `.TWO` symbols
+  - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` provides Yahoo Taiwan quote/context rows for the fixed pool: `2330.TW:台積電`, `2603.TW:長榮`, `2882.TW:國泰金`, `1605.TW:華新`, and `4956.TWO:光鋐`
+  - `MARKET_ANALYSIS_EXCLUDED_TICKERS` defaults to `4749`, so 新應材 is excluded from visible individual-stock analysis even if old quote/context rows remain in storage
+  - Official TWSE context is preferred when both sources produce the same ticker; Yahoo context fills gaps such as TPEx `.TWO` symbols
 - Trade-signal boundary:
-  - `t_trade_signals` stores analysis-derived Taiwan ticker ideas only
+  - `t_trade_signals` stores fixed-pool Taiwan watch items only
   - `ticker` is the normalized tradable symbol; Taiwan signals use the 4-digit code without `.TW` / `.TWO`
   - Every signal keeps `analysis_id`, slot/date, ticker, strategy/direction, optional entry/stop/target JSON, and `source_event_ids`
   - Internal `direction=long` means buy-side / 做多, not long-term holding; `entry_zone` is the entry area, `take_profit_zone` is the profit-taking exit area, and `invalidation` is rendered as 停損
-  - `quote_fallback_stock_watch` / `context_fallback_stock_watch` are degraded-mode or tracked-stock visibility signal sources only; configured `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` tickers are ranked ahead of generic fallback rows in the visible pre-open section, and review/risk gate still decides whether they are usable
+  - `quote_fallback_stock_watch` / `context_fallback_stock_watch` are fixed-pool evidence sources only; they enrich or fill monitor levels and must not add tickers outside `2330`, `2603`, `2882`, `1605`, `4956`
   - `idempotency_key` suppresses duplicate signals for the same analysis/ticker/strategy
   - `t_signal_reviews` is reserved for risk gate / human / model-review decisions
   - `t_signal_outcomes` is reserved for later performance feedback
   - LLM analysis never creates order intents or broker calls directly
 - Historical-case RAG:
   - Module: `src/event_relay/rag.py`
-  - First implementation uses deterministic local lexical embeddings (`local-hash-v1`) to avoid a new paid API dependency
+  - Current retrieval is hybrid: metadata overlap filters candidates, deterministic local lexical/vector similarity ranks semantic fit, and stored `outcome_json` scores successful past analyses higher
+  - Default embeddings still use deterministic local lexical embeddings (`local-hash-v1`) to avoid a new paid API dependency
   - `scripts/run_rag_indexer.ps1` incrementally indexes recent `t_relay_events` into `t_event_embeddings` and `t_market_analyses` into `t_analysis_embeddings`
   - `stage2_transmission` receives retrieved examples as analogues only; historical event IDs are not valid current evidence IDs
   - If RAG retrieval fails or has no candidates, market analysis continues without historical examples and records the gap in `raw_json.rag`
@@ -203,8 +260,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `source` starts with `market_context:`
   - `raw_json.stored_only=true`
   - `raw_json.dimension=market_context`
-  - `raw_json.event_type` is `market_context_point`, `market_context_collection`, or `tw_market_flow_dataset`
-  - current source families: Yahoo chart market snapshots, U.S. Treasury official yield curve XML, FRED public CSV macro-regime series, TWSE official OpenAPI index/stock/margin data, Taiwan official flow datasets from TWSE / TPEx / TAIFEX, and BLS official macro series
+  - `raw_json.event_type` is `market_context_point`, `market_context_collection`, `market_context_scorecard`, or `tw_market_flow_dataset`
+  - current source families: deterministic scorecard, Yahoo chart market snapshots, U.S. Treasury official yield curve XML, FRED public CSV macro-regime series, market-breadth ETF spreads, SEC companyfacts AI capex proxy, FRED oil price context, optional EIA oil inventory context, TWSE official OpenAPI index/stock/margin data, Taiwan official flow datasets from TWSE / TPEx / TAIFEX, and BLS official macro series
 - Prompt snapshots:
   - `runtime/prompts/market_analysis_<slot>_system_prompt.txt`
   - `runtime/prompts/market_analysis_<slot>_user_prompt.txt`
@@ -240,6 +297,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `.secrets/x_bearer_token.dpapi`
   - `.secrets/openai_api_key.dpapi`
   - `.secrets/openai_admin_key.dpapi` (admin use, high sensitivity)
+  - Anthropic Admin API keys are read from env only (`MARKET_ANALYSIS_ANTHROPIC_ADMIN_KEY` / `ANTHROPIC_ADMIN_KEY` / `ANTHROPIC_ADMIN_API_KEY`) and must not be logged
 - Never print full secret values in logs.
 
 ## Operations

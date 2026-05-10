@@ -36,7 +36,7 @@ All thresholds overrideable via `MovementThresholds`. Stable event_id format:
 ### Source mapping (yfinance → market)
 | WATCHLIST category | market label | example symbols |
 |---|---|---|
-| `taiwan` | TW | 2330.TW, 2317.TW |
+| `taiwan` | TW | 2330.TW, 2603.TW, 2882.TW, 1605.TW, 4956.TWO |
 | `us` | US | AAPL, NVDA |
 | `index` | INDEX | ^TWII, ^GSPC, ^IXIC, ^DJI |
 | `crypto` | CRYPTO | BTC-USD, ETH-USD |

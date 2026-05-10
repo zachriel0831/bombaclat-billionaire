@@ -110,6 +110,25 @@
 - Check bridge log for `Polling source=rss fetched=<count>`
 - Query `t_relay_events` for recent RSS source rows
 
+## Workflow 3B: Taiwan Society Topic Classification
+1. Smoke check feeds without DB writes
+- `$env:PYTHONPATH='src'; python -m news_platform.main --smoke`
+2. Collect one batch into `t_news_articles`
+- `$env:PYTHONPATH='src'; python -m news_platform.main --once`
+3. Backfill keywords and topics
+- `$env:PYTHONPATH='src'; python -m news_platform.main --extract-keywords --classify-topics`
+4. Optional LLM fallback for `general_social_news` fallback rows
+- Set `NEWSPF_TOPIC_LLM_ENABLED=true` for loop mode, or run manually:
+- `$env:PYTHONPATH='src'; python -m news_platform.main --llm-topic-fallback`
+5. Run continuous collection
+- `$env:PYTHONPATH='src'; python -m news_platform.main --loop`
+6. Verify DB evidence
+- Confirm recent rows have `keywords_json IS NOT NULL`
+- Confirm classified rows have `topics_json IS NOT NULL`
+- Treat `topics_json[0].topic_id='general_social_news' AND topic_classified_by='rule'` as eligible for optional LLM refinement
+- Treat `topics_json[0].topic_id='general_social_news' AND topic_classified_by='llm'` as processed by both layers but still general social news
+- Review `general_social_news` rows when tuning `news_platform.topics`
+
 ## Workflow 4: Incident Handling (Source Outage / Rate Limit)
 1. Confirm outage scope (single source vs all)
 2. Keep collector running for healthy sources
@@ -160,18 +179,22 @@
 - Use `scripts/run_market_analysis.ps1 -Slot pre_tw_open` at `07:30`
 - Use `scripts/run_market_analysis.ps1 -Slot tw_close` at `15:30`
 - Treat `t_relay_events` as primary local evidence, not exhaustive truth
-- Stage2 transmission may receive retrieved historical examples from `t_event_embeddings`; these are analogues only, not current evidence IDs
+- If `MARKET_ANALYSIS_MODEL_ROUTER_ENABLED=true`, OpenAI is the default primary and Claude is fallback; configure budgets/Admin API keys before relying on provider fallback, and inspect `raw_json.model_router` to confirm the selected route
+- When the selected provider is Anthropic, compact context mode is applied by default to reduce rate-limit risk; inspect `raw_json.provider_context_policy` for event/RAG/market-row reductions
+- Market analysis builds a quota-managed context pack before RAG/prompting; `market_context:scorecard`, market-context rows, and important official data must remain selected even when general news volume is high
+- Stage0 selects 1-2 deterministic core tensions before LLM stages; later stage prompts should answer those tensions directly
+- Stage2 transmission may receive hybrid retrieved historical examples from `t_event_embeddings` / `t_analysis_embeddings`; these are analogues only, not current evidence IDs
 - OpenAI runs request web search by default; if unavailable, the prompt must label missing context instead of fabricating
 3. Persist analysis output
 - Generated text is upserted into `t_market_analyses` by `(analysis_date, analysis_slot)`
 - `push_enabled` means Java delivery eligibility, not Python push execution
 - Daily delivery policy is `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`
 - `us_close` remains stored and is injected into the next Taiwan pre-open analysis context only when the relevant U.S. session was open; if U.S. was closed, the pre-open prompt has no `us_close` context
-- Structured stock recommendations are extracted into `t_trade_signals`
-- For `pre_tw_open`, configured `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` tracked fallback tickers are prioritized in the visible candidate section when recent context exists; otherwise official TWSE tracked-stock context or recent `yfinance_taiwan` quote events top up only when fewer than five visible long swing/medium candidates exist
+- Fixed-pool `structured_json.stock_watch` rows are extracted into `t_trade_signals`
+- For `pre_tw_open`, the visible stock section is limited to the fixed pool: `2330` 台積電, `2603` 長榮, `2882` 國泰金, `1605` 華新, and `4956` 光鋐. Do not substitute model-recommended tickers outside this pool.
 - New signals use `status=pending_review`; stale pending signals for the same analysis are marked `superseded`
 - `ticker` is normalized symbol text; Taiwan signals use 4-digit codes without `.TW` / `.TWO`
-- For `pre_tw_open`, up to five long `swing` / `medium` signals are read back from `t_trade_signals` and appended as `## 今日個股觀察` while preserving the full analysis text
+- For `pre_tw_open`, fixed-pool watch rows are read back from `t_trade_signals` and appended as `## 今日個股觀察` while preserving the full analysis text. Missing evidence should be shown as a data gap or neutral watch state.
 - Daily formatting uses date-only `raw_json.display_title` and the fixed flow `總經 Regime` -> `利率與流動性` -> `景氣循環` -> `市場情緒` -> `台股配置` -> `風險與資料缺口`
 - In that section, `direction=long` is rendered as `可做/建議觀察` plus the strategy label; `entry_zone` means entry area, `take_profit_zone` means profit-taking/exit area, and `invalidation` is rendered as `停損`
 - Do not create orders here. Risk gate / review and outcomes stay in `t_signal_reviews` and `t_signal_outcomes`
@@ -184,6 +207,8 @@
 - Query `t_market_analyses` for the current `analysis_date`
 - Query `t_trade_signals` by `analysis_id` or `(analysis_date, analysis_slot)`
 - Query `t_relay_events` for recent `source LIKE 'market_context:%'`
+- Inspect `t_market_analyses.raw_json.context_pack` for selected counts and guaranteed bucket status
+- Inspect `t_market_analyses.raw_json.model_router`, `raw_json.provider_context_policy`, `raw_json.pipeline_stages.core_tensions`, `raw_json.rag`, and `raw_json.claim_verifier`
 - Confirm rows exist as event/context facts only; Python does not contact LINE or create delivery jobs
 
 ## Workflow 4L: Historical-Case RAG Indexing
@@ -195,8 +220,9 @@
 - Default is `local-hash-v1`, a deterministic lexical embedding that needs no external API key
 - Keep `RAG_EMBEDDING_MODEL` stable unless intentionally rebuilding the index
 3. Use in market analysis
-- `MARKET_ANALYSIS_RAG_ENABLED=true` lets `market_analysis` retrieve similar historical events
+- `MARKET_ANALYSIS_RAG_ENABLED=true` lets `market_analysis` retrieve hybrid-ranked historical events and generated analyses
 - Retrieved examples are inserted into `runtime/prompts/market_analysis_<slot>_stage2_transmission_user.txt`
+- `raw_json.rag.score_components` records vector / metadata / outcome components for selected examples
 - RAG failure must degrade to an empty example set and never block analysis
 4. Verify
 - Run `python -m unittest tests.test_rag tests.test_analysis_stages tests.test_market_analysis -v`
@@ -237,7 +263,7 @@
 4. Verify storage
 - Query `t_market_analyses` by `analysis_slot`
 - Weekly uses `analysis_slot=weekly_tw_preopen`
-- Daily market analysis also extracts recommendations to `t_trade_signals`
+- Daily market analysis also extracts fixed-pool watch rows to `t_trade_signals`
 
 ## Workflow 4E: SEC Tracked Filings Flow
 1. Define tracked universe
@@ -291,10 +317,17 @@
 2. Source families
 - Yahoo chart snapshots: NASDAQ Composite, NASDAQ 100, SOX, VIX, DXY, WTI, Gold, and key semiconductor ADR/stocks
 - U.S. Treasury official daily yield curve XML: 2Y, 10Y, 30Y, and 10Y-2Y spread
+- FRED public CSV: Fed path, liquidity, financial conditions, credit stress, and VIX close
+- Market breadth: `RSP-SPY`, `QQEW-QQQ`, and `IWM-SPY` relative return spreads
+- SEC companyfacts AI capex proxy: default `MSFT,GOOGL,META,AMZN`; requires `SEC_USER_AGENT`
+- FRED oil context: WTI, Brent, and Brent-WTI spread; optional EIA inventory context for U.S. crude stocks excluding SPR when `EIA_API_KEY` is set
+- Deterministic scorecard: `breadth_health`, `ai_capex_quality`, `energy_shock_risk`, `credit_stress`, and `liquidity_impulse` on a -2..+2 scale
 - TWSE official OpenAPI: index groups, tracked stocks, and margin balances
-- Taiwan tracked-stock Yahoo fallback from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS`; use `.TWO` for TPEx symbols such as `4749.TWO:新應材`
+- Taiwan fixed-pool Yahoo context from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS`; use `.TWO` for TPEx `4956`
+- Visible stock-analysis exclusions are controlled by `MARKET_ANALYSIS_EXCLUDED_TICKERS`; default excludes `4749` / 新應材
 3. Persist as event-only facts
 - Insert one stored-only event per context point into `t_relay_events`
+- Insert one `market_context:scorecard` event when `MARKET_CONTEXT_SCORECARD_ENABLED=true`
 - Add one `market_context:collector` summary event for point/failure counts
 - Keep `raw_json.stored_only=true`, `raw_json.dimension=market_context`, and `raw_json.event_type` for traceability
 4. Schedule before the AI brief
@@ -302,6 +335,7 @@
 5. Verify
 - Query `t_relay_events` for today's `source LIKE 'market_context:%'`
 - Confirm rows are marked `stored_only_context` / stored-only and inspect `raw_json.failures` on the collector event
+- Confirm sources include `market_context:scorecard`, `market_context:market_breadth`, `market_context:sec_companyfacts`, `market_context:fred_energy`, and optionally `market_context:eia` when the modules are enabled
 
 ## Workflow 4I: Taiwan Official Market-Flow Context
 1. Collect official Taiwan flow datasets

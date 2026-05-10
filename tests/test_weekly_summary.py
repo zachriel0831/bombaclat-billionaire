@@ -4,6 +4,7 @@ import os
 import unittest
 from unittest import mock
 
+from event_relay.prompt_assets import TokenUsage
 from event_relay.weekly_summary import (
     WeeklySummaryConfig,
     _call_llm,
@@ -104,7 +105,7 @@ class WeeklySummaryTests(unittest.TestCase):
         now_local = datetime(2026, 4, 26, 10, 0, 0, tzinfo=taipei)
         self.assertEqual(_analysis_date_key(now_local, self._config()), "2026-04-26")
 
-    def test_store_weekly_analysis_uses_hhmm_scheduled_time(self) -> None:
+    def test_store_weekly_analysis_uses_hhmm_scheduled_time_and_telemetry(self) -> None:
         """weekly scheduled_time_local should match daily HH:MM format."""
 
         class FakeStore:
@@ -123,24 +124,37 @@ class WeeklySummaryTests(unittest.TestCase):
             config=self._config(),
             message="summary",
             events_used=3,
+            usage=TokenUsage(
+                provider="openai",
+                model="gpt-5",
+                prompt_tokens=100,
+                completion_tokens=20,
+                cached_tokens=5,
+            ),
         )
 
         self.assertIsNotNone(store.record)
         self.assertEqual(store.record.scheduled_time_local, "05:10")
+        raw_json = json.loads(store.record.raw_json)
+        self.assertEqual(raw_json["section_contract"], ["週總經", "下週台股配置", "下週觀察清單"])
+        self.assertEqual(raw_json["token_usage"]["provider"], "openai")
+        self.assertEqual(raw_json["token_usage"]["prompt_tokens"], 100)
+        self.assertEqual(raw_json["token_usage"]["completion_tokens"], 20)
+        self.assertEqual(raw_json["token_usage"]["cached_tokens"], 5)
 
-    def test_compile_prompts_uses_macro_regime_weekly_sections(self) -> None:
-        """Weekly prompt should follow the same macro-regime flow as daily analysis."""
+    def test_compile_prompts_uses_weekly_three_section_contract(self) -> None:
+        """Weekly prompt should use the weekly-specific section contract."""
         with mock.patch("event_relay.weekly_summary._load_text", return_value=""):
             _system_prompt, reusable_prompt = _compile_prompts(self._config())
 
-        self.assertIn("總經 Regime", reusable_prompt)
-        self.assertIn("利率與流動性", reusable_prompt)
-        self.assertIn("景氣循環", reusable_prompt)
-        self.assertIn("市場情緒", reusable_prompt)
-        self.assertIn("台股配置", reusable_prompt)
-        self.assertIn("風險與資料缺口", reusable_prompt)
-        self.assertIn("Section 2 利率與流動性", reusable_prompt)
-        self.assertNotIn("本週重點", reusable_prompt)
+        self.assertIn("週總經", reusable_prompt)
+        self.assertIn("下週台股配置", reusable_prompt)
+        self.assertIn("下週觀察清單", reusable_prompt)
+        self.assertIn("evidence -> mechanism -> Taiwan implication", reusable_prompt)
+        self.assertIn("Weekly reports should not output intraday entry", reusable_prompt)
+        self.assertIn("1200-2200 Chinese characters", reusable_prompt)
+        self.assertNotIn("總經 Regime", reusable_prompt)
+        self.assertNotIn("Section 2 利率與流動性", reusable_prompt)
 
     def test_call_llm_routes_to_openai_by_default(self) -> None:
         """測試 test call llm routes to openai by default 的預期行為。"""

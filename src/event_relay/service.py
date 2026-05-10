@@ -173,6 +173,23 @@ class StoredEventEmbedding:
     embedding_dim: int
     embedding: list[float]
     text_hash: str
+    outcome_json: dict[str, Any] | None = None
+
+
+@dataclass
+class StoredAnalysisEmbedding:
+    """Stored analysis embedding plus outcome metadata for hybrid RAG."""
+    analysis_id: int
+    analysis_date: str
+    analysis_slot: str
+    summary_text: str
+    raw_json: str | None
+    updated_at: str
+    embedding_model: str
+    embedding_dim: int
+    embedding: list[float]
+    text_hash: str
+    outcome_json: dict[str, Any] | None = None
 
 
 @dataclass
@@ -282,12 +299,12 @@ class MySqlEventStore:
 
         safe_days = max(int(days), 1)
         safe_limit = max(int(limit), 1)
-        # Use the auto-increment primary key as the recency order. Recent
-        # market-context rows can carry large official payloads, and filesort
-        # over created_at/raw_json can exceed MySQL's sort buffer on small DBs.
+        # Use the auto-increment primary key as the recency order. Force the
+        # primary index so MySQL scans backward instead of filesorting rows that
+        # include large market-context raw_json payloads.
         sql = (
             f"SELECT id, event_id, source, title, url, summary, published_at, created_at, raw_json "
-            f"FROM {self._event_table} "
+            f"FROM {self._event_table} FORCE INDEX (PRIMARY) "
             "WHERE created_at >= (NOW() - INTERVAL %s DAY) "
             "AND source NOT REGEXP '^(local_live_test|manual_test)' "
             "ORDER BY id DESC "
@@ -559,6 +576,64 @@ class MySqlEventStore:
                     embedding_dim=int(row[9] or 0),
                     embedding=[float(value) for value in embedding if isinstance(value, (int, float))],
                     text_hash=str(row[11] or ""),
+                )
+            )
+        return candidates
+
+    def fetch_analysis_embedding_candidates(
+        self,
+        *,
+        embedding_model: str,
+        limit: int,
+    ) -> list[StoredAnalysisEmbedding]:
+        """Fetch stored analysis embeddings for historical-case RAG."""
+        if self._conn is None:
+            return []
+
+        safe_limit = max(int(limit), 1)
+        sql = (
+            f"SELECT emb.analysis_id, emb.analysis_date, emb.analysis_slot, "
+            "a.summary_text, a.raw_json, a.updated_at, "
+            "emb.embedding_model, emb.embedding_dim, emb.embedding_json, emb.text_hash, emb.outcome_json "
+            f"FROM {self._analysis_embedding_table} emb "
+            f"LEFT JOIN {self._analysis_table} a ON a.id = emb.analysis_id "
+            "WHERE emb.embedding_model = %s "
+            "ORDER BY emb.analysis_date DESC, emb.analysis_id DESC "
+            "LIMIT %s"
+        )
+        with self._lock:
+            cur = self._cursor()
+            try:
+                cur.execute(sql, (embedding_model, safe_limit))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        candidates: list[StoredAnalysisEmbedding] = []
+        for row in rows:
+            try:
+                embedding = json.loads(row[8]) if isinstance(row[8], str) else row[8]
+            except (TypeError, ValueError):
+                embedding = []
+            if not isinstance(embedding, list):
+                embedding = []
+            try:
+                outcome_json = json.loads(row[10]) if isinstance(row[10], str) else row[10]
+            except (TypeError, ValueError):
+                outcome_json = None
+            candidates.append(
+                StoredAnalysisEmbedding(
+                    analysis_id=int(row[0]),
+                    analysis_date=str(row[1] or ""),
+                    analysis_slot=str(row[2] or ""),
+                    summary_text=str(row[3] or ""),
+                    raw_json=str(row[4]) if row[4] is not None else None,
+                    updated_at=str(row[5]) if row[5] is not None else "",
+                    embedding_model=str(row[6] or ""),
+                    embedding_dim=int(row[7] or 0),
+                    embedding=[float(value) for value in embedding if isinstance(value, (int, float))],
+                    text_hash=str(row[9] or ""),
+                    outcome_json=outcome_json if isinstance(outcome_json, dict) else None,
                 )
             )
         return candidates
@@ -851,7 +926,7 @@ class MySqlEventStore:
                 cur.close()
 
     def fetch_trade_signal_recommendations(self, analysis_id: int, *, limit: int = 5) -> list[dict[str, Any]]:
-        """Fetch short/medium-term long recommendations for one analysis."""
+        """Fetch fixed-pool short/medium-term watch rows for one analysis."""
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
 
@@ -861,6 +936,7 @@ class MySqlEventStore:
             "invalidation, take_profit_zone, holding_horizon, rationale, risk_notes, status "
             f"FROM `{self._trade_signal_table}` "
             "WHERE analysis_id=%s "
+            "AND ticker IN ('2330','2603','2882','1605','4956') "
             "AND direction='long' "
             "AND strategy_type IN ('swing','medium') "
             "AND status IN ('pending_review','new','watch') "

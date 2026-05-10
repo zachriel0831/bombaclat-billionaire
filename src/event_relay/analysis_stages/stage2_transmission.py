@@ -29,6 +29,7 @@ def build_prompts(
     slot: str,
     now_local_iso: str,
     stage1_json: str,
+    stage0_json: str = "{}",
     retrieved_examples_json: str = "[]",
 ) -> tuple[str, str]:
     """建立 build prompts 對應的資料或結果。"""
@@ -60,6 +61,9 @@ def build_prompts(
         "- strength 0.8+: high-confidence direct link; 0.4-0.7: conditional; <0.4: weak/speculative.\n"
         "- assumptions are the load-bearing conditions; list at least one.\n"
         "- Produce 1-5 chains total; deduplicate overlapping paths.\n\n"
+        "Stage0 selected core tensions JSON:\n"
+        f"{stage0_json}\n\n"
+        "Build transmission chains that answer these tensions first when evidence exists.\n\n"
         "Historical retrieved examples JSON:\n"
         f"{retrieved_examples_json}\n\n"
         "Use historical examples only as analogues for possible transmission paths. "
@@ -73,6 +77,7 @@ def run(
     *,
     context: StageContext,
     stage1_output: dict[str, Any],
+    stage0_output: dict[str, Any] | None = None,
     retrieved_examples: list[dict[str, Any]] | None = None,
     snapshot_dir: Path | None = None,
 ) -> StageResult:
@@ -90,6 +95,7 @@ def run(
         slot=context.slot,
         now_local_iso=context.now_local.isoformat(),
         stage1_json=json.dumps(stage1_output, ensure_ascii=False),
+        stage0_json=json.dumps(stage0_output or {}, ensure_ascii=False),
         retrieved_examples_json=json.dumps(retrieved_examples or [], ensure_ascii=False),
     )
     if snapshot_dir is not None:

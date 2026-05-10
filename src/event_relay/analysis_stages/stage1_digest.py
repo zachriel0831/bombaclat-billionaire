@@ -36,6 +36,7 @@ def build_prompts(
     now_local_iso: str,
     events_json: str,
     market_snapshot_json: str,
+    stage0_json: str = "{}",
 ) -> tuple[str, str]:
     """建立 build prompts 對應的資料或結果。"""
     system_prompt = (
@@ -68,6 +69,10 @@ def build_prompts(
         "Also populate market_snapshot with whatever US close / bond / FX / TW "
         "session / Fed path / liquidity / credit stress / sentiment-positioning "
         "data is visible in the inputs; leave sub-objects empty if absent.\n\n"
+        "Stage0 selected core tensions JSON:\n"
+        f"{stage0_json}\n\n"
+        "Use stage0 only as an attention lens. Still classify facts from the input events; "
+        "do not invent a fact just because it fits a selected thesis.\n\n"
         f"Events JSON:\n{events_json}\n\n"
         f"Market snapshot JSON:\n{market_snapshot_json}\n"
     )
@@ -79,6 +84,7 @@ def run(
     context: StageContext,
     events_payload: list[dict[str, Any]],
     market_payload: list[dict[str, Any]],
+    stage0_output: dict[str, Any] | None = None,
     snapshot_dir: Path | None = None,
 ) -> StageResult:
     """執行 run 的主要流程。"""
@@ -96,6 +102,7 @@ def run(
         now_local_iso=context.now_local.isoformat(),
         events_json=json.dumps(events_payload, ensure_ascii=False),
         market_snapshot_json=json.dumps(market_payload, ensure_ascii=False),
+        stage0_json=json.dumps(stage0_output or {}, ensure_ascii=False),
     )
     if snapshot_dir is not None:
         _write_prompt_snapshot(snapshot_dir, context.slot, system_prompt, user_prompt)
