@@ -27,6 +27,72 @@ This file is append-only. Add a new entry after any user correction to prevent r
 
 <!-- Add new lessons below this line -->
 
+## LESSON-20260511-06
+- Date: 2026-05-11
+- Trigger (User correction): User clarified Taiwan finance news should enter `relay_event`, not the Taiwan `news_article` pipeline.
+- What was wrong: The finance-news storage boundary could be confused with the newly added Taiwan society/politics `news_platform` tables.
+- Root cause: Both tasks involve Taiwan news sources, but market-analysis finance news and society/politics article browsing use different storage contracts.
+- New rule (always/never): Always route finance/market news into `news_collector` -> `t_relay_events`; never put it into `news_platform.t_news_articles` unless the user explicitly creates a finance news-platform product.
+- Prevention checklist (before final response):
+  - [ ] Confirm source category is market/finance vs society/politics
+  - [ ] Confirm storage destination is `t_relay_events` for market evidence
+  - [ ] Restart bridge after `.env` source-list changes and verify DB rows
+- Repo updates made:
+  - `.env`
+  - `README.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `memory-bank/09-decisions/2026-05-11-taiwan-finance-rss-relay-events.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - RSS smoke fetch returned Taiwan finance rows from LTN, CNA, and ETtoday
+  - Bridge log `source-bridge-20260511-120622.out.log` showed the three Taiwan finance feeds parsed and stored
+  - DB query confirmed ids `79193`, `79194`, and `79195` in `t_relay_events`
+- Status: active
+
+## LESSON-20260511-05
+- Date: 2026-05-11
+- Trigger (User correction): User saw the society page still showing many vehicle-accident articles as pending/mixed in the all-society view.
+- What was wrong: The live `news_platform.main --loop` processes were still old instances that crawled and ran keyword extraction but did not run topic classification, leaving fresh rows with `topics_json IS NULL`.
+- Root cause: Code/backfill had been updated, but existing long-running worker processes were not restarted and verified after the topic-worker change.
+- New rule (always/never): Always restart and verify long-running `news_platform` loops after worker/topic code changes; live DB verification must include `topics_json IS NULL` counts for active categories.
+- Prevention checklist (before final response):
+  - [ ] Check live rows with `topics_json IS NULL`
+  - [ ] Inspect loop logs for `Topic pass scanned=<n>` after restart or after new rows arrive
+  - [ ] Reclassify targeted fallback rows when topic rules are expanded
+- Repo updates made:
+  - `src/news_platform/topics.py`
+  - `tests/test_news_platform_topic_classifier.py`
+  - `memory-bank/workflows.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - Backfill output: `Topic classification done: scanned=73 updated=73 failed=0`
+  - Live DB counts: `politics|127|0|0`, `society|634|0|0`
+  - Full news-platform tests: `81 tests OK`
+- Status: active
+
+## LESSON-20260511-04
+- Date: 2026-05-11
+- Trigger (User correction): User ordered two iron rules: never operate outside `D:\work_space`; never charge a credit card.
+- What was wrong: These absolute safety boundaries were not yet persisted in repo rules.
+- Root cause: Prior rules covered secrets and destructive operations but did not define workspace and payment hard stops.
+- New rule (always/never): Never operate on files outside `D:\work_space`; never charge, authorize, submit, test, save, or use any credit card/payment method.
+- Prevention checklist (before final response):
+  - [ ] Confirm every filesystem path is under `D:\work_space`
+  - [ ] Refuse any operation involving credit-card/payment submission
+  - [ ] Keep these rules visible in `AGENTS.md` and `memory-bank/rules.md`
+- Repo updates made:
+  - `AGENTS.md`
+  - `memory-bank/rules.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `rg` confirmed both iron rules in `AGENTS.md`, `memory-bank/rules.md`, `tasks/todo.md`, and this lesson
+  - `git diff --check -- AGENTS.md memory-bank/rules.md tasks/todo.md tasks/lessons.md` passed with CRLF warnings only
+- Status: active
+
 ## LESSON-20260511-03
 - Date: 2026-05-11
 - Trigger (User correction): User asked to temporarily classify unclassified news as general society news.

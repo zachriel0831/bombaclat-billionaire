@@ -47,6 +47,7 @@ class NewsPlatformStoreTopicTests(unittest.TestCase):
                 (
                     7,
                     "article-7",
+                    "society",
                     "酒駕撞死行人",
                     "法官輕判",
                     '[{"kw":"酒駕","score":1.0}]',
@@ -62,6 +63,7 @@ class NewsPlatformStoreTopicTests(unittest.TestCase):
         self.assertIn("keywords_json IS NOT NULL", sql)
         self.assertEqual(params, (50,))
         self.assertEqual(rows[0].row_id, 7)
+        self.assertEqual(rows[0].category, "society")
         self.assertEqual(rows[0].summary, "法官輕判")
         self.assertEqual(rows[0].keywords_json, '[{"kw":"酒駕","score":1.0}]')
 
@@ -81,7 +83,7 @@ class NewsPlatformStoreTopicTests(unittest.TestCase):
         self.assertEqual(store._conn.commits, 1)
 
     def test_fetch_articles_empty_topics_queries_rule_unmatched_rows(self):
-        cursor = FakeCursor(rows=[(8, "article-8", "後續報導", "家屬悲痛")])
+        cursor = FakeCursor(rows=[(8, "article-8", "politics", "後續報導", "府院回應")])
         store = _store_with_cursor(cursor)
 
         rows = store.fetch_articles_empty_topics(limit=25)
@@ -89,10 +91,12 @@ class NewsPlatformStoreTopicTests(unittest.TestCase):
         sql, params = cursor.executed[0]
         self.assertIn("JSON_LENGTH(topics_json) = 0", sql)
         self.assertIn("general_social_news", sql)
+        self.assertIn("general_politics_news", sql)
         self.assertIn("topic_classified_by IS NULL OR topic_classified_by = 'rule'", sql)
         self.assertEqual(params, (25,))
         self.assertEqual(rows[0].row_id, 8)
-        self.assertEqual(rows[0].summary, "家屬悲痛")
+        self.assertEqual(rows[0].category, "politics")
+        self.assertEqual(rows[0].summary, "府院回應")
 
 
 if __name__ == "__main__":

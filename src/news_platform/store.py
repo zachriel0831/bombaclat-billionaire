@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from news_platform.config import NewsPlatformSettings
-from news_platform.models import NewsArticle
+from news_platform.models import NewsArticle, PublicRecord
 from news_platform.registry import TW_SOURCES
 
 
@@ -32,6 +32,7 @@ class StoredArticleTopicInput:
 
     row_id: int
     article_id: str
+    category: str
     title: str
     summary: str | None
     keywords_json: str | bytes | list[dict[str, Any]] | None
@@ -43,8 +44,27 @@ class StoredArticleLlmTopicInput:
 
     row_id: int
     article_id: str
+    category: str
     title: str
     summary: str | None
+
+
+@dataclass(frozen=True)
+class StoredArticlePublicRecordLink:
+    """Joined view of one article-to-public-record relation."""
+
+    article_id: str
+    public_record_id: str
+    relation_type: str
+    confidence: float
+    matched_by: str
+    record_type: str
+    source_id: str
+    title: str
+    url: str | None
+    occurred_at: datetime | None
+    region: str | None
+    metrics_json: str | bytes | dict[str, Any] | None
 
 
 class NewsPlatformStore:
@@ -52,6 +72,8 @@ class NewsPlatformStore:
         self._settings = settings
         self._article_table = settings.mysql_article_table
         self._source_table = settings.mysql_source_table
+        self._public_record_table = settings.mysql_public_record_table
+        self._article_record_link_table = settings.mysql_article_record_link_table
         self._connector = self._import_mysql_connector()
         self._conn = None
         self._lock = threading.RLock()
@@ -106,6 +128,138 @@ class NewsPlatformStore:
             finally:
                 cur.close()
 
+    def upsert_public_record(self, record: PublicRecord) -> bool:
+        """Insert or refresh one structured official record."""
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+
+        sql = (
+            f"INSERT INTO `{self._public_record_table}` "
+            "(record_id, source_id, record_type, country, category, title, url, "
+            "occurred_at, region, metrics_json, tags_json, raw_json) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "ON DUPLICATE KEY UPDATE "
+            "source_id=VALUES(source_id), record_type=VALUES(record_type), "
+            "country=VALUES(country), category=VALUES(category), title=VALUES(title), "
+            "url=VALUES(url), occurred_at=VALUES(occurred_at), region=VALUES(region), "
+            "metrics_json=VALUES(metrics_json), tags_json=VALUES(tags_json), "
+            "raw_json=VALUES(raw_json), updated_at=CURRENT_TIMESTAMP"
+        )
+        occurred = (
+            record.occurred_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            if record.occurred_at
+            else None
+        )
+        values = (
+            record.record_id,
+            record.source_id,
+            record.record_type,
+            record.country,
+            record.category,
+            record.title,
+            record.url,
+            occurred,
+            record.region,
+            json.dumps(record.metrics, ensure_ascii=False),
+            json.dumps(list(record.tags), ensure_ascii=False),
+            json.dumps(record.raw, ensure_ascii=False),
+        )
+
+        with self._lock:
+            cur = self._cursor()
+            try:
+                cur.execute(sql, values)
+                rowcount = int(getattr(cur, "rowcount", 0) or 0)
+                self._conn.commit()
+                return rowcount == 1
+            finally:
+                cur.close()
+
+    def link_article_public_record(
+        self,
+        *,
+        article_id: str,
+        public_record_id: str,
+        relation_type: str = "related",
+        confidence: float = 1.0,
+        matched_by: str = "manual",
+        evidence: dict[str, Any] | list[Any] | None = None,
+    ) -> bool:
+        """Create or update a relation between an article and a public record."""
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+
+        bounded_confidence = max(0.0, min(1.0, float(confidence)))
+        sql = (
+            f"INSERT INTO `{self._article_record_link_table}` "
+            "(article_id, public_record_id, relation_type, confidence, matched_by, evidence_json) "
+            "VALUES (%s,%s,%s,%s,%s,%s) "
+            "ON DUPLICATE KEY UPDATE "
+            "confidence=VALUES(confidence), matched_by=VALUES(matched_by), "
+            "evidence_json=VALUES(evidence_json)"
+        )
+        values = (
+            article_id,
+            public_record_id,
+            str(relation_type or "related")[:32],
+            round(bounded_confidence, 4),
+            str(matched_by or "manual")[:32],
+            json.dumps(evidence or {}, ensure_ascii=False),
+        )
+
+        with self._lock:
+            cur = self._cursor()
+            try:
+                cur.execute(sql, values)
+                rowcount = int(getattr(cur, "rowcount", 0) or 0)
+                self._conn.commit()
+                return rowcount == 1
+            finally:
+                cur.close()
+
+    def fetch_public_record_links_for_article(
+        self,
+        article_id: str,
+        limit: int = 100,
+    ) -> list[StoredArticlePublicRecordLink]:
+        """Return public records linked to one article."""
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+        safe_limit = max(1, int(limit))
+        sql = (
+            f"SELECT l.article_id, l.public_record_id, l.relation_type, l.confidence, "
+            f"l.matched_by, r.record_type, r.source_id, r.title, r.url, "
+            f"r.occurred_at, r.region, r.metrics_json "
+            f"FROM `{self._article_record_link_table}` l "
+            f"JOIN `{self._public_record_table}` r ON r.record_id = l.public_record_id "
+            "WHERE l.article_id = %s "
+            "ORDER BY l.confidence DESC, r.occurred_at DESC, l.id DESC LIMIT %s"
+        )
+        with self._lock:
+            cur = self._cursor()
+            try:
+                cur.execute(sql, (article_id, safe_limit))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+        return [
+            StoredArticlePublicRecordLink(
+                article_id=str(r[0]),
+                public_record_id=str(r[1]),
+                relation_type=str(r[2]),
+                confidence=float(r[3]),
+                matched_by=str(r[4]),
+                record_type=str(r[5]),
+                source_id=str(r[6]),
+                title=str(r[7] or ""),
+                url=None if r[8] is None else str(r[8]),
+                occurred_at=r[9],
+                region=None if r[10] is None else str(r[10]),
+                metrics_json=r[11],
+            )
+            for r in rows
+        ]
+
     def fetch_articles_missing_keywords(self, limit: int = 100) -> list[StoredArticleHead]:
         """挑出尚未抽過關鍵字的文章。供關鍵字 worker 批次處理。"""
         if self._conn is None:
@@ -150,7 +304,7 @@ class NewsPlatformStore:
             raise RuntimeError("MySQL not initialized")
         safe_limit = max(1, int(limit))
         sql = (
-            f"SELECT id, article_id, title, summary, keywords_json FROM `{self._article_table}` "
+            f"SELECT id, article_id, category, title, summary, keywords_json FROM `{self._article_table}` "
             "WHERE topics_json IS NULL AND keywords_json IS NOT NULL "
             "ORDER BY published_at DESC, id DESC LIMIT %s"
         )
@@ -165,9 +319,10 @@ class NewsPlatformStore:
             StoredArticleTopicInput(
                 row_id=int(r[0]),
                 article_id=str(r[1]),
-                title=str(r[2] or ""),
-                summary=None if r[3] is None else str(r[3]),
-                keywords_json=r[4],
+                category=str(r[2] or ""),
+                title=str(r[3] or ""),
+                summary=None if r[4] is None else str(r[4]),
+                keywords_json=r[5],
             )
             for r in rows
         ]
@@ -208,11 +363,12 @@ class NewsPlatformStore:
             raise RuntimeError("MySQL not initialized")
         safe_limit = max(1, int(limit))
         sql = (
-            f"SELECT id, article_id, title, summary FROM `{self._article_table}` "
+            f"SELECT id, article_id, category, title, summary FROM `{self._article_table}` "
             "WHERE topics_json IS NOT NULL "
             "AND ("
             "JSON_LENGTH(topics_json) = 0 "
-            "OR JSON_UNQUOTE(JSON_EXTRACT(topics_json, '$[0].topic_id')) = 'general_social_news'"
+            "OR JSON_UNQUOTE(JSON_EXTRACT(topics_json, '$[0].topic_id')) "
+            "IN ('general_social_news', 'general_politics_news')"
             ") "
             "AND (topic_classified_by IS NULL OR topic_classified_by = 'rule') "
             "ORDER BY published_at DESC, id DESC LIMIT %s"
@@ -228,8 +384,9 @@ class NewsPlatformStore:
             StoredArticleLlmTopicInput(
                 row_id=int(r[0]),
                 article_id=str(r[1]),
-                title=str(r[2] or ""),
-                summary=None if r[3] is None else str(r[3]),
+                category=str(r[2] or ""),
+                title=str(r[3] or ""),
+                summary=None if r[4] is None else str(r[4]),
             )
             for r in rows
         ]
@@ -347,12 +504,56 @@ class NewsPlatformStore:
           KEY idx_ttl (ttl_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
+        ddl_public_records = f"""
+        CREATE TABLE IF NOT EXISTS `{self._public_record_table}` (
+          id BIGINT NOT NULL AUTO_INCREMENT,
+          record_id VARCHAR(96) NOT NULL,
+          source_id VARCHAR(64) NOT NULL,
+          record_type VARCHAR(64) NOT NULL,
+          country VARCHAR(8) NOT NULL,
+          category VARCHAR(32) NULL,
+          title TEXT NOT NULL,
+          url TEXT NULL,
+          occurred_at DATETIME NULL,
+          region VARCHAR(128) NULL,
+          metrics_json JSON NULL,
+          tags_json JSON NULL,
+          raw_json JSON NULL,
+          fetched_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_record_id (record_id),
+          KEY idx_record_type_occurred (record_type, occurred_at),
+          KEY idx_source_type (source_id, record_type),
+          KEY idx_category_occurred (category, occurred_at),
+          KEY idx_region_occurred (region, occurred_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+        ddl_article_record_links = f"""
+        CREATE TABLE IF NOT EXISTS `{self._article_record_link_table}` (
+          id BIGINT NOT NULL AUTO_INCREMENT,
+          article_id VARCHAR(64) NOT NULL,
+          public_record_id VARCHAR(96) NOT NULL,
+          relation_type VARCHAR(32) NOT NULL DEFAULT 'related',
+          confidence DECIMAL(5,4) NOT NULL DEFAULT 1.0000,
+          matched_by VARCHAR(32) NOT NULL DEFAULT 'manual',
+          evidence_json JSON NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_article_record_relation (article_id, public_record_id, relation_type),
+          KEY idx_article_id (article_id),
+          KEY idx_public_record_id (public_record_id),
+          KEY idx_relation_type (relation_type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
 
         with self._lock:
             cur = self._conn.cursor()
             try:
                 cur.execute(ddl_sources)
                 cur.execute(ddl_articles)
+                cur.execute(ddl_public_records)
+                cur.execute(ddl_article_record_links)
                 self._conn.commit()
             finally:
                 cur.close()

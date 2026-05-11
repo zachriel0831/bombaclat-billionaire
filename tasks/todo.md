@@ -4,31 +4,29 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Route rule-unclassified news articles to `general_social_news` / 一般社會新聞.
+- Task: Add Taiwan finance RSS feeds to relay-event ingestion.
 - Requested by: user
 - Start date: 2026-05-11
-- Scope: Code fallback behavior, docs/spec updates, tests, and live DB update for existing `topics_json=[]` rows.
+- Scope: Active `news_collector` RSS feed config, relay-event source mapping docs, service restart, and storage verification.
 
 ## Plan
-- [x] Inspect current topic worker, LLM fallback worker, store SQL, docs, and tests.
-- [x] Add reusable general-social fallback topic.
-- [x] Update rule and LLM fallback workers to write general-social when no topic matches.
-- [x] Keep LLM fallback eligible for rule fallback rows if enabled later.
-- [x] Update docs/specs/tests.
-- [x] Run tests and update live DB rows.
-- [x] Verify live counts.
+- [x] Confirm finance news storage boundary is `t_relay_events`.
+- [x] Verify Taiwan finance RSS feeds are current and parseable.
+- [x] Add active Taiwan finance feeds to `.env`.
+- [x] Update docs and decision notes.
+- [x] Restart bridge and verify rows enter `t_relay_events`.
 
 ## Progress Notes
-- 2026-05-11: Existing empty rows are `topics_json=[]` with `topic_classified_by='rule'`; target is no visible unclassified bucket.
-- 2026-05-11: Live DB update converted 498 empty-topic rows to `general_social_news`.
+- 2026-05-11: Finance/news source facts belong in `t_relay_events`; `news_platform` stays society/politics only.
+- 2026-05-11: Verified live parse for CNA finance, LTN business, and ETtoday finance RSS; bridge topic/date filters accept all three latest items.
+- 2026-05-11: Restarted `news_collector.relay_bridge`; latest log shows all three Taiwan finance feeds parsed and stored.
 
 ## Verification
-- [x] news_platform topic tests pass.
-- [x] live DB no longer has `JSON_LENGTH(topics_json)=0`.
-- [x] live DB has `general_social_news` rows for previous no-hit articles.
-- [x] `git diff --check -- <changed news_platform/docs/spec/task files>`
+- [x] RSS smoke fetch returns Taiwan finance items.
+- [x] Bridge restart sees new `.env` and stores/duplicates RSS rows.
+- [x] DB query confirms recent Taiwan finance RSS rows in `t_relay_events`.
 
 ## Review Summary
 - Outcome: complete
-- Evidence: 67 news_platform tests OK; compileall OK; diff check OK with CRLF warnings only; live DB updated 498 rows; counts now total=575, missing_topics=0, empty_topics=0, general_social_news=498, specific_topics=77.
-- Open risks: LLM refinement remains disabled unless `NEWSPF_TOPIC_LLM_ENABLED=true` or manual `--llm-topic-fallback` is run.
+- Evidence: `python -m news_collector.main fetch --source rss --limit 1 --title-url-only --pretty --log-level WARNING` returned CNA/LTN/ETtoday finance items; `python -m unittest tests.test_config tests.test_rss_source tests.test_relay_bridge` passed 12 tests; bridge log `source-bridge-20260511-120622.out.log` shows 15 RSS fetched and three Taiwan finance rows stored; DB query confirmed ids `79193`, `79194`, and `79195` in `t_relay_events`.
+- Open risks: `OFFICIAL_RSS_FIRST_PER_FEED=true` means each poll only takes the newest item per feed unless changed.

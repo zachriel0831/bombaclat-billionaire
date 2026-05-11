@@ -18,6 +18,8 @@ def _settings(**overrides) -> NewsPlatformSettings:
         mysql_database="news_platform",
         mysql_article_table="t_news_articles",
         mysql_source_table="t_news_sources",
+        mysql_public_record_table="t_public_records",
+        mysql_article_record_link_table="t_news_article_public_record_links",
         mysql_connect_timeout_seconds=5,
         article_ttl_days=30,
         poll_interval_seconds=900,

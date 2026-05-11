@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from news_platform.topic_classifier import classify
-from news_platform.topics import general_social_topic
+from news_platform.topics import general_topic_for_category
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class TopicWorker:
                     keywords=keywords,
                 )
                 if not topics:
-                    topics = [general_social_topic()]
+                    topics = [general_topic_for_category(getattr(row, "category", None))]
                 self._store.update_article_topics(row.row_id, topics, classified_by="rule")
                 updated += 1
             except Exception as exc:

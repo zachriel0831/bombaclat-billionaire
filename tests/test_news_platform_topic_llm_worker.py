@@ -45,7 +45,15 @@ class FakeClassifier:
 
 class TopicLlmFallbackWorkerTests(unittest.TestCase):
     def test_run_once_writes_general_social_when_llm_has_no_match(self):
-        rows = [StoredArticleLlmTopicInput(row_id=1, article_id="a", title="後續", summary="證據不足")]
+        rows = [
+            StoredArticleLlmTopicInput(
+                row_id=1,
+                article_id="a",
+                category="society",
+                title="後續",
+                summary="證據不足",
+            )
+        ]
         store = FakeStore([rows])
         worker = TopicLlmFallbackWorker(store, FakeClassifier(topics=[]), batch_size=10)
 
@@ -60,8 +68,38 @@ class TopicLlmFallbackWorkerTests(unittest.TestCase):
         self.assertEqual(store.updated[1][0]["provider"], "openai")
         self.assertEqual(store.classified_by[1], "llm")
 
+    def test_run_once_writes_general_politics_when_llm_has_no_match(self):
+        rows = [
+            StoredArticleLlmTopicInput(
+                row_id=1,
+                article_id="a",
+                category="politics",
+                title="政黨回應今日議程",
+                summary=None,
+            )
+        ]
+        store = FakeStore([rows])
+        worker = TopicLlmFallbackWorker(store, FakeClassifier(topics=[]), batch_size=10)
+
+        result = worker.run_once()
+
+        self.assertEqual(result.scanned, 1)
+        self.assertEqual(result.updated, 1)
+        self.assertEqual(result.failed, 0)
+        self.assertEqual(store.updated[1][0]["topic_id"], "general_politics_news")
+        self.assertEqual(store.updated[1][0]["label"], "一般政治新聞")
+        self.assertEqual(store.updated[1][0]["source"], "llm_fallback")
+
     def test_run_once_counts_classifier_failure(self):
-        rows = [StoredArticleLlmTopicInput(row_id=1, article_id="a", title="後續", summary=None)]
+        rows = [
+            StoredArticleLlmTopicInput(
+                row_id=1,
+                article_id="a",
+                category="society",
+                title="後續",
+                summary=None,
+            )
+        ]
         store = FakeStore([rows])
         worker = TopicLlmFallbackWorker(store, FakeClassifier(raises=True), batch_size=10)
 

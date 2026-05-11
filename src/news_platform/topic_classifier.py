@@ -1,4 +1,4 @@
-"""Deterministic Taiwan society topic classifier."""
+"""Deterministic Taiwan news topic classifier."""
 
 from __future__ import annotations
 

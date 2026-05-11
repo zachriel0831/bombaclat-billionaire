@@ -32,6 +32,7 @@ class TopicWorkerTests(unittest.TestCase):
             StoredArticleTopicInput(
                 row_id=1,
                 article_id="a",
+                category="society",
                 title="酒駕撞死行人",
                 summary=None,
                 keywords_json=json.dumps([{"kw": "酒駕", "score": 1.0}], ensure_ascii=False),
@@ -39,6 +40,7 @@ class TopicWorkerTests(unittest.TestCase):
             StoredArticleTopicInput(
                 row_id=2,
                 article_id="b",
+                category="society",
                 title="詐騙集團車手落網",
                 summary=None,
                 keywords_json="[]",
@@ -61,6 +63,7 @@ class TopicWorkerTests(unittest.TestCase):
             StoredArticleTopicInput(
                 row_id=1,
                 article_id="a",
+                category="society",
                 title="天氣晴朗活動登場",
                 summary=None,
                 keywords_json="not json",
@@ -78,11 +81,34 @@ class TopicWorkerTests(unittest.TestCase):
         self.assertEqual(store.updated[1][0]["label"], "一般社會新聞")
         self.assertEqual(store.updated[1][0]["source"], "rule_fallback")
 
+    def test_run_once_writes_general_politics_topic_for_politics_no_match(self):
+        rows = [
+            StoredArticleTopicInput(
+                row_id=1,
+                article_id="a",
+                category="politics",
+                title="總統府回應今日行程",
+                summary=None,
+                keywords_json="[]",
+            )
+        ]
+        store = FakeStore([rows])
+        worker = TopicWorker(store, batch_size=10)
+
+        result = worker.run_once()
+
+        self.assertEqual(result.scanned, 1)
+        self.assertEqual(result.updated, 1)
+        self.assertEqual(result.failed, 0)
+        self.assertEqual(store.updated[1][0]["topic_id"], "general_politics_news")
+        self.assertEqual(store.updated[1][0]["label"], "一般政治新聞")
+
     def test_run_once_counts_store_failure(self):
         rows = [
             StoredArticleTopicInput(
                 row_id=1,
                 article_id="a",
+                category="society",
                 title="少子化衝擊幼兒園",
                 summary=None,
                 keywords_json="[]",
@@ -102,6 +128,7 @@ class TopicWorkerTests(unittest.TestCase):
             StoredArticleTopicInput(
                 row_id=1,
                 article_id="a",
+                category="society",
                 title="高房價青年買不起房",
                 summary=None,
                 keywords_json="[]",
@@ -111,6 +138,7 @@ class TopicWorkerTests(unittest.TestCase):
             StoredArticleTopicInput(
                 row_id=2,
                 article_id="b",
+                category="society",
                 title="醫護過勞急診壅塞",
                 summary=None,
                 keywords_json="[]",

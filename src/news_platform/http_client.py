@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ssl
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -9,7 +10,7 @@ from urllib.request import Request, urlopen
 DEFAULT_HEADERS = {
     # 不附假聯絡方式：站方若需協商找不到比假信箱更好；保留 UA 識別性即可。
     "User-Agent": "news-platform/0.1",
-    "Accept": "application/xml, text/xml;q=0.9, text/html;q=0.8, */*;q=0.5",
+    "Accept": "application/json, application/xml;q=0.9, text/xml;q=0.8, text/html;q=0.7, */*;q=0.5",
 }
 
 
@@ -18,13 +19,15 @@ def http_get_text(
     params: dict[str, str | int] | None = None,
     timeout: int = 15,
     headers: dict[str, str] | None = None,
+    verify_ssl: bool = True,
 ) -> str:
     full_url = f"{url}?{urlencode(params)}" if params else url
     request_headers = dict(DEFAULT_HEADERS)
     if headers:
         request_headers.update(headers)
     req = Request(full_url, headers=request_headers)
-    with urlopen(req, timeout=timeout) as resp:
+    context = None if verify_ssl else ssl._create_unverified_context()
+    with urlopen(req, timeout=timeout, context=context) as resp:
         return resp.read().decode("utf-8", errors="replace")
 
 
@@ -33,6 +36,7 @@ def http_get_bytes(
     params: dict[str, str | int] | None = None,
     timeout: int = 15,
     headers: dict[str, str] | None = None,
+    verify_ssl: bool = True,
 ) -> bytes:
     """回傳原始 bytes，讓 ElementTree 自行依 XML declaration 決定編碼。
 
@@ -44,5 +48,6 @@ def http_get_bytes(
     if headers:
         request_headers.update(headers)
     req = Request(full_url, headers=request_headers)
-    with urlopen(req, timeout=timeout) as resp:
+    context = None if verify_ssl else ssl._create_unverified_context()
+    with urlopen(req, timeout=timeout, context=context) as resp:
         return resp.read()

@@ -36,6 +36,36 @@ class TopicClassifierTests(unittest.TestCase):
 
         self.assertEqual(result, [])
 
+    def test_classifies_collision_variants(self):
+        titles = [
+            "大貨車駕駛低頭撿手機 釀國道4車連撞 人妻夾困亡",
+            "台中貨車機車路口猛烈碰撞 29歲男騎士頭部重創亡",
+            "板橋婦走斑馬線闖紅燈過馬路 機車閃避不及撞飛",
+        ]
+
+        for title in titles:
+            with self.subTest(title=title):
+                result = classify(title=title, summary=None, keywords=[])
+                self.assertEqual(result[0]["topic_id"], "drunk_driving_accident")
+
+    def test_classifies_passenger_fall_with_traffic_context(self):
+        result = classify(
+            title="未關門就起步害乘客摔落骨折 中壢客運駕駛涉過失判刑",
+            summary=None,
+            keywords=[],
+        )
+
+        self.assertEqual(result[0]["topic_id"], "drunk_driving_accident")
+
+    def test_excludes_driver_license_subsidy(self):
+        result = classify(
+            title="竹市學生考機車駕照最高補助1800元",
+            summary=None,
+            keywords=[],
+        )
+
+        self.assertEqual(result, [])
+
     def test_max_topics_limits_output(self):
         result = classify(
             title="酒駕撞死行人 詐騙集團被起訴 房價飆漲",

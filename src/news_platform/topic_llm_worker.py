@@ -1,4 +1,4 @@
-"""Worker that sends general-social fallback articles to the LLM refinement layer."""
+"""Worker that sends rule-fallback topic articles to the LLM refinement layer."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 
 from news_platform.topic_llm import TopicLlmClassifier
-from news_platform.topics import general_social_topic
+from news_platform.topics import general_topic_for_category
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,8 @@ class TopicLlmFallbackWorker:
             try:
                 result = self._classifier.classify(title=row.title or "", summary=row.summary or "")
                 topics = result.topics or [
-                    general_social_topic(
+                    general_topic_for_category(
+                        getattr(row, "category", None),
                         source="llm_fallback",
                         reason="llm_no_specific_topic_match",
                         raw_topic_id=result.raw_topic_id,

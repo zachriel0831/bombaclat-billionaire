@@ -10,7 +10,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Main packages:
   - `src/news_collector`: source ingestion + bridge
   - `src/event_relay`: event storage API (`/events`), MySQL persistence, retention cleanup, weekly summary, market analysis, and market context modules
-  - `src/news_platform`: separate Taiwan society-news collection pipeline with keyword extraction and deterministic issue classification
+  - `src/news_platform`: separate Taiwan society/politics news collection pipeline with keyword extraction and deterministic issue classification
 - Main services:
   1. `news_collector.relay_bridge`
   2. `event_relay.main` (event relay API for `/events`)
@@ -25,8 +25,9 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Bridge startup performs a one-shot X backfill for tracked accounts before attaching the live stream, so recent gap tweets can still be written directly to `t_relay_events` and `t_x_posts`
 
 2. RSS polling
-- BBC / Reuters / Fox / NPR feeds from `OFFICIAL_RSS_FEEDS`
-- RSS bridge `--limit` is applied per configured feed, then all feed items are merged, deduped, and sorted. With 12 active feeds and `--limit 5`, one polling cycle can consider up to 60 RSS items before filters.
+- BBC / Reuters / Fox / NPR plus Taiwan finance feeds from `OFFICIAL_RSS_FEEDS`
+- Active Taiwan finance RSS feeds are CNA finance, LTN business, and ETtoday finance; these finance news rows stay in `t_relay_events`, not `news_platform.t_news_articles`
+- RSS bridge `--limit` is applied per configured feed, then all feed items are merged, deduped, and sorted. With 15 active feeds and `--limit 5`, one polling cycle can consider up to 75 RSS items before filters.
 - Reuters currently uses Google News RSS search as fallback because legacy Reuters RSS endpoints are unavailable from this environment
 - CNN RSS is configurable in code, but the previously tested CNN feeds were removed from the active `.env` set after returning stale items from 2016-2024 during the 2026-04-19 verification
 
@@ -109,25 +110,37 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `MARKET_CONTEXT_OIL_SUPPLY_ENABLED=false`
   - `MARKET_CONTEXT_SCORECARD_ENABLED=false`
 
-10. Taiwan society news platform
+10. Taiwan society/politics news platform
 - Runs in `src/news_platform` and is separate from `event_relay`
-- Reads Taiwan society RSS/sitemap sources defined in `news_platform.registry`
+- Reads Taiwan society/politics RSS, sitemap, ETtoday category-list, and PTS category-page sources defined in `news_platform.registry`
+- Default society/politics source set is LTN, ETtoday, TVBS, CNA, PTS, and EBC
+- Category scope defaults to `society,politics` and can be limited by `NEWSPF_CATEGORIES` or CLI `--categories`
 - Writes article rows to independent MySQL tables controlled by `NEWSPF_MYSQL_*`
 - Storage contract:
   - `t_news_sources`: source metadata
   - `t_news_articles`: article rows with `article_id`, `source_id`, title/url/summary, timestamps, `tags_json`, `raw_json`, `keywords_json`, `topics_json`, `topic_classified_by`, `topic_classified_at`, `ttl_at`
+  - `t_public_records`: structured official records with `record_id`, `source_id`, `record_type`, `country`, optional article category, title/url, `occurred_at`, `region`, `metrics_json`, `tags_json`, and `raw_json`
+  - `t_news_article_public_record_links`: many-to-many article-to-record links with `article_id`, `public_record_id`, `relation_type`, `confidence`, `matched_by`, and `evidence_json`
   - `keywords_json`: output of `KeywordWorker` as `[{kw, score}, ...]`
   - `topics_json`: ordered `[{topic_id, label, score, source, ...}, ...]`; `source` is `rule`, `llm`, `rule_fallback`, or `llm_fallback`
   - `topic_classified_by`: `rule` after deterministic classification, `llm` after LLM fallback, NULL before topic classification
   - `topic_classified_at`: UTC timestamp for the latest topic classification write
+- Middle-office/frontend read contract:
+  - Society category: `GET /api/society/topics`, `GET /api/society/articles`, `GET /api/society/articles/{id}`
+  - Politics category: `GET /api/politics/topics`, `GET /api/politics/articles`, `GET /api/politics/articles/{id}`
+  - The route category maps to `t_news_articles.category`; frontend topic pages pass `topic=<topicId>` instead of parsing `topics_json` directly
 - Data flow:
   1. crawler writes raw article rows
   2. `KeywordWorker` fills `keywords_json`
   3. `TopicWorker` reads rows where `topics_json IS NULL AND keywords_json IS NOT NULL`
-  4. deterministic classifier writes up to three specific topic hits into `topics_json`; no-hit rows become `general_social_news` / 一般社會新聞 with `source=rule_fallback`, `topic_classified_by=rule`
-  5. Optional `TopicLlmFallbackWorker` can refine rule fallback rows where the first topic is `general_social_news` and `topic_classified_by` is NULL or `rule`
-  6. LLM fallback calls OpenAI first (`gpt-5-nano` by default), then Anthropic Claude Haiku if OpenAI is unavailable; it writes either one `source=llm` topic or keeps `general_social_news` with `source=llm_fallback`, `topic_classified_by=llm`
-- MVP keeps topic classifications embedded on `t_news_articles`; a normalized article-topic relation table is deferred until timeline/query workloads require it
+  4. deterministic classifier writes up to three specific topic hits into `topics_json`; no-hit rows become category-specific general topics (`general_social_news` / 一般社會新聞 or `general_politics_news` / 一般政治新聞) with `source=rule_fallback`, `topic_classified_by=rule`
+  5. Optional `TopicLlmFallbackWorker` can refine rule fallback rows where the first topic is a general fallback topic and `topic_classified_by` is NULL or `rule`
+  6. LLM fallback calls OpenAI first (`gpt-5-nano` by default), then Anthropic Claude Haiku if OpenAI is unavailable; it writes either one `source=llm` topic or keeps the category-specific general topic with `source=llm_fallback`, `topic_classified_by=llm`
+  7. Official structured datasets such as Legislative Yuan records, judicial records, fraud lists, accident rows, population indicators, or housing indicators are stored in `t_public_records`, not `t_news_articles`
+  8. Article-to-record matching writes one row per relation to `t_news_article_public_record_links`, preserving match evidence and confidence for downstream ranking/explanations
+- Current public-record sources:
+  - Legislative Yuan legal proposals (`ly_bills`): `https://www.ly.gov.tw/WebAPI/LegislativeBill.aspx`, stored as `source_id=ly`, `record_type=legislative_bill`, `category=politics`; upstream ROC dates are normalized to Asia/Taipei timestamps
+- MVP keeps topic classifications embedded on `t_news_articles`; a normalized article-topic relation table is deferred until timeline/query workloads require it. Public records are normalized immediately because one record can support many articles and one article can cite many records.
 
 ## Event Storage & Analysis Boundary
 - HTTP endpoints:

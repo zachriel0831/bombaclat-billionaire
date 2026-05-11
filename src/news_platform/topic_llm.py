@@ -1,4 +1,4 @@
-"""LLM fallback classifier for Taiwan society topics."""
+"""LLM fallback classifier for Taiwan news topics."""
 
 from __future__ import annotations
 
@@ -183,7 +183,7 @@ class TopicLlmClassifier:
 
 
 _SYSTEM_PROMPT = (
-    "你是台灣社會新聞議題分類器。只根據標題與摘要判斷。"
+    "你是台灣新聞議題分類器。只根據標題與摘要判斷。"
     "若證據不足或不屬於清單議題，選 none。"
     "回傳必須符合指定 JSON schema，不要輸出解釋文字。"
 )

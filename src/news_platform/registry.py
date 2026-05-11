@@ -1,4 +1,4 @@
-"""TW 媒體 metadata + 第一批社會新聞 feed 來源表。
+"""TW 媒體 metadata + 社會／政治新聞 feed 來源表。
 
 political_camp: pan_green | pan_blue | mixed | neutral
 china_alignment: critical | neutral | beijing_friendly | unknown
@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,8 @@ class FeedSpec:
 
     kind=``rss`` 走 RSS / Atom 解析；kind=``sitemap`` 走 Google News sitemap 解析
     並用 ``path_filter`` 篩出指定分類路徑（例：TVBS 的 `/local/` 對應社會新聞）。
+    kind=``ettoday_list`` 走 ETtoday 分類列表 HTML 解析。
+    kind=``pts_category`` 走公視新聞網分類頁 HTML 解析。
     """
 
     source_id: str
@@ -35,6 +38,9 @@ class FeedSpec:
     kind: str
     url: str
     path_filter: str | None = None
+
+
+SUPPORTED_TW_CATEGORIES = ("society", "politics")
 
 
 TW_SOURCES: list[SourceMeta] = [
@@ -63,6 +69,13 @@ TW_SOURCES: list[SourceMeta] = [
         # 公營通訊社，作為政治光譜的中立基準。
         source_id="cna",
         name="中央通訊社",
+        country="TW",
+        political_camp="neutral",
+        china_alignment="neutral",
+    ),
+    SourceMeta(
+        source_id="pts",
+        name="公視新聞網",
         country="TW",
         political_camp="neutral",
         china_alignment="neutral",
@@ -107,6 +120,12 @@ _DEFAULT_TW_SOCIETY_FEEDS: list[FeedSpec] = [
         url="https://feeds.feedburner.com/rsscna/social",
     ),
     FeedSpec(
+        source_id="pts",
+        category="society",
+        kind="pts_category",
+        url="https://news.pts.org.tw/category/7",
+    ),
+    FeedSpec(
         # EBC 沒有官方 RSS，但 sitemap 有清楚的 /news/society/ 路徑。
         source_id="ebc",
         category="society",
@@ -117,22 +136,89 @@ _DEFAULT_TW_SOCIETY_FEEDS: list[FeedSpec] = [
 ]
 
 
+_DEFAULT_TW_POLITICS_FEEDS: list[FeedSpec] = [
+    FeedSpec(
+        source_id="ltn",
+        category="politics",
+        kind="rss",
+        url="https://news.ltn.com.tw/rss/politics.xml",
+    ),
+    FeedSpec(
+        # ETtoday 政治沒有穩定 RSS；抓官方分類列表（category id=1）。
+        source_id="ettoday",
+        category="politics",
+        kind="ettoday_list",
+        url="https://www.ettoday.net/news/news-list-{date}-1.htm",
+    ),
+    FeedSpec(
+        source_id="tvbs",
+        category="politics",
+        kind="sitemap",
+        url="https://news.tvbs.com.tw/crontab/sitemap/latest",
+        path_filter="/politics/",
+    ),
+    FeedSpec(
+        source_id="cna",
+        category="politics",
+        kind="rss",
+        url="https://feeds.feedburner.com/rsscna/politics",
+    ),
+    FeedSpec(
+        source_id="pts",
+        category="politics",
+        kind="pts_category",
+        url="https://news.pts.org.tw/category/1",
+    ),
+    FeedSpec(
+        source_id="ebc",
+        category="politics",
+        kind="sitemap",
+        url="https://news.ebc.net.tw/sitemap/realtime.xml",
+        path_filter="/news/politics/",
+    ),
+]
+
+
+_DEFAULT_TW_FEEDS_BY_CATEGORY: dict[str, list[FeedSpec]] = {
+    "society": _DEFAULT_TW_SOCIETY_FEEDS,
+    "politics": _DEFAULT_TW_POLITICS_FEEDS,
+}
+
+
 def tw_society_feeds() -> list[FeedSpec]:
     """回傳 TW 社會新聞 feed 清單，env 可覆寫單一條目 URL。"""
+    return tw_news_feeds(categories=("society",))
+
+
+def tw_politics_feeds() -> list[FeedSpec]:
+    """回傳 TW 政治新聞 feed 清單，env 可覆寫單一條目 URL。"""
+    return tw_news_feeds(categories=("politics",))
+
+
+def tw_news_feeds(categories: Iterable[str] | None = None) -> list[FeedSpec]:
+    """回傳指定分類的 TW 新聞 feed 清單，依 category 順序展開。"""
+    wanted = tuple(categories or SUPPORTED_TW_CATEGORIES)
     overridden: list[FeedSpec] = []
-    for spec in _DEFAULT_TW_SOCIETY_FEEDS:
-        env_key = f"NEWSPF_FEED_{spec.source_id.upper()}_{spec.category.upper()}"
-        url = os.getenv(env_key, spec.url).strip() or spec.url
-        overridden.append(
-            FeedSpec(
-                source_id=spec.source_id,
-                category=spec.category,
-                kind=spec.kind,
-                url=url,
-                path_filter=spec.path_filter,
-            )
-        )
+    for category in wanted:
+        normalized = category.strip().lower()
+        if normalized not in _DEFAULT_TW_FEEDS_BY_CATEGORY:
+            supported = ", ".join(SUPPORTED_TW_CATEGORIES)
+            raise ValueError(f"Unsupported TW news category: {category}. Supported: {supported}")
+        for spec in _DEFAULT_TW_FEEDS_BY_CATEGORY[normalized]:
+            overridden.append(_with_env_override(spec))
     return overridden
+
+
+def _with_env_override(spec: FeedSpec) -> FeedSpec:
+    env_key = f"NEWSPF_FEED_{spec.source_id.upper()}_{spec.category.upper()}"
+    url = os.getenv(env_key, spec.url).strip() or spec.url
+    return FeedSpec(
+        source_id=spec.source_id,
+        category=spec.category,
+        kind=spec.kind,
+        url=url,
+        path_filter=spec.path_filter,
+    )
 
 
 def source_meta(source_id: str) -> SourceMeta | None:

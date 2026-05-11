@@ -5,8 +5,10 @@ This project starts from data ingestion for international finance breaking news.
 ## Current data sources
 
 1. Official RSS (no API key)
-- BBC / Reuters / Fox / NPR feeds from `OFFICIAL_RSS_FEEDS`
-- RSS `--limit` is applied per feed, not globally. For example, 12 feeds with `-Limit 5` can return up to 60 RSS items before URL dedupe and topic/date filters.
+- BBC / Reuters / Fox / NPR plus Taiwan finance feeds from `OFFICIAL_RSS_FEEDS`
+- Active Taiwan finance RSS feeds: CNA finance, LTN business, and ETtoday finance
+- RSS news rows are normalized by `news_collector` and written through the bridge into `t_relay_events`
+- RSS `--limit` is applied per feed, not globally. For example, 15 feeds with `-Limit 5` can return up to 75 RSS items before URL dedupe and topic/date filters.
 
 2. SEC EDGAR tracked filings (no API key, declared User-Agent required)
 - Track selected tickers through official SEC ticker mapping + submissions API
@@ -23,11 +25,13 @@ This project starts from data ingestion for international finance breaking news.
 - Yahoo chart market proxies, U.S. Treasury yield curve, FRED public CSV macro-regime series, market breadth, SEC companyfacts AI capex proxy, FRED oil-price context, optional EIA inventory context, and TWSE official index/stock/margin context
 - Written as stored-only `market_context:*` events into `t_relay_events`, including deterministic `market_context:scorecard`
 
-6. Taiwan society news platform (separate MySQL database)
+6. Taiwan society/politics news platform (separate MySQL database)
 - Module: `src/news_platform`
-- Collects Taiwan society RSS/sitemap feeds into `t_news_articles`
-- `KeywordWorker` writes `keywords_json`; `TopicWorker` writes deterministic issue classifications into `topics_json`; optional LLM fallback refines `general_social_news` fallback rows
-- Topic MVP uses 7 specific registry topics: drunk driving/accidents, fraud, low birthrate, judicial injustice, healthcare burden, housing justice, and drug abuse. Rule no-hit rows temporarily fall back to `general_social_news` / 一般社會新聞.
+- Collects Taiwan society and politics RSS/sitemap/list feeds into `t_news_articles`
+- Default source set: LTN, ETtoday, TVBS, CNA, PTS, and EBC for both society and politics
+- `NEWSPF_CATEGORIES` or `--categories` controls collection scope; default is `society,politics`
+- `KeywordWorker` writes `keywords_json`; `TopicWorker` writes deterministic issue classifications into `topics_json`; optional LLM fallback refines rule-fallback general rows
+- Topic MVP uses 7 specific registry topics: drunk driving/accidents, fraud, low birthrate, judicial injustice, healthcare burden, housing justice, and drug abuse. Rule no-hit rows temporarily fall back by article category: `general_social_news` / 一般社會新聞 or `general_politics_news` / 一般政治新聞.
 
 ## API key requirements
 
@@ -77,24 +81,37 @@ Safe first run (recommended):
 $env:PYTHONPATH='src'; python -m news_collector.main fetch --source rss --limit 3 --log-level INFO --pretty
 ```
 
-## Taiwan Society News Platform
+## Taiwan Society/Politics News Platform
 
 This path is separate from `event_relay`; it writes to `NEWSPF_MYSQL_DATABASE` and does not push LINE messages.
 
 ```powershell
 $env:PYTHONPATH='src'; python -m news_platform.main --smoke
+$env:PYTHONPATH='src'; python -m news_platform.main --smoke --categories politics
 $env:PYTHONPATH='src'; python -m news_platform.main --once
+$env:PYTHONPATH='src'; python -m news_platform.main --once --categories politics
 $env:PYTHONPATH='src'; python -m news_platform.main --extract-keywords --classify-topics
 $env:PYTHONPATH='src'; python -m news_platform.main --llm-topic-fallback
+$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources ly_bills
+$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources ly_bills
 $env:PYTHONPATH='src'; python -m news_platform.main --loop
 ```
 
 Storage:
 - `t_news_sources`: source metadata
 - `t_news_articles`: article rows, including `keywords_json`, `topics_json`, `topic_classified_by`, and `topic_classified_at`
+- `t_public_records`: structured official records such as legislative bills, court judgments, fraud lists, accident rows, population indicators, or housing indicators
+- `t_news_article_public_record_links`: many-to-many article-to-record links with `relation_type`, `confidence`, `matched_by`, and `evidence_json`
 - `topics_json` is an ordered JSON array like `[{"topic_id":"fraud","label":"詐騙","score":1.3,"source":"rule"}]`
-- Rule no-hit rows use `[{"topic_id":"general_social_news","label":"一般社會新聞","score":0.0,"source":"rule_fallback"}]`
-- LLM fallback results use `source:"llm"` plus `provider` and `model`; if LLM still finds no specific topic, the row stays `general_social_news` with `source:"llm_fallback"`
+- Rule no-hit society rows use `[{"topic_id":"general_social_news","label":"一般社會新聞","score":0.0,"source":"rule_fallback"}]`
+- Rule no-hit politics rows use `[{"topic_id":"general_politics_news","label":"一般政治新聞","score":0.0,"source":"rule_fallback"}]`
+- LLM fallback results use `source:"llm"` plus `provider` and `model`; if LLM still finds no specific topic, the row stays in its category-specific general topic with `source:"llm_fallback"`
+- Structured official datasets do not go into `t_news_articles`; they are upserted into `t_public_records` and linked back to related articles through `t_news_article_public_record_links`.
+- First official public-record source: Legislative Yuan legal proposals (`ly_bills`) via `https://www.ly.gov.tw/WebAPI/LegislativeBill.aspx`; dates use ROC calendar in the upstream API and are normalized to UTC/Taipei timestamps in storage.
+
+Optional table-name env keys:
+- `NEWSPF_MYSQL_PUBLIC_RECORD_TABLE=t_public_records`
+- `NEWSPF_MYSQL_ARTICLE_RECORD_LINK_TABLE=t_news_article_public_record_links`
 
 Optional LLM fallback env keys:
 - `NEWSPF_TOPIC_LLM_ENABLED=false`

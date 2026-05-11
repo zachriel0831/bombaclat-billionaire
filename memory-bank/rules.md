@@ -8,6 +8,8 @@
 If two sources conflict, prefer the higher-priority source in output or alert explanation.
 
 ## Security Rules
+- Iron rule: Never read, write, move, delete, execute against, or otherwise operate on files outside `D:\work_space`.
+- Iron rule: Never charge, authorize, submit, test, save, or use a credit card or payment method.
 - Never commit real API keys or access tokens.
 - Keep secrets in `.env` or CI secrets only.
 - Do not print full tokens in logs or error payloads.

@@ -8,7 +8,15 @@
 - 分類結果是後續時間軸、情緒聚合、媒體行為觀察的共用索引
 
 ## 2. 第一階段範圍
-先支援台灣社會新聞的議題分類。
+先支援台灣社會新聞與政治新聞的議題分類。
+
+收集類別：
+- `society`：社會新聞
+- `politics`：政治新聞
+
+CLI / 環境控制：
+- 預設收 `society,politics`
+- 可用 `--categories politics` 或 `NEWSPF_CATEGORIES=politics` 只抓政治新聞
 
 MVP 議題：
 - `drunk_driving_accident`：酒駕毒駕／車禍傷亡
@@ -35,10 +43,13 @@ TopicLlmFallbackWorker（可選）
 
 流程規則：
 - crawler 只負責收新聞，不做議題判斷
+- `t_news_articles.category` 保留來源分類，政治新聞仍沿用同一張文章表
 - `KeywordWorker` 先補 `keywords_json`
 - `TopicWorker` 使用詞典規則分類
-- 規則沒命中時，暫時歸到 `general_social_news` / 一般社會新聞，且 `topic_classified_by='rule'`
-- LLM fallback 可處理 `general_social_news AND topic_classified_by IN (NULL,'rule')` 的文章，嘗試補判成更明確議題
+- 規則沒命中時，依 `category` 暫歸一般新聞：
+  - `society` → `general_social_news` / 一般社會新聞
+  - `politics` → `general_politics_news` / 一般政治新聞
+- LLM fallback 可處理 category-specific general topic 且 `topic_classified_by IN (NULL,'rule')` 的文章，嘗試補判成更明確議題
 - LLM fallback 跑完後，無論有無命中，都設 `topic_classified_by='llm'`
 
 ## 4. LLM fallback 策略
@@ -67,13 +78,15 @@ LLM 只回一個主議題或 `none`。不做多議題，避免兜底層過度擴
 - `topics_json IS NULL`：尚未分類
 - `topics_json[0].topic_id='general_social_news' AND topic_classified_by='rule'`：規則未命中，暫歸一般社會新聞，可等待 LLM 或人工審查
 - `topics_json[0].topic_id='general_social_news' AND topic_classified_by='llm'`：規則與 LLM 都未命中，維持一般社會新聞
+- `topics_json[0].topic_id='general_politics_news' AND topic_classified_by='rule'`：規則未命中，暫歸一般政治新聞，可等待 LLM 或人工審查
+- `topics_json[0].topic_id='general_politics_news' AND topic_classified_by='llm'`：規則與 LLM 都未命中，維持一般政治新聞
 
 ## 6. 中台操作建議
 中台應提供：
 - 依 topic 篩選文章
 - 查看分類來源：rule / llm
 - 查看 LLM reason
-- 查看 `general_social_news` 文章，作為詞典補強與人工審查池
+- 查看 `general_social_news` / `general_politics_news` 文章，作為詞典補強與人工審查池
 - 人工修正分類
 - 匯出誤判/漏判案例供詞典維護
 

@@ -1,4 +1,4 @@
-"""Taiwan society topic registry for deterministic article classification."""
+"""Taiwan topic registry for deterministic article classification."""
 
 from __future__ import annotations
 
@@ -17,6 +17,8 @@ class TopicSpec:
 
 GENERAL_SOCIAL_TOPIC_ID = "general_social_news"
 GENERAL_SOCIAL_TOPIC_LABEL = "一般社會新聞"
+GENERAL_POLITICS_TOPIC_ID = "general_politics_news"
+GENERAL_POLITICS_TOPIC_LABEL = "一般政治新聞"
 
 
 def general_social_topic(
@@ -27,9 +29,50 @@ def general_social_topic(
     **extra: object,
 ) -> dict[str, object]:
     """Return the temporary fallback topic for articles without a specific issue hit."""
+    return general_topic_for_category(
+        "society",
+        source=source,
+        reason=reason,
+        score=score,
+        **extra,
+    )
+
+
+def general_politics_topic(
+    *,
+    source: str = "rule_fallback",
+    reason: str = "no_specific_topic_match",
+    score: float = 0.0,
+    **extra: object,
+) -> dict[str, object]:
+    """Return the temporary fallback topic for politics articles without a specific issue hit."""
+    return general_topic_for_category(
+        "politics",
+        source=source,
+        reason=reason,
+        score=score,
+        **extra,
+    )
+
+
+def general_topic_for_category(
+    category: str | None,
+    *,
+    source: str = "rule_fallback",
+    reason: str = "no_specific_topic_match",
+    score: float = 0.0,
+    **extra: object,
+) -> dict[str, object]:
+    normalized = (category or "").strip().lower()
+    if normalized == "politics":
+        topic_id = GENERAL_POLITICS_TOPIC_ID
+        label = GENERAL_POLITICS_TOPIC_LABEL
+    else:
+        topic_id = GENERAL_SOCIAL_TOPIC_ID
+        label = GENERAL_SOCIAL_TOPIC_LABEL
     payload: dict[str, object] = {
-        "topic_id": GENERAL_SOCIAL_TOPIC_ID,
-        "label": GENERAL_SOCIAL_TOPIC_LABEL,
+        "topic_id": topic_id,
+        "label": label,
         "score": round(float(score), 2),
         "source": source,
         "reason": reason,
@@ -52,6 +95,16 @@ TOPIC_REGISTRY: list[TopicSpec] = [
             "撞傷",
             "翻車",
             "追撞",
+            "連撞",
+            "對撞",
+            "碰撞",
+            "衝撞",
+            "猛撞",
+            "擦撞",
+            "撞飛",
+            "撞斷",
+            "撞上",
+            "撞擊",
             "闖紅燈",
             "駕駛肇事",
             "酒測",
@@ -64,6 +117,11 @@ TOPIC_REGISTRY: list[TopicSpec] = [
             "行人",
             "機車",
             "貨車",
+            "客運",
+            "公車",
+            "國道",
+            "騎士",
+            "乘客",
             "肇責",
             "超速",
             "闖燈",
@@ -71,11 +129,21 @@ TOPIC_REGISTRY: list[TopicSpec] = [
             "死亡車禍",
             "重傷",
             "奪命",
+            "身亡",
+            "不治",
+            "送醫",
+            "頭部重創",
+            "夾困",
+            "摔落",
+            "骨折",
         ),
         exclude=(
             "賽車",
             "電動車補貼",
             "停車費",
+            "駕照補助",
+            "考機車駕照",
+            "科技執法",
             "模型車",
             "玩具車",
         ),

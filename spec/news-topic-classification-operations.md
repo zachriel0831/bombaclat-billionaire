@@ -10,6 +10,7 @@ NEWSPF_MYSQL_PORT=3306
 NEWSPF_MYSQL_USER=root
 NEWSPF_MYSQL_PASSWORD=...
 NEWSPF_MYSQL_DATABASE=news_platform
+NEWSPF_CATEGORIES=society,politics
 ```
 
 LLM fallback 選用：
@@ -36,6 +37,12 @@ NEWSPF_TOPIC_ANTHROPIC_API_KEY=
 $env:PYTHONPATH='src'; python -m news_platform.main --once
 ```
 
+只抓政治新聞：
+
+```powershell
+$env:PYTHONPATH='src'; python -m news_platform.main --once --categories politics
+```
+
 回填關鍵字與規則分類：
 
 ```powershell
@@ -56,8 +63,8 @@ $env:PYTHONPATH='src'; python -m news_platform.main --loop
 
 ## 3. 成本控制
 - LLM fallback 預設關閉
-- 只送 `general_social_news AND topic_classified_by IN (NULL,'rule')`
-- `topic_classified_by='llm'` 的一般社會新聞不會重送
+- 只送 `general_social_news/general_politics_news AND topic_classified_by IN (NULL,'rule')`
+- `topic_classified_by='llm'` 的一般新聞不會重送
 - 可用 `NEWSPF_TOPIC_LLM_BATCH_SIZE` 控制每批送出量
 - 可用 `NEWSPF_TOPIC_LLM_MIN_CONFIDENCE` 控制低信心結果是否接受
 
@@ -71,12 +78,13 @@ WHERE topics_json IS NOT NULL
 GROUP BY topic_classified_by;
 ```
 
-一般社會新聞比例：
+一般新聞比例：
 
 ```sql
 SELECT
   COUNT(*) AS classified_count,
-  SUM(JSON_UNQUOTE(JSON_EXTRACT(topics_json, '$[0].topic_id')) = 'general_social_news') AS general_social_count
+  SUM(JSON_UNQUOTE(JSON_EXTRACT(topics_json, '$[0].topic_id')) = 'general_social_news') AS general_social_count,
+  SUM(JSON_UNQUOTE(JSON_EXTRACT(topics_json, '$[0].topic_id')) = 'general_politics_news') AS general_politics_count
 FROM t_news_articles
 WHERE topics_json IS NOT NULL;
 ```
@@ -92,8 +100,9 @@ WHERE topic_classified_by = 'llm'
 
 ## 5. 驗收標準
 - 新文章進入 `t_news_articles`
+- 政治新聞寫入 `category='politics'`
 - 關鍵字完成後 `keywords_json IS NOT NULL`
 - 規則分類完成後 `topics_json IS NOT NULL`
-- 規則未命中時暫歸 `general_social_news`
-- LLM fallback 啟用時，規則 fallback 文章會改為具體 LLM topic 或 `topic_classified_by='llm'` 的 `general_social_news`
+- 規則未命中時暫歸 `general_social_news` 或 `general_politics_news`
+- LLM fallback 啟用時，規則 fallback 文章會改為具體 LLM topic 或 `topic_classified_by='llm'` 的 category-specific general topic
 - LLM 命中結果包含 `source='llm'`、`provider`、`model`

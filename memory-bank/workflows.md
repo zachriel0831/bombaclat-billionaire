@@ -100,24 +100,27 @@
 ## Workflow 3A: RSS Feed Coverage Check
 1. Confirm active feeds
 - Inspect `OFFICIAL_RSS_FEEDS` in `.env`
+- Taiwan finance feed additions currently use CNA finance, LTN business, and ETtoday finance RSS URLs
 2. Understand fetch limits
 - `news_collector.sources.rss.OfficialRssSource` applies `--limit` per feed, not globally
-- Example: 12 feeds with `--limit 5` can produce up to 60 RSS items before URL dedupe and bridge filters
+- Example: 15 feeds with `--limit 5` can produce up to 75 RSS items before URL dedupe and bridge filters
 3. Smoke fetch
 - Run `python -m news_collector.main fetch --source rss --limit 5 --pretty`
 4. Verify storage path
-- Restart or wait for `news_collector.relay_bridge`
+- Restart `news_collector.relay_bridge` after `.env` source-list changes so the running process sees the new feed set
 - Check bridge log for `Polling source=rss fetched=<count>`
 - Query `t_relay_events` for recent RSS source rows
 
-## Workflow 3B: Taiwan Society Topic Classification
+## Workflow 3B: Taiwan Society/Politics News Topic Classification
 1. Smoke check feeds without DB writes
 - `$env:PYTHONPATH='src'; python -m news_platform.main --smoke`
+- Politics only: `$env:PYTHONPATH='src'; python -m news_platform.main --smoke --categories politics`
 2. Collect one batch into `t_news_articles`
 - `$env:PYTHONPATH='src'; python -m news_platform.main --once`
+- Politics only: `$env:PYTHONPATH='src'; python -m news_platform.main --once --categories politics`
 3. Backfill keywords and topics
 - `$env:PYTHONPATH='src'; python -m news_platform.main --extract-keywords --classify-topics`
-4. Optional LLM fallback for `general_social_news` fallback rows
+4. Optional LLM fallback for category-specific general fallback rows
 - Set `NEWSPF_TOPIC_LLM_ENABLED=true` for loop mode, or run manually:
 - `$env:PYTHONPATH='src'; python -m news_platform.main --llm-topic-fallback`
 5. Run continuous collection
@@ -125,9 +128,27 @@
 6. Verify DB evidence
 - Confirm recent rows have `keywords_json IS NOT NULL`
 - Confirm classified rows have `topics_json IS NOT NULL`
-- Treat `topics_json[0].topic_id='general_social_news' AND topic_classified_by='rule'` as eligible for optional LLM refinement
-- Treat `topics_json[0].topic_id='general_social_news' AND topic_classified_by='llm'` as processed by both layers but still general social news
-- Review `general_social_news` rows when tuning `news_platform.topics`
+- Treat `topics_json[0].topic_id IN ('general_social_news','general_politics_news') AND topic_classified_by='rule'` as eligible for optional LLM refinement
+- Treat category-specific general topics with `topic_classified_by='llm'` as processed by both layers but still general news
+- Review `general_social_news` and `general_politics_news` rows when tuning `news_platform.topics`
+7. After changing worker/topic code, restart any existing `news_platform.main --loop` process
+- Verify the new loop log shows current source scope and, when new rows exist, `Topic pass scanned=<n>`
+- Check live DB has `SUM(topics_json IS NULL)=0` for active categories after backfill
+
+## Workflow 3C: Taiwan Official Public Records
+1. Smoke check official public-record sources without DB writes
+- `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources ly_bills`
+- Date window override: add `--public-record-from YYYY-MM-DD --public-record-to YYYY-MM-DD`
+2. Collect one batch into `t_public_records`
+- `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources ly_bills`
+- Use `--public-record-limit N` for controlled smoke writes
+3. Storage boundary
+- Structured official rows must go into `t_public_records`, not `t_news_articles`
+- Link related articles later through `t_news_article_public_record_links`
+4. Verify DB evidence
+- Query `t_public_records` by `source_id='ly' AND record_type='legislative_bill'`
+- Confirm `raw_json` keeps upstream API params and source fields
+- Confirm `metrics_json` includes term/session fields and `cosignatory_count`
 
 ## Workflow 4: Incident Handling (Source Outage / Rate Limit)
 1. Confirm outage scope (single source vs all)

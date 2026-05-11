@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 _STOPWORDS_PATH = Path(__file__).parent / "data" / "stopwords_tw.txt"
+_JIEBA_CACHE_DIR = Path(__file__).resolve().parents[2] / ".cache" / "jieba"
 
 # 不要直接抽出去做關鍵字的字元樣式：純標點、純空白、單字數字（保留多位數字以維持事件 hook）。
 _PUNCT_ONLY_RE = re.compile(r"^[\W_]+$", re.UNICODE)
@@ -75,6 +76,9 @@ class KeywordExtractor:
             if self._initialized:
                 return
             try:
+                import jieba  # type: ignore
+
+                _configure_jieba_cache(jieba)
                 import jieba.analyse as analyse  # type: ignore
             except Exception as exc:
                 raise RuntimeError(
@@ -88,6 +92,12 @@ class KeywordExtractor:
             except Exception as exc:  # pragma: no cover - 防禦
                 logger.warning("set_stop_words failed: %s", exc)
             self._initialized = True
+
+
+def _configure_jieba_cache(jieba_module) -> None:
+    """Keep jieba cache inside this workspace instead of the OS temp directory."""
+    _JIEBA_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    jieba_module.dt.tmp_dir = str(_JIEBA_CACHE_DIR)
 
 
 def _load_stopwords() -> set[str]:

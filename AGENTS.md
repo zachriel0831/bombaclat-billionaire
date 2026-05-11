@@ -20,6 +20,8 @@ Add these only when relevant:
 - `memory-bank/archive/enterprise/`: agent platform, skills, MCP, enterprise readiness, or eval-governance work
 
 ## Working Rules
+- Iron rule: Never read, write, move, delete, execute against, or otherwise operate on files outside `D:\work_space`.
+- Iron rule: Never charge, authorize, submit, test, save, or use a credit card or payment method.
 - Confirm `memory-bank/PROJECT_DOCUMENTATION.md` only before architecture, schema, data-flow, source-mapping, scheduler, or service-boundary code changes.
 - Prefer official data-source docs and repository facts over assumptions.
 - If required project information is missing, state the gap explicitly.

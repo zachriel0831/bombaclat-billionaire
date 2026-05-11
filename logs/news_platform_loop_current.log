@@ -1,0 +1,15 @@
+2026-05-11 11:15:58,973 INFO news_platform - News-platform ready: db=news_platform sources=['ltn:society', 'ettoday:society', 'tvbs:society', 'cna:society', 'pts:society', 'ebc:society', 'ltn:politics', 'ettoday:politics', 'tvbs:politics', 'cna:politics', 'pts:politics', 'ebc:politics']
+2026-05-11 11:15:59,247 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-11 11:15:59,247 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-11 11:15:59,282 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-11 11:15:59,305 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-11 11:15:59,312 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-11 11:15:59,381 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-11 11:15:59,464 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-11 11:15:59,509 INFO news_platform.pipeline - Fetched source=ebc:politics items=8
+2026-05-11 11:15:59,534 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-11 11:15:59,541 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-11 11:16:00,316 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-11 11:16:00,484 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-11 11:16:00,793 INFO news_platform - Cycle complete fetched=218 stored=0 duplicates=218 failed=0
+2026-05-11 11:16:00,799 INFO news_platform - TTL purge done date=2026-05-11 deleted=0
