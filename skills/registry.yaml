@@ -3,9 +3,27 @@ skills:
   - name: news-ingestion-skill
     owner: data-platform
     status: draft
-    version: 0.1.0
+    version: 0.2.0
     path: skills/news-ingestion-skill/SKILL.md
     evals: skills/news-ingestion-skill/EVALS.md
     changelog: skills/news-ingestion-skill/CHANGELOG.md
     risk_tier: medium
-    last_reviewed: 2026-03-05
+    last_reviewed: 2026-05-14
+  - name: rag-operations-skill
+    owner: data-platform
+    status: draft
+    version: 0.1.0
+    path: skills/rag-operations-skill/SKILL.md
+    evals: skills/rag-operations-skill/EVALS.md
+    changelog: skills/rag-operations-skill/CHANGELOG.md
+    risk_tier: medium
+    last_reviewed: 2026-05-14
+  - name: political-topic-thread-skill
+    owner: data-platform
+    status: draft
+    version: 0.1.0
+    path: skills/political-topic-thread-skill/SKILL.md
+    evals: skills/political-topic-thread-skill/EVALS.md
+    changelog: skills/political-topic-thread-skill/CHANGELOG.md
+    risk_tier: medium
+    last_reviewed: 2026-05-14

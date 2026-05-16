@@ -13,6 +13,10 @@ from html import unescape
 from html.parser import HTMLParser
 from urllib.parse import urljoin
 
+from news_platform.author_metadata import (
+    AUTHOR_METHOD_NONE,
+    AUTHOR_STATUS_PARSER_NOT_SUPPORTED,
+)
 from news_platform.http_client import http_get_bytes
 from news_platform.models import NewsArticle
 from news_platform.sources.base import NewsSource
@@ -165,6 +169,8 @@ class EttodayNewsListSource(NewsSource):
             url=canonical,
             published_at=published,
             summary=None,
+            author_extraction_status=AUTHOR_STATUS_PARSER_NOT_SUPPORTED,
+            author_extraction_method=AUTHOR_METHOD_NONE,
             tags=[tag] if tag else [],
             raw={
                 "feed": source_url,

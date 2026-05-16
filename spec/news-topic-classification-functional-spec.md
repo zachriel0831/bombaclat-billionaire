@@ -25,7 +25,11 @@ MVP 議題：
 - `judicial_injustice`：司法量刑不公
 - `healthcare_burden`：醫護過勞／醫療崩潰
 - `housing_justice`：高房價／居住正義
-- `drug_abuse`：新興毒品／校園毒品
+- `drug_abuse`：新興毒品／校園毒品；包含 `絕命毒師` 型犯罪標題、`製毒`、`製造毒品`、`第三級毒品`、`喵喵`、`喪屍煙彈`、`喪屍菸彈`、`依托咪酯` 等製毒/新興毒品語境
+
+政治二層 topic 與事件 thread 設計另見
+`spec/political-topic-thread-technical-plan.md`。政治 topic 實作前，分類器必須先支援
+category-aware rules，避免政治詞彙誤分類社會新聞。
 
 ## 3. 分類流程
 ```text

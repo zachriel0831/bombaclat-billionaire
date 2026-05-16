@@ -1,0 +1,264 @@
+2026-05-14 21:00:10,262 INFO news_platform - News-platform ready: db=news_platform sources=['ltn:society', 'ettoday:society', 'tvbs:society', 'cna:society', 'pts:society', 'ebc:society', 'newtalk:society', 'storm:society', 'ctee:society', 'ltn:politics', 'ettoday:politics', 'tvbs:politics', 'cna:politics', 'pts:politics', 'ebc:politics', 'newtalk:politics', 'storm:politics', 'ctee:politics']
+2026-05-14 21:00:10,488 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 21:00:10,505 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 21:00:10,542 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 21:00:10,561 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 21:00:10,641 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 21:00:10,671 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 21:00:10,693 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 21:00:10,735 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 21:00:10,752 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 21:00:10,758 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-14 21:00:10,781 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 21:00:10,809 INFO news_platform.pipeline - Fetched source=ebc:politics items=15
+2026-05-14 21:00:10,845 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 21:00:10,872 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 21:00:10,882 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 21:00:10,888 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 21:00:11,155 INFO news_platform.pipeline - Fetched source=ctee:politics items=19
+2026-05-14 21:00:11,535 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 21:00:11,764 INFO news_platform - Cycle complete fetched=344 stored=0 duplicates=344 failed=0
+2026-05-14 21:00:11,824 INFO news_platform.public_sources.npa_public_records - NPA source retry without SSL verification url=https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/F713DBFE-7432-4401-B5C0-1C07A8F5B1FB/resource/12676819-B43E-405F-B4ED-580BF77036D0/download reason=missing_ski
+2026-05-14 21:00:11,848 INFO news_platform.public_sources.npa_public_records - NPA source retry without SSL verification url=https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/4F4DF9A5-DF4C-4EE8-A50D-869347D38D9E/resource/3FD6EC97-D1AC-4B50-82AF-66AECE6A756F/download reason=missing_ski
+2026-05-14 21:00:11,848 INFO news_platform.public_sources.npa_public_records - NPA source retry without SSL verification url=https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/F4077949-50CC-4640-8114-79958CC8BBEA/resource/5D5EFC6C-BFC2-4727-AFBC-A4EE0825D3FF/download reason=missing_ski
+2026-05-14 21:00:11,985 INFO news_platform.public_record_pipeline - Fetched public source=ly:legislative_bill records=116
+2026-05-14 21:00:11,997 INFO news_platform.public_sources.npa_public_records - NPA source retry without SSL verification url=https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/9E413113-EA49-41DF-822C-E89D94A78807/resource/000F1CF6-FED1-4C08-B405-4A5B7A7E2BC2/download reason=missing_ski
+2026-05-14 21:00:12,103 INFO news_platform.public_record_pipeline - Fetched public source=npa:fraud_rumor records=89
+2026-05-14 21:00:12,139 INFO news_platform.public_sources.npa_public_records - NPA source retry without SSL verification url=https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/E5465CB7-2482-4988-AD9A-6B39D82AC5B6/download reason=missing_ski
+2026-05-14 21:00:12,806 INFO news_platform.public_sources.npa_public_records - NPA source retry without SSL verification url=https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/F713DBFE-7432-4401-B5C0-1C07A8F5B1FB/resource/1B0A2667-C932-4EB7-8AC1-68B30AC602C0/download reason=missing_ski
+2026-05-14 21:00:13,275 INFO news_platform.public_record_pipeline - Fetched public source=npa:fraud_blocked_domain_stat records=43
+2026-05-14 21:00:13,310 INFO news_platform.public_record_pipeline - Fetched public source=npa:traffic_accident_a1 records=489
+2026-05-14 21:00:13,322 INFO news_platform.public_sources.npa_public_records - NPA source retry without SSL verification url=https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/7F7EEF1C-0946-4A09-87E5-EC34C14C3A80/resource/7615153E-E5C5-4D89-84DF-C51C95FCCE4D/download reason=missing_ski
+2026-05-14 21:00:13,365 INFO news_platform.public_record_pipeline - Fetched public source=npa:traffic_drunk_driving_stat records=10
+2026-05-14 21:00:13,526 INFO news_platform.public_record_pipeline - Fetched public source=npa:fraud_enforcement_stat records=20
+2026-05-14 21:00:16,283 INFO news_platform.public_sources.npa_public_records - NPA source retry without SSL verification url=https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/F713DBFE-7432-4401-B5C0-1C07A8F5B1FB/resource/1CFFE5C9-51BD-49DE-A6FC-9F9BBF4698C6/download reason=missing_ski
+2026-05-14 21:00:19,034 INFO news_platform.public_sources.npa_public_records - NPA source retry without SSL verification url=https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/F713DBFE-7432-4401-B5C0-1C07A8F5B1FB/resource/A16927F0-88B0-474E-81F9-0016D55EFAC6/download reason=missing_ski
+2026-05-14 21:00:21,987 INFO news_platform.public_record_pipeline - Fetched public source=npa:traffic_accident_a2_stat records=85
+2026-05-14 21:00:23,593 INFO news_platform - Public records daily pass fetched=852 stored=0 duplicates=852 failed=0
+2026-05-14 21:00:24,090 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=258 matched=1 linked=0 duplicates=1 failed=0
+2026-05-14 21:00:24,093 INFO news_platform - TTL purge done date=2026-05-14 deleted=0
+2026-05-14 21:15:24,171 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 21:15:24,200 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 21:15:24,247 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 21:15:24,379 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 21:15:24,384 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 21:15:24,396 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 21:15:24,420 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 21:15:24,537 INFO news_platform.pipeline - Fetched source=ebc:politics items=15
+2026-05-14 21:15:24,577 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 21:15:24,632 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 21:15:24,695 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 21:15:24,983 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 21:15:25,131 INFO news_platform.pipeline - Fetched source=ctee:politics items=19
+2026-05-14 21:15:25,164 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 21:15:25,175 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 21:15:25,437 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 21:15:26,125 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-14 21:15:26,131 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 21:15:26,346 INFO news_platform - Cycle complete fetched=344 stored=3 duplicates=341 failed=0
+2026-05-14 21:15:26,804 DEBUG jieba - Building prefix dict from the default dictionary ...
+2026-05-14 21:15:26,805 DEBUG jieba - Loading model from cache D:\work_space\stock\data-collecting\.cache\jieba\jieba.cache
+2026-05-14 21:15:27,357 DEBUG jieba - Loading model cost 0.553 seconds.
+2026-05-14 21:15:27,358 DEBUG jieba - Prefix dict has been built successfully.
+2026-05-14 21:15:27,368 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-14 21:15:27,379 INFO news_platform - Topic pass scanned=3 updated=3 failed=0
+2026-05-14 21:15:27,872 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=257 matched=1 linked=0 duplicates=1 failed=0
+2026-05-14 21:30:27,916 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 21:30:28,058 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 21:30:28,078 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 21:30:28,099 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 21:30:28,122 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 21:30:28,182 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 21:30:28,214 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-14 21:30:28,214 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 21:30:28,251 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 21:30:28,256 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 21:30:28,317 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 21:30:28,321 INFO news_platform.pipeline - Fetched source=ebc:politics items=16
+2026-05-14 21:30:28,410 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 21:30:28,648 INFO news_platform.pipeline - Fetched source=ctee:politics items=19
+2026-05-14 21:30:28,653 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 21:30:28,933 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 21:30:28,965 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 21:30:29,164 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 21:30:29,403 INFO news_platform - Cycle complete fetched=345 stored=5 duplicates=340 failed=0
+2026-05-14 21:30:29,419 INFO news_platform - Keyword pass scanned=5 updated=5 failed=0
+2026-05-14 21:30:29,434 INFO news_platform - Topic pass scanned=5 updated=5 failed=0
+2026-05-14 21:30:29,939 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=257 matched=1 linked=0 duplicates=1 failed=0
+2026-05-14 21:45:29,980 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 21:45:30,040 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 21:45:30,073 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 21:45:30,141 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 21:45:30,187 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 21:45:30,213 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 21:45:30,249 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 21:45:30,257 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-14 21:45:30,297 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 21:45:30,343 INFO news_platform.pipeline - Fetched source=ebc:politics items=16
+2026-05-14 21:45:30,353 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 21:45:30,441 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 21:45:30,451 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 21:45:30,629 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 21:45:30,695 INFO news_platform.pipeline - Fetched source=ctee:politics items=18
+2026-05-14 21:45:30,968 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 21:45:31,002 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 21:45:31,274 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 21:45:31,501 INFO news_platform - Cycle complete fetched=344 stored=4 duplicates=340 failed=0
+2026-05-14 21:45:31,517 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-14 21:45:31,532 INFO news_platform - Topic pass scanned=4 updated=4 failed=0
+2026-05-14 21:45:32,058 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=257 matched=1 linked=0 duplicates=1 failed=0
+2026-05-14 22:00:32,125 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 22:00:32,228 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 22:00:32,234 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 22:00:32,247 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 22:00:32,360 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 22:00:32,416 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 22:00:32,431 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 22:00:32,488 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 22:00:32,507 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 22:00:32,542 INFO news_platform.pipeline - Fetched source=ebc:politics items=16
+2026-05-14 22:00:32,584 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 22:00:32,626 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 22:00:32,799 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 22:00:33,022 INFO news_platform.pipeline - Fetched source=ctee:politics items=18
+2026-05-14 22:00:33,125 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 22:00:33,144 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 22:00:33,449 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 22:00:47,479 WARNING news_platform.sources.sitemap_news - Sitemap fetch failed source=tvbs:politics url=https://news.tvbs.com.tw/crontab/sitemap/latest error=The read operation timed out
+2026-05-14 22:00:47,479 WARNING news_platform.pipeline - Fetched source=tvbs:politics items=0 (verify feed is alive)
+2026-05-14 22:00:47,752 INFO news_platform - Cycle complete fetched=324 stored=6 duplicates=318 failed=0
+2026-05-14 22:00:47,834 INFO news_platform - Keyword pass scanned=6 updated=6 failed=0
+2026-05-14 22:00:47,852 INFO news_platform - Topic pass scanned=6 updated=6 failed=0
+2026-05-14 22:00:48,394 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=257 matched=1 linked=0 duplicates=1 failed=0
+2026-05-14 22:15:48,415 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 22:15:48,447 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 22:15:48,487 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 22:15:48,499 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 22:15:48,501 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 22:15:48,531 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-14 22:15:48,568 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 22:15:48,592 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 22:15:48,624 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 22:15:48,672 INFO news_platform.pipeline - Fetched source=ebc:politics items=16
+2026-05-14 22:15:48,721 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 22:15:48,859 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 22:15:48,980 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 22:15:49,079 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 22:15:49,101 INFO news_platform.pipeline - Fetched source=ctee:politics items=18
+2026-05-14 22:15:49,474 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 22:15:49,514 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 22:15:49,563 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 22:15:49,815 INFO news_platform - Cycle complete fetched=344 stored=15 duplicates=329 failed=0
+2026-05-14 22:15:50,050 INFO news_platform - Keyword pass scanned=15 updated=15 failed=0
+2026-05-14 22:15:50,080 INFO news_platform - Topic pass scanned=15 updated=15 failed=0
+2026-05-14 22:15:50,615 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=257 matched=1 linked=0 duplicates=1 failed=0
+2026-05-14 22:30:50,717 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 22:30:50,787 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 22:30:50,806 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 22:30:50,903 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 22:30:50,917 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 22:30:50,924 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 22:30:50,954 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 22:30:51,019 INFO news_platform.pipeline - Fetched source=ebc:politics items=16
+2026-05-14 22:30:51,103 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 22:30:51,124 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 22:30:51,209 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-14 22:30:51,215 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 22:30:51,246 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 22:30:51,545 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 22:30:51,552 INFO news_platform.pipeline - Fetched source=ctee:politics items=19
+2026-05-14 22:30:51,712 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 22:30:51,773 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 22:30:51,944 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 22:30:52,301 INFO news_platform - Cycle complete fetched=345 stored=4 duplicates=341 failed=0
+2026-05-14 22:30:52,462 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-14 22:30:52,479 INFO news_platform - Topic pass scanned=4 updated=4 failed=0
+2026-05-14 22:30:53,117 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=257 matched=1 linked=0 duplicates=1 failed=0
+2026-05-14 22:45:53,228 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 22:45:53,252 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 22:45:53,268 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 22:45:53,412 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 22:45:53,424 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 22:45:53,429 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 22:45:53,454 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-14 22:45:53,463 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 22:45:53,503 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 22:45:53,526 INFO news_platform.pipeline - Fetched source=ebc:politics items=16
+2026-05-14 22:45:53,570 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 22:45:53,662 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 22:45:53,694 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 22:45:53,724 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 22:45:53,829 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 22:45:53,880 INFO news_platform.pipeline - Fetched source=ctee:politics items=19
+2026-05-14 22:45:54,348 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 22:45:55,299 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 22:45:55,579 INFO news_platform - Cycle complete fetched=345 stored=5 duplicates=340 failed=0
+2026-05-14 22:45:55,704 INFO news_platform - Keyword pass scanned=5 updated=5 failed=0
+2026-05-14 22:45:55,722 INFO news_platform - Topic pass scanned=5 updated=5 failed=0
+2026-05-14 22:45:56,248 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=257 matched=1 linked=0 duplicates=1 failed=0
+2026-05-14 23:00:56,322 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 23:00:56,352 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 23:00:56,383 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 23:00:56,447 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 23:00:56,471 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 23:00:56,500 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 23:00:56,513 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-14 23:00:56,609 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 23:00:56,649 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 23:00:56,685 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 23:00:56,709 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 23:00:56,721 INFO news_platform.pipeline - Fetched source=ebc:politics items=16
+2026-05-14 23:00:56,759 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 23:00:56,899 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 23:00:56,914 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 23:00:57,075 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 23:00:57,119 INFO news_platform.pipeline - Fetched source=ctee:politics items=19
+2026-05-14 23:00:57,394 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 23:00:57,626 INFO news_platform - Cycle complete fetched=345 stored=4 duplicates=341 failed=0
+2026-05-14 23:00:57,722 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-14 23:00:57,735 INFO news_platform - Topic pass scanned=4 updated=4 failed=0
+2026-05-14 23:00:58,250 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=257 matched=1 linked=0 duplicates=1 failed=0
+2026-05-14 23:15:58,388 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 23:15:58,418 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 23:15:58,432 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 23:15:58,448 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 23:15:58,507 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-14 23:15:58,541 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 23:15:58,604 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 23:15:58,641 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 23:15:58,644 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 23:15:58,725 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 23:15:58,732 INFO news_platform.pipeline - Fetched source=ebc:politics items=16
+2026-05-14 23:15:58,755 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 23:15:58,802 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 23:15:58,890 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 23:15:59,008 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 23:15:59,045 INFO news_platform.pipeline - Fetched source=ctee:politics items=19
+2026-05-14 23:15:59,439 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 23:15:59,495 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 23:15:59,791 INFO news_platform - Cycle complete fetched=345 stored=4 duplicates=341 failed=0
+2026-05-14 23:15:59,967 INFO news_platform - Keyword pass scanned=4 updated=4 failed=0
+2026-05-14 23:15:59,984 INFO news_platform - Topic pass scanned=4 updated=4 failed=0
+2026-05-14 23:16:00,555 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=257 matched=1 linked=0 duplicates=1 failed=0
+2026-05-14 23:31:00,631 INFO news_platform.pipeline - Fetched source=ltn:society items=20
+2026-05-14 23:31:00,725 INFO news_platform.pipeline - Fetched source=newtalk:society items=20
+2026-05-14 23:31:00,767 INFO news_platform.pipeline - Fetched source=ltn:politics items=20
+2026-05-14 23:31:00,840 INFO news_platform.pipeline - Fetched source=pts:society items=15
+2026-05-14 23:31:00,854 INFO news_platform.pipeline - Fetched source=cna:society items=20
+2026-05-14 23:31:00,865 INFO news_platform.pipeline - Fetched source=ebc:society items=20
+2026-05-14 23:31:00,882 INFO news_platform.pipeline - Fetched source=ettoday:politics items=20
+2026-05-14 23:31:00,947 INFO news_platform.pipeline - Fetched source=ettoday:society items=20
+2026-05-14 23:31:00,954 INFO news_platform.pipeline - Fetched source=tvbs:politics items=20
+2026-05-14 23:31:00,962 INFO news_platform.pipeline - Fetched source=tvbs:society items=20
+2026-05-14 23:31:00,967 INFO news_platform.pipeline - Fetched source=ebc:politics items=16
+2026-05-14 23:31:01,030 INFO news_platform.pipeline - Fetched source=newtalk:politics items=20
+2026-05-14 23:31:01,137 INFO news_platform.pipeline - Fetched source=pts:politics items=15
+2026-05-14 23:31:01,156 INFO news_platform.pipeline - Fetched source=ctee:society items=20
+2026-05-14 23:31:01,300 INFO news_platform.pipeline - Fetched source=storm:society items=20
+2026-05-14 23:31:01,433 INFO news_platform.pipeline - Fetched source=ctee:politics items=19
+2026-05-14 23:31:01,993 INFO news_platform.pipeline - Fetched source=cna:politics items=20
+2026-05-14 23:31:02,430 INFO news_platform.pipeline - Fetched source=storm:politics items=20
+2026-05-14 23:31:02,753 INFO news_platform - Cycle complete fetched=345 stored=3 duplicates=342 failed=0
+2026-05-14 23:31:02,867 INFO news_platform - Keyword pass scanned=3 updated=3 failed=0
+2026-05-14 23:31:02,881 INFO news_platform - Topic pass scanned=3 updated=3 failed=0
+2026-05-14 23:31:03,440 INFO news_platform - Public-record link pass scanned_articles=200 candidate_records=308 matched=1 linked=0 duplicates=1 failed=0

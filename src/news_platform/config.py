@@ -47,6 +47,9 @@ class NewsPlatformSettings:
     mysql_source_table: str
     mysql_public_record_table: str
     mysql_article_record_link_table: str
+    mysql_author_table: str
+    mysql_article_author_table: str
+    mysql_author_coverage_daily_table: str
     mysql_connect_timeout_seconds: int
     article_ttl_days: int
     poll_interval_seconds: int
@@ -82,6 +85,15 @@ def load_settings(env_file: str = ".env") -> NewsPlatformSettings:
         mysql_article_record_link_table=os.getenv(
             "NEWSPF_MYSQL_ARTICLE_RECORD_LINK_TABLE",
             "t_news_article_public_record_links",
+        ),
+        mysql_author_table=os.getenv("NEWSPF_MYSQL_AUTHOR_TABLE", "t_news_authors"),
+        mysql_article_author_table=os.getenv(
+            "NEWSPF_MYSQL_ARTICLE_AUTHOR_TABLE",
+            "t_news_article_authors",
+        ),
+        mysql_author_coverage_daily_table=os.getenv(
+            "NEWSPF_MYSQL_AUTHOR_COVERAGE_DAILY_TABLE",
+            "t_news_author_coverage_daily",
         ),
         mysql_connect_timeout_seconds=int(os.getenv("NEWSPF_MYSQL_CONNECT_TIMEOUT", "5")),
         article_ttl_days=max(1, min(365, int(os.getenv("NEWSPF_ARTICLE_TTL_DAYS", "30")))),

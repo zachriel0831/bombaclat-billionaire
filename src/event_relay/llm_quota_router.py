@@ -331,10 +331,13 @@ def _ordered_candidates(
         for item in (os.getenv("MARKET_ANALYSIS_PROVIDER_ORDER") or "").split(",")
         if item.strip()
     ]
-    order = explicit_order or ["openai", "anthropic"]
     preferred_key = _provider_key(preferred.provider)
-    if preferred_key not in order:
-        order.insert(0, preferred_key)
+    if explicit_order:
+        order = explicit_order
+        if preferred_key not in order:
+            order.insert(0, preferred_key)
+    else:
+        order = [preferred_key, *[provider for provider in ("openai", "anthropic") if provider != preferred_key]]
     for provider in by_provider:
         if provider not in order:
             order.append(provider)

@@ -40,6 +40,23 @@
 3. Ask final quality question
 - "Would a senior engineer approve this as production-safe?"
 
+## Workflow 0A: Machine Restart Recovery
+Use this first when Windows/the machine was rebooted, live collectors stopped,
+or the user asks whether society/politics news, finance RSS, market context, or
+Taiwan pre-open analysis ran after restart.
+
+Primary runbook:
+- `memory-bank/restart-recovery-runbook.md`
+
+Minimum evidence before reporting recovery complete:
+- `event_relay.main`, `news_collector.relay_bridge`, and `news_platform.main --loop` are running
+- `http://127.0.0.1:18090/healthz` returns `{"ok": true}`
+- source bridge log shows recent `Polling source=rss fetched=<n>`
+- `news_platform` log shows a recent crawl/keyword/topic cycle
+- DB checks show same-day society/politics rows in `news_platform.t_news_articles`
+- DB checks show same-day finance RSS rows in `news_relay.t_relay_events`
+- today's `pre_tw_open` or calendar-guarded `macro_daily` row exists in `t_market_analyses`
+
 ## Demand Elegance (Balanced)
 1. For non-trivial changes:
 - pause and choose the simplest robust solution
@@ -100,10 +117,11 @@
 ## Workflow 3A: RSS Feed Coverage Check
 1. Confirm active feeds
 - Inspect `OFFICIAL_RSS_FEEDS` in `.env`
-- Taiwan finance feed additions currently use CNA finance, LTN business, and ETtoday finance RSS URLs
+- Taiwan finance/official feed additions currently include CNA finance, LTN business, ETtoday finance, Anue, Economic Daily News, Newtalk finance, Storm finance, MoneyDJ, CBC, TWSE, and FSC RSS URLs
 2. Understand fetch limits
 - `news_collector.sources.rss.OfficialRssSource` applies `--limit` per feed, not globally
-- Example: 15 feeds with `--limit 5` can produce up to 75 RSS items before URL dedupe and bridge filters
+- Current `.env` has `OFFICIAL_RSS_FIRST_PER_FEED=true`, so the bridge fetches one item per configured feed
+- If `OFFICIAL_RSS_FIRST_PER_FEED=false`, 27 feeds with `--limit 5` can produce up to 135 RSS items before URL dedupe and bridge filters
 3. Smoke fetch
 - Run `python -m news_collector.main fetch --source rss --limit 5 --pretty`
 4. Verify storage path
@@ -131,24 +149,68 @@
 - Treat `topics_json[0].topic_id IN ('general_social_news','general_politics_news') AND topic_classified_by='rule'` as eligible for optional LLM refinement
 - Treat category-specific general topics with `topic_classified_by='llm'` as processed by both layers but still general news
 - Review `general_social_news` and `general_politics_news` rows when tuning `news_platform.topics`
-7. After changing worker/topic code, restart any existing `news_platform.main --loop` process
+7. After adding or tuning deterministic `TopicSpec` rules, reclassify existing rule-fallback rows for the affected category; `TopicWorker` only processes `topics_json IS NULL`, so old `general_social_news` / `general_politics_news` rows will not update unless explicitly re-run through `topic_classifier.classify` and written back only when a specific topic matches.
+8. After changing worker/topic code, restart any existing `news_platform.main --loop` process
 - Verify the new loop log shows current source scope and, when new rows exist, `Topic pass scanned=<n>`
 - Check live DB has `SUM(topics_json IS NULL)=0` for active categories after backfill
 
 ## Workflow 3C: Taiwan Official Public Records
 1. Smoke check official public-record sources without DB writes
-- `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources ly_bills`
+- `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources all`
+- Healthcare-only public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources healthcare`
+- Justice/corrections public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources justice`
 - Date window override: add `--public-record-from YYYY-MM-DD --public-record-to YYYY-MM-DD`
 2. Collect one batch into `t_public_records`
-- `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources ly_bills`
+- `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources all`
+- Healthcare-only public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources healthcare`
+- Justice/corrections public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources justice`
 - Use `--public-record-limit N` for controlled smoke writes
-3. Storage boundary
+3. Link articles to public records
+- `$env:PYTHONPATH='src'; python -m news_platform.main --link-public-records`
+- Optional tuning: `--public-record-link-batch-size N`, `--public-record-link-lookback-days N`, `--public-record-link-min-confidence 0.68`
+- In loop mode, public-record sources are collected once per local day, then `PublicRecordLinkWorker` runs after crawl, keyword, topic, and optional LLM passes
+4. Storage boundary
 - Structured official rows must go into `t_public_records`, not `t_news_articles`
-- Link related articles later through `t_news_article_public_record_links`
-4. Verify DB evidence
+- Related article links go through `t_news_article_public_record_links`
+5. Verify DB evidence
 - Query `t_public_records` by `source_id='ly' AND record_type='legislative_bill'`
+- Query `t_public_records` by `source_id='npa' AND record_type IN ('fraud_rumor','traffic_accident_a1','traffic_accident_a2_stat','traffic_drunk_driving_stat','fraud_blocked_domain_stat','fraud_enforcement_stat')`
+- Query healthcare public records by:
+  - `source_id='ly' AND record_type='healthcare_legislative_bill'`
+  - `source_id='nhi' AND record_type IN ('nhi_hospital_nursing_staff_stat','nhi_hospital_bed_occupancy_stat')`
+  - `source_id='mohw' AND record_type IN ('mohw_hospital_workforce_stat','mohw_clinic_workforce_stat','mohw_hospital_bed_stat','mohw_nursing_staff_stat')`
+- Query justice/corrections public records by:
+  - `source_id='moj' AND record_type='moj_prosecution_disposition_stat'`
+  - `source_id='mojac' AND record_type='mojac_daily_custody_stat'`
 - Confirm `raw_json` keeps upstream API params and source fields
-- Confirm `metrics_json` includes term/session fields and `cosignatory_count`
+- Confirm `metrics_json` includes term/session fields and `cosignatory_count` for Legislative Yuan records, content length for NPA 165 records, casualty/party/geolocation fields for A1 traffic records, monthly/yearly aggregate count fields for NPA statistic records, nurse/staff/bed counts for healthcare capacity records, bed occupancy rates for NHI occupancy records, prosecution-disposition counts for MOJ records, and custody/capacity/over-capacity fields for corrections records
+- Query `t_news_article_public_record_links` joined with article/record tables; inspect `confidence`, `matched_by`, and `evidence_json`
+
+## Workflow 3D: News Data-Source Health Check
+Use this when news analysis quality depends on fresh source rows, after a
+machine restart, or when the user asks whether source data has caught up.
+
+1. Run the combined read-only health report
+- `powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -EnvFile .env`
+- JSON output for automation: add `-Json`
+- Scheduled gate options: add `-FailOnWarn` or `-FailOnStale`
+2. Expected healthy probes
+- relay finance/public RSS: recent Taiwan finance/official RSS rows in `news_relay.t_relay_events`
+- relay international RSS: BBC/Reuters/Fox/NPR public RSS rows
+- relay X/SEC/TWSE-MOPS/US-index probes when enabled in `.env`
+- relay market-context, BLS macro, Taiwan market-flow, and stored analysis probes
+- news platform society/politics category and per-source article probes
+- news platform public records and article-public-record link probes
+- process counts: exactly one root Python service instance for `event_relay.main`, `news_collector.relay_bridge`, and `news_platform.main --loop`
+3. Interpret WARNs
+- Public records use `updated_at` as refresh freshness because duplicate official records are upserted; WARN means last refresh is over 48 hours old, STALE means over 96 hours old.
+- Duplicate `news_platform.main --loop` is WARN because it can double-fetch and hide restart mistakes.
+- Event-driven SEC/TWSE-MOPS sources can be quiet; use the probe age and source cadence before calling it a source outage.
+4. Remediation
+- For stale finance/international RSS, inspect bridge logs and rerun Workflow 3A.
+- For stale society/politics articles, inspect `news_platform` logs and rerun Workflow 3B.
+- For stale public records, run Workflow 3C collection/link commands.
+- For duplicate loops, stop only the extra `news_platform.main --loop` PID, then rerun the health report.
 
 ## Workflow 4: Incident Handling (Source Outage / Rate Limit)
 1. Confirm outage scope (single source vs all)

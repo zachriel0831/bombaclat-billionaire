@@ -8,6 +8,7 @@
 | 欄位 | 型別 | 說明 |
 |---|---|---|
 | `category` | VARCHAR(32) | 新聞來源分類；目前支援 `society` / `politics` |
+| `authors_json` | JSON NULL | Reporter/author names from RSS/Atom/sitemap metadata or high-confidence byline extraction; empty array when unavailable. |
 | `keywords_json` | JSON NULL | 關鍵字抽取結果 |
 | `topics_json` | JSON NULL | 議題分類結果 |
 | `topic_classified_by` | VARCHAR(16) NULL | `rule` / `llm` / NULL |

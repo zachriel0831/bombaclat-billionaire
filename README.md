@@ -1,14 +1,48 @@
 ﻿# News Collector (MVP)
 
-This project starts from data ingestion for international finance breaking news.
+## Platform Role
+
+`data-collecting` is the ingestion, enrichment, analysis, and decision-memory center of the financial news platform. It collects market/news/public-record data, stores normalized events, runs scheduled market-analysis and weekly-summary jobs, extracts trade-signal candidates, and maintains the platform's richest documentation set.
+
+It does not own LINE delivery, the public API runtime, frontend rendering, live quote WebSocket monitoring, or broker order placement. Those boundaries are handled by sibling services.
+
+## Total Index
+
+Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this repo. It maps the README, specs, memory bank, skills, runbooks, scripts, and sibling-service boundaries in one place.
+
+## Documentation Map
+
+| Need | Start here |
+|---|---|
+| Whole-repo navigation | [PROJECT_INDEX.md](PROJECT_INDEX.md) |
+| Codex/Claude operating rules | [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md) |
+| Architecture, data flow, source boundaries | [memory-bank/PROJECT_DOCUMENTATION.md](memory-bank/PROJECT_DOCUMENTATION.md) |
+| Operational workflows and repeatable runbooks | [memory-bank/workflows.md](memory-bank/workflows.md) |
+| Machine restart recovery | [memory-bank/restart-recovery-runbook.md](memory-bank/restart-recovery-runbook.md) |
+| Historical-case RAG operations | [memory-bank/rag-operations.md](memory-bank/rag-operations.md) |
+| Product/data contracts | [spec/](spec/) |
+| Politics topic/thread technical plan | [spec/political-topic-thread-technical-plan.md](spec/political-topic-thread-technical-plan.md) |
+| Architecture decision history | [memory-bank/09-decisions/](memory-bank/09-decisions/) |
+| Agent and skill workspace | [skills/README.md](skills/README.md) |
+| Task board and lessons | [tasks/todo.md](tasks/todo.md), [tasks/lessons.md](tasks/lessons.md) |
+
+## Related Services
+
+| Service | Relationship |
+|---|---|
+| `news-platform-api` | Reads event, article, analysis, trade-signal, public-record, and candle tables for public API access. |
+| `news-display-frontend` | Displays public news, analyses, issue timelines, and market candles through the API. |
+| `line-relay-service` | Delivers selected analyses and stock-query responses to LINE users. |
+| `stock-monitor-service` | Consumes trade signals and produces live quote/candle/trigger data. |
+| `order-dispatcher-service` | Future consumer of reviewed trigger/order intents; broker calls do not live here. |
 
 ## Current data sources
 
 1. Official RSS (no API key)
 - BBC / Reuters / Fox / NPR plus Taiwan finance feeds from `OFFICIAL_RSS_FEEDS`
-- Active Taiwan finance RSS feeds: CNA finance, LTN business, and ETtoday finance
+- Active Taiwan finance/official RSS feeds include CNA finance, LTN business, ETtoday finance, Anue, Economic Daily News, Newtalk finance, Storm finance, MoneyDJ, CBC, TWSE, and FSC feeds
 - RSS news rows are normalized by `news_collector` and written through the bridge into `t_relay_events`
-- RSS `--limit` is applied per feed, not globally. For example, 15 feeds with `-Limit 5` can return up to 75 RSS items before URL dedupe and topic/date filters.
+- RSS `--limit` is applied per feed, not globally. Current `.env` uses `OFFICIAL_RSS_FIRST_PER_FEED=true`, so one polling cycle fetches one item per configured feed; if disabled, 27 feeds with `-Limit 5` can return up to 135 RSS items before URL dedupe and topic/date filters.
 
 2. SEC EDGAR tracked filings (no API key, declared User-Agent required)
 - Track selected tickers through official SEC ticker mapping + submissions API
@@ -28,10 +62,12 @@ This project starts from data ingestion for international finance breaking news.
 6. Taiwan society/politics news platform (separate MySQL database)
 - Module: `src/news_platform`
 - Collects Taiwan society and politics RSS/sitemap/list feeds into `t_news_articles`
-- Default source set: LTN, ETtoday, TVBS, CNA, PTS, and EBC for both society and politics
+- RSS/Atom and sitemap ingestion stores reporter/author names in `authors_json` when the feed exposes explicit author metadata or a high-confidence byline. Reporter identities are also normalized into `t_news_authors` and linked through `t_news_article_authors`; missing byline states are tracked on `t_news_articles.author_extraction_status` and summarized in `t_news_author_coverage_daily`.
+- Default source set: LTN, ETtoday, TVBS, CNA, PTS, EBC, Newtalk, and Storm Media for both society and politics
 - `NEWSPF_CATEGORIES` or `--categories` controls collection scope; default is `society,politics`
 - `KeywordWorker` writes `keywords_json`; `TopicWorker` writes deterministic issue classifications into `topics_json`; optional LLM fallback refines rule-fallback general rows
-- Topic MVP uses 7 specific registry topics: drunk driving/accidents, fraud, low birthrate, judicial injustice, healthcare burden, housing justice, and drug abuse. Rule no-hit rows temporarily fall back by article category: `general_social_news` / 一般社會新聞 or `general_politics_news` / 一般政治新聞.
+- Topic MVP uses deterministic `TopicSpec` rules. Existing social/policy topics stay unscoped; politics second-layer topics are scoped to `category=politics` so political terms do not classify unrelated society rows. Rule no-hit rows temporarily fall back by article category: `general_social_news` / 一般社會新聞 or `general_politics_news` / 一般政治新聞.
+- Politics second-layer topic IDs are `elections`, `cross_strait_relations`, `foreign_affairs`, `legislative_policy`, `party_politics`, `political_accountability`, `defense_security`, and `public_budget`. Event-thread templates are specified in [spec/political-topic-thread-technical-plan.md](spec/political-topic-thread-technical-plan.md); persistent thread tables are deferred.
 
 ## API key requirements
 
@@ -92,14 +128,24 @@ $env:PYTHONPATH='src'; python -m news_platform.main --once
 $env:PYTHONPATH='src'; python -m news_platform.main --once --categories politics
 $env:PYTHONPATH='src'; python -m news_platform.main --extract-keywords --classify-topics
 $env:PYTHONPATH='src'; python -m news_platform.main --llm-topic-fallback
-$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources ly_bills
-$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources ly_bills
+$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources all
+$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources healthcare
+$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources justice
+$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources all
+$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources healthcare
+$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources justice
+$env:PYTHONPATH='src'; python -m news_platform.main --link-public-records
 $env:PYTHONPATH='src'; python -m news_platform.main --loop
 ```
 
+Loop mode collects the default public-record source set once per local day, then runs article-record linking each crawl cycle.
+
 Storage:
 - `t_news_sources`: source metadata
-- `t_news_articles`: article rows, including `keywords_json`, `topics_json`, `topic_classified_by`, and `topic_classified_at`
+- `t_news_articles`: article rows, including `authors_json`, author extraction status fields, `keywords_json`, `topics_json`, `topic_classified_by`, and `topic_classified_at`
+- `t_news_authors`: normalized source-scoped reporter/author identities
+- `t_news_article_authors`: article-to-author relation rows
+- `t_news_author_coverage_daily`: daily source/category reporter-name coverage metrics
 - `t_public_records`: structured official records such as legislative bills, court judgments, fraud lists, accident rows, population indicators, or housing indicators
 - `t_news_article_public_record_links`: many-to-many article-to-record links with `relation_type`, `confidence`, `matched_by`, and `evidence_json`
 - `topics_json` is an ordered JSON array like `[{"topic_id":"fraud","label":"詐騙","score":1.3,"source":"rule"}]`
@@ -107,7 +153,8 @@ Storage:
 - Rule no-hit politics rows use `[{"topic_id":"general_politics_news","label":"一般政治新聞","score":0.0,"source":"rule_fallback"}]`
 - LLM fallback results use `source:"llm"` plus `provider` and `model`; if LLM still finds no specific topic, the row stays in its category-specific general topic with `source:"llm_fallback"`
 - Structured official datasets do not go into `t_news_articles`; they are upserted into `t_public_records` and linked back to related articles through `t_news_article_public_record_links`.
-- First official public-record source: Legislative Yuan legal proposals (`ly_bills`) via `https://www.ly.gov.tw/WebAPI/LegislativeBill.aspx`; dates use ROC calendar in the upstream API and are normalized to UTC/Taipei timestamps in storage.
+- Official public-record sources: Legislative Yuan legal proposals (`ly_bills`), healthcare-filtered Legislative Yuan proposals (`ly_healthcare_bills`), NPA 165 fraud-rumor open data (`npa_fraud_rumors`), NPA A1 traffic accident open data (`npa_traffic_a1`), NPA A2 traffic accident monthly statistics (`npa_traffic_a2_stats`), NPA drunk-driving annual statistics (`npa_drunk_driving_stats`), NPA fraud blocked-domain statistics (`npa_fraud_blocked_domain_stats`), NPA fraud enforcement dashboard statistics (`npa_fraud_enforcement_stats`), NHI healthcare capacity sources (`nhi_hospital_nursing_staff`, `nhi_hospital_bed_occupancy`), MOHW annual healthcare capacity sources (`mohw_hospital_workforce`, `mohw_clinic_workforce`, `mohw_hospital_beds`, `mohw_nursing_staff_stats`), MOJ prosecution disposition statistics (`moj_prosecution_disposition_stats`), and Agency of Corrections daily custody statistics (`mojac_daily_custody`). Use `--public-sources healthcare` or `--public-sources justice` for focused subsets.
+- Article-record matching uses deterministic high-precision rules for Legislative Yuan bills, healthcare-filtered Legislative Yuan bills, and NPA 165 fraud-rumor records. Links are written with source-specific `matched_by` values and evidence in `evidence_json`.
 
 Optional table-name env keys:
 - `NEWSPF_MYSQL_PUBLIC_RECORD_TABLE=t_public_records`
@@ -185,6 +232,19 @@ Health check:
 ```powershell
 Invoke-RestMethod http://127.0.0.1:18090/healthz
 ```
+
+Data-source freshness health:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -EnvFile .env
+powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -EnvFile .env -Json
+```
+
+This read-only report checks MySQL freshness for finance/public RSS, international RSS, X, SEC, TWSE/MOPS, market-context facts, market analyses, society/politics article feeds, public records, article-record links, and local Python process counts. Use `-FailOnWarn` or `-FailOnStale` for scheduled monitoring.
+
+Machine restart recovery:
+- Use `memory-bank/restart-recovery-runbook.md` before rediscovering restart steps.
+- It covers restarting relay/bridge/news-platform loops, scheduled-task checks, society/politics freshness, finance RSS freshness, and Taiwan pre-open analysis verification.
 
 Retention cleanup:
 - Deletes rows older than `RELAY_RETENTION_KEEP_DAYS` from `t_relay_events` and `t_x_posts`.
@@ -294,7 +354,7 @@ Required `.env` keys for TWSE/MOPS:
 
 Notes:
 - This source uses the official TWSE openapi dataset `https://openapi.twse.com.tw/v1/opendata/t187ap04_L`.
-- Current MVP covers `銝??砍瘥?之閮`.
+- Current MVP covers TWSE listed-company daily material announcements.
 - Events flow directly into `t_relay_events` through the crawler bridge.
 
 ## Weekly macro summary (AI, stored only)
@@ -313,7 +373,7 @@ Or trigger it through the running relay service:
 
 Prompt pipeline:
 - Read skill docs:
-  - `skills/macro-weekly-summary-skill/SKILLS.md`
+  - `skills/macro-weekly-summary-skill/SKILLS.md` (prompt-loader compatibility file; `SKILL.md` is the skill entry)
   - `skills/line-brief-format-skill/line-weekly-brief.md`
 - Weekly output uses a weekly-specific three-section contract:
   - `週總經` -> `下週台股配置` -> `下週觀察清單`
@@ -550,6 +610,7 @@ Create `.env` in project root and fill values as needed.
 - Project docs: `memory-bank/PROJECT_DOCUMENTATION.md`
 - Rules: `memory-bank/rules.md`
 - Workflows: `memory-bank/workflows.md`
+- Restart recovery: `memory-bank/restart-recovery-runbook.md`
 - Task board: `tasks/todo.md`
 - Lessons log: `tasks/lessons.md`
 - Archived enterprise docs: `memory-bank/archive/enterprise/`

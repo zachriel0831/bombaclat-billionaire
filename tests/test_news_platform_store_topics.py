@@ -3,21 +3,33 @@
 import json
 import threading
 import unittest
+from datetime import datetime, timezone
+from types import SimpleNamespace
 
+from news_platform.models import NewsArticle
 from news_platform.store import NewsPlatformStore
 
 
 class FakeConnection:
     def __init__(self) -> None:
         self.commits = 0
+        self.rollbacks = 0
 
     def commit(self) -> None:
         self.commits += 1
 
+    def rollback(self) -> None:
+        self.rollbacks += 1
+
+
+class FakeConnector:
+    IntegrityError = RuntimeError
+
 
 class FakeCursor:
-    def __init__(self, rows=None) -> None:
+    def __init__(self, rows=None, rowcount: int = 1) -> None:
         self.rows = rows or []
+        self.rowcount = rowcount
         self.executed: list[tuple[str, tuple]] = []
         self.closed = False
 
@@ -26,6 +38,11 @@ class FakeCursor:
 
     def fetchall(self):
         return list(self.rows)
+
+    def fetchone(self):
+        if self.rows:
+            return self.rows[0]
+        return (101,)
 
     def close(self) -> None:
         self.closed = True
@@ -36,11 +53,71 @@ def _store_with_cursor(cursor: FakeCursor):
     store._conn = FakeConnection()
     store._lock = threading.RLock()
     store._article_table = "t_news_articles"
+    store._author_table = "t_news_authors"
+    store._article_author_table = "t_news_article_authors"
+    store._author_coverage_daily_table = "t_news_author_coverage_daily"
+    store._settings = SimpleNamespace(article_ttl_days=30)
+    store._connector = FakeConnector
     store._cursor = lambda: cursor
     return store
 
 
 class NewsPlatformStoreTopicTests(unittest.TestCase):
+    def test_upsert_article_writes_authors_json(self):
+        cursor = FakeCursor()
+        store = _store_with_cursor(cursor)
+        article = NewsArticle(
+            article_id="article-author",
+            source_id="ltn",
+            country="TW",
+            category="society",
+            title="author row",
+            url="https://example.com/author-row",
+            published_at=datetime(2026, 5, 8, 12, 0, tzinfo=timezone.utc),
+            summary=None,
+            authors=["張文川"],
+            tags=["society"],
+            raw={"feed": "x"},
+        )
+
+        inserted = store.upsert_article(article)
+
+        sql, params = cursor.executed[0]
+        self.assertTrue(inserted)
+        self.assertIn("authors_json", sql)
+        self.assertIn("ON DUPLICATE KEY UPDATE", sql)
+        self.assertEqual(json.loads(params[8]), ["張文川"])
+        self.assertEqual(params[9], "present")
+        self.assertEqual(params[10], "legacy_authors_json")
+        self.assertEqual(json.loads(params[14]), ["society"])
+        self.assertTrue(
+            any("INSERT INTO `t_news_authors`" in executed_sql for executed_sql, _ in cursor.executed)
+        )
+        self.assertTrue(
+            any("INSERT INTO `t_news_article_authors`" in executed_sql for executed_sql, _ in cursor.executed)
+        )
+        self.assertEqual(store._conn.commits, 1)
+
+    def test_upsert_article_treats_duplicate_author_refresh_as_duplicate(self):
+        cursor = FakeCursor(rowcount=2)
+        store = _store_with_cursor(cursor)
+        article = NewsArticle(
+            article_id="article-author",
+            source_id="ltn",
+            country="TW",
+            category="society",
+            title="author row",
+            url="https://example.com/author-row",
+            published_at=datetime(2026, 5, 8, 12, 0, tzinfo=timezone.utc),
+            summary=None,
+            authors=["張文川"],
+        )
+
+        inserted = store.upsert_article(article)
+
+        self.assertFalse(inserted)
+        self.assertEqual(store._conn.commits, 1)
+
     def test_fetch_articles_missing_topics_queries_keywords_ready_rows(self):
         cursor = FakeCursor(
             rows=[

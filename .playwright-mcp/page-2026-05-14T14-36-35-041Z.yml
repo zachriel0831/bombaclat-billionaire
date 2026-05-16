@@ -1,0 +1,700 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - link "Market Brief" [ref=e5] [cursor=pointer]:
+        - /url: /
+    - main [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - generic [ref=e9]:
+            - generic [ref=e10]:
+              - generic [ref=e11]:
+                - img [ref=e12]
+                - paragraph [ref=e14]: 議題熱度時間軸
+              - heading "最近 30 天" [level=2] [ref=e15]
+            - generic [ref=e16]:
+              - generic [ref=e17]:
+                - img [ref=e18]
+                - text: 4/15 - 5/14
+              - generic [ref=e20]: 220 篇
+          - generic [ref=e21]:
+            - img [ref=e23]:
+              - generic [ref=e56]: 4/15
+              - generic [ref=e57]: 4/20
+              - generic [ref=e58]: 4/25
+              - generic [ref=e59]: 4/30
+              - generic [ref=e60]: 5/5
+              - generic [ref=e61]: 5/10
+              - generic [ref=e62]: 5/14
+              - generic [ref=e63]: "64"
+            - generic [ref=e65]:
+              - button "4/15，0 篇" [ref=e66]:
+                - generic [ref=e68]: "0"
+                - generic [ref=e69]: 4/15
+              - button "4/16，0 篇" [ref=e70]:
+                - generic [ref=e72]: "0"
+              - button "4/17，0 篇" [ref=e74]:
+                - generic [ref=e76]: "0"
+              - button "4/18，0 篇" [ref=e78]:
+                - generic [ref=e80]: "0"
+              - button "4/19，0 篇" [ref=e82]:
+                - generic [ref=e84]: "0"
+              - button "4/20，0 篇" [ref=e86]:
+                - generic [ref=e88]: "0"
+                - generic [ref=e89]: 4/20
+              - button "4/21，0 篇" [ref=e90]:
+                - generic [ref=e92]: "0"
+              - button "4/22，0 篇" [ref=e94]:
+                - generic [ref=e96]: "0"
+              - button "4/23，0 篇" [ref=e98]:
+                - generic [ref=e100]: "0"
+              - button "4/24，0 篇" [ref=e102]:
+                - generic [ref=e104]: "0"
+              - button "4/25，0 篇" [ref=e106]:
+                - generic [ref=e108]: "0"
+                - generic [ref=e109]: 4/25
+              - button "4/26，0 篇" [ref=e110]:
+                - generic [ref=e112]: "0"
+              - button "4/27，0 篇" [ref=e114]:
+                - generic [ref=e116]: "0"
+              - button "4/28，0 篇" [ref=e118]:
+                - generic [ref=e120]: "0"
+              - button "4/29，0 篇" [ref=e122]:
+                - generic [ref=e124]: "0"
+              - button "4/30，0 篇" [ref=e126]:
+                - generic [ref=e128]: "0"
+                - generic [ref=e129]: 4/30
+              - button "5/1，0 篇" [ref=e130]:
+                - generic [ref=e132]: "0"
+              - button "5/2，0 篇" [ref=e134]:
+                - generic [ref=e136]: "0"
+              - button "5/3，0 篇" [ref=e138]:
+                - generic [ref=e140]: "0"
+              - button "5/4，0 篇" [ref=e142]:
+                - generic [ref=e144]: "0"
+              - button "5/5，0 篇" [ref=e146]:
+                - generic [ref=e148]: "0"
+                - generic [ref=e149]: 5/5
+              - button "5/6，0 篇" [ref=e150]:
+                - generic [ref=e152]: "0"
+              - button "5/7，0 篇" [ref=e154]:
+                - generic [ref=e156]: "0"
+              - button "5/8，6 篇" [ref=e158]:
+                - generic [ref=e159]:
+                  - generic [ref=e160]: E
+                  - generic [ref=e161]: 自
+                  - generic [ref=e162]: T
+                - generic [ref=e163]: "6"
+              - button "5/9，23 篇" [ref=e165]:
+                - generic [ref=e166]:
+                  - generic [ref=e167]: T
+                  - generic [ref=e168]: 自
+                  - generic [ref=e169]: E
+                  - generic [ref=e170]: 公
+                - generic [ref=e171]: "23"
+              - button "5/10，35 篇" [ref=e173]:
+                - generic [ref=e174]:
+                  - generic [ref=e175]: T
+                  - generic [ref=e176]: E
+                  - generic [ref=e177]: 自
+                  - generic [ref=e178]: 東
+                  - generic [ref=e179]: 中
+                - generic [ref=e180]: "35"
+                - generic [ref=e181]: 5/10
+              - button "5/11，64 篇" [ref=e182]:
+                - generic [ref=e183]:
+                  - generic [ref=e184]: E
+                  - generic [ref=e185]: 自
+                  - generic [ref=e186]: T
+                  - generic [ref=e187]: 中
+                  - generic [ref=e188]: 東
+                - generic [ref=e189]: "64"
+              - button "5/12，51 篇" [ref=e191]:
+                - generic [ref=e192]:
+                  - generic [ref=e193]: 自
+                  - generic [ref=e194]: E
+                  - generic [ref=e195]: T
+                  - generic [ref=e196]: 中
+                  - generic [ref=e197]: 東
+                - generic [ref=e198]: "51"
+              - button "5/13，16 篇" [ref=e200]:
+                - generic [ref=e201]:
+                  - generic [ref=e202]: "N"
+                  - generic [ref=e203]: E
+                  - generic [ref=e204]: T
+                  - generic [ref=e205]: 自
+                  - generic [ref=e206]: 東
+                - generic [ref=e207]: "16"
+              - button "5/14，25 篇" [ref=e209]:
+                - generic [ref=e210]:
+                  - generic [ref=e211]: 自
+                  - generic [ref=e212]: T
+                  - generic [ref=e213]: 東
+                  - generic [ref=e214]: E
+                  - generic [ref=e215]: 中
+                - generic [ref=e216]: "25"
+                - generic [ref=e217]: 5/14
+        - generic [ref=e218]:
+          - generic [ref=e219]:
+            - generic [ref=e220]:
+              - generic [ref=e221]:
+                - img [ref=e222]
+                - paragraph [ref=e225]: 媒體行為觀察
+              - heading "4/15 - 5/14" [level=2] [ref=e226]
+            - generic [ref=e227]: 30 天
+          - generic [ref=e228]:
+            - article [ref=e229]:
+              - generic [ref=e230]:
+                - heading "密集發稿分析" [level=3] [ref=e231]
+                - img [ref=e232]
+              - generic [ref=e234]:
+                - generic [ref=e235]:
+                  - generic [ref=e236]:
+                    - generic [ref=e237]:
+                      - generic [ref=e238]: 自
+                      - generic [ref=e239]: 自由時報
+                    - generic [ref=e240]: 8.9 篇 / 發稿日
+                  - generic [ref=e272]:
+                    - generic [ref=e273]: 5/8 - 5/14
+                    - generic [ref=e274]: 總量 62
+                    - generic [ref=e275]: 單日高點 19
+                - generic [ref=e276]:
+                  - generic [ref=e277]:
+                    - generic [ref=e278]:
+                      - generic [ref=e279]: E
+                      - generic [ref=e280]: ETtoday
+                    - generic [ref=e281]: 8.3 篇 / 發稿日
+                  - generic [ref=e313]:
+                    - generic [ref=e314]: 5/8 - 5/14
+                    - generic [ref=e315]: 總量 58
+                    - generic [ref=e316]: 單日高點 21
+                - generic [ref=e317]:
+                  - generic [ref=e318]:
+                    - generic [ref=e319]:
+                      - generic [ref=e320]: T
+                      - generic [ref=e321]: TVBS
+                    - generic [ref=e322]: 7.7 篇 / 發稿日
+                  - generic [ref=e354]:
+                    - generic [ref=e355]: 5/8 - 5/14
+                    - generic [ref=e356]: 總量 54
+                    - generic [ref=e357]: 單日高點 13
+            - article [ref=e359]:
+              - generic [ref=e360]:
+                - heading "消息來源結構" [level=3] [ref=e361]
+                - img [ref=e362]
+              - generic [ref=e366]: 待資料標籤
+              - generic [ref=e367]:
+                - generic [ref=e368]:
+                  - generic [ref=e369]: 自由時報
+                  - generic [ref=e372]: "62"
+                - generic [ref=e373]:
+                  - generic [ref=e374]: ETtoday
+                  - generic [ref=e377]: "58"
+                - generic [ref=e378]:
+                  - generic [ref=e379]: TVBS
+                  - generic [ref=e382]: "54"
+                - generic [ref=e383]:
+                  - generic [ref=e384]: 東森
+                  - generic [ref=e387]: "20"
+                - generic [ref=e388]:
+                  - generic [ref=e389]: 中央社
+                  - generic [ref=e392]: "13"
+        - generic [ref=e393]:
+          - generic [ref=e395]:
+            - generic [ref=e396]:
+              - button "新聞" [pressed] [ref=e397]:
+                - img [ref=e398]
+                - text: 新聞
+              - button "公開數據/文件" [ref=e401]:
+                - img [ref=e402]
+                - text: 公開數據/文件
+            - generic [ref=e405]: 220 篇新聞
+          - generic [ref=e406]:
+            - article [ref=e407]:
+              - link "自由時報 05/14 14:11 酒駕毒駕／車禍傷亡 台中921公車司機內急下車 公車竟「自行起步」滑行撞路燈 台中市921公車今（14）日下午4時8分許，沿豐原區豐勢路往豐陽路方向行駛，於豐原轉運站停靠之際，45歲田姓男司機內急下車如廁，疑因車輛未確實停妥，致車輛向前滑行，撞上路旁禁制...… 原文" [ref=e408] [cursor=pointer]:
+                - /url: https://news.ltn.com.tw/news/society/breakingnews/5437363
+                - generic [ref=e409]:
+                  - paragraph [ref=e410]: 自由時報
+                  - generic [ref=e411]:
+                    - img [ref=e412]
+                    - text: 05/14 14:11
+                - generic [ref=e417]: 酒駕毒駕／車禍傷亡
+                - heading "台中921公車司機內急下車 公車竟「自行起步」滑行撞路燈" [level=2] [ref=e418]
+                - paragraph [ref=e419]: 台中市921公車今（14）日下午4時8分許，沿豐原區豐勢路往豐陽路方向行駛，於豐原轉運站停靠之際，45歲田姓男司機內急下車如廁，疑因車輛未確實停妥，致車輛向前滑行，撞上路旁禁制...…
+                - generic [ref=e420]:
+                  - text: 原文
+                  - img [ref=e421]
+              - generic [ref=e425]:
+                - generic [ref=e426]:
+                  - button "🔥 憤怒" [ref=e427]:
+                    - generic [ref=e428]: 🔥
+                    - generic [ref=e429]: 憤怒
+                  - button "🌀 無力" [ref=e430]:
+                    - generic [ref=e431]: 🌀
+                    - generic [ref=e432]: 無力
+                  - button "⚡ 擔憂" [ref=e433]:
+                    - generic [ref=e434]: ⚡
+                    - generic [ref=e435]: 擔憂
+                  - button "❓ 荒謬" [ref=e436]:
+                    - generic [ref=e437]: ❓
+                    - generic [ref=e438]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e439]:
+                    - generic [ref=e440]: 🕳️
+                    - generic [ref=e441]: 放它爛
+                - button "爆打沙袋 0" [ref=e442]:
+                  - generic [ref=e443]:
+                    - img [ref=e445]
+                    - generic [ref=e447]: 爆打沙袋
+                  - generic [ref=e449]: "0"
+            - article [ref=e450]:
+              - link "自由時報 05/14 14:10 酒駕毒駕／車禍傷亡 曳引車開進彰師大旁巷道輾斃行人 警方：加強取締大型車違規 彰化市國立彰化師範大學旁的進德路與學士街口，本月11日發生1起死亡車禍，1輛曳引車轉入學士街時，突然輾過1名行人，該名行人送醫後仍因傷重宣告不治，司機被依過失致死罪嫌移送法辦；...… 原文" [ref=e451] [cursor=pointer]:
+                - /url: https://news.ltn.com.tw/news/society/breakingnews/5437384
+                - generic [ref=e452]:
+                  - paragraph [ref=e453]: 自由時報
+                  - generic [ref=e454]:
+                    - img [ref=e455]
+                    - text: 05/14 14:10
+                - generic [ref=e460]: 酒駕毒駕／車禍傷亡
+                - heading "曳引車開進彰師大旁巷道輾斃行人 警方：加強取締大型車違規" [level=2] [ref=e461]
+                - paragraph [ref=e462]: 彰化市國立彰化師範大學旁的進德路與學士街口，本月11日發生1起死亡車禍，1輛曳引車轉入學士街時，突然輾過1名行人，該名行人送醫後仍因傷重宣告不治，司機被依過失致死罪嫌移送法辦；...…
+                - generic [ref=e463]:
+                  - text: 原文
+                  - img [ref=e464]
+              - generic [ref=e468]:
+                - generic [ref=e469]:
+                  - button "🔥 憤怒" [ref=e470]:
+                    - generic [ref=e471]: 🔥
+                    - generic [ref=e472]: 憤怒
+                  - button "🌀 無力" [ref=e473]:
+                    - generic [ref=e474]: 🌀
+                    - generic [ref=e475]: 無力
+                  - button "⚡ 擔憂" [ref=e476]:
+                    - generic [ref=e477]: ⚡
+                    - generic [ref=e478]: 擔憂
+                  - button "❓ 荒謬" [ref=e479]:
+                    - generic [ref=e480]: ❓
+                    - generic [ref=e481]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e482]:
+                    - generic [ref=e483]: 🕳️
+                    - generic [ref=e484]: 放它爛
+                - button "爆打沙袋 0" [ref=e485]:
+                  - generic [ref=e486]:
+                    - img [ref=e488]
+                    - generic [ref=e490]: 爆打沙袋
+                  - generic [ref=e492]: "0"
+            - article [ref=e493]:
+              - link "ETtoday 05/14 13:33 酒駕毒駕／車禍傷亡 彰師大學區「行人地獄」 女遭拖板車拖行2米慘死 彰化市進德路二巷與學士街口日前發生一起死亡車禍，66歲翁姓女子疑似因視線死角與內輪差，遭拖板車輾過拖行，當場失去呼吸心跳，送醫後不治。由於事發地點緊鄰彰師大校園及高中，是學生上下學必經之路，校方同時在官網提醒學生出入務必注意安全，相關號誌及標線劃設警方已會同交通處及公所等權責單位實施會勘，警方將就大型車違法持續加強取締。 《詳全文...》 原文" [ref=e494] [cursor=pointer]:
+                - /url: https://www.ettoday.net/news/20260514/3166110.htm
+                - generic [ref=e495]:
+                  - paragraph [ref=e496]: ETtoday
+                  - generic [ref=e497]:
+                    - img [ref=e498]
+                    - text: 05/14 13:33
+                - generic [ref=e503]: 酒駕毒駕／車禍傷亡
+                - heading "彰師大學區「行人地獄」 女遭拖板車拖行2米慘死" [level=2] [ref=e504]
+                - paragraph [ref=e505]: 彰化市進德路二巷與學士街口日前發生一起死亡車禍，66歲翁姓女子疑似因視線死角與內輪差，遭拖板車輾過拖行，當場失去呼吸心跳，送醫後不治。由於事發地點緊鄰彰師大校園及高中，是學生上下學必經之路，校方同時在官網提醒學生出入務必注意安全，相關號誌及標線劃設警方已會同交通處及公所等權責單位實施會勘，警方將就大型車違法持續加強取締。 《詳全文...》
+                - generic [ref=e506]:
+                  - text: 原文
+                  - img [ref=e507]
+              - generic [ref=e511]:
+                - generic [ref=e512]:
+                  - button "🔥 憤怒" [ref=e513]:
+                    - generic [ref=e514]: 🔥
+                    - generic [ref=e515]: 憤怒
+                  - button "🌀 無力" [ref=e516]:
+                    - generic [ref=e517]: 🌀
+                    - generic [ref=e518]: 無力
+                  - button "⚡ 擔憂" [ref=e519]:
+                    - generic [ref=e520]: ⚡
+                    - generic [ref=e521]: 擔憂
+                  - button "❓ 荒謬" [ref=e522]:
+                    - generic [ref=e523]: ❓
+                    - generic [ref=e524]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e525]:
+                    - generic [ref=e526]: 🕳️
+                    - generic [ref=e527]: 放它爛
+                - button "爆打沙袋 0" [ref=e528]:
+                  - generic [ref=e529]:
+                    - img [ref=e531]
+                    - generic [ref=e533]: 爆打沙袋
+                  - generic [ref=e535]: "0"
+            - article [ref=e536]:
+              - link "newtalk 05/14 12:45 酒駕毒駕／車禍傷亡 新北三重特斯拉自撞傢俱行 駕駛輕傷送醫 新北市三重區新北大道2段14日傍晚有民眾駕駛一輛特斯拉電動車，疑因精神不濟，意外撞上傢俱行，車頭嚴重毀損，幸未殃及旁人，僅駕駛輕傷送醫。（翻攝畫面）中央社記者曹亞沿傳真 115年5月14日 Newtalk新聞 （中央社記者曹亞沿新北14日電）新北市三重區新北大道二段今天傍晚一輛特斯拉駕駛疑精神不濟，恍神右偏撞上前方傢俱行，幸無波及到店內人員。駕駛無酒駕，臉部輕傷送醫，肇事原因待進一步釐清。新北市警察局三重分局獲報，今天傍晚5時許三重區新北大道二段與中興北街路口，一輛電動車自撞傢俱行，車頭嚴重毀損，店家玻璃 延伸閱讀： 健保撒31億救思覺失調！長效針劑讓住院天數狂降25天 黃金治療期大公開 醫美針孔偷拍案！高市衛生局開第一槍 愛爾麗2分店停業6個月 中國劃出中美關係四條紅線！石明謹酸：剛好都是中國沒有的東西 「川習會」暗藏危機 洪智坤警告：台灣恐淪美中「共管框架」 森崴能源下市倒數今跌停、集團股也一片倒 傳郭台強找金主救火 原文" [ref=e537] [cursor=pointer]:
+                - /url: https://newtalk.tw/news/view/2026-05-14/1035221
+                - generic [ref=e538]:
+                  - paragraph [ref=e539]: newtalk
+                  - generic [ref=e540]:
+                    - img [ref=e541]
+                    - text: 05/14 12:45
+                - generic [ref=e546]: 酒駕毒駕／車禍傷亡
+                - heading "新北三重特斯拉自撞傢俱行 駕駛輕傷送醫" [level=2] [ref=e547]
+                - paragraph [ref=e548]: 新北市三重區新北大道2段14日傍晚有民眾駕駛一輛特斯拉電動車，疑因精神不濟，意外撞上傢俱行，車頭嚴重毀損，幸未殃及旁人，僅駕駛輕傷送醫。（翻攝畫面）中央社記者曹亞沿傳真 115年5月14日 Newtalk新聞 （中央社記者曹亞沿新北14日電）新北市三重區新北大道二段今天傍晚一輛特斯拉駕駛疑精神不濟，恍神右偏撞上前方傢俱行，幸無波及到店內人員。駕駛無酒駕，臉部輕傷送醫，肇事原因待進一步釐清。新北市警察局三重分局獲報，今天傍晚5時許三重區新北大道二段與中興北街路口，一輛電動車自撞傢俱行，車頭嚴重毀損，店家玻璃 延伸閱讀： 健保撒31億救思覺失調！長效針劑讓住院天數狂降25天 黃金治療期大公開 醫美針孔偷拍案！高市衛生局開第一槍 愛爾麗2分店停業6個月 中國劃出中美關係四條紅線！石明謹酸：剛好都是中國沒有的東西 「川習會」暗藏危機 洪智坤警告：台灣恐淪美中「共管框架」 森崴能源下市倒數今跌停、集團股也一片倒 傳郭台強找金主救火
+                - generic [ref=e549]:
+                  - text: 原文
+                  - img [ref=e550]
+              - generic [ref=e554]:
+                - generic [ref=e555]:
+                  - button "🔥 憤怒" [ref=e556]:
+                    - generic [ref=e557]: 🔥
+                    - generic [ref=e558]: 憤怒
+                  - button "🌀 無力" [ref=e559]:
+                    - generic [ref=e560]: 🌀
+                    - generic [ref=e561]: 無力
+                  - button "⚡ 擔憂" [ref=e562]:
+                    - generic [ref=e563]: ⚡
+                    - generic [ref=e564]: 擔憂
+                  - button "❓ 荒謬" [ref=e565]:
+                    - generic [ref=e566]: ❓
+                    - generic [ref=e567]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e568]:
+                    - generic [ref=e569]: 🕳️
+                    - generic [ref=e570]: 放它爛
+                - button "爆打沙袋 0" [ref=e571]:
+                  - generic [ref=e572]:
+                    - img [ref=e574]
+                    - generic [ref=e576]: 爆打沙袋
+                  - generic [ref=e578]: "0"
+            - article [ref=e579]:
+              - link "pts 05/14 11:39 酒駕毒駕／車禍傷亡 毒駕唾液快篩法規不明確 警政署下令可依現行犯逮捕 原文" [ref=e580] [cursor=pointer]:
+                - /url: https://news.pts.org.tw/article/808372
+                - generic [ref=e581]:
+                  - paragraph [ref=e582]: pts
+                  - generic [ref=e583]:
+                    - img [ref=e584]
+                    - text: 05/14 11:39
+                - generic [ref=e589]: 酒駕毒駕／車禍傷亡
+                - heading "毒駕唾液快篩法規不明確 警政署下令可依現行犯逮捕" [level=2] [ref=e590]
+                - generic [ref=e591]:
+                  - text: 原文
+                  - img [ref=e592]
+              - generic [ref=e596]:
+                - generic [ref=e597]:
+                  - button "🔥 憤怒" [ref=e598]:
+                    - generic [ref=e599]: 🔥
+                    - generic [ref=e600]: 憤怒
+                  - button "🌀 無力" [ref=e601]:
+                    - generic [ref=e602]: 🌀
+                    - generic [ref=e603]: 無力
+                  - button "⚡ 擔憂" [ref=e604]:
+                    - generic [ref=e605]: ⚡
+                    - generic [ref=e606]: 擔憂
+                  - button "❓ 荒謬" [ref=e607]:
+                    - generic [ref=e608]: ❓
+                    - generic [ref=e609]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e610]:
+                    - generic [ref=e611]: 🕳️
+                    - generic [ref=e612]: 放它爛
+                - button "爆打沙袋 0" [ref=e613]:
+                  - generic [ref=e614]:
+                    - img [ref=e616]
+                    - generic [ref=e618]: 爆打沙袋
+                  - generic [ref=e620]: "0"
+            - article [ref=e621]:
+              - link "cna 05/14 11:09 酒駕毒駕／車禍傷亡 新北三重特斯拉自撞傢俱行 駕駛輕傷送醫 （中央社記者曹亞沿新北14日電）新北市三重區新北大道二段今天傍晚一輛特斯拉駕駛疑精神不濟，恍神右偏撞上前方傢俱行，幸無波及到店內人員。駕駛無酒駕，臉部輕傷送醫，肇事原因待進一步釐清。 原文" [ref=e622] [cursor=pointer]:
+                - /url: https://www.cna.com.tw/news/asoc/202605140299.aspx
+                - generic [ref=e623]:
+                  - paragraph [ref=e624]: cna
+                  - generic [ref=e625]:
+                    - img [ref=e626]
+                    - text: 05/14 11:09
+                - generic [ref=e631]: 酒駕毒駕／車禍傷亡
+                - heading "新北三重特斯拉自撞傢俱行 駕駛輕傷送醫" [level=2] [ref=e632]
+                - paragraph [ref=e633]: （中央社記者曹亞沿新北14日電）新北市三重區新北大道二段今天傍晚一輛特斯拉駕駛疑精神不濟，恍神右偏撞上前方傢俱行，幸無波及到店內人員。駕駛無酒駕，臉部輕傷送醫，肇事原因待進一步釐清。
+                - generic [ref=e634]:
+                  - text: 原文
+                  - img [ref=e635]
+              - generic [ref=e639]:
+                - generic [ref=e640]:
+                  - button "🔥 憤怒" [ref=e641]:
+                    - generic [ref=e642]: 🔥
+                    - generic [ref=e643]: 憤怒
+                  - button "🌀 無力" [ref=e644]:
+                    - generic [ref=e645]: 🌀
+                    - generic [ref=e646]: 無力
+                  - button "⚡ 擔憂" [ref=e647]:
+                    - generic [ref=e648]: ⚡
+                    - generic [ref=e649]: 擔憂
+                  - button "❓ 荒謬" [ref=e650]:
+                    - generic [ref=e651]: ❓
+                    - generic [ref=e652]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e653]:
+                    - generic [ref=e654]: 🕳️
+                    - generic [ref=e655]: 放它爛
+                - button "爆打沙袋 0" [ref=e656]:
+                  - generic [ref=e657]:
+                    - img [ref=e659]
+                    - generic [ref=e661]: 爆打沙袋
+                  - generic [ref=e663]: "0"
+            - article [ref=e664]:
+              - link "自由時報 05/14 10:46 酒駕毒駕／車禍傷亡 特斯拉衝破新北大道家具行 車頭全毀駕駛受傷稱「恍神」 新北市三重驚傳1輛特斯拉轎車衝入新北大道1間家具行，猛烈撞擊巨響嚇壞店家、路人，警、消到場，赫見車頭因猛烈撞擊全毀，店家門面整片玻璃也遭撞碎，警、消將徐姓駕駛送醫，初步沒有查獲...… 原文" [ref=e665] [cursor=pointer]:
+                - /url: https://news.ltn.com.tw/news/society/breakingnews/5437190
+                - generic [ref=e666]:
+                  - paragraph [ref=e667]: 自由時報
+                  - generic [ref=e668]:
+                    - img [ref=e669]
+                    - text: 05/14 10:46
+                - generic [ref=e674]: 酒駕毒駕／車禍傷亡
+                - heading "特斯拉衝破新北大道家具行 車頭全毀駕駛受傷稱「恍神」" [level=2] [ref=e675]
+                - paragraph [ref=e676]: 新北市三重驚傳1輛特斯拉轎車衝入新北大道1間家具行，猛烈撞擊巨響嚇壞店家、路人，警、消到場，赫見車頭因猛烈撞擊全毀，店家門面整片玻璃也遭撞碎，警、消將徐姓駕駛送醫，初步沒有查獲...…
+                - generic [ref=e677]:
+                  - text: 原文
+                  - img [ref=e678]
+              - generic [ref=e682]:
+                - generic [ref=e683]:
+                  - button "🔥 憤怒" [ref=e684]:
+                    - generic [ref=e685]: 🔥
+                    - generic [ref=e686]: 憤怒
+                  - button "🌀 無力" [ref=e687]:
+                    - generic [ref=e688]: 🌀
+                    - generic [ref=e689]: 無力
+                  - button "⚡ 擔憂" [ref=e690]:
+                    - generic [ref=e691]: ⚡
+                    - generic [ref=e692]: 擔憂
+                  - button "❓ 荒謬" [ref=e693]:
+                    - generic [ref=e694]: ❓
+                    - generic [ref=e695]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e696]:
+                    - generic [ref=e697]: 🕳️
+                    - generic [ref=e698]: 放它爛
+                - button "爆打沙袋 0" [ref=e699]:
+                  - generic [ref=e700]:
+                    - img [ref=e702]
+                    - generic [ref=e704]: 爆打沙袋
+                  - generic [ref=e706]: "0"
+            - article [ref=e707]:
+              - link "ETtoday 05/14 10:23 酒駕毒駕／車禍傷亡 農用車擦撞「駕駛摔出來」慘被自己車輾過 全身骨折命危送醫 花蓮縣警察局玉里分局14日清晨6時許接獲通報，於玉里鎮觀音里發生一起交通事故，造成駕駛農用車的婦人從車上摔落後，遭自駕農用車輾過，造成全身多處骨折當場無生命跡象，所幸經警消緊急送醫救回一命。 《詳全文...》 原文" [ref=e708] [cursor=pointer]:
+                - /url: https://www.ettoday.net/news/20260514/3166061.htm
+                - generic [ref=e709]:
+                  - paragraph [ref=e710]: ETtoday
+                  - generic [ref=e711]:
+                    - img [ref=e712]
+                    - text: 05/14 10:23
+                - generic [ref=e717]: 酒駕毒駕／車禍傷亡
+                - heading "農用車擦撞「駕駛摔出來」慘被自己車輾過 全身骨折命危送醫" [level=2] [ref=e718]
+                - paragraph [ref=e719]: 花蓮縣警察局玉里分局14日清晨6時許接獲通報，於玉里鎮觀音里發生一起交通事故，造成駕駛農用車的婦人從車上摔落後，遭自駕農用車輾過，造成全身多處骨折當場無生命跡象，所幸經警消緊急送醫救回一命。 《詳全文...》
+                - generic [ref=e720]:
+                  - text: 原文
+                  - img [ref=e721]
+              - generic [ref=e725]:
+                - generic [ref=e726]:
+                  - button "🔥 憤怒" [ref=e727]:
+                    - generic [ref=e728]: 🔥
+                    - generic [ref=e729]: 憤怒
+                  - button "🌀 無力" [ref=e730]:
+                    - generic [ref=e731]: 🌀
+                    - generic [ref=e732]: 無力
+                  - button "⚡ 擔憂" [ref=e733]:
+                    - generic [ref=e734]: ⚡
+                    - generic [ref=e735]: 擔憂
+                  - button "❓ 荒謬" [ref=e736]:
+                    - generic [ref=e737]: ❓
+                    - generic [ref=e738]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e739]:
+                    - generic [ref=e740]: 🕳️
+                    - generic [ref=e741]: 放它爛
+                - button "爆打沙袋 0" [ref=e742]:
+                  - generic [ref=e743]:
+                    - img [ref=e745]
+                    - generic [ref=e747]: 爆打沙袋
+                  - generic [ref=e749]: "0"
+            - article [ref=e750]:
+              - link "TVBS 05/14 09:54 酒駕毒駕／車禍傷亡 影音／淡江大橋號誌惹議！駕駛下車拍照回報 綠燈5秒「慘闖紅燈」 原文" [ref=e751] [cursor=pointer]:
+                - /url: https://news.tvbs.com.tw/local/3204251
+                - generic [ref=e752]:
+                  - paragraph [ref=e753]: TVBS
+                  - generic [ref=e754]:
+                    - img [ref=e755]
+                    - text: 05/14 09:54
+                - generic [ref=e760]: 酒駕毒駕／車禍傷亡
+                - heading "影音／淡江大橋號誌惹議！駕駛下車拍照回報 綠燈5秒「慘闖紅燈」" [level=2] [ref=e761]
+                - generic [ref=e762]:
+                  - text: 原文
+                  - img [ref=e763]
+              - generic [ref=e767]:
+                - generic [ref=e768]:
+                  - button "🔥 憤怒" [ref=e769]:
+                    - generic [ref=e770]: 🔥
+                    - generic [ref=e771]: 憤怒
+                  - button "🌀 無力" [ref=e772]:
+                    - generic [ref=e773]: 🌀
+                    - generic [ref=e774]: 無力
+                  - button "⚡ 擔憂" [ref=e775]:
+                    - generic [ref=e776]: ⚡
+                    - generic [ref=e777]: 擔憂
+                  - button "❓ 荒謬" [ref=e778]:
+                    - generic [ref=e779]: ❓
+                    - generic [ref=e780]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e781]:
+                    - generic [ref=e782]: 🕳️
+                    - generic [ref=e783]: 放它爛
+                - button "爆打沙袋 0" [ref=e784]:
+                  - generic [ref=e785]:
+                    - img [ref=e787]
+                    - generic [ref=e789]: 爆打沙袋
+                  - generic [ref=e791]: "0"
+            - article [ref=e792]:
+              - link "TVBS 05/14 09:47 酒駕毒駕／車禍傷亡 快訊／新北男開特斯拉暴衝撞進三重傢俱行 店員嚇傻急逃 原文" [ref=e793] [cursor=pointer]:
+                - /url: https://news.tvbs.com.tw/local/3204241
+                - generic [ref=e794]:
+                  - paragraph [ref=e795]: TVBS
+                  - generic [ref=e796]:
+                    - img [ref=e797]
+                    - text: 05/14 09:47
+                - generic [ref=e802]: 酒駕毒駕／車禍傷亡
+                - heading "快訊／新北男開特斯拉暴衝撞進三重傢俱行 店員嚇傻急逃" [level=2] [ref=e803]
+                - generic [ref=e804]:
+                  - text: 原文
+                  - img [ref=e805]
+              - generic [ref=e809]:
+                - generic [ref=e810]:
+                  - button "🔥 憤怒" [ref=e811]:
+                    - generic [ref=e812]: 🔥
+                    - generic [ref=e813]: 憤怒
+                  - button "🌀 無力" [ref=e814]:
+                    - generic [ref=e815]: 🌀
+                    - generic [ref=e816]: 無力
+                  - button "⚡ 擔憂" [ref=e817]:
+                    - generic [ref=e818]: ⚡
+                    - generic [ref=e819]: 擔憂
+                  - button "❓ 荒謬" [ref=e820]:
+                    - generic [ref=e821]: ❓
+                    - generic [ref=e822]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e823]:
+                    - generic [ref=e824]: 🕳️
+                    - generic [ref=e825]: 放它爛
+                - button "爆打沙袋 0" [ref=e826]:
+                  - generic [ref=e827]:
+                    - img [ref=e829]
+                    - generic [ref=e831]: 爆打沙袋
+                  - generic [ref=e833]: "0"
+            - article [ref=e834]:
+              - link "TVBS 05/14 09:37 酒駕毒駕／車禍傷亡 桃園路口連爆4車禍！16歲高中生遭撞側翻 今年違規暴增2189件 原文" [ref=e835] [cursor=pointer]:
+                - /url: https://news.tvbs.com.tw/local/3204226
+                - generic [ref=e836]:
+                  - paragraph [ref=e837]: TVBS
+                  - generic [ref=e838]:
+                    - img [ref=e839]
+                    - text: 05/14 09:37
+                - generic [ref=e844]: 酒駕毒駕／車禍傷亡
+                - heading "桃園路口連爆4車禍！16歲高中生遭撞側翻 今年違規暴增2189件" [level=2] [ref=e845]
+                - generic [ref=e846]:
+                  - text: 原文
+                  - img [ref=e847]
+              - generic [ref=e851]:
+                - generic [ref=e852]:
+                  - button "🔥 憤怒" [ref=e853]:
+                    - generic [ref=e854]: 🔥
+                    - generic [ref=e855]: 憤怒
+                  - button "🌀 無力" [ref=e856]:
+                    - generic [ref=e857]: 🌀
+                    - generic [ref=e858]: 無力
+                  - button "⚡ 擔憂" [ref=e859]:
+                    - generic [ref=e860]: ⚡
+                    - generic [ref=e861]: 擔憂
+                  - button "❓ 荒謬" [ref=e862]:
+                    - generic [ref=e863]: ❓
+                    - generic [ref=e864]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e865]:
+                    - generic [ref=e866]: 🕳️
+                    - generic [ref=e867]: 放它爛
+                - button "爆打沙袋 0" [ref=e868]:
+                  - generic [ref=e869]:
+                    - img [ref=e871]
+                    - generic [ref=e873]: 爆打沙袋
+                  - generic [ref=e875]: "0"
+            - article [ref=e876]:
+              - link "TVBS 05/14 08:58 酒駕毒駕／車禍傷亡 影音／路口猛撞摔車！花蓮婦被「自家搬運車」輾過昏迷命危 原文" [ref=e877] [cursor=pointer]:
+                - /url: https://news.tvbs.com.tw/local/3204168
+                - generic [ref=e878]:
+                  - paragraph [ref=e879]: TVBS
+                  - generic [ref=e880]:
+                    - img [ref=e881]
+                    - text: 05/14 08:58
+                - generic [ref=e886]: 酒駕毒駕／車禍傷亡
+                - heading "影音／路口猛撞摔車！花蓮婦被「自家搬運車」輾過昏迷命危" [level=2] [ref=e887]
+                - generic [ref=e888]:
+                  - text: 原文
+                  - img [ref=e889]
+              - generic [ref=e893]:
+                - generic [ref=e894]:
+                  - button "🔥 憤怒" [ref=e895]:
+                    - generic [ref=e896]: 🔥
+                    - generic [ref=e897]: 憤怒
+                  - button "🌀 無力" [ref=e898]:
+                    - generic [ref=e899]: 🌀
+                    - generic [ref=e900]: 無力
+                  - button "⚡ 擔憂" [ref=e901]:
+                    - generic [ref=e902]: ⚡
+                    - generic [ref=e903]: 擔憂
+                  - button "❓ 荒謬" [ref=e904]:
+                    - generic [ref=e905]: ❓
+                    - generic [ref=e906]: 荒謬
+                  - button "🕳️ 放它爛" [ref=e907]:
+                    - generic [ref=e908]: 🕳️
+                    - generic [ref=e909]: 放它爛
+                - button "爆打沙袋 0" [ref=e910]:
+                  - generic [ref=e911]:
+                    - img [ref=e913]
+                    - generic [ref=e915]: 爆打沙袋
+                  - generic [ref=e917]: "0"
+          - button "Load more" [ref=e922]
+    - navigation "主要分類" [ref=e923]:
+      - link "財經" [ref=e924] [cursor=pointer]:
+        - /url: /
+        - img [ref=e925]
+        - generic [ref=e930]: 財經
+      - link "名人動態" [ref=e931] [cursor=pointer]:
+        - /url: /celebrities
+        - img [ref=e932]
+        - generic [ref=e935]: 名人動態
+      - link "社會" [ref=e936] [cursor=pointer]:
+        - /url: /?category=society
+        - img [ref=e937]
+        - generic [ref=e939]: 社會
+      - link "政治" [ref=e940] [cursor=pointer]:
+        - /url: /?category=politics
+        - img [ref=e941]
+        - generic [ref=e943]: 政治
+      - link "娛樂" [ref=e944] [cursor=pointer]:
+        - /url: /?category=entertainment
+        - img [ref=e945]
+        - generic [ref=e950]: 娛樂
+    - navigation "議題導覽" [ref=e951]:
+      - generic [ref=e952]:
+        - link "酒駕毒駕／車禍傷亡 220" [ref=e953] [cursor=pointer]:
+          - /url: /?category=society&topic=drunk_driving_accident
+          - img [ref=e954]
+          - generic [ref=e958]: 酒駕毒駕／車禍傷亡
+          - generic [ref=e959]: "220"
+        - link "詐騙 101" [ref=e960] [cursor=pointer]:
+          - /url: /?category=society&topic=fraud
+          - img [ref=e961]
+          - generic [ref=e963]: 詐騙
+          - generic [ref=e964]: "101"
+        - link "少子化 7" [ref=e965] [cursor=pointer]:
+          - /url: /?category=society&topic=low_birthrate
+          - img [ref=e966]
+          - generic [ref=e969]: 少子化
+          - generic [ref=e970]: "7"
+        - link "司法量刑不公 43" [ref=e971] [cursor=pointer]:
+          - /url: /?category=society&topic=judicial_injustice
+          - img [ref=e972]
+          - generic [ref=e976]: 司法量刑不公
+          - generic [ref=e977]: "43"
+        - link "醫護過勞／醫療崩潰 9" [ref=e978] [cursor=pointer]:
+          - /url: /?category=society&topic=healthcare_burden
+          - img [ref=e979]
+          - generic [ref=e983]: 醫護過勞／醫療崩潰
+          - generic [ref=e984]: "9"
+        - link "高房價／居住正義 4" [ref=e985] [cursor=pointer]:
+          - /url: /?category=society&topic=housing_justice
+          - img [ref=e986]
+          - generic [ref=e989]: 高房價／居住正義
+          - generic [ref=e990]: "4"
+        - link "新興毒品／校園毒品 8" [ref=e991] [cursor=pointer]:
+          - /url: /?category=society&topic=drug_abuse
+          - img [ref=e992]
+          - generic [ref=e995]: 新興毒品／校園毒品
+          - generic [ref=e996]: "8"
+  - button "Open Next.js Dev Tools" [ref=e1002] [cursor=pointer]:
+    - img [ref=e1003]

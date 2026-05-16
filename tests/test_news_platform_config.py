@@ -17,6 +17,9 @@ class NewsPlatformConfigTests(unittest.TestCase):
                     [
                         "NEWSPF_MYSQL_PUBLIC_RECORD_TABLE=t_custom_records",
                         "NEWSPF_MYSQL_ARTICLE_RECORD_LINK_TABLE=t_custom_links",
+                        "NEWSPF_MYSQL_AUTHOR_TABLE=t_custom_authors",
+                        "NEWSPF_MYSQL_ARTICLE_AUTHOR_TABLE=t_custom_article_authors",
+                        "NEWSPF_MYSQL_AUTHOR_COVERAGE_DAILY_TABLE=t_custom_author_coverage",
                     ]
                 ),
                 encoding="utf-8",
@@ -24,6 +27,9 @@ class NewsPlatformConfigTests(unittest.TestCase):
             keys = [
                 "NEWSPF_MYSQL_PUBLIC_RECORD_TABLE",
                 "NEWSPF_MYSQL_ARTICLE_RECORD_LINK_TABLE",
+                "NEWSPF_MYSQL_AUTHOR_TABLE",
+                "NEWSPF_MYSQL_ARTICLE_AUTHOR_TABLE",
+                "NEWSPF_MYSQL_AUTHOR_COVERAGE_DAILY_TABLE",
             ]
             old = {key: os.environ.get(key) for key in keys}
             for key in keys:
@@ -39,6 +45,9 @@ class NewsPlatformConfigTests(unittest.TestCase):
 
         self.assertEqual(settings.mysql_public_record_table, "t_custom_records")
         self.assertEqual(settings.mysql_article_record_link_table, "t_custom_links")
+        self.assertEqual(settings.mysql_author_table, "t_custom_authors")
+        self.assertEqual(settings.mysql_article_author_table, "t_custom_article_authors")
+        self.assertEqual(settings.mysql_author_coverage_daily_table, "t_custom_author_coverage")
 
     def test_public_record_table_names_have_defaults(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -47,6 +56,9 @@ class NewsPlatformConfigTests(unittest.TestCase):
             keys = [
                 "NEWSPF_MYSQL_PUBLIC_RECORD_TABLE",
                 "NEWSPF_MYSQL_ARTICLE_RECORD_LINK_TABLE",
+                "NEWSPF_MYSQL_AUTHOR_TABLE",
+                "NEWSPF_MYSQL_ARTICLE_AUTHOR_TABLE",
+                "NEWSPF_MYSQL_AUTHOR_COVERAGE_DAILY_TABLE",
             ]
             old = {key: os.environ.get(key) for key in keys}
             for key in keys:
@@ -65,6 +77,9 @@ class NewsPlatformConfigTests(unittest.TestCase):
             settings.mysql_article_record_link_table,
             "t_news_article_public_record_links",
         )
+        self.assertEqual(settings.mysql_author_table, "t_news_authors")
+        self.assertEqual(settings.mysql_article_author_table, "t_news_article_authors")
+        self.assertEqual(settings.mysql_author_coverage_daily_table, "t_news_author_coverage_daily")
 
 
 if __name__ == "__main__":

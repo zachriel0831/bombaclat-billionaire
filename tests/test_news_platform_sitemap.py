@@ -90,6 +90,25 @@ class GoogleNewsSitemapTests(unittest.TestCase):
         for art in articles:
             self.assertIsNotNone(art.published_at)
 
+    def test_extracts_optional_author_metadata(self):
+        feed = """<?xml version="1.0" encoding="UTF-8" ?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+  <url><loc>https://news.tvbs.com.tw/local/author</loc>
+    <news:news>
+      <news:publication><news:name>TVBS新聞網</news:name><news:language>zh-tw</news:language></news:publication>
+      <news:publication_date>2026-05-08T22:22:58+08:00</news:publication_date>
+      <news:title>作者測試</news:title>
+      <news:author>記者王小明／台北報導</news:author>
+    </news:news>
+  </url>
+</urlset>
+"""
+        articles = _make().parse(feed)
+        self.assertEqual(articles[0].authors, ["王小明"])
+        self.assertEqual(articles[0].raw["author_values"], ["記者王小明／台北報導"])
+        self.assertEqual(articles[0].raw["publication_name"], "TVBS新聞網")
+
     def test_drops_old_entries(self):
         old_iso = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
         recent_iso = datetime.now(timezone.utc).isoformat()

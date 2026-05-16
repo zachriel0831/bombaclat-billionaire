@@ -412,7 +412,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertTrue(result.extras["has_structured"])
 
     def test_stage4_pre_open_prompt_uses_readable_sections(self) -> None:
-        _system, user_prompt = stage4_synthesis.build_prompts(
+        system_prompt, user_prompt = stage4_synthesis.build_prompts(
             slot="pre_tw_open",
             now_local_iso="2026-04-30T08:00:00+08:00",
             stage1_json="{}",
@@ -431,6 +431,9 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("Section 2 利率與流動性", user_prompt)
         self.assertIn("Stage0 core tensions JSON", user_prompt)
         self.assertIn("date-only", user_prompt)
+        self.assertIn("professional-but-conversational macro-commentary voice", system_prompt)
+        self.assertIn("市場現在在交易的是", user_prompt)
+        self.assertIn("Avoid acronym piles", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
 
     def test_stage4_falls_back_to_text_when_schema_fails(self) -> None:

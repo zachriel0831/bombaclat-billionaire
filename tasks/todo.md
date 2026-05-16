@@ -4,29 +4,33 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Add Taiwan finance RSS feeds to relay-event ingestion.
+- Task: Fix market-analysis provider switch from OpenAI to Anthropic.
 - Requested by: user
-- Start date: 2026-05-11
-- Scope: Active `news_collector` RSS feed config, relay-event source mapping docs, service restart, and storage verification.
+- Start date: 2026-05-16
+- Scope: model router ordering, runtime LLM failover, tests, and verification.
 
 ## Plan
-- [x] Confirm finance news storage boundary is `t_relay_events`.
-- [x] Verify Taiwan finance RSS feeds are current and parseable.
-- [x] Add active Taiwan finance feeds to `.env`.
-- [x] Update docs and decision notes.
-- [x] Restart bridge and verify rows enter `t_relay_events`.
+- [x] Record the task before implementation.
+- [x] Inspect current market-analysis provider selection and scheduled failure.
+- [x] Make router honor the preferred provider before default alternatives.
+- [x] Add runtime failover from OpenAI provider errors to Anthropic.
+- [x] Update focused tests for startup routing and runtime failover.
+- [x] Run focused tests and readiness validation.
 
 ## Progress Notes
-- 2026-05-11: Finance/news source facts belong in `t_relay_events`; `news_platform` stays society/politics only.
-- 2026-05-11: Verified live parse for CNA finance, LTN business, and ETtoday finance RSS; bridge topic/date filters accept all three latest items.
-- 2026-05-11: Restarted `news_collector.relay_bridge`; latest log shows all three Taiwan finance feeds parsed and stored.
+- 2026-05-16: `NewsCollector-MarketAnalysis-UsClose` ran at 05:00 but returned task result 1.
+- 2026-05-16: Manual reproduction showed OpenAI `429 insufficient_quota`; Anthropic manual run succeeded after disabling the router.
+- 2026-05-16: Current router can put OpenAI before a preferred Anthropic provider when no explicit `MARKET_ANALYSIS_PROVIDER_ORDER` exists.
+- 2026-05-16: Added runtime failover so retryable OpenAI provider errors rerun the same analysis with Anthropic when an Anthropic key is configured.
+- 2026-05-16: `.env` now enables the market-analysis router with provider order `openai,anthropic` and runtime failover enabled.
 
 ## Verification
-- [x] RSS smoke fetch returns Taiwan finance items.
-- [x] Bridge restart sees new `.env` and stores/duplicates RSS rows.
-- [x] DB query confirms recent Taiwan finance RSS rows in `t_relay_events`.
+- [x] `python -m py_compile src/event_relay/llm_quota_router.py src/event_relay/market_analysis.py`
+- [x] `$env:PYTHONPATH='src'; python -m unittest tests.test_llm_quota_router tests.test_market_analysis -v`
+- [x] `python scripts/validate_readiness.py`
+- [x] Sanitized config check shows provider `openai`, model `gpt-5`, router enabled, provider order `openai,anthropic`.
 
 ## Review Summary
-- Outcome: complete
-- Evidence: `python -m news_collector.main fetch --source rss --limit 1 --title-url-only --pretty --log-level WARNING` returned CNA/LTN/ETtoday finance items; `python -m unittest tests.test_config tests.test_rss_source tests.test_relay_bridge` passed 12 tests; bridge log `source-bridge-20260511-120622.out.log` shows 15 RSS fetched and three Taiwan finance rows stored; DB query confirmed ids `79193`, `79194`, and `79195` in `t_relay_events`.
-- Open risks: `OFFICIAL_RSS_FIRST_PER_FEED=true` means each poll only takes the newest item per feed unless changed.
+- Outcome: complete.
+- Evidence: syntax check passed; 46 focused tests passed; readiness validation passed; sanitized config check selected OpenAI primary with Anthropic ordered fallback.
+- Open risks: Weekly summary has its own provider path and is not covered by this market-analysis-specific change.

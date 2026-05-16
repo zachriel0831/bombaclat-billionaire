@@ -25,6 +25,7 @@ class NewsArticleTests(unittest.TestCase):
         self.assertEqual(data["country"], "TW")
         self.assertEqual(data["category"], "society")
         self.assertEqual(data["published_at"], "2026-05-08T12:00:00+00:00")
+        self.assertEqual(data["authors"], [])
         self.assertEqual(data["tags"], ["社會"])
 
     def test_to_dict_handles_none_published(self):
@@ -40,8 +41,23 @@ class NewsArticleTests(unittest.TestCase):
         )
         data = article.to_dict()
         self.assertIsNone(data["published_at"])
+        self.assertEqual(data["authors"], [])
         self.assertEqual(data["tags"], [])
         self.assertEqual(data["raw"], {})
+
+    def test_to_dict_includes_authors(self):
+        article = NewsArticle(
+            article_id="author-1",
+            source_id="ltn",
+            country="TW",
+            category="society",
+            title="t",
+            url="https://example.com/a",
+            published_at=None,
+            summary=None,
+            authors=["張文川"],
+        )
+        self.assertEqual(article.to_dict()["authors"], ["張文川"])
 
 
 if __name__ == "__main__":

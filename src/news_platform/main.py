@@ -19,8 +19,30 @@ from news_platform.config import NewsPlatformSettings, load_settings
 from news_platform.keyword_extractor import KeywordExtractor
 from news_platform.keyword_worker import KeywordWorker
 from news_platform.pipeline import fetch_all, run_once
+from news_platform.public_record_matcher import PublicRecordLinkWorker
 from news_platform.public_record_pipeline import fetch_all_public_records, run_public_records_once
+from news_platform.public_sources.healthcare_public_records import (
+    HealthcareLegislativeBillSource,
+    MohwClinicWorkforceSource,
+    MohwHospitalBedsSource,
+    MohwHospitalWorkforceSource,
+    MohwNursingStaffStatsSource,
+    NhiHospitalBedOccupancySource,
+    NhiHospitalNursingStaffSource,
+)
+from news_platform.public_sources.justice_public_records import (
+    MojProsecutionDispositionStatsSource,
+    MojacDailyCustodyStatsSource,
+)
 from news_platform.public_sources.ly_legislative_bill import LegislativeBillSource
+from news_platform.public_sources.npa_public_records import (
+    NpaDrunkDrivingStatsSource,
+    NpaFraudBlockedDomainStatsSource,
+    NpaFraudEnforcementStatsSource,
+    NpaFraudRumorSource,
+    NpaTrafficAccidentA1Source,
+    NpaTrafficAccidentA2StatsSource,
+)
 from news_platform.registry import FeedSpec, SUPPORTED_TW_CATEGORIES, tw_news_feeds
 from news_platform.sources.base import NewsSource
 from news_platform.sources.ettoday_list import EttodayNewsListSource
@@ -34,6 +56,40 @@ from news_platform.topic_worker import TopicWorker
 
 
 logger = logging.getLogger("news_platform")
+
+DEFAULT_PUBLIC_RECORD_SOURCES = (
+    "ly_bills",
+    "ly_healthcare_bills",
+    "npa_fraud_rumors",
+    "npa_traffic_a1",
+    "npa_traffic_a2_stats",
+    "npa_drunk_driving_stats",
+    "npa_fraud_blocked_domain_stats",
+    "npa_fraud_enforcement_stats",
+    "nhi_hospital_nursing_staff",
+    "nhi_hospital_bed_occupancy",
+    "mohw_hospital_workforce",
+    "mohw_clinic_workforce",
+    "mohw_hospital_beds",
+    "mohw_nursing_staff_stats",
+    "moj_prosecution_disposition_stats",
+    "mojac_daily_custody",
+)
+
+HEALTHCARE_PUBLIC_RECORD_SOURCES = (
+    "ly_healthcare_bills",
+    "nhi_hospital_nursing_staff",
+    "nhi_hospital_bed_occupancy",
+    "mohw_hospital_workforce",
+    "mohw_clinic_workforce",
+    "mohw_hospital_beds",
+    "mohw_nursing_staff_stats",
+)
+
+JUSTICE_PUBLIC_RECORD_SOURCES = (
+    "moj_prosecution_disposition_stats",
+    "mojac_daily_custody",
+)
 
 
 def build_source(spec: FeedSpec, settings: NewsPlatformSettings) -> NewsSource:
@@ -101,7 +157,58 @@ def build_public_record_sources(
                 )
             )
             continue
-        raise ValueError(f"Unsupported public record source: {name}. Supported: ly_bills")
+        if name == "ly_healthcare_bills":
+            sources.append(
+                HealthcareLegislativeBillSource(
+                    timeout_seconds=settings.http_timeout_seconds,
+                    lookback_days=max(lookback_days, 365),
+                )
+            )
+            continue
+        if name == "npa_fraud_rumors":
+            sources.append(NpaFraudRumorSource(timeout_seconds=settings.http_timeout_seconds))
+            continue
+        if name == "npa_traffic_a1":
+            sources.append(NpaTrafficAccidentA1Source(timeout_seconds=settings.http_timeout_seconds))
+            continue
+        if name == "npa_traffic_a2_stats":
+            sources.append(NpaTrafficAccidentA2StatsSource(timeout_seconds=max(settings.http_timeout_seconds, 45)))
+            continue
+        if name == "npa_drunk_driving_stats":
+            sources.append(NpaDrunkDrivingStatsSource(timeout_seconds=settings.http_timeout_seconds))
+            continue
+        if name == "npa_fraud_blocked_domain_stats":
+            sources.append(NpaFraudBlockedDomainStatsSource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
+            continue
+        if name == "npa_fraud_enforcement_stats":
+            sources.append(NpaFraudEnforcementStatsSource(timeout_seconds=settings.http_timeout_seconds))
+            continue
+        if name == "nhi_hospital_nursing_staff":
+            sources.append(NhiHospitalNursingStaffSource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
+            continue
+        if name == "nhi_hospital_bed_occupancy":
+            sources.append(NhiHospitalBedOccupancySource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
+            continue
+        if name == "mohw_hospital_workforce":
+            sources.append(MohwHospitalWorkforceSource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
+            continue
+        if name == "mohw_clinic_workforce":
+            sources.append(MohwClinicWorkforceSource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
+            continue
+        if name == "mohw_hospital_beds":
+            sources.append(MohwHospitalBedsSource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
+            continue
+        if name == "mohw_nursing_staff_stats":
+            sources.append(MohwNursingStaffStatsSource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
+            continue
+        if name == "moj_prosecution_disposition_stats":
+            sources.append(MojProsecutionDispositionStatsSource(timeout_seconds=settings.http_timeout_seconds))
+            continue
+        if name == "mojac_daily_custody":
+            sources.append(MojacDailyCustodyStatsSource(timeout_seconds=settings.http_timeout_seconds))
+            continue
+        supported = ", ".join(DEFAULT_PUBLIC_RECORD_SOURCES)
+        raise ValueError(f"Unsupported public record source: {name}. Supported: {supported}")
     return sources
 
 
@@ -163,14 +270,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Fetch official structured public records and write them to t_public_records.",
     )
     parser.add_argument(
+        "--link-public-records",
+        action="store_true",
+        help="Link recent articles to related public records in t_news_article_public_record_links.",
+    )
+    parser.add_argument(
         "--public-records-smoke",
         action="store_true",
         help="Fetch official structured public records without DB writes.",
     )
     parser.add_argument(
         "--public-sources",
-        default="ly_bills",
-        help="Comma-separated public-record sources. Supported: ly_bills.",
+        default=",".join(DEFAULT_PUBLIC_RECORD_SOURCES),
+        help=(
+            "Comma-separated public-record sources. "
+            f"Supported: {', '.join(DEFAULT_PUBLIC_RECORD_SOURCES)}."
+        ),
     )
     parser.add_argument(
         "--public-record-lookback-days",
@@ -193,6 +308,30 @@ def _build_parser() -> argparse.ArgumentParser:
         "--public-record-to",
         default=None,
         help="Reserved for source-specific date windows; use YYYY-MM-DD.",
+    )
+    parser.add_argument(
+        "--public-record-link-batch-size",
+        type=int,
+        default=200,
+        help="Recent articles scanned per public-record matching pass (default 200).",
+    )
+    parser.add_argument(
+        "--public-record-link-lookback-days",
+        type=int,
+        default=45,
+        help="Lookback window for article/public-record matching (default 45).",
+    )
+    parser.add_argument(
+        "--public-record-link-min-confidence",
+        type=float,
+        default=0.68,
+        help="Minimum deterministic match confidence (default 0.68).",
+    )
+    parser.add_argument(
+        "--public-record-link-max-per-article",
+        type=int,
+        default=3,
+        help="Maximum public-record links written per article per pass (default 3).",
     )
     parser.add_argument(
         "--topic-llm-batch-size",
@@ -234,17 +373,74 @@ def parse_categories(value: str | None) -> tuple[str, ...]:
 
 
 def parse_public_sources(value: str | None) -> tuple[str, ...]:
-    raw = value or "ly_bills"
+    raw = value or ",".join(DEFAULT_PUBLIC_RECORD_SOURCES)
     sources: list[str] = []
     for item in raw.split(","):
         normalized = item.strip().lower().replace("-", "_")
         if not normalized:
             continue
-        if normalized in {"all", "ly", "legislative_bill", "legislative_bills"}:
+        if normalized in {"healthcare", "healthcare_burden", "medical", "medical_care"}:
+            for healthcare_source in HEALTHCARE_PUBLIC_RECORD_SOURCES:
+                if healthcare_source not in sources:
+                    sources.append(healthcare_source)
+            continue
+        if normalized in {"justice", "judicial", "judicial_burden", "judicial_injustice", "case_backlog"}:
+            for justice_source in JUSTICE_PUBLIC_RECORD_SOURCES:
+                if justice_source not in sources:
+                    sources.append(justice_source)
+            continue
+        if normalized == "all":
+            for default_source in DEFAULT_PUBLIC_RECORD_SOURCES:
+                if default_source not in sources:
+                    sources.append(default_source)
+            continue
+        if normalized in {"ly", "legislative_bill", "legislative_bills"}:
             normalized = "ly_bills"
+        elif normalized in {"ly_healthcare", "healthcare_bills", "healthcare_legislative_bill"}:
+            normalized = "ly_healthcare_bills"
+        elif normalized in {"165", "npa_165", "fraud_rumor", "fraud_rumors"}:
+            normalized = "npa_fraud_rumors"
+        elif normalized in {"traffic_a1", "npa_traffic", "npa_traffic_accident_a1"}:
+            normalized = "npa_traffic_a1"
+        elif normalized in {"traffic_a2", "traffic_a2_stats", "npa_traffic_a2", "npa_traffic_accident_a2"}:
+            normalized = "npa_traffic_a2_stats"
+        elif normalized in {"drunk_driving", "drunk_driving_stats", "npa_drunk_driving"}:
+            normalized = "npa_drunk_driving_stats"
+        elif normalized in {"fraud_blocked_domain", "fraud_blocked_domains", "blocked_domains"}:
+            normalized = "npa_fraud_blocked_domain_stats"
+        elif normalized in {"fraud_enforcement", "fraud_enforcement_stats", "anti_fraud_dashboard"}:
+            normalized = "npa_fraud_enforcement_stats"
+        elif normalized in {"nhi_nursing_staff", "hospital_nursing_staff", "nursing_staff_monthly"}:
+            normalized = "nhi_hospital_nursing_staff"
+        elif normalized in {"nhi_bed_occupancy", "hospital_bed_occupancy", "bed_occupancy"}:
+            normalized = "nhi_hospital_bed_occupancy"
+        elif normalized in {"hospital_workforce", "mohw_hospital_personnel"}:
+            normalized = "mohw_hospital_workforce"
+        elif normalized in {"clinic_workforce", "mohw_clinic_personnel"}:
+            normalized = "mohw_clinic_workforce"
+        elif normalized in {"hospital_beds", "mohw_hospital_bed"}:
+            normalized = "mohw_hospital_beds"
+        elif normalized in {"mohw_nursing_staff", "nursing_staff_stats"}:
+            normalized = "mohw_nursing_staff_stats"
+        elif normalized in {
+            "moj_prosecution_disposition",
+            "moj_prosecution_disposition_stat",
+            "prosecution_disposition",
+            "prosecution_disposition_stats",
+        }:
+            normalized = "moj_prosecution_disposition_stats"
+        elif normalized in {
+            "corrections",
+            "mojac_custody",
+            "daily_custody",
+            "correctional_daily_custody",
+            "correctional_custody",
+            "prison_custody",
+        }:
+            normalized = "mojac_daily_custody"
         if normalized not in sources:
             sources.append(normalized)
-    return tuple(sources or ["ly_bills"])
+    return tuple(sources or DEFAULT_PUBLIC_RECORD_SOURCES)
 
 
 def _parse_cli_date(value: str | None) -> date | None:
@@ -301,16 +497,20 @@ def main() -> int:
     store.initialize()
 
     if args.collect_public_records:
-        return _public_records_once(
+        public_exit_code = _public_records_once(
             public_sources,
             store,
             limit_per_source=args.public_record_limit,
             from_date=_parse_cli_date(args.public_record_from),
             to_date=_parse_cli_date(args.public_record_to),
         )
+        if not args.link_public_records:
+            return public_exit_code
+    else:
+        public_exit_code = 0
 
     manual_batch_size = args.topic_llm_batch_size or settings.topic_llm_batch_size
-    exit_code = 0
+    exit_code = public_exit_code
 
     if args.extract_keywords:
         exit_code = _extract_keywords(
@@ -329,7 +529,17 @@ def main() -> int:
         llm_exit_code = _classify_topics_with_llm(store, settings, batch_size=manual_batch_size)
         exit_code = max(exit_code, llm_exit_code)
 
-    if args.extract_keywords or args.classify_topics or args.llm_topic_fallback:
+    if args.link_public_records:
+        link_exit_code = _link_public_records(
+            store,
+            batch_size=args.public_record_link_batch_size,
+            lookback_days=args.public_record_link_lookback_days,
+            min_confidence=args.public_record_link_min_confidence,
+            max_per_article=args.public_record_link_max_per_article,
+        )
+        exit_code = max(exit_code, link_exit_code)
+
+    if args.extract_keywords or args.classify_topics or args.llm_topic_fallback or args.link_public_records:
         return exit_code
 
     logger.info(
@@ -349,6 +559,12 @@ def main() -> int:
             topic_batch_size=args.topic_batch_size,
             topic_llm_enabled=settings.topic_llm_enabled,
             topic_llm_batch_size=manual_batch_size,
+            public_record_link_batch_size=args.public_record_link_batch_size,
+            public_record_link_lookback_days=args.public_record_link_lookback_days,
+            public_record_link_min_confidence=args.public_record_link_min_confidence,
+            public_record_link_max_per_article=args.public_record_link_max_per_article,
+            public_sources=public_sources,
+            public_record_limit=args.public_record_limit,
             settings=settings,
         )
     return _once(sources, store, settings.limit_per_feed)
@@ -401,6 +617,12 @@ def _loop(
     topic_batch_size: int,
     topic_llm_enabled: bool,
     topic_llm_batch_size: int,
+    public_record_link_batch_size: int,
+    public_record_link_lookback_days: int,
+    public_record_link_min_confidence: float,
+    public_record_link_max_per_article: int,
+    public_sources,
+    public_record_limit: int | None,
     settings: NewsPlatformSettings,
 ) -> int:
     """每輪：crawl → 抽詞 → 議題分類 → 等下一輪。
@@ -419,8 +641,16 @@ def _loop(
         if topic_llm_enabled
         else None
     )
+    public_record_link_worker = PublicRecordLinkWorker(
+        store,
+        batch_size=public_record_link_batch_size,
+        lookback_days=public_record_link_lookback_days,
+        min_confidence=public_record_link_min_confidence,
+        max_per_article=public_record_link_max_per_article,
+    )
     stop_event = threading.Event()
     last_purge_date: date | None = None
+    last_public_record_collect_date: date | None = None
     try:
         while not stop_event.is_set():
             _once(sources, store, limit_per_feed)
@@ -449,8 +679,36 @@ def _loop(
                         llm_result.updated,
                         llm_result.failed,
                     )
-            # 一天 purge 一次過期 row 即可。記錄最後 purge 的 date，跨日才再跑。
             today = date.today()
+            if last_public_record_collect_date != today:
+                try:
+                    public_result = run_public_records_once(
+                        public_sources,
+                        store,
+                        limit_per_source=public_record_limit,
+                    )
+                    logger.info(
+                        "Public records daily pass fetched=%d stored=%d duplicates=%d failed=%d",
+                        public_result.fetched,
+                        public_result.stored,
+                        public_result.duplicates,
+                        public_result.failed,
+                    )
+                except Exception as exc:
+                    logger.warning("Public records daily pass failed: %s", exc)
+                last_public_record_collect_date = today
+            link_result = public_record_link_worker.run_once()
+            if link_result.scanned_articles or link_result.linked or link_result.failed:
+                logger.info(
+                    "Public-record link pass scanned_articles=%d candidate_records=%d matched=%d linked=%d duplicates=%d failed=%d",
+                    link_result.scanned_articles,
+                    link_result.candidate_records,
+                    link_result.matched,
+                    link_result.linked,
+                    link_result.duplicates,
+                    link_result.failed,
+                )
+            # 一天 purge 一次過期 row 即可。記錄最後 purge 的 date，跨日才再跑。
             if last_purge_date != today:
                 try:
                     deleted = store.purge_expired()
@@ -500,6 +758,34 @@ def _classify_topics_with_llm(store, settings: NewsPlatformSettings, *, batch_si
         "Topic LLM fallback done: scanned=%d updated=%d failed=%d",
         result.scanned,
         result.updated,
+        result.failed,
+    )
+    return 0 if result.failed == 0 else 1
+
+
+def _link_public_records(
+    store,
+    *,
+    batch_size: int,
+    lookback_days: int,
+    min_confidence: float,
+    max_per_article: int,
+) -> int:
+    worker = PublicRecordLinkWorker(
+        store,
+        batch_size=batch_size,
+        lookback_days=lookback_days,
+        min_confidence=min_confidence,
+        max_per_article=max_per_article,
+    )
+    result = worker.run_once()
+    logger.info(
+        "Public-record linking done: scanned_articles=%d candidate_records=%d matched=%d linked=%d duplicates=%d failed=%d",
+        result.scanned_articles,
+        result.candidate_records,
+        result.matched,
+        result.linked,
+        result.duplicates,
         result.failed,
     )
     return 0 if result.failed == 0 else 1

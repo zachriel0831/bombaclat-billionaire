@@ -8,6 +8,15 @@ from __future__ import annotations
 import logging
 from xml.etree import ElementTree as ET
 
+from news_platform.author_metadata import (
+    AUTHOR_METHOD_BYLINE_REGEX,
+    AUTHOR_METHOD_NONE,
+    AUTHOR_METHOD_RSS_METADATA,
+    AUTHOR_STATUS_LOW_CONFIDENCE,
+    AUTHOR_STATUS_NO_DETAIL_FETCHED,
+    AUTHOR_STATUS_PRESENT,
+)
+from news_platform.author_extractor import extract_authors_from_text, normalize_authors
 from news_platform.http_client import http_get_bytes
 from news_platform.models import NewsArticle
 from news_platform.sources.base import NewsSource
@@ -85,6 +94,31 @@ class RssFeedSource(NewsSource):
         canonical = canonical_url(link) or link
         published = parse_datetime(self._text(node, "pubDate", "published", "updated"))
         summary = clean_summary(self._text(node, "description", "summary", "content"))
+        author_values = self._author_values(node)
+        authors = normalize_authors(author_values)
+        author_status = AUTHOR_STATUS_NO_DETAIL_FETCHED
+        author_method = AUTHOR_METHOD_NONE
+        author_confidence: float | None = None
+        author_raw_text: str | None = None
+        if author_values:
+            author_raw_text = " | ".join(author_values)
+            author_method = AUTHOR_METHOD_RSS_METADATA
+            if authors:
+                author_status = AUTHOR_STATUS_PRESENT
+                author_confidence = 1.0
+            else:
+                author_status = AUTHOR_STATUS_LOW_CONFIDENCE
+                author_confidence = 0.0
+        if not authors:
+            for candidate in (summary, title):
+                extracted = extract_authors_from_text(candidate)
+                if extracted:
+                    authors = extracted
+                    author_status = AUTHOR_STATUS_PRESENT
+                    author_method = AUTHOR_METHOD_BYLINE_REGEX
+                    author_confidence = 0.9
+                    author_raw_text = candidate
+                    break
 
         tags: list[str] = []
         for child in list(node):
@@ -102,8 +136,13 @@ class RssFeedSource(NewsSource):
             url=canonical,
             published_at=published,
             summary=summary,
+            authors=authors,
+            author_extraction_status=author_status,
+            author_extraction_method=author_method,
+            author_extraction_confidence=author_confidence,
+            author_raw_text=author_raw_text,
             tags=sorted(set(tags)),
-            raw={"feed": self.url, "original_url": link},
+            raw=self._raw_payload(link, author_values),
         )
 
     @staticmethod
@@ -130,3 +169,27 @@ class RssFeedSource(NewsSource):
                 if (child.text or "").strip():
                     return child.text.strip()
         return None
+
+    @staticmethod
+    def _author_values(node: ET.Element) -> list[str]:
+        values: list[str] = []
+        for child in list(node):
+            child_name = local_name(child.tag).lower()
+            if child_name in {"author", "creator", "credit"}:
+                text = (child.text or "").strip()
+                if text:
+                    values.append(text)
+                for sub in child.iter():
+                    if sub is child:
+                        continue
+                    if local_name(sub.tag).lower() == "name":
+                        name = (sub.text or "").strip()
+                        if name:
+                            values.append(name)
+        return values
+
+    def _raw_payload(self, original_url: str, author_values: list[str]) -> dict[str, object]:
+        raw: dict[str, object] = {"feed": self.url, "original_url": original_url}
+        if author_values:
+            raw["author_values"] = author_values
+        return raw

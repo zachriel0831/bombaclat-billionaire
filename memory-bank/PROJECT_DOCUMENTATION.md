@@ -25,9 +25,9 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Bridge startup performs a one-shot X backfill for tracked accounts before attaching the live stream, so recent gap tweets can still be written directly to `t_relay_events` and `t_x_posts`
 
 2. RSS polling
-- BBC / Reuters / Fox / NPR plus Taiwan finance feeds from `OFFICIAL_RSS_FEEDS`
-- Active Taiwan finance RSS feeds are CNA finance, LTN business, and ETtoday finance; these finance news rows stay in `t_relay_events`, not `news_platform.t_news_articles`
-- RSS bridge `--limit` is applied per configured feed, then all feed items are merged, deduped, and sorted. With 15 active feeds and `--limit 5`, one polling cycle can consider up to 75 RSS items before filters.
+- BBC / Reuters / Fox / NPR plus Taiwan finance and official finance/macro feeds from `OFFICIAL_RSS_FEEDS`
+- Active Taiwan finance/official RSS feeds include CNA finance, LTN business, ETtoday finance, Anue, Economic Daily News, Newtalk finance, Storm finance, MoneyDJ, CBC, TWSE, and FSC; these finance/news rows stay in `t_relay_events`, not `news_platform.t_news_articles`
+- RSS bridge `--limit` is applied per configured feed, then all feed items are merged, deduped, and sorted. Current `.env` uses `OFFICIAL_RSS_FIRST_PER_FEED=true`, so one polling cycle considers one item per feed; if disabled, 27 active feeds and `--limit 5` can consider up to 135 RSS items before filters.
 - Reuters currently uses Google News RSS search as fallback because legacy Reuters RSS endpoints are unavailable from this environment
 - CNN RSS is configurable in code, but the previously tested CNN feeds were removed from the active `.env` set after returning stale items from 2016-2024 during the 2026-04-19 verification
 
@@ -113,12 +113,16 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 10. Taiwan society/politics news platform
 - Runs in `src/news_platform` and is separate from `event_relay`
 - Reads Taiwan society/politics RSS, sitemap, ETtoday category-list, and PTS category-page sources defined in `news_platform.registry`
-- Default society/politics source set is LTN, ETtoday, TVBS, CNA, PTS, and EBC
+- Default society/politics source set is LTN, ETtoday, TVBS, CNA, PTS, EBC, Newtalk, Storm Media, and Commercial Times (`ctee`)
+- Commercial Times uses `https://www.ctee.com.tw/sitemaps/sitemap_newstoday.xml`; URL tail category code `-431401` is mapped to `society`, and `-430104` is mapped to `politics`. These are source-category filters only; issue topics are still assigned later by the normal deterministic/LLM topic workers.
 - Category scope defaults to `society,politics` and can be limited by `NEWSPF_CATEGORIES` or CLI `--categories`
 - Writes article rows to independent MySQL tables controlled by `NEWSPF_MYSQL_*`
 - Storage contract:
   - `t_news_sources`: source metadata
-  - `t_news_articles`: article rows with `article_id`, `source_id`, title/url/summary, timestamps, `tags_json`, `raw_json`, `keywords_json`, `topics_json`, `topic_classified_by`, `topic_classified_at`, `ttl_at`
+  - `t_news_articles`: article rows with `article_id`, `source_id`, title/url/summary, timestamps, `authors_json`, `author_extraction_status`, `author_extraction_method`, `author_extraction_confidence`, `author_raw_text`, `author_extracted_at`, `tags_json`, `raw_json`, `keywords_json`, `topics_json`, `topic_classified_by`, `topic_classified_at`, `ttl_at`
+  - `t_news_authors`: normalized source-scoped reporter/author identities
+  - `t_news_article_authors`: many-to-many article-to-author links with role, ordinal, extraction method, confidence, and raw byline text
+  - `t_news_author_coverage_daily`: materialized daily source/category byline coverage with missing-author status breakdown
   - `t_public_records`: structured official records with `record_id`, `source_id`, `record_type`, `country`, optional article category, title/url, `occurred_at`, `region`, `metrics_json`, `tags_json`, and `raw_json`
   - `t_news_article_public_record_links`: many-to-many article-to-record links with `article_id`, `public_record_id`, `relation_type`, `confidence`, `matched_by`, and `evidence_json`
   - `keywords_json`: output of `KeywordWorker` as `[{kw, score}, ...]`
@@ -128,19 +132,53 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Middle-office/frontend read contract:
   - Society category: `GET /api/society/topics`, `GET /api/society/articles`, `GET /api/society/articles/{id}`
   - Politics category: `GET /api/politics/topics`, `GET /api/politics/articles`, `GET /api/politics/articles/{id}`
-  - The route category maps to `t_news_articles.category`; frontend topic pages pass `topic=<topicId>` instead of parsing `topics_json` directly
+  - Government public records: `GET /api/public-records`, `GET /api/public-records/{id}`
+  - Article-linked public records: `GET /api/society/articles/{id}/public-records`, `GET /api/politics/articles/{id}/public-records`
+  - The route category normally maps to `t_news_articles.category`; frontend topic pages pass `topic=<topicId>` instead of parsing `topics_json` directly
+  - `low_birthrate` is a cross-category issue view: `GET /api/society/topics`, `GET /api/society/articles?topic=low_birthrate`, and `GET /api/society/timeline?topic=low_birthrate` aggregate matching rows from all `t_news_articles.category` values while preserving each article's original `category`
+  - Finance feed: `news-display-frontend` calls `GET /api/events` through `/api/content/events` with the public source allowlist in `news-platform-api/docs/API_SPEC.md`; the allowlist must include active Taiwan finance/public market RSS source names such as Economic Daily News, LTN finance, MoneyDJ, Anue, CNA finance, ETtoday finance, Newtalk finance, Storm, TWSE, and CBC. The API source filter matches both normal UTF-8 source names and legacy mojibake DB values before returning repaired display text.
 - Data flow:
-  1. crawler writes raw article rows
+  1. crawler writes raw article rows; RSS/Atom and sitemap sources also fill `authors_json` when explicit author metadata or a high-confidence reporter byline is available; all new article rows also receive `author_extraction_status`
+     - Articles with authors upsert normalized rows into `t_news_authors` and `t_news_article_authors`
+     - Articles without authors keep article-level missing states such as `no_detail_fetched`, `parser_not_supported`, `low_confidence`, or `parse_failed`; no fake `unknown` author row is created
+     - `scripts/backfill_news_author_status.py`, `scripts/backfill_news_author_relations.py`, and `scripts/build_news_author_coverage_daily.py` maintain existing-row status, author relations, and daily coverage aggregates
   2. `KeywordWorker` fills `keywords_json`
   3. `TopicWorker` reads rows where `topics_json IS NULL AND keywords_json IS NOT NULL`
-  4. deterministic classifier writes up to three specific topic hits into `topics_json`; no-hit rows become category-specific general topics (`general_social_news` / 一般社會新聞 or `general_politics_news` / 一般政治新聞) with `source=rule_fallback`, `topic_classified_by=rule`
+  4. deterministic classifier writes up to three specific topic hits into `topics_json`; `TopicSpec.categories` scopes category-specific rules such as politics L2 topics to `category=politics`; no-hit rows become category-specific general topics (`general_social_news` / 一般社會新聞 or `general_politics_news` / 一般政治新聞) with `source=rule_fallback`, `topic_classified_by=rule`
+      - `low_birthrate` includes common policy variants such as `少子女化`, `0到6歲國家一起養`, and `兒少TISA`
+      - Related-link sections in summaries (`延伸閱讀`, `相關新聞`, `更多新聞`) are ignored before deterministic matching to avoid misclassifying unrelated articles
+      - Politics second-layer topics are `elections`, `cross_strait_relations`, `foreign_affairs`, `legislative_policy`, `party_politics`, `political_accountability`, `defense_security`, and `public_budget`; persistent thread tables remain deferred
   5. Optional `TopicLlmFallbackWorker` can refine rule fallback rows where the first topic is a general fallback topic and `topic_classified_by` is NULL or `rule`
   6. LLM fallback calls OpenAI first (`gpt-5-nano` by default), then Anthropic Claude Haiku if OpenAI is unavailable; it writes either one `source=llm` topic or keeps the category-specific general topic with `source=llm_fallback`, `topic_classified_by=llm`
   7. Official structured datasets such as Legislative Yuan records, judicial records, fraud lists, accident rows, population indicators, or housing indicators are stored in `t_public_records`, not `t_news_articles`
-  8. Article-to-record matching writes one row per relation to `t_news_article_public_record_links`, preserving match evidence and confidence for downstream ranking/explanations
+  8. In loop mode, default public-record sources are collected once per local day
+  9. `PublicRecordLinkWorker` matches recent articles to recent public records and writes one row per relation to `t_news_article_public_record_links`, preserving match evidence and confidence for downstream ranking/explanations
 - Current public-record sources:
   - Legislative Yuan legal proposals (`ly_bills`): `https://www.ly.gov.tw/WebAPI/LegislativeBill.aspx`, stored as `source_id=ly`, `record_type=legislative_bill`, `category=politics`; upstream ROC dates are normalized to Asia/Taipei timestamps
+  - Legislative Yuan healthcare proposals (`ly_healthcare_bills`, included in CLI alias `healthcare`): same official LY legal proposal API, filtered by healthcare terms such as `醫療法`, `護理人員法`, `全民健康保險法`, `長期照顧服務法`, `護病比`, `護理待遇`, and `護理津貼`; stored as `source_id=ly`, `record_type=healthcare_legislative_bill`, `category=society`, tagged `healthcare_burden`
+  - NPA 165 fraud-rumor open data (`npa_fraud_rumors`): `https://data.gov.tw/dataset/38262`, stored as `source_id=npa`, `record_type=fraud_rumor`, `category=society`
+  - NPA A1 traffic accident open data (`npa_traffic_a1`): `https://data.gov.tw/dataset/57023`, stored as `source_id=npa`, `record_type=traffic_accident_a1`, `category=society`; party rows are grouped into one accident record by date/time/location/type
+  - NPA A2 traffic accident monthly statistics (`npa_traffic_a2_stats`): `https://data.gov.tw/dataset/57024`, stored as `source_id=npa`, `record_type=traffic_accident_a2_stat`, `category=society`; rows are grouped by accident/month/region, then aggregated into monthly casualty/count metrics
+  - NPA drunk-driving annual statistics (`npa_drunk_driving_stats`): `https://data.gov.tw/dataset/9018`, stored as `source_id=npa`, `record_type=traffic_drunk_driving_stat`, `category=society`; this official dataset is low-frequency and may lag recent traffic news
+  - NPA fraud blocked-domain statistics (`npa_fraud_blocked_domain_stats`): `https://data.gov.tw/en/datasets/176455`, stored as `source_id=npa`, `record_type=fraud_blocked_domain_stat`, `category=society`; rows are aggregated by ROC year-month and website nature
+  - NPA fraud enforcement dashboard (`npa_fraud_enforcement_stats`): `https://data.gov.tw/dataset/172159`, stored as `source_id=npa`, `record_type=fraud_enforcement_stat`, `category=society`; rows track monthly enforcement groups, suspects, seized proceeds, and blocked amounts
+  - NHI contracted-hospital nursing staff monthly data (`nhi_hospital_nursing_staff`, included in `healthcare`): `https://data.gov.tw/dataset/174661`, stored as `source_id=nhi`, `record_type=nhi_hospital_nursing_staff_stat`, `category=society`; rows are aggregated by Gregorian year/month and county/city with practicing and support nurse counts
+  - NHI hospital bed occupancy (`nhi_hospital_bed_occupancy`, included in `healthcare`): `https://data.gov.tw/dataset/79622`, stored as `source_id=nhi`, `record_type=nhi_hospital_bed_occupancy_stat`, `category=society`; ODS rows are stored per hospital with four bed-type occupancy rates
+  - MOHW annual healthcare capacity sources (`mohw_hospital_workforce`, `mohw_clinic_workforce`, `mohw_hospital_beds`, included in `healthcare`): `https://data.gov.tw/dataset/6474`, `https://data.gov.tw/dataset/6476`, and `https://data.gov.tw/dataset/6473`; ZIP/CSV township rows are aggregated by year and county/city into `mohw_hospital_workforce_stat`, `mohw_clinic_workforce_stat`, and `mohw_hospital_bed_stat`
+  - MOHW nursing staff annual statistic (`mohw_nursing_staff_stats`, included in `healthcare`): `https://data.gov.tw/dataset/118549`, stored as `source_id=mohw`, `record_type=mohw_nursing_staff_stat`, `category=society`; source CSV is CP950 and currently contains the upstream years present in the official file
+  - MOJ prosecution disposition statistics (`moj_prosecution_disposition_stats`, included in `justice`): `https://data.gov.tw/dataset/39402`, stored as `source_id=moj`, `record_type=moj_prosecution_disposition_stat`, `category=society`; rows are aggregated by Gregorian year/month into prosecution, deferred-prosecution, non-prosecution, and other disposition people counts
+  - Agency of Corrections daily custody dynamics (`mojac_daily_custody`, included in `justice`): `https://data.gov.tw/dataset/101185`, stored as `source_id=mojac`, `record_type=mojac_daily_custody_stat`, `category=society`; current daily XML row stores actual custody, approved capacity, over-capacity rate, intake, and release counts
+- Current article-record matchers:
+  - Legislative Yuan bills and healthcare-filtered bills: deterministic `ly_bill_rule`, using full bill title, law names, proposer/cosignatory names, and date distance; CLI `--link-public-records`
+  - NPA 165 fraud rumors: deterministic `npa_fraud_rumor_rule`, using full title or fraud-context title terms plus date distance; A1 traffic records, NPA statistic records, healthcare capacity records, and justice/corrections statistics are ingested but not auto-linked until higher-precision location/event/stat-context matching is available
 - MVP keeps topic classifications embedded on `t_news_articles`; a normalized article-topic relation table is deferred until timeline/query workloads require it. Public records are normalized immediately because one record can support many articles and one article can cite many records.
+
+11. Data-source health tracking
+- `scripts/run_data_source_health.ps1` / `scripts/check_data_source_health.py` produce a read-only freshness report for news-analysis inputs.
+- The report checks relay-side finance/public RSS, international RSS, X, SEC, TWSE/MOPS, US index tracker, market-context facts, BLS macro facts, Taiwan market-flow facts, and stored market analyses.
+- It also checks news-platform society/politics article freshness per category and per source, article enrichment gaps, public-record refresh freshness based on `updated_at`, article-record link freshness, and local Python process counts.
+- Status semantics: `OK` within expected cadence, `WARN` outside warn threshold, `STALE` outside stale threshold, `MISSING` no rows, and `ERROR` for query/connect failures.
+- Public-record sources are lower cadence than news feeds; current guardrails warn after 48 hours and stale after 96 hours.
 
 ## Event Storage & Analysis Boundary
 - HTTP endpoints:

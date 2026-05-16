@@ -7,6 +7,7 @@ published-at fields."""
 from __future__ import annotations
 
 import logging
+from urllib.parse import urljoin
 from xml.etree import ElementTree as ET
 
 from news_collector.http_client import http_get_text
@@ -36,7 +37,7 @@ class OfficialRssSource(NewsSource):
             try:
                 # 單一 feed 的請求與解析結果都會寫日誌，方便查來源是否失效。
                 logger.info("RSS request feed=%s", url)
-                xml_text = http_get_text(url, timeout=self.timeout_seconds)
+                xml_text = self._fetch_feed_text(url)
                 parsed = self._parse_feed(xml_text, url)
                 parsed = parsed[:per_feed_limit]
                 logger.info("RSS parsed feed=%s items=%d", url, len(parsed))
@@ -59,6 +60,15 @@ class OfficialRssSource(NewsSource):
         deduped = self._dedupe(items)
         deduped.sort(key=lambda x: sort_timestamp(x.published_at), reverse=True)
         return deduped
+
+    def _fetch_feed_text(self, url: str) -> str:
+        try:
+            return http_get_text(url, timeout=self.timeout_seconds, verify_ssl=True)
+        except Exception as exc:
+            if not _is_missing_subject_key_identifier_error(exc):
+                raise
+            logger.info("RSS retry without SSL verification feed=%s reason=missing_ski", url)
+            return http_get_text(url, timeout=self.timeout_seconds, verify_ssl=False)
 
     def _parse_feed(self, xml_text: str, feed_url: str) -> list[NewsItem]:
         """解析 parse feed 對應的資料或結果。"""
@@ -132,6 +142,8 @@ class OfficialRssSource(NewsSource):
                         link = href
                         break
 
+        if link:
+            link = urljoin(feed_url, link)
         if not link:
             link = feed_url
 
@@ -170,3 +182,8 @@ class OfficialRssSource(NewsSource):
             seen.add(key)
             result.append(item)
         return result
+
+
+def _is_missing_subject_key_identifier_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "missing subject key identifier" in text

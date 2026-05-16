@@ -1,63 +1,74 @@
 ---
 name: weekly-macro-line-brief
-description: 將市場事件、總經資料與結構性分數整理成台灣投資人可讀的宏觀週報或每日分析。
+description: Build market-analysis and weekly-summary prompts for Taiwan investors from relay events, market context, scorecard, RAG analogues, and fixed-watchlist rules. Use when changing macro weekly summary, daily market analysis prompt assets, LINE brief shape, section contracts, or prompt safety rules in data-collecting.
 ---
 
 # Weekly Macro Summary Skill
 
-## 目的
-把 `t_relay_events`、`market_context:*`、scorecard 與已確認的市場資料，寫成有主軸、有反證、有交易含意的繁體中文宏觀分析。重點不是列新聞，而是回答「市場正在交易什麼，哪些變數真的在改變定價」。
+This file is intentionally named `SKILLS.md` for compatibility with existing prompt-loading code. Keep it in sync with `SKILL.md` when editing this skill.
 
-## 必要輸入
-- 近期新聞與官方資料來源，需保留時間、來源、國家/區域、影響資產。
-- deterministic scorecard：至少包含 `breadth_health`、`ai_capex_quality`、`energy_shock_risk`、`credit_stress`、`liquidity_impulse`。
-- market context：指數、利率、信用利差、流動性、台股族群、追蹤股、市場廣度、AI capex、油價與庫存。
-- 資料新鮮度與缺口：每個核心結論要知道資料是今天、昨天、本週，還是過期。
+## Purpose
 
-## 寫作原則
-- 先下結論，再列證據。每段都要回答「所以市場會怎麼重新定價」。
-- 同一主題至少放一個反證或失效條件，不要只堆同方向證據。
-- 分清楚短期價格動能、基本面趨勢、流動性環境、估值壓力。
-- 台股段落要寫傳導鏈：美股/美元/利率/油價/AI capex 如何影響半導體、AI 伺服器、金融、航運、內需。
-- 不要用「市場樂觀」「題材發酵」這種空話；要指出是哪個資料點支持。
-- 不要補不存在的數字。缺資料時要明確寫「資料不足，不能確認」。
+Guide generated weekly summaries and market-analysis drafts so they are evidence-grounded, readable in LINE, and useful for Taiwan investors.
 
-## 建議架構
-1. 核心 Regime
-   - 用 2-4 句說明目前市場主軸。
-   - 指出主要風險是成長、通膨、利率、信用、能源、AI 估值，還是市場結構。
+## Inputs
 
-2. 數據面板
-   - 利率：Fed path、2Y、10Y、10Y-2Y、DXY、SOFR。
-   - 流動性：Fed balance sheet、RRP、TGA、reserves。
-   - 信用：HY OAS、IG OAS、NFCI、STLFSI。
-   - 市場：Nasdaq、SOX、S&P 500、Russell 2000、VIX。
-   - 結構：市場廣度、等權重 vs 市值權重、AI capex、油價供需。
+- Recent `t_relay_events` source facts.
+- Stored `market_context:*` events and deterministic `market_context:scorecard`.
+- Recent `t_market_index_snapshots` rows when available.
+- Hybrid RAG historical analogues from `t_event_embeddings` and `t_analysis_embeddings`.
+- Fixed five-stock watchlist context when generating visible Taiwan stock sections.
 
-3. 市場結構
-   - 判斷漲勢是健康擴散，還是少數大型股支撐。
-   - 比較 cap-weight、equal-weight、small-cap、semiconductor 的相對強弱。
-   - 若指數創高但廣度轉弱，要寫成風險，而不是忽略。
+## Output Principles
 
-4. AI Capex 與財報品質
-   - 區分「營收/獲利已兌現」與「資本支出仍在燒錢」。
-   - 評估 hyperscalers capex 是否帶來 FCF 壓力、折舊壓力、供應鏈訂單延續性。
-   - 寫清楚對台灣供應鏈的正面與負面傳導。
+- Explain evidence -> transmission mechanism -> Taiwan market implication.
+- Use short paragraphs and compact bullets.
+- Label data gaps explicitly.
+- Use a professional-but-conversational Taiwan macro commentary tone: first say what the market is trading, then explain which data supports or breaks that chain.
+- Keep useful terms such as regime, liquidity, Fed path, credit spread, VIX, SOX, and DXY, but explain why each matters to Taiwan investors; avoid dense acronym piles.
+- Do not turn the report into a beginner "lazy bag"; keep the mechanism, but translate it into market implications.
+- Keep historical RAG examples as analogues only; never present them as current evidence.
+- Do not invent arbitrary Taiwan ticker recommendations outside the fixed watch pool.
+- Do not output order intents, broker actions, or automated trading instructions.
 
-5. 油價與能源風險
-   - 區分價格衝擊、庫存變化、供應中斷、需求放緩。
-   - 油價上行若沒有推升通膨預期，短期可能只是成本壓力；若推升利率，才是更大的市場風險。
+## Daily Market Analysis Sections
 
-6. 台股與配置
-   - 將宏觀結論落到台股族群與風險控管。
-   - 給出可觀察條件，不要直接把宏觀敘事變成買賣建議。
+Use this readable macro flow unless the calling code supplies a stricter section contract:
 
-7. 反證與下次更新
-   - 列 2-4 個會推翻本文判斷的資料。
-   - 標記下一次需要看的數據或事件。
+1. Macro regime
+2. Rates and liquidity
+3. Cycle and earnings
+4. Market sentiment
+5. Taiwan allocation
+6. Risk and data gaps
+7. Taiwan fixed-watchlist observations when evidence exists
 
-## 禁止事項
-- 不要使用亂碼、簡體中文、未翻譯的 placeholder。
-- 不要把新聞逐條改寫成流水帳。
-- 不要把單一新聞直接外推成市場 regime。
-- 不要假裝有資料；沒有就寫缺口。
+## Weekly Summary Sections
+
+Weekly reports use:
+
+1. Weekly macro
+2. Next-week Taiwan allocation
+3. Next-week watchlist
+
+Weekly reports are allocation/watchlist briefs. They should not produce intraday entry, take-profit, stop-loss, or order-level instructions.
+
+## Fixed Watch Pool
+
+Only these Taiwan tickers may appear in visible fixed-watchlist sections unless the user changes the governing spec:
+
+| Ticker | Name | Notes |
+|---|---|---|
+| `2330` | TSMC | AI demand and semiconductor cycle. |
+| `2603` | Evergreen Marine | Freight rates, oil, geopolitics. |
+| `2882` | Cathay Financial | Rates and insurance/financial conditions. |
+| `1605` | Walsin Lihwa | Copper and infrastructure cycle. |
+| `4956` | Epileds | Smaller TPEx semiconductor exposure. |
+
+## Related Docs
+
+- [../../memory-bank/rag-operations.md](../../memory-bank/rag-operations.md)
+- [../../spec/market-analysis-fixed-watchlist-functional-spec.md](../../spec/market-analysis-fixed-watchlist-functional-spec.md)
+- [../../spec/market-analysis-fixed-watchlist-data-contract.md](../../spec/market-analysis-fixed-watchlist-data-contract.md)
+- [../line-brief-format-skill/line-weekly-brief.md](../line-brief-format-skill/line-weekly-brief.md)
+- [../line-brief-format-skill/rubric.md](../line-brief-format-skill/rubric.md)

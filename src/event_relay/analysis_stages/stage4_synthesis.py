@@ -85,6 +85,15 @@ _REGIME_FLOW_GUIDE = (
     "6. 風險與資料缺口: list what could break the chain and what must be verified next.\n"
 )
 
+_POPULAR_MACRO_TONE_GUIDE = (
+    "Tone target: professional macro commentary with a popular Taiwan market-commentary feel, not an institutional research note and not an over-simplified beginner explainer.\n"
+    "- Keep macro terms such as Regime, Fed path, liquidity, credit spread, VIX, SOX, and DXY when they matter, but immediately translate why they matter to Taiwan investors.\n"
+    "- Prefer wording like: 市場現在在交易的是..., 重點不是數字本身，而是..., 對台股的意思是..., 這條鏈會失效如果...\n"
+    "- Put raw indicators after the implication, not before it. Example: 先寫「資金環境沒有收緊，科技股比較有人接」，再列 TGA/RRP/OAS evidence.\n"
+    "- Avoid acronym piles. If using SOFR, RRP, TGA, OAS, or NFCI, add a short appositive explanation or keep it inside a data bullet.\n"
+    "- Do not remove mechanism. Each section still needs evidence -> market mechanism -> Taiwan implication, but the first sentence should tell readers what the market is really pricing.\n"
+)
+
 
 def _structured_instructions() -> str:
     """執行 structured instructions 的主要流程。"""
@@ -161,6 +170,7 @@ def build_prompts(
     system_prompt = (
         "You are a Taiwan market morning strategist writing in Traditional Chinese.\n"
         "Use plain text only. Be concise, concrete, and avoid fabricating facts.\n"
+        "Write with a professional-but-conversational macro-commentary voice: keep the framework, but make every indicator answer what the market is trading and why it matters for Taiwan.\n"
         "You are the final stage of a multi-stage pipeline. Do not introduce new\n"
         "facts: restate what earlier stages produced, keep evidence-backed claims,\n"
         "and clearly mark items coming from risks / data_gaps.\n"
@@ -179,6 +189,7 @@ def build_prompts(
         "Required sections (used inside summary_text):",
         numbered_sections,
         _REGIME_FLOW_GUIDE,
+        _POPULAR_MACRO_TONE_GUIDE,
         _summary_length_instruction(slot),
         f"Now local time: {now_local_iso}",
         "Keep readability: short paragraphs, bullet dense data, no wall-of-text blocks.",

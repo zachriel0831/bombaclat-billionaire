@@ -1,9 +1,13 @@
 # Memory Bank Index
 
+For whole-repo navigation, start at [../PROJECT_INDEX.md](../PROJECT_INDEX.md). This file indexes only the memory-bank and nearby task/review material.
+
 ## Active Core
 - `memory-bank/PROJECT_DOCUMENTATION.md`: project overview, architecture, source contracts
 - `memory-bank/rules.md`: development, security, and quality rules
 - `memory-bank/workflows.md`: operational workflows and runbooks
+- `memory-bank/restart-recovery-runbook.md`: machine-restart recovery steps and post-restart checks
+- `memory-bank/rag-operations.md`: RAG indexing, retrieval, config, telemetry, and verification
 
 Do not read every file by default. Load only the file needed for the current task.
 
@@ -30,6 +34,13 @@ Do not read every file by default. Load only the file needed for the current tas
 - `memory-bank/09-decisions/2026-05-11-news-platform-public-record-links.md`: structured official public records and article-record link table
 - `memory-bank/09-decisions/2026-05-11-news-platform-ly-bills-public-record-source.md`: Legislative Yuan bill API stored as public records
 - `memory-bank/09-decisions/2026-05-11-taiwan-finance-rss-relay-events.md`: Taiwan finance RSS feeds write to `t_relay_events`
+- `memory-bank/09-decisions/2026-05-12-news-platform-public-record-matching.md`: deterministic article-to-public-record matching
+- `memory-bank/09-decisions/2026-05-12-four-track-source-expansion.md`: four-track Taiwan source expansion across article, relay RSS, official finance/macro, and public-record paths
+- `memory-bank/09-decisions/2026-05-14-healthcare-public-record-sources.md`: healthcare public-record sources and `healthcare_burden` mapping
+- `memory-bank/09-decisions/2026-05-14-justice-corrections-public-record-sources.md`: justice/corrections public-record sources and judicial burden mapping
+- `memory-bank/09-decisions/2026-05-14-politics-l2-topic-thread-model.md`: stable politics second-layer topic IDs and dynamic event-thread model
+- `memory-bank/09-decisions/2026-05-15-news-article-author-metadata.md`: article reporter/author metadata on `t_news_articles.authors_json`
+- `memory-bank/09-decisions/2026-05-15-news-author-relations-and-coverage.md`: normalized author relations and byline coverage metrics
 
 ## Archived / On Demand
 - `memory-bank/archive/enterprise/40-agent-enterprise-readiness.md`: enterprise baseline for production agents

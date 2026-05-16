@@ -129,6 +129,22 @@ class SlotDecision:
         }
 
 
+@dataclass(frozen=True)
+class AnalysisGenerationResult:
+    """One completed analysis generation attempt."""
+
+    config: MarketAnalysisConfig
+    events_payload: list[dict[str, Any]]
+    market_payload: list[dict[str, Any]]
+    rag_examples: list[dict[str, Any]]
+    provider_context_policy: dict[str, Any]
+    summary_text: str
+    structured_payload: dict[str, Any] | None
+    pipeline_telemetry: dict[str, Any] | None
+    legacy_token_usage: dict[str, Any] | None
+    used_multi_stage: bool
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """建立命令列參數解析器。"""
     parser = argparse.ArgumentParser(description="Generate scheduled market analysis")
@@ -239,7 +255,7 @@ def _candidate_variants(
 
 
 def _primary_provider_for_market_analysis(provider_env: str) -> str:
-    """OpenAI is the default market-analysis primary; Claude is fallback."""
+    """Resolve the market-analysis primary provider before quota routing."""
     if not router_enabled_from_env():
         return provider_env
     raw_primary = (os.getenv("MARKET_ANALYSIS_PRIMARY_PROVIDER") or "").strip()
@@ -248,6 +264,9 @@ def _primary_provider_for_market_analysis(provider_env: str) -> str:
     provider_order = _env_csv("MARKET_ANALYSIS_PROVIDER_ORDER")
     if provider_order:
         return provider_order[0].lower()
+    normalized = (provider_env or "").strip().lower()
+    if normalized in {"anthropic", "claude"}:
+        return "anthropic"
     return "openai"
 
 
@@ -1297,6 +1316,133 @@ def _aggregate_token_usage(
     }
 
 
+def _is_retryable_provider_error(exc: BaseException | str) -> bool:
+    text = str(exc or "").lower()
+    retry_markers = (
+        "status=429",
+        "insufficient_quota",
+        "rate_limit",
+        "rate limited",
+        "too many requests",
+        "quota",
+        "status=500",
+        "status=502",
+        "status=503",
+        "status=504",
+        "overloaded",
+        "temporarily unavailable",
+    )
+    return any(marker in text for marker in retry_markers)
+
+
+def _runtime_failover_config(
+    config: MarketAnalysisConfig,
+    exc: BaseException | str,
+) -> MarketAnalysisConfig | None:
+    if not _env_bool("MARKET_ANALYSIS_RUNTIME_FAILOVER_ENABLED", True):
+        return None
+    if (config.provider or "").strip().lower() != "openai":
+        return None
+    if not _is_retryable_provider_error(exc):
+        return None
+    provider, model, api_base, api_key_file, api_key = _resolve_market_anthropic_settings()
+    if not api_key:
+        logger.warning("Runtime LLM failover skipped: missing Anthropic API key")
+        return None
+    router_payload = dict(config.model_router or {})
+    router_payload["runtime_failover"] = {
+        "from_provider": config.provider,
+        "from_model": config.model,
+        "to_provider": provider,
+        "to_model": model,
+        "reason": str(exc)[:500],
+    }
+    return replace(
+        config,
+        provider=provider,
+        model=model,
+        api_base=api_base,
+        api_key=api_key,
+        api_key_file=api_key_file,
+        model_router=router_payload,
+    )
+
+
+def _generate_analysis_once(
+    *,
+    config: MarketAnalysisConfig,
+    slot: str,
+    now_local: datetime,
+    events_payload: list[dict[str, Any]],
+    market_payload: list[dict[str, Any]],
+    rag_examples: list[dict[str, Any]],
+    upstream_analysis_context: dict[str, Any] | None,
+) -> AnalysisGenerationResult:
+    provider_events, provider_market, provider_rag, provider_context_policy = _apply_provider_context_policy(
+        provider=config.provider,
+        events_payload=events_payload,
+        market_payload=market_payload,
+        rag_examples=rag_examples,
+    )
+
+    pipeline_mode = _pipeline_mode_from_env()
+    pipeline_telemetry: dict[str, Any] | None = None
+    summary_text: str | None = None
+    structured_payload: dict[str, Any] | None = None
+    legacy_token_usage: dict[str, Any] | None = None
+
+    if pipeline_mode in ("multi_stage", "auto"):
+        summary_text, structured_payload, pipeline_telemetry = _run_multi_stage_pipeline(
+            config=config,
+            slot=slot,
+            now_local=now_local,
+            events_payload=provider_events,
+            market_payload=provider_market,
+            rag_examples=provider_rag,
+        )
+        if summary_text is None:
+            logger.warning(
+                "Multi-stage pipeline failed; falling back to legacy single-call. telemetry=%s",
+                pipeline_telemetry,
+            )
+
+    used_multi_stage = summary_text is not None
+
+    if summary_text is None:
+        system_prompt, user_prompt = _build_prompts(
+            config=config,
+            slot=slot,
+            now_local=now_local,
+            events_json=json.dumps(provider_events, ensure_ascii=False),
+            market_json=json.dumps(provider_market, ensure_ascii=False),
+            upstream_analysis_context=upstream_analysis_context,
+        )
+        _write_prompt_snapshots(system_prompt, user_prompt, slot)
+        summary_text_raw, legacy_usage = _call_llm(
+            provider=config.provider,
+            api_base=config.api_base,
+            api_key=config.api_key,
+            model=config.model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+        summary_text = _normalize_text(summary_text_raw)
+        legacy_token_usage = legacy_usage.to_dict()
+
+    return AnalysisGenerationResult(
+        config=config,
+        events_payload=provider_events,
+        market_payload=provider_market,
+        rag_examples=provider_rag,
+        provider_context_policy=provider_context_policy,
+        summary_text=summary_text,
+        structured_payload=structured_payload,
+        pipeline_telemetry=pipeline_telemetry,
+        legacy_token_usage=legacy_token_usage,
+        used_multi_stage=used_multi_stage,
+    )
+
+
 def _retrieve_rag_examples(
     store: MySqlEventStore,
     events_payload: list[dict[str, Any]],
@@ -1440,58 +1586,50 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         for row in recent_market_rows
     ]
     rag_examples, rag_telemetry = _retrieve_rag_examples(store, events_payload, slot=slot)
-    events_payload, market_payload, rag_examples, provider_context_policy = _apply_provider_context_policy(
-        provider=config.provider,
-        events_payload=events_payload,
-        market_payload=market_payload,
-        rag_examples=rag_examples,
-    )
-
-    pipeline_mode = _pipeline_mode_from_env()
-    pipeline_telemetry: dict[str, Any] | None = None
-    summary_text: str | None = None
-    structured_payload: dict[str, Any] | None = None
-
-    legacy_token_usage: dict[str, Any] | None = None
-    if pipeline_mode in ("multi_stage", "auto"):
-        summary_text, structured_payload, pipeline_telemetry = _run_multi_stage_pipeline(
+    runtime_failover: dict[str, Any] | None = None
+    try:
+        generation = _generate_analysis_once(
             config=config,
             slot=slot,
             now_local=now_local,
             events_payload=events_payload,
             market_payload=market_payload,
             rag_examples=rag_examples,
-        )
-        if summary_text is None:
-            logger.warning(
-                "Multi-stage pipeline failed; falling back to legacy single-call. telemetry=%s",
-                pipeline_telemetry,
-            )
-
-    used_multi_stage = summary_text is not None
-
-    if summary_text is None:
-        # legacy path 是最後保底：就算多階段 schema / stage 其中一段爆掉，
-        # 仍嘗試用舊式單次 prompt 產出可閱讀報告，避免排程整天空白。
-        system_prompt, user_prompt = _build_prompts(
-            config=config,
-            slot=slot,
-            now_local=now_local,
-            events_json=json.dumps(events_payload, ensure_ascii=False),
-            market_json=json.dumps(market_payload, ensure_ascii=False),
             upstream_analysis_context=upstream_analysis_context,
         )
-        _write_prompt_snapshots(system_prompt, user_prompt, slot)
-        summary_text_raw, legacy_usage = _call_llm(
-            provider=config.provider,
-            api_base=config.api_base,
-            api_key=config.api_key,
-            model=config.model,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
+    except Exception as exc:
+        failover_config = _runtime_failover_config(config, exc)
+        if failover_config is None:
+            raise
+        runtime_failover = dict((failover_config.model_router or {}).get("runtime_failover") or {})
+        logger.warning(
+            "Market analysis runtime LLM failover from %s/%s to %s/%s after error=%s",
+            config.provider,
+            config.model,
+            failover_config.provider,
+            failover_config.model,
+            str(exc)[:300],
         )
-        summary_text = _normalize_text(summary_text_raw)
-        legacy_token_usage = legacy_usage.to_dict()
+        generation = _generate_analysis_once(
+            config=failover_config,
+            slot=slot,
+            now_local=now_local,
+            events_payload=events_payload,
+            market_payload=market_payload,
+            rag_examples=rag_examples,
+            upstream_analysis_context=upstream_analysis_context,
+        )
+
+    config = generation.config
+    events_payload = generation.events_payload
+    market_payload = generation.market_payload
+    rag_examples = generation.rag_examples
+    provider_context_policy = generation.provider_context_policy
+    summary_text = generation.summary_text
+    structured_payload = generation.structured_payload
+    pipeline_telemetry = generation.pipeline_telemetry
+    legacy_token_usage = generation.legacy_token_usage
+    used_multi_stage = generation.used_multi_stage
 
     claim_verification = verify_claim_coverage(
         summary_text=summary_text or "",
@@ -1562,6 +1700,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 "python_push_removed": True,
                 "web_search_requested": config.provider == "openai" and _openai_web_search_enabled(),
                 "model_router": getattr(config, "model_router", None),
+                "runtime_failover": runtime_failover,
                 "upstream_analysis_context": upstream_analysis_context,
                 "context_pack": context_pack_telemetry,
                 "provider_context_policy": provider_context_policy,

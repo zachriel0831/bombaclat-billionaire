@@ -3,17 +3,25 @@
 ## Scope
 These instructions apply to this repository.
 
+## AI Operating Model
+- Codex is the primary implementation and maintenance agent for this repo.
+- Claude is a secondary assistant for review, explanation, or narrow follow-up work.
+- `AGENTS.md` is the source of truth for agent behavior. `CLAUDE.md` may add Claude-specific shell/test notes, but it must not contradict this file.
+- Start at `PROJECT_INDEX.md` for whole-repo navigation, then load only the smallest task-specific context.
+
 ## Context Loading
 Do not preload the whole `memory-bank/`.
 Read only the smallest useful set for the task.
 
 Default:
+0. `PROJECT_INDEX.md` when orientation is needed
 1. `memory-bank/rules.md`
 2. Related source files for the task
 
 Add these only when relevant:
 - `memory-bank/PROJECT_DOCUMENTATION.md`: architecture, schema, data flow, source mapping, scheduler, or service-boundary changes
 - `memory-bank/workflows.md`: service operations, runbooks, or repeatable workflow changes
+- `memory-bank/rag-operations.md`: RAG indexing, retrieval, embeddings, telemetry, or RAG failure handling
 - `tasks/lessons.md`: user corrections, repeated mistakes, or task-start prevention checks
 - `tasks/todo.md`: non-trivial work with 3+ steps or architecture decisions
 - `memory-bank/09-decisions/`: decisions that explain existing behavior
@@ -34,6 +42,7 @@ Add these only when relevant:
 - Do not mark work complete without verification evidence (tests, logs, or runtime output).
 - Prefer parallel execution for independent checks to keep task flow efficient.
 - For agent/skills related changes, run readiness gate locally: `python scripts/validate_readiness.py`.
+- For RAG-related changes, update `memory-bank/rag-operations.md` and run targeted RAG/analysis tests when code changes.
 
 ## Response Style
 - Default response style is primitive-short: minimal words, direct meaning, no filler.

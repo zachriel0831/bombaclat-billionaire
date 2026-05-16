@@ -6,6 +6,11 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Any
 
+from news_platform.author_metadata import (
+    AUTHOR_METHOD_NONE,
+    AUTHOR_STATUS_PARSER_NOT_SUPPORTED,
+)
+
 
 @dataclass
 class NewsArticle:
@@ -19,6 +24,12 @@ class NewsArticle:
     url: str
     published_at: datetime | None
     summary: str | None
+    authors: list[str] = field(default_factory=list)
+    author_extraction_status: str = AUTHOR_STATUS_PARSER_NOT_SUPPORTED
+    author_extraction_method: str = AUTHOR_METHOD_NONE
+    author_extraction_confidence: float | None = None
+    author_raw_text: str | None = None
+    author_extracted_at: datetime | None = None
     tags: list[str] = field(default_factory=list)
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -26,6 +37,9 @@ class NewsArticle:
         data = asdict(self)
         data["published_at"] = (
             self.published_at.isoformat() if self.published_at else None
+        )
+        data["author_extracted_at"] = (
+            self.author_extracted_at.isoformat() if self.author_extracted_at else None
         )
         return data
 

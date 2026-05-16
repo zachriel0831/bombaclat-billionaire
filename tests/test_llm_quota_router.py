@@ -110,11 +110,25 @@ class LlmQuotaRouterTests(unittest.TestCase):
         self.assertEqual(decision.statuses[0].status, "unknown")
         self.assertEqual(decision.statuses[0].reason, "monthly_budget_not_configured")
 
-    def test_select_model_defaults_openai_before_anthropic(self) -> None:
+    def test_select_model_keeps_preferred_provider_first_without_explicit_order(self) -> None:
         openai = LlmRouteCandidate("openai", "gpt-main", "https://api.openai.com/v1", "", "openai-key")
         anthropic = LlmRouteCandidate("anthropic", "claude-main", "https://api.anthropic.com", "", "claude-key")
 
         with patch.dict(os.environ, {"MARKET_ANALYSIS_PROVIDER_ORDER": ""}, clear=False):
+            decision = select_market_analysis_model(
+                preferred=anthropic,
+                alternatives=[openai],
+                now_utc=datetime(2026, 5, 7, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(decision.provider_order[:2], ["anthropic", "openai"])
+        self.assertEqual(decision.selected.provider, "anthropic")
+
+    def test_select_model_explicit_order_can_prefer_openai(self) -> None:
+        openai = LlmRouteCandidate("openai", "gpt-main", "https://api.openai.com/v1", "", "openai-key")
+        anthropic = LlmRouteCandidate("anthropic", "claude-main", "https://api.anthropic.com", "", "claude-key")
+
+        with patch.dict(os.environ, {"MARKET_ANALYSIS_PROVIDER_ORDER": "openai,anthropic"}, clear=False):
             decision = select_market_analysis_model(
                 preferred=anthropic,
                 alternatives=[openai],

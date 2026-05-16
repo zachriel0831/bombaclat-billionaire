@@ -90,6 +90,42 @@ class RssFeedParseTests(unittest.TestCase):
         self.assertEqual(articles[0].title, "Atom 條目")
         self.assertEqual(articles[0].url, "https://www.ettoday.net/news/20260508/abc.htm")
 
+    def test_extracts_dc_creator_author(self):
+        feed = """<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel>
+          <item>
+            <title>作者測試</title>
+            <link>https://e.com/a</link>
+            <pubDate>Thu, 08 May 2026 04:00:00 +0000</pubDate>
+            <dc:creator>記者張文川／台北報導</dc:creator>
+          </item>
+        </channel></rss>"""
+        articles = self.source.parse(feed)
+        self.assertEqual(articles[0].authors, ["張文川"])
+        self.assertEqual(articles[0].raw["author_values"], ["記者張文川／台北報導"])
+
+    def test_extracts_atom_author_name(self):
+        feed = """<feed xmlns="http://www.w3.org/2005/Atom">
+          <entry>
+            <title>Atom 作者</title>
+            <link href="https://e.com/atom-author" />
+            <updated>2026-05-08T05:00:00Z</updated>
+            <author><name>Jane Doe</name></author>
+          </entry>
+        </feed>"""
+        articles = self.source.parse(feed)
+        self.assertEqual(articles[0].authors, ["Jane Doe"])
+
+    def test_extracts_reporter_from_summary_when_author_tag_missing(self):
+        feed = """<rss><channel>
+          <item>
+            <title>摘要作者</title>
+            <link>https://e.com/byline</link>
+            <description><![CDATA[〔記者王小明／台北報導〕新聞內容。]]></description>
+          </item>
+        </channel></rss>"""
+        articles = self.source.parse(feed)
+        self.assertEqual(articles[0].authors, ["王小明"])
+
     def test_skips_items_without_title_or_link(self):
         bad = """<rss><channel>
           <item><link>https://e.com/a</link></item>

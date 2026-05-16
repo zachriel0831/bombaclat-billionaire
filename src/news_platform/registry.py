@@ -88,6 +88,28 @@ TW_SOURCES: list[SourceMeta] = [
         political_camp="pan_blue",
         china_alignment="beijing_friendly",
     ),
+    SourceMeta(
+        source_id="newtalk",
+        name="Newtalk",
+        country="TW",
+        political_camp="pan_green",
+        china_alignment="critical",
+    ),
+    SourceMeta(
+        source_id="storm",
+        name="Storm Media",
+        country="TW",
+        political_camp="mixed",
+        china_alignment="neutral",
+    ),
+    SourceMeta(
+        # 工商時報屬旺中系，以公開 Google News sitemap 補足政策與生活新聞覆蓋。
+        source_id="ctee",
+        name="工商時報",
+        country="TW",
+        political_camp="pan_blue",
+        china_alignment="beijing_friendly",
+    ),
 ]
 
 
@@ -133,6 +155,26 @@ _DEFAULT_TW_SOCIETY_FEEDS: list[FeedSpec] = [
         url="https://news.ebc.net.tw/sitemap/realtime.xml",
         path_filter="/news/society/",
     ),
+    FeedSpec(
+        source_id="newtalk",
+        category="society",
+        kind="rss",
+        url="https://newtalk.tw/rss/category/14",
+    ),
+    FeedSpec(
+        source_id="storm",
+        category="society",
+        kind="rss",
+        url="https://www.storm.mg/api/getRss/channel_id/9?path=https%3A%2F%2Fwww.storm.mg%2Farticle",
+    ),
+    FeedSpec(
+        # CTEE sitemap URL tail category code 431401 maps to articleSection=生活.
+        source_id="ctee",
+        category="society",
+        kind="sitemap",
+        url="https://www.ctee.com.tw/sitemaps/sitemap_newstoday.xml",
+        path_filter="-431401",
+    ),
 ]
 
 
@@ -175,6 +217,26 @@ _DEFAULT_TW_POLITICS_FEEDS: list[FeedSpec] = [
         kind="sitemap",
         url="https://news.ebc.net.tw/sitemap/realtime.xml",
         path_filter="/news/politics/",
+    ),
+    FeedSpec(
+        source_id="newtalk",
+        category="politics",
+        kind="rss",
+        url="https://newtalk.tw/rss/category/2",
+    ),
+    FeedSpec(
+        source_id="storm",
+        category="politics",
+        kind="rss",
+        url="https://www.storm.mg/api/getRss/channel_id/7?path=https%3A%2F%2Fwww.storm.mg%2Farticle",
+    ),
+    FeedSpec(
+        # CTEE sitemap URL tail category code 430104 maps to articleSection=要聞.
+        source_id="ctee",
+        category="politics",
+        kind="sitemap",
+        url="https://www.ctee.com.tw/sitemaps/sitemap_newstoday.xml",
+        path_filter="-430104",
     ),
 ]
 

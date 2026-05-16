@@ -11,6 +11,14 @@ from __future__ import annotations
 import logging
 from xml.etree import ElementTree as ET
 
+from news_platform.author_metadata import (
+    AUTHOR_METHOD_NONE,
+    AUTHOR_METHOD_SITEMAP_METADATA,
+    AUTHOR_STATUS_LOW_CONFIDENCE,
+    AUTHOR_STATUS_NO_DETAIL_FETCHED,
+    AUTHOR_STATUS_PRESENT,
+)
+from news_platform.author_extractor import normalize_authors
 from news_platform.http_client import http_get_bytes
 from news_platform.models import NewsArticle
 from news_platform.sources.base import NewsSource
@@ -96,6 +104,22 @@ class GoogleNewsSitemapSource(NewsSource):
 
         published = parse_datetime(self._find_text(news_node, "publication_date"))
         canonical = canonical_url(loc) or loc
+        author_values = self._find_texts(news_node, "author", "creator")
+        authors = normalize_authors(author_values)
+        author_status = AUTHOR_STATUS_NO_DETAIL_FETCHED
+        author_method = AUTHOR_METHOD_NONE
+        author_confidence: float | None = None
+        author_raw_text: str | None = None
+        if author_values:
+            author_raw_text = " | ".join(author_values)
+            author_method = AUTHOR_METHOD_SITEMAP_METADATA
+            if authors:
+                author_status = AUTHOR_STATUS_PRESENT
+                author_confidence = 1.0
+            else:
+                author_status = AUTHOR_STATUS_LOW_CONFIDENCE
+                author_confidence = 0.0
+        publication_name = self._publication_name(news_node)
 
         return NewsArticle(
             article_id=stable_id(self.source_id, self.category, canonical, title.strip()),
@@ -106,8 +130,13 @@ class GoogleNewsSitemapSource(NewsSource):
             url=canonical,
             published_at=published,
             summary=None,
+            authors=authors,
+            author_extraction_status=author_status,
+            author_extraction_method=author_method,
+            author_extraction_confidence=author_confidence,
+            author_raw_text=author_raw_text,
             tags=[],
-            raw={"feed": self.url, "original_url": loc, "kind": "sitemap"},
+            raw=self._raw_payload(loc, author_values, publication_name),
         )
 
     @staticmethod
@@ -125,3 +154,38 @@ class GoogleNewsSitemapSource(NewsSource):
             if local_name(child.tag).lower() == name.lower():
                 return child
         return None
+
+    @staticmethod
+    def _find_texts(parent: ET.Element, *names: str) -> list[str]:
+        wanted = {name.lower() for name in names}
+        values: list[str] = []
+        for child in parent.iter():
+            if local_name(child.tag).lower() in wanted:
+                value = (child.text or "").strip()
+                if value:
+                    values.append(value)
+        return values
+
+    @staticmethod
+    def _publication_name(news_node: ET.Element) -> str | None:
+        publication = GoogleNewsSitemapSource._find_child(news_node, "publication")
+        if publication is None:
+            return None
+        return GoogleNewsSitemapSource._find_text(publication, "name")
+
+    def _raw_payload(
+        self,
+        original_url: str,
+        author_values: list[str],
+        publication_name: str | None,
+    ) -> dict[str, object]:
+        raw: dict[str, object] = {
+            "feed": self.url,
+            "original_url": original_url,
+            "kind": "sitemap",
+        }
+        if author_values:
+            raw["author_values"] = author_values
+        if publication_name:
+            raw["publication_name"] = publication_name
+        return raw

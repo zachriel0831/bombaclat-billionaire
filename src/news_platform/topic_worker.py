@@ -37,6 +37,7 @@ class TopicWorker:
                     title=row.title or "",
                     summary=row.summary or "",
                     keywords=keywords,
+                    category=getattr(row, "category", None),
                 )
                 if not topics:
                     topics = [general_topic_for_category(getattr(row, "category", None))]

@@ -80,6 +80,13 @@ def main() -> int:
                     continue
                 if not (root / rel).exists():
                     errors.append(f"Skill '{entry.name}' references missing file: {rel}")
+            skill_path = root / entry.path if entry.path else None
+            if skill_path and skill_path.exists():
+                skill_text = skill_path.read_text(encoding="utf-8")
+                if not skill_text.lstrip().startswith("---"):
+                    errors.append(f"Skill '{entry.name}' SKILL.md missing YAML frontmatter")
+                if "name:" not in skill_text or "description:" not in skill_text:
+                    errors.append(f"Skill '{entry.name}' SKILL.md missing name/description frontmatter")
 
     if warnings:
         print("Warnings:")

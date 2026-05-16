@@ -103,6 +103,27 @@ class TopicWorkerTests(unittest.TestCase):
         self.assertEqual(store.updated[1][0]["topic_id"], "general_politics_news")
         self.assertEqual(store.updated[1][0]["label"], "一般政治新聞")
 
+    def test_run_once_passes_category_to_politics_classifier(self):
+        rows = [
+            StoredArticleTopicInput(
+                row_id=1,
+                article_id="a",
+                category="politics",
+                title="總統大選民調出爐 候選人展開競選造勢",
+                summary=None,
+                keywords_json="[]",
+            )
+        ]
+        store = FakeStore([rows])
+        worker = TopicWorker(store, batch_size=10)
+
+        result = worker.run_once()
+
+        self.assertEqual(result.scanned, 1)
+        self.assertEqual(result.updated, 1)
+        self.assertEqual(result.failed, 0)
+        self.assertEqual(store.updated[1][0]["topic_id"], "elections")
+
     def test_run_once_counts_store_failure(self):
         rows = [
             StoredArticleTopicInput(

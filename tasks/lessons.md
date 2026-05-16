@@ -27,6 +27,245 @@ This file is append-only. Add a new entry after any user correction to prevent r
 
 <!-- Add new lessons below this line -->
 
+## LESSON-20260515-04
+- Date: 2026-05-15
+- Trigger (User correction): User clarified market-analysis tone should not become overly plain-language; it should stay closer to Yutinghao-style macro commentary that general audiences still like.
+- What was wrong: The first framing overcorrected toward a beginner-friendly "human translation" format instead of a professional-but-conversational macro commentary voice.
+- Root cause: I treated readability as simplification, while the desired tone is structured macro reasoning with clearer market implications and less acronym stacking.
+- New rule (always/never): Always keep market-analysis rigor and mechanism, but lead each section with what the market is trading and why it matters to Taiwan; never turn market analysis into a shallow beginner lazy-bag.
+- Prevention checklist (before final response):
+  - [ ] Preserve the macro flow: Regime, rates/liquidity, cycle, sentiment, Taiwan allocation, risks
+  - [ ] Add market-implication translation before raw indicator piles
+  - [ ] Keep useful technical terms but explain acronyms or move them into data bullets
+  - [ ] Verify prompt snapshots/tests include the tone contract
+- Repo updates made:
+  - `src/event_relay/analysis_stages/stage4_synthesis.py`
+  - `skills/macro-weekly-summary-skill/SKILLS.md`
+  - `skills/macro-weekly-summary-skill/SKILL.md`
+  - `tests/test_analysis_stages.py`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest tests.test_analysis_stages -v` passed 26 tests
+  - `python scripts/validate_readiness.py` passed
+- Status: active
+
+## LESSON-20260515-03
+- Date: 2026-05-15
+- Trigger (User correction): User asked why politics rows still had no second-layer topic after politics `TopicSpec` rules were added.
+- What was wrong: The new politics topic rules were added, but old rows already classified as `general_politics_news` were not re-run through deterministic rules.
+- Root cause: `TopicWorker` only fetches `topics_json IS NULL`; rule fallback rows are processed rows and require an explicit fallback-row reclassification/backfill after topic dictionary changes.
+- New rule (always/never): Always backfill affected `general_social_news` / `general_politics_news` rows after adding or tuning deterministic topic rules; never assume `--classify-topics` will update already-classified fallback rows.
+- Prevention checklist (before final response):
+  - [ ] Query before/after topic distribution for the affected category
+  - [ ] Reclassify only rule fallback rows and write back only when a specific topic matches
+  - [ ] Leave no-match rows in the category-specific general topic
+  - [ ] Record updated/skipped counts and topic distribution
+- Repo updates made:
+  - `memory-bank/workflows.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - Politics backfill scanned 1425 `general_politics_news` rows
+  - 1008 rows updated to politics L2 topics; 417 rows remained `general_politics_news`
+  - Post-backfill politics distribution includes `party_politics=327`, `legislative_policy=233`, `defense_security=120`, `cross_strait_relations=103`, `elections=95`, `foreign_affairs=86`, `public_budget=32`, `political_accountability=12`
+- Status: active
+
+## LESSON-20260515-02
+- Date: 2026-05-15
+- Trigger (User correction): User reported `中國進口原料煉喪屍煙彈 市值5億` still displayed as `一般社會新聞`.
+- What was wrong: The previous fix reclassified rows that matched manufacturing terms in summaries, but title-only `喪屍煙彈` / `喪屍菸彈` and `依托咪酯` emerging-drug wording was not yet covered.
+- Root cause: The `drug_abuse` dictionary still depended too much on generic manufacturing terms and missed current emerging-drug product names.
+- New rule (always/never): Always test both summary-rich and title-only versions of visible cards; never assume a summary match is enough for future rows or UI snippets.
+- Prevention checklist (before final response):
+  - [ ] Classify the exact visible title with `summary=None`
+  - [ ] Add product-name variants for emerging drugs, including Traditional Chinese spelling variants
+  - [ ] Backfill matching general fallback rows after the rule expands
+  - [ ] Verify the exact reported title/id in DB or API
+- Repo updates made:
+  - `src/news_platform/topics.py`
+  - `tests/test_news_platform_topic_classifier.py`
+  - `spec/news-topic-classification-functional-spec.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest tests.test_news_platform_topic_classifier -v` passed 14 tests
+  - DB exact row id `88981` for `中國進口原料煉喪屍煙彈 市值5億` has `topic_id=drug_abuse`
+  - Backfill updated 4 additional zombie-vape fallback rows to `drug_abuse`
+- Status: active
+
+## LESSON-20260515-01
+- Date: 2026-05-15
+- Trigger (User correction): User reported `理化老師變「絕命毒師」 判7年9月入獄` displayed as `一般社會新聞` instead of `新興毒品／校園毒品`.
+- What was wrong: `drug_abuse` rules missed school/drug-manufacturing wording such as `絕命毒師`, `製毒`, `製造毒品`, `第三級毒品`, and `喵喵`.
+- Root cause: The deterministic topic rules covered common usage/dealing terms but did not include manufacturing and emerging-drug slang variants; existing general fallback rows also require explicit reclassification because `TopicWorker` only handles `topics_json IS NULL`.
+- New rule (always/never): Always add regression terms and backfill matching general fallback rows after a topic false negative; never rely on the normal topic worker to reprocess rows that already have general fallback `topics_json`.
+- Prevention checklist (before final response):
+  - [ ] Reproduce the headline/summary through `topic_classifier.classify`
+  - [ ] Add narrow terms that cover the miss without broad generic false positives
+  - [ ] Reclassify existing fallback rows that now match the fixed rule
+  - [ ] Verify the exact reported row in DB or API
+- Repo updates made:
+  - `src/news_platform/topics.py`
+  - `tests/test_news_platform_topic_classifier.py`
+  - `spec/news-topic-classification-functional-spec.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest tests.test_news_platform_topic_classifier -v` passed 13 tests
+  - `python scripts/validate_readiness.py` passed
+  - DB backfill updated 11 general fallback rows to `drug_abuse`, including id `88982` for the reported title
+  - Local API `http://localhost:8082` was unavailable, so API display verification was not completed
+- Status: active
+
+## LESSON-20260514-06
+- Date: 2026-05-14
+- Trigger (User correction): User clarified that 少子化 must not remain 0 on the visible page; matching articles should be pulled from all relevant categories into that issue view.
+- What was wrong: I framed the issue as category scoping and suggested routing to politics instead of immediately making the issue page aggregate cross-category data.
+- Root cause: The system treated route category as both navigation state and data boundary, but 少子化 is an issue topic whose current coverage often lives outside society.
+- New rule (always/never): Always make user-facing issue pages aggregate cross-category when the issue naturally spans society/politics/life; never leave the visible topic empty just because the source category differs.
+- Prevention checklist (before final response):
+  - [ ] Query exact visible route and alternate categories for the topic
+  - [ ] If the topic is issue-level, verify API aggregation behavior rather than only crawler classification
+  - [ ] Preserve original article `category` while exposing the issue view
+- Repo updates made:
+  - `D:\work_space\claude-box\workspace\news-platform-api\src\main\java\com\zack\newsplatform\content\JdbcNewsArticleService.java`
+  - `D:\work_space\claude-box\workspace\news-platform-api\src\main\java\com\zack\newsplatform\content\NewsTopicCatalog.java`
+  - `D:\work_space\claude-box\workspace\news-platform-api\src\test\java\com\zack\newsplatform\content\JdbcNewsArticleServiceTest.java`
+  - `D:\work_space\claude-box\workspace\news-platform-api\docs\API_SPEC.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/09-decisions/2026-05-14-low-birthrate-cross-category-topic.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - API tests passed: `mvnw test` reported 67 tests, 0 failures
+  - Live API returned `low_birthrate.articleCount=6`, article total 6, and timeline total 6 on the society route
+  - Frontend proxy returned `low_birthrate.articleCount=6`
+  - Browser page `/?category=society&topic=low_birthrate` showed `6 articles` and topic nav `少子化 6`
+- Status: active
+
+## LESSON-20260514-05
+- Date: 2026-05-14
+- Trigger (User correction): User showed Google results with many current 少子化 stories after the frontend topic page still showed 0 articles.
+- What was wrong: I treated the first finding as only category scoping, but did not immediately compare live external headlines against configured sources and classifier terms.
+- Root cause: Current stories used `少子女化` and policy terms such as `兒少TISA`; the deterministic `low_birthrate` rules only covered `少子化` variants. Some source summaries also include related-link blocks that can pollute topic matching.
+- New rule (always/never): Always compare current external headline wording, configured source coverage, smoke-fetch matches, DB rows, and exact frontend/API category route before calling a topic-source issue resolved.
+- Prevention checklist (before final response):
+  - [ ] Search current external examples and list publishers
+  - [ ] Compare publishers against `news_platform.registry`
+  - [ ] Run smoke fetch and DB topic queries for the exact issue terms
+  - [ ] Verify classifier variants and related-link pollution
+  - [ ] Call both exact visible category route and alternate category when issue topics cross politics/society
+- Repo updates made:
+  - `src/news_platform/topics.py`
+  - `src/news_platform/topic_classifier.py`
+  - `tests/test_news_platform_topic_classifier.py`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - External search found current Yahoo/時報、知新聞、TVBS、Newtalk 等少子化/少子女化 stories
+  - Smoke fetch found TVBS、ETtoday、Newtalk matching low-birthrate policy titles
+  - DB/API after backfill: `/api/politics/topics?...` returned `low_birthrate.articleCount=5`; `/api/society/topics?...` still returned 0 because visible page is category-scoped
+  - `scripts/run_data_source_health.ps1 -EnvFile .env` returned `Data source health: OK`
+  - Topic classifier tests passed: `python -m unittest tests.test_news_platform_topic_classifier -v`
+- Status: active
+
+## LESSON-20260514-04
+- Date: 2026-05-14
+- Trigger (User correction): User showed the 少子化 society topic page with 0 articles after data-source health was reported OK.
+- What was wrong: Source/process freshness was healthy, but I had not checked per-topic coverage and category scoping for the user-facing issue page.
+- Root cause: `low_birthrate` had one recent article under `category=politics`; the screenshot was `category=society`, whose scoped API query correctly returned 0.
+- New rule (always/never): Always verify issue pages by exact `category + topic` API path and DB topic/category counts; never infer topic-page health from source freshness alone.
+- Prevention checklist (before final response):
+  - [ ] Query `topics_json` counts grouped by `category`
+  - [ ] Call the exact frontend/API route for the visible page category and topic
+  - [ ] Check the alternate category before calling a topic truly empty
+- Repo updates made:
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - DB query returned `low_birthrate_by_category [('politics', 1)]`
+  - `/api/society/topics?...` returned `low_birthrate.articleCount=0`
+  - `/api/politics/topics?...` returned `low_birthrate.articleCount=1`
+  - `/api/politics/articles?...topic=low_birthrate` returned article `14297`
+- Status: active
+
+## LESSON-20260514-03
+- Date: 2026-05-14
+- Trigger (User correction): User showed the frontend finance page still rendering old Reuters/Fox/BBC rows after live DB/API checks showed Taiwan finance rows existed.
+- What was wrong: I verified crawler and DB freshness but did not verify the frontend `/api/events` source allowlist that controls what the finance page can display.
+- Root cause: The public finance feed uses an explicit allowlist; newly added Taiwan finance RSS sources were in ingestion but not in the frontend/API source mapping. Chinese source filters also had to match legacy mojibake DB values before display repair.
+- New rule (always/never): Always verify the frontend API request path and source allowlist after adding or checking relay-event news sources; never conclude feed freshness from DB rows alone when a UI uses allowlisted sources.
+- Prevention checklist (before final response):
+  - [ ] Call the exact frontend proxy URL used by the page, including `source` filters
+  - [ ] Confirm API source filters match normal names and any legacy stored encoding variants
+  - [ ] Open the frontend page and verify visible latest titles, not just backend rows
+- Repo updates made:
+  - `D:\work_space\claude-box\workspace\news-display-frontend\src\lib\content-api.ts`
+  - `D:\work_space\claude-box\workspace\news-display-frontend\src\components\infinite-news-feed.tsx`
+  - `D:\work_space\claude-box\workspace\news-display-frontend\src\components\news-platform-dashboard.tsx`
+  - `D:\work_space\claude-box\workspace\news-platform-api\src\main\java\com\zack\newsplatform\content\JdbcContentRepository.java`
+  - `D:\work_space\claude-box\workspace\news-platform-api\src\main\java\com\zack\newsplatform\content\TextEncodingRepair.java`
+  - `D:\work_space\claude-box\workspace\news-platform-api\src\test\java\com\zack\newsplatform\content\JdbcContentRepositoryTest.java`
+  - `D:\work_space\claude-box\workspace\news-platform-api\docs\API_SPEC.md`
+  - `D:\work_space\claude-box\workspace\news-platform-api\docs\openapi.yaml`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - Frontend proxy with the public source allowlist returned latest 5/14 rows including MoneyDJ, LTN finance, Economic Daily News, Storm, and CNA finance
+  - API tests passed: 62 tests, 0 failures
+  - Frontend `npm run lint` passed with two pre-existing warnings; `npx tsc --noEmit` passed
+  - Browser snapshot showed the finance page rendering latest 5/14 Taiwan finance titles and short source labels
+- Status: active
+
+## LESSON-20260514-02
+- Date: 2026-05-14
+- Trigger (User correction): User asked to persist the restart process and post-restart checks in repo docs so future new conversations do not rediscover the flow.
+- What was wrong: Restart recovery knowledge was scattered across scripts, workflows, logs, and prior conversation context.
+- Root cause: There was no focused runbook that tied service restart, source freshness checks, scheduled tasks, and pre-open analysis verification into one entry point.
+- New rule (always/never): Always read `memory-bank/restart-recovery-runbook.md` first for machine reboot, service restart, data-source freshness, or missed pre-open analysis questions; never rebuild the recovery checklist from memory when the runbook exists.
+- Prevention checklist (before final response):
+  - [ ] Confirm live services/processes and `/healthz`
+  - [ ] Check society/politics and finance RSS freshness from DB/log evidence
+  - [ ] Check scheduled tasks and today's `pre_tw_open` / `macro_daily` storage
+- Repo updates made:
+  - `memory-bank/restart-recovery-runbook.md`
+  - `memory-bank/workflows.md`
+  - `memory-bank/00-index.md`
+  - `README.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `rg` found `memory-bank/restart-recovery-runbook.md` links in README, memory-bank index, workflows, lessons, and task board
+  - `git diff --check -- README.md memory-bank\00-index.md memory-bank\workflows.md memory-bank\restart-recovery-runbook.md tasks\todo.md tasks\lessons.md` passed with CRLF warnings only
+- Status: active
+
+## LESSON-20260514-01
+- Date: 2026-05-14
+- Trigger (User correction): User showed the market candle UI where TAIEX displayed `13:30` beside live stock candles around `08:37`, and asked whether the skill/workflow missed a previously fixed timestamp issue.
+- What was wrong: The frontend displayed the latest candle `bucketStart` as time-only, so a stale prior-day TAIEX candle looked like current intraday data.
+- Root cause: Market candle client docs and lessons did not preserve the rule to display update time with date context for stale rows; the UI also dropped per-symbol market metadata during refresh.
+- New rule (always/never): Always display market candle card time from `lastTickAt` first, then `bucketEnd`, then `bucketStart`; never render a non-today candle as time-only in live/intraday UI.
+- Prevention checklist (before final response):
+  - [x] Query live candle API for the reported symbol and compare `bucketStart`, `lastTickAt`, and current Asia/Taipei date
+  - [x] Verify frontend stale candle display includes `昨日` or date context
+  - [x] Preserve each symbol's `market` in initial fetch, refresh fetch, and SSE matching
+- Repo updates made:
+  - `D:\work_space\claude-box\workspace\news-display-frontend\src\lib\market-candle-display.ts`
+  - `D:\work_space\claude-box\workspace\news-display-frontend\src\components\market-candle-carousel.tsx`
+  - `D:\work_space\claude-box\workspace\news-display-frontend\src\components\market-candle-section.tsx`
+  - `D:\work_space\claude-box\workspace\news-display-frontend\docs\MARKET_CANDLES_CLIENT.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - Live API showed `TAIEX` latest candle at 2026-05-13 13:30/13:31 Asia/Taipei while stock candles were current 2026-05-14 intraday
+  - `npm run lint` passed in `D:\work_space\claude-box\workspace\news-display-frontend`
+  - `npx tsc --noEmit` passed in `D:\work_space\claude-box\workspace\news-display-frontend`
+  - Browser verification showed stale TAIEX as `昨日 13:31`, not time-only `13:30`
+- Status: active
+
 ## LESSON-20260511-06
 - Date: 2026-05-11
 - Trigger (User correction): User clarified Taiwan finance news should enter `relay_event`, not the Taiwan `news_article` pipeline.

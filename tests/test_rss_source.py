@@ -48,7 +48,7 @@ class OfficialRssSourceTests(unittest.TestCase):
             ),
         }
 
-        def fake_get(url: str, timeout: int = 15) -> str:
+        def fake_get(url: str, timeout: int = 15, verify_ssl: bool = True) -> str:
             """執行 fake get 方法的主要邏輯。"""
             return payloads[url]
 
@@ -75,7 +75,7 @@ class OfficialRssSourceTests(unittest.TestCase):
             ),
         }
 
-        def fake_get(url: str, timeout: int = 15) -> str:
+        def fake_get(url: str, timeout: int = 15, verify_ssl: bool = True) -> str:
             """執行 fake get 方法的主要邏輯。"""
             return payloads[url]
 
@@ -84,6 +84,42 @@ class OfficialRssSourceTests(unittest.TestCase):
             items = source.fetch(limit=20)
 
         self.assertEqual([item.title for item in items], ["b1", "a1"])
+
+    def test_fetch_retries_missing_ski_feed_without_ssl_verification(self) -> None:
+        calls: list[bool] = []
+
+        def fake_get(url: str, timeout: int = 15, verify_ssl: bool = True) -> str:
+            calls.append(verify_ssl)
+            if verify_ssl:
+                raise OSError("Missing Subject Key Identifier")
+            return _rss([("a1", "Wed, 22 Apr 2026 10:00:00 GMT")])
+
+        source = OfficialRssSource(["https://feed-a.example/rss.xml"], timeout_seconds=3)
+        with patch("news_collector.sources.rss.http_get_text", side_effect=fake_get):
+            items = source.fetch(limit=2)
+
+        self.assertEqual(calls, [True, False])
+        self.assertEqual([item.title for item in items], ["a1"])
+
+    def test_relative_links_are_resolved_against_feed_url(self) -> None:
+        source = OfficialRssSource(["https://www.twse.com.tw/rwd/zh/news/feed?type=rss"])
+        items = source._parse_feed(
+            """
+            <rss version="2.0">
+              <channel>
+                <title>TWSE</title>
+                <item>
+                  <title>t1</title>
+                  <link>/rwd/zh/news/newsDetail/abc</link>
+                  <pubDate>Wed, 22 Apr 2026 10:00:00 GMT</pubDate>
+                </item>
+              </channel>
+            </rss>
+            """,
+            "https://www.twse.com.tw/rwd/zh/news/feed?type=rss",
+        )
+
+        self.assertEqual(items[0].url, "https://www.twse.com.tw/rwd/zh/news/newsDetail/abc")
 
 
 if __name__ == "__main__":

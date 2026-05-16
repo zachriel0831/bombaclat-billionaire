@@ -1,3 +1,8 @@
+---
+name: skill-name
+description: Describe what this skill does and the concrete situations that should trigger it.
+---
+
 # SKILL_NAME
 
 ## Purpose

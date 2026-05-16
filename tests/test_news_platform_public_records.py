@@ -41,6 +41,7 @@ def _store_with_cursor(cursor: FakeCursor):
     store = NewsPlatformStore.__new__(NewsPlatformStore)
     store._conn = FakeConnection()
     store._lock = threading.RLock()
+    store._article_table = "t_news_articles"
     store._public_record_table = "t_public_records"
     store._article_record_link_table = "t_news_article_public_record_links"
     store._cursor = lambda: cursor
@@ -130,6 +131,72 @@ class NewsPlatformPublicRecordTests(unittest.TestCase):
         self.assertEqual(rows[0].confidence, 0.85)
         self.assertEqual(rows[0].record_type, "legislative_bill")
         self.assertEqual(rows[0].metrics_json, '{"proposal_count":1}')
+
+    def test_fetch_articles_for_public_record_matching_filters_recent_categories(self):
+        cursor = FakeCursor(
+            rows=[
+                (
+                    10,
+                    "article-1",
+                    "politics",
+                    "Title",
+                    "Summary",
+                    datetime(2026, 5, 12, 1, 0),
+                    '[{"kw":"法案","score":1}]',
+                    '[{"topic_id":"general_politics_news"}]',
+                )
+            ]
+        )
+        store = _store_with_cursor(cursor)
+
+        rows = store.fetch_articles_for_public_record_matching(
+            limit=25,
+            lookback_days=9,
+            categories=("politics",),
+        )
+
+        sql, params = cursor.executed[0]
+        self.assertIn("FROM `t_news_articles`", sql)
+        self.assertIn("category IN (%s)", sql)
+        self.assertIn("DATE_SUB(UTC_TIMESTAMP(), INTERVAL %s DAY)", sql)
+        self.assertEqual(params, ("politics", 9, 25))
+        self.assertEqual(rows[0].article_id, "article-1")
+        self.assertEqual(rows[0].topics_json, '[{"topic_id":"general_politics_news"}]')
+
+    def test_fetch_public_records_for_matching_filters_recent_types(self):
+        cursor = FakeCursor(
+            rows=[
+                (
+                    "ly:bill:123",
+                    "ly",
+                    "legislative_bill",
+                    "politics",
+                    "大學法部分條文修正草案",
+                    "https://www.ly.gov.tw/WebAPI/LegislativeBill.aspx",
+                    datetime(2026, 5, 8, 0, 0),
+                    "TW",
+                    '{"term":11}',
+                    '["大學法"]',
+                    '{"proposers":["吳思瑤"]}',
+                )
+            ]
+        )
+        store = _store_with_cursor(cursor)
+
+        rows = store.fetch_public_records_for_matching(
+            limit=10,
+            lookback_days=45,
+            categories=("politics",),
+            record_types=("legislative_bill",),
+        )
+
+        sql, params = cursor.executed[0]
+        self.assertIn("FROM `t_public_records`", sql)
+        self.assertIn("(category IS NULL OR category IN (%s))", sql)
+        self.assertIn("record_type IN (%s)", sql)
+        self.assertEqual(params, (45, "politics", "legislative_bill", 10))
+        self.assertEqual(rows[0].record_id, "ly:bill:123")
+        self.assertEqual(rows[0].raw_json, '{"proposers":["吳思瑤"]}')
 
 
 if __name__ == "__main__":

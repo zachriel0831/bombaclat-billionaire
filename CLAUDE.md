@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project-specific guidance for Claude Code. Keep this short.
+Claude is secondary in this workspace. [AGENTS.md](AGENTS.md) is the source of truth for repo behavior; this file only adds Claude-specific reminders.
 
 ## Style
 - Default to terse responses. Skip the closing summary table unless explicitly asked.

@@ -13,6 +13,7 @@ from event_relay.market_analysis import (
     _normalize_text,
     _resolve_slot,
     _resolve_slot_decision,
+    MarketAnalysisConfig,
     run_once,
 )
 from event_relay.prompt_assets import TokenUsage
@@ -499,6 +500,67 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertEqual(raw["delivery_policy"], "daily_pre_tw_open_macro_or_tw_holiday_us_close")
         self.assertFalse(result["push_enabled"])
 
+    def test_run_once_runtime_failover_openai_quota_to_anthropic(self) -> None:
+        _FakeAnalysisStore.records = []
+        _FakeAnalysisStore.signals = []
+        _FakeAnalysisStore.updated_summaries = []
+        _FakeAnalysisStore.summary_events = None
+        _FakeAnalysisStore.latest_us_close = None
+        calls: list[str] = []
+        config = MarketAnalysisConfig(
+            env_file=".env",
+            model="gpt-5",
+            api_base="https://api.openai.com/v1",
+            api_key="sk-openai-test",
+            api_key_file=".secrets/openai.dpapi",
+            skill_macro_path="",
+            skill_line_format_path="",
+            lookback_hours=24,
+            max_events=20,
+            max_market_rows=2,
+            window_minutes=25,
+            force=True,
+            slot="us_close",
+            provider="openai",
+        )
+
+        def _fake_call_llm(*_args, **kwargs):
+            provider = kwargs["provider"]
+            calls.append(provider)
+            if provider == "openai":
+                raise RuntimeError("OpenAI HTTPError status=429 body=insufficient_quota")
+            return "anthropic fallback analysis", TokenUsage(
+                provider="anthropic",
+                model=kwargs["model"],
+                prompt_tokens=12,
+                completion_tokens=4,
+            )
+
+        env = {
+            "MARKET_ANALYSIS_PIPELINE": "legacy",
+            "MARKET_ANALYSIS_RUNTIME_FAILOVER_ENABLED": "1",
+            "ANTHROPIC_API_KEY": "sk-ant-test",
+            "ANTHROPIC_MODEL": "claude-backup",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            with patch("event_relay.market_analysis.load_settings", return_value=SimpleNamespace(mysql_enabled=True)):
+                with patch("event_relay.market_analysis.MySqlEventStore", _FakeAnalysisStore):
+                    with patch("event_relay.market_analysis._write_prompt_snapshots", return_value=None):
+                        with patch("event_relay.market_analysis._call_llm", side_effect=_fake_call_llm):
+                            with patch("event_relay.market_analysis.datetime", _FixedDateTime):
+                                result = run_once(config)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["provider"], "anthropic")
+        self.assertEqual(result["model"], "claude-backup")
+        self.assertEqual(calls, ["openai", "anthropic"])
+        record = _FakeAnalysisStore.records[0]
+        self.assertEqual(record.model, "claude-backup")
+        raw = json.loads(record.raw_json)
+        self.assertEqual(raw["runtime_failover"]["from_provider"], "openai")
+        self.assertEqual(raw["runtime_failover"]["to_provider"], "anthropic")
+        self.assertEqual(raw["model_router"]["runtime_failover"]["to_model"], "claude-backup")
+
     def test_run_once_us_close_delivery_enabled_on_tw_holiday_if_us_open(self) -> None:
         _FakeAnalysisStore.records = []
         _FakeAnalysisStore.signals = []
@@ -815,8 +877,8 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertEqual(config.api_key, "sk-ant-test")
         self.assertEqual((config.model_router or {})["selected_provider"], "anthropic")
 
-    def test_load_config_model_router_defaults_openai_primary(self) -> None:
-        """Market analysis prefers OpenAI even if global LLM_PROVIDER points at Claude."""
+    def test_load_config_model_router_respects_llm_provider_without_override(self) -> None:
+        """Market analysis uses LLM_PROVIDER when no market-specific provider order is set."""
         env = {
             "LLM_PROVIDER": "anthropic",
             "MARKET_ANALYSIS_OPENAI_API_KEY": "sk-openai-test",
@@ -834,9 +896,9 @@ class MarketAnalysisTests(unittest.TestCase):
 
             config = _load_config(args)
 
-        self.assertEqual(config.provider, "openai")
-        self.assertEqual(config.model, "gpt-primary")
-        self.assertEqual((config.model_router or {})["provider_order"][:2], ["openai", "anthropic"])
+        self.assertEqual(config.provider, "anthropic")
+        self.assertEqual(config.model, "claude-secondary")
+        self.assertEqual((config.model_router or {})["provider_order"][:2], ["anthropic", "openai"])
 
     def test_anthropic_context_policy_compacts_prompt_payloads(self) -> None:
         """Claude fallback gets smaller prompt payloads while preserving scorecard context."""

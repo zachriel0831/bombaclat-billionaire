@@ -7,6 +7,7 @@ from __future__ import annotations
 
 # 共用 HTTP Client：提供含標頭的文字與 JSON 讀取工具。
 import json
+import ssl
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -17,9 +18,20 @@ DEFAULT_HEADERS = {
 }
 
 
-def http_get_text(url: str, params: dict[str, str | int] | None = None, timeout: int = 15) -> str:
+def http_get_text(
+    url: str,
+    params: dict[str, str | int] | None = None,
+    timeout: int = 15,
+    verify_ssl: bool = True,
+) -> str:
     """執行 http get text 的主要流程。"""
-    return http_get_text_with_headers(url=url, params=params, timeout=timeout, headers=None)
+    return http_get_text_with_headers(
+        url=url,
+        params=params,
+        timeout=timeout,
+        headers=None,
+        verify_ssl=verify_ssl,
+    )
 
 
 def http_get_text_with_headers(
@@ -27,6 +39,7 @@ def http_get_text_with_headers(
     params: dict[str, str | int] | None = None,
     timeout: int = 15,
     headers: dict[str, str] | None = None,
+    verify_ssl: bool = True,
 ) -> str:
     """執行 http get text with headers 的主要流程。"""
     full_url = f"{url}?{urlencode(params)}" if params else url
@@ -34,7 +47,8 @@ def http_get_text_with_headers(
     if headers:
         request_headers.update(headers)
     req = Request(full_url, headers=request_headers)
-    with urlopen(req, timeout=timeout) as resp:
+    context = None if verify_ssl else ssl._create_unverified_context()
+    with urlopen(req, timeout=timeout, context=context) as resp:
         return resp.read().decode("utf-8", errors="replace")
 
 
