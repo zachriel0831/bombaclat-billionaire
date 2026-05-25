@@ -149,7 +149,7 @@ class RagRetrievalTests(unittest.TestCase):
                 _analysis_candidate(
                     201,
                     "Fed cut supported Taiwan semiconductors and later hit target.",
-                    outcome_json={"status": "target_hit"},
+                    outcome_json={"entry_first_status": "entry_then_target"},
                 )
             ],
         )
@@ -169,9 +169,46 @@ class RagRetrievalTests(unittest.TestCase):
         self.assertGreater(analysis.hybrid_score, 0)
 
     def test_outcome_score_from_json_maps_status_and_return(self) -> None:
-        self.assertEqual(outcome_score_from_json({"status": "target_hit"}), 0.9)
-        self.assertEqual(outcome_score_from_json({"status": "stop_hit"}), 0.1)
+        self.assertEqual(outcome_score_from_json({"status": "win"}), 0.9)
+        self.assertEqual(outcome_score_from_json({"status": "loss"}), 0.1)
+        self.assertEqual(outcome_score_from_json({"status": "target_hit"}), 0.5)
+        self.assertEqual(outcome_score_from_json({"status": "stop_hit"}), 0.5)
         self.assertEqual(outcome_score_from_json({"realized_return_pct": 3.5}), 0.75)
+
+    def test_outcome_score_uses_first_exit_after_entry(self) -> None:
+        self.assertEqual(
+            outcome_score_from_json(
+                {
+                    "trigger_events": [
+                        {"trigger_type": "target_hit", "triggered_at": "2026-05-25T09:01:00+08:00"},
+                        {"trigger_type": "entry_hit", "triggered_at": "2026-05-25T09:10:00+08:00"},
+                        {"trigger_type": "stop_hit", "triggered_at": "2026-05-25T09:20:00+08:00"},
+                    ]
+                }
+            ),
+            0.1,
+        )
+        self.assertEqual(
+            outcome_score_from_json(
+                {
+                    "trigger_events": [
+                        {"trigger_type": "entry_hit", "triggered_at": "2026-05-25T09:10:00+08:00"},
+                        {"trigger_type": "target_hit", "triggered_at": "2026-05-25T09:20:00+08:00"},
+                    ]
+                }
+            ),
+            0.9,
+        )
+        self.assertEqual(
+            outcome_score_from_json(
+                {
+                    "trigger_events": [
+                        {"trigger_type": "target_hit", "triggered_at": "2026-05-25T09:01:00+08:00"}
+                    ]
+                }
+            ),
+            0.5,
+        )
 
 
 class _IndexStore:

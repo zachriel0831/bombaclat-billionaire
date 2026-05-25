@@ -29,6 +29,7 @@ RAG does not write delivery rows, LINE rows, order rows, or frontend rows.
   - vector similarity from local embeddings
   - metadata overlap for source family, category, ticker, topic, and slot
   - stored outcome score as a prior
+- Outcome scoring is entry-first for strategy triggers: raw `target_hit` or `stop_hit` alone is neutral, because a target can occur before `entry_hit`. Only lifecycle metadata such as `entry_first_status=entry_then_target` or ordered `trigger_events` where entry comes first can raise/lower the prior.
 - Event examples and generated-analysis examples can both be retrieved.
 - Retrieved examples are sent to stage2 as historical analogues only.
 - Historical example IDs must not be treated as current `trigger_event_ids` or current evidence IDs.

@@ -318,15 +318,24 @@ def outcome_score_from_json(outcome_json: dict[str, Any] | None) -> float:
         raw_score = _to_float(outcome_json.get(key))
         if raw_score is not None:
             return max(0.0, min(1.0, raw_score if raw_score <= 1 else raw_score / 100.0))
+    lifecycle = _entry_first_outcome_status(outcome_json)
+    if lifecycle in {"entry_then_target", "win"}:
+        return 0.9
+    if lifecycle in {"entry_then_stop", "loss"}:
+        return 0.1
+    if lifecycle == "open_after_entry":
+        return 0.55
+    if lifecycle == "not_entered":
+        return 0.5
     status = str(outcome_json.get("status") or "").strip().lower()
-    if status in {"success", "win", "won", "profitable", "target_hit", "good"}:
+    if status in {"success", "win", "won", "profitable", "good", "entry_then_target", "target_after_entry"}:
         return 0.9
-    if status in {"failed", "failure", "loss", "lost", "stop_hit", "bad"}:
+    if status in {"failed", "failure", "loss", "lost", "bad", "entry_then_stop", "stop_after_entry"}:
         return 0.1
-    if outcome_json.get("target_hit") is True:
-        return 0.9
-    if outcome_json.get("stop_hit") is True:
-        return 0.1
+    if status in {"target_hit", "stop_hit"}:
+        return 0.5
+    if outcome_json.get("target_hit") is True or outcome_json.get("stop_hit") is True:
+        return 0.5
     realized = _to_float(outcome_json.get("realized_return_pct"))
     if realized is not None:
         if realized >= 8:
@@ -339,6 +348,88 @@ def outcome_score_from_json(outcome_json: dict[str, Any] | None) -> float:
             return 0.40
         return 0.20
     return 0.5
+
+
+def _entry_first_outcome_status(outcome_json: dict[str, Any]) -> str | None:
+    """Derive strategy outcome from first target/stop after entry.
+
+    Raw trigger rows can record a target before the entry level is touched.
+    For performance/RAG scoring, pre-entry target/stop touches are ignored and
+    only the first exit trigger after entry decides win or loss.
+    """
+    explicit = str(
+        outcome_json.get("entry_first_status")
+        or outcome_json.get("lifecycle_status")
+        or ""
+    ).strip().lower()
+    if explicit:
+        return explicit
+
+    events = _extract_trigger_events(outcome_json)
+    if events:
+        entry_seen = False
+        for event in events:
+            trigger_type = str(
+                event.get("trigger_type")
+                or event.get("type")
+                or event.get("status")
+                or ""
+            ).strip().lower()
+            if trigger_type == "entry_hit":
+                entry_seen = True
+                continue
+            if not entry_seen:
+                continue
+            if trigger_type == "target_hit":
+                return "entry_then_target"
+            if trigger_type == "stop_hit":
+                return "entry_then_stop"
+        return "open_after_entry" if entry_seen else "not_entered"
+
+    entry_at = _first_text(outcome_json, "entry_hit_at", "entry_at")
+    target_at = _first_text(outcome_json, "target_hit_at", "target_at")
+    stop_at = _first_text(outcome_json, "stop_hit_at", "stop_at")
+    if entry_at:
+        candidates: list[tuple[str, str]] = []
+        if target_at and target_at >= entry_at:
+            candidates.append((target_at, "entry_then_target"))
+        if stop_at and stop_at >= entry_at:
+            candidates.append((stop_at, "entry_then_stop"))
+        if candidates:
+            return sorted(candidates, key=lambda item: item[0])[0][1]
+        return "open_after_entry"
+    if target_at or stop_at:
+        return "not_entered"
+    return None
+
+
+def _extract_trigger_events(outcome_json: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return ordered trigger events from common outcome JSON shapes."""
+    raw_events = (
+        outcome_json.get("trigger_events")
+        or outcome_json.get("events")
+        or outcome_json.get("event_sequence")
+    )
+    if not isinstance(raw_events, list):
+        return []
+    events = [event for event in raw_events if isinstance(event, dict)]
+    return sorted(
+        events,
+        key=lambda event: str(
+            event.get("triggered_at")
+            or event.get("ts")
+            or event.get("time")
+            or ""
+        ),
+    )
+
+
+def _first_text(payload: dict[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        value = payload.get(key)
+        if value not in (None, ""):
+            return str(value)
+    return None
 
 
 def _source_family(source: str) -> str:

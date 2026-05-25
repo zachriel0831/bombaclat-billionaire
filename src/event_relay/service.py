@@ -12,6 +12,7 @@ REQ-018 boundaries no other module bypasses it.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
@@ -925,7 +926,7 @@ class MySqlEventStore:
             finally:
                 cur.close()
 
-    def fetch_trade_signal_recommendations(self, analysis_id: int, *, limit: int = 5) -> list[dict[str, Any]]:
+    def fetch_trade_signal_recommendations(self, analysis_id: int, *, limit: int = 10) -> list[dict[str, Any]]:
         """Fetch fixed-pool short/medium-term watch rows for one analysis."""
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
@@ -936,7 +937,7 @@ class MySqlEventStore:
             "invalidation, take_profit_zone, holding_horizon, rationale, risk_notes, status "
             f"FROM `{self._trade_signal_table}` "
             "WHERE analysis_id=%s "
-            "AND ticker IN ('2330','2603','2882','1605','4956') "
+            "AND ticker IN ('2330','2317','2454','2308','2881','2882','2485','3535','3715','2351') "
             "AND direction='long' "
             "AND strategy_type IN ('swing','medium') "
             "AND status IN ('pending_review','new','watch') "
@@ -974,6 +975,87 @@ class MySqlEventStore:
                 }
             )
         return result
+
+    def fetch_recent_trade_signal_references(
+        self,
+        *,
+        tickers: Iterable[str],
+        exclude_analysis_id: int,
+        days: int = 30,
+        limit: int = 80,
+    ) -> list[dict[str, Any]]:
+        """Fetch latest prior fixed-pool signal rows that can seed reference levels."""
+        if self._conn is None:
+            raise RuntimeError("MySQL not initialized")
+
+        normalized_tickers: list[str] = []
+        seen: set[str] = set()
+        for ticker in tickers:
+            value = str(ticker or "").strip().upper().replace(".TW", "").replace(".TWO", "")
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            normalized_tickers.append(value)
+        if not normalized_tickers:
+            return []
+
+        safe_days = max(int(days), 1)
+        safe_limit = max(int(limit), len(normalized_tickers) * 20)
+        placeholders = ",".join(["%s"] * len(normalized_tickers))
+        sql = (
+            "SELECT id, analysis_id, analysis_date, analysis_slot, market, ticker, name, "
+            "strategy_type, direction, confidence, entry_zone, invalidation, "
+            "take_profit_zone, holding_horizon, rationale, risk_notes, source_event_ids, "
+            "status, signal_type, raw_json, updated_at "
+            f"FROM `{self._trade_signal_table}` "
+            f"WHERE ticker IN ({placeholders}) "
+            "AND analysis_id <> %s "
+            "AND updated_at >= (NOW() - INTERVAL %s DAY) "
+            "AND direction='long' "
+            "AND strategy_type IN ('swing','medium') "
+            "AND status IN ('pending_review','new','watch') "
+            "AND (entry_zone IS NOT NULL OR invalidation IS NOT NULL "
+            "OR take_profit_zone IS NOT NULL OR rationale IS NOT NULL) "
+            "ORDER BY updated_at DESC, id DESC "
+            "LIMIT %s"
+        )
+        with self._lock:
+            cur = self._cursor()
+            try:
+                cur.execute(sql, (*normalized_tickers, int(exclude_analysis_id), safe_days, safe_limit))
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        latest_by_ticker: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            ticker = str(row[5] or "")
+            if ticker in latest_by_ticker:
+                continue
+            latest_by_ticker[ticker] = {
+                "id": int(row[0]),
+                "analysis_id": int(row[1]),
+                "analysis_date": str(row[2] or ""),
+                "analysis_slot": str(row[3] or ""),
+                "market": str(row[4] or ""),
+                "ticker": ticker,
+                "name": str(row[6] or "") or None,
+                "strategy_type": str(row[7] or ""),
+                "direction": str(row[8] or ""),
+                "confidence": str(row[9] or "") or None,
+                "entry_zone": row[10],
+                "invalidation": row[11],
+                "take_profit_zone": row[12],
+                "holding_horizon": str(row[13] or "") or None,
+                "rationale": str(row[14] or "") or None,
+                "risk_notes": row[15],
+                "source_event_ids": row[16],
+                "status": str(row[17] or ""),
+                "signal_type": str(row[18] or ""),
+                "raw_json": str(row[19]) if row[19] is not None else None,
+                "updated_at": str(row[20]) if row[20] is not None else "",
+            }
+        return [latest_by_ticker[ticker] for ticker in normalized_tickers if ticker in latest_by_ticker]
 
     def update_market_analysis_summary_text(self, analysis_id: int, summary_text: str) -> None:
         """Update summary text after deterministic post-processing."""
@@ -1198,6 +1280,35 @@ class MySqlEventStore:
             )
             for row in rows
         ]
+
+    def fetch_market_analysis_for_signals(self, analysis_id: int) -> MarketAnalysisSignalSource | None:
+        """Fetch one market-analysis row for targeted signal repair."""
+        if self._conn is None:
+            return None
+
+        sql = (
+            f"SELECT id, analysis_date, analysis_slot, structured_json, raw_json, updated_at "
+            f"FROM {self._analysis_table} "
+            "WHERE id=%s "
+            "LIMIT 1"
+        )
+        with self._lock:
+            cur = self._cursor()
+            try:
+                cur.execute(sql, (int(analysis_id),))
+                row = cur.fetchone()
+            finally:
+                cur.close()
+        if not row:
+            return None
+        return MarketAnalysisSignalSource(
+            row_id=int(row[0]),
+            analysis_date=str(row[1] or ""),
+            analysis_slot=str(row[2] or ""),
+            structured_json=str(row[3]) if row[3] is not None else None,
+            raw_json=str(row[4]) if row[4] is not None else None,
+            updated_at=str(row[5]) if row[5] is not None else "",
+        )
 
     def delete_events_older_than_days(self, keep_days: int) -> int:
         """刪除 delete events older than days 對應的資料或結果。"""

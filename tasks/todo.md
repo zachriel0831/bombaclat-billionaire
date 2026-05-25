@@ -4,33 +4,31 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Fix market-analysis provider switch from OpenAI to Anthropic.
+- Task: Restore internal stock-monitor signals and fix entry-first strategy outcome scoring.
 - Requested by: user
-- Start date: 2026-05-16
-- Scope: model router ordering, runtime LLM failover, tests, and verification.
+- Start date: 2026-05-25
+- Scope: `data-collecting` must keep producing/backfilling internal `t_trade_signals` for fixed-pool daily analysis even when visible stock sections are hidden. Strategy outcome scoring must count a win/loss only from the first target/stop after entry.
 
 ## Plan
-- [x] Record the task before implementation.
-- [x] Inspect current market-analysis provider selection and scheduled failure.
-- [x] Make router honor the preferred provider before default alternatives.
-- [x] Add runtime failover from OpenAI provider errors to Anthropic.
-- [x] Update focused tests for startup routing and runtime failover.
-- [x] Run focused tests and readiness validation.
+- [x] Confirm failure mode: 2026-05-25 `pre_tw_open` analysis exists but has no `t_trade_signals`; stock-monitor has no active watchlist.
+- [x] Add deterministic signal repair/backfill path for analysis rows with empty structured stock watch.
+- [x] Add entry-first lifecycle scoring for strategy/RAG outcome metadata.
+- [x] Update tests and docs/runbooks.
+- [x] Run targeted verification and, if safe, repair the 2026-05-25 row.
 
 ## Progress Notes
-- 2026-05-16: `NewsCollector-MarketAnalysis-UsClose` ran at 05:00 but returned task result 1.
-- 2026-05-16: Manual reproduction showed OpenAI `429 insufficient_quota`; Anthropic manual run succeeded after disabling the router.
-- 2026-05-16: Current router can put OpenAI before a preferred Anthropic provider when no explicit `MARKET_ANALYSIS_PROVIDER_ORDER` exists.
-- 2026-05-16: Added runtime failover so retryable OpenAI provider errors rerun the same analysis with Anthropic when an Anthropic key is configured.
-- 2026-05-16: `.env` now enables the market-analysis router with provider order `openai,anthropic` and runtime failover enabled.
+- 2026-05-25: Confirmed stock-monitor is healthy but has `activeWatchlistRows=0`; upstream `data-collecting` analysis `id=78` has no same-day `t_trade_signals`.
+- 2026-05-25: Added targeted `run_trade_signal_extraction.ps1 -AnalysisId <id> -FixedPoolFallback` repair path; it honors stored trust-gate signal blocks.
+- 2026-05-25: Updated RAG/outcome scoring so raw `target_hit` / `stop_hit` alone are neutral unless lifecycle metadata proves entry happened first.
+- 2026-05-25: Repaired `t_market_analyses.id=78`; inserted 10 `t_trade_signals` (`id=174..183`), and stock-monitor synced cursor `173 -> 183` with 10 upserts.
+- 2026-05-25: Updated stock-monitor fixed-pool priority so the 5-subscription cap selects triggerable core tickers first.
 
 ## Verification
-- [x] `python -m py_compile src/event_relay/llm_quota_router.py src/event_relay/market_analysis.py`
-- [x] `$env:PYTHONPATH='src'; python -m unittest tests.test_llm_quota_router tests.test_market_analysis -v`
-- [x] `python scripts/validate_readiness.py`
-- [x] Sanitized config check shows provider `openai`, model `gpt-5`, router enabled, provider order `openai,anthropic`.
+- [x] Python compile/unit tests.
+- [x] Stock-monitor focused tests, if Java code changes.
+- [x] DB repair dry run / execution summary.
 
 ## Review Summary
-- Outcome: complete.
-- Evidence: syntax check passed; 46 focused tests passed; readiness validation passed; sanitized config check selected OpenAI primary with Anthropic ordered fallback.
-- Open risks: Weekly summary has its own provider path and is not covered by this market-analysis-specific change.
+- Outcome: fixed.
+- Evidence: Python compile passed; `python -m unittest tests.test_trade_signals tests.test_rag tests.test_market_analysis -v` passed 71 tests; stock-monitor `WatchlistRepositoryTest` passed 9 tests; runtime `/health`, `/sync/status`, and `/quote/status` are ok.
+- Open risks: It is after Taiwan market hours, so selected streams show `waiting_for_tick` until the next live trading session.

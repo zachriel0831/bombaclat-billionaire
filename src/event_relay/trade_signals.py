@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Iterable
+from dataclasses import replace
 import hashlib
 import json
 import logging
@@ -33,12 +34,76 @@ _DEFAULT_ENTRY_TIMING = "09:05後，確認價格落在進場區且量能未失�
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 _SUSPECT_STOCK_NAME_RE = re.compile(r"[?\ufffd\ue000-\uf8ff]")
 _DEFAULT_EXCLUDED_TICKERS = "4749"
+VISIBLE_RECOMMENDATION_LIMIT = 10
+FIXED_POOL_SIGNAL_BACKFILL_SLOTS = {"pre_tw_open", "us_close"}
 FIXED_MARKET_ANALYSIS_WATCH_POOL: dict[str, dict[str, str]] = {
     "2330": {"name": "台積電", "market": "TWSE", "sector": "半導體（晶圓）"},
-    "2603": {"name": "長榮", "market": "TWSE", "sector": "航運"},
+    "2317": {"name": "鴻海", "market": "TWSE", "sector": "AI伺服器/組裝"},
+    "2454": {"name": "聯發科", "market": "TWSE", "sector": "IC設計"},
+    "2308": {"name": "台達電", "market": "TWSE", "sector": "電源/AI伺服器"},
+    "2881": {"name": "富邦金", "market": "TWSE", "sector": "金融"},
     "2882": {"name": "國泰金", "market": "TWSE", "sector": "金融"},
-    "1605": {"name": "華新", "market": "TWSE", "sector": "傳產（電纜）"},
-    "4956": {"name": "光鋐", "market": "TPEx", "sector": "半導體封測"},
+    "2485": {"name": "兆赫", "market": "TWSE", "sector": "網通/通訊"},
+    "3535": {"name": "晶彩科", "market": "TWSE", "sector": "設備/光電"},
+    "3715": {"name": "定穎投控", "market": "TWSE", "sector": "PCB/車用電子"},
+    "2351": {"name": "順德", "market": "TWSE", "sector": "導線架/半導體材料"},
+}
+_FIXED_STOCK_WATCH_PROFILES: dict[str, dict[str, str]] = {
+    "2330": {
+        "bull": "AI/HPC、先進製程與半導體景氣若延續，權值資金通常會先看台積電。",
+        "bear": "估值對美債利率、費半與外資動向敏感；若費半轉弱或外資賣超，追價風險升高。",
+        "buy_note": "等回到進場區且大盤、費半同步轉強；只看有量的回測，不追開盤急拉。",
+    },
+    "2317": {
+        "bull": "AI伺服器與組裝出貨題材仍是主要觀察點，若法人買盤回流可帶動評價修復。",
+        "bear": "毛利率、客戶拉貨節奏與消費電子循環仍是壓力；量能不續時容易回到區間整理。",
+        "buy_note": "確認AI伺服器新聞、法人買超與進場區支撐同時成立；跌破停損區先退出觀察。",
+    },
+    "2454": {
+        "bull": "手機SoC、AI edge與ASIC題材可支撐IC設計族群人氣。",
+        "bear": "Android需求、同業競爭與匯率變動會壓縮評價；若族群轉弱不宜單獨追高。",
+        "buy_note": "等族群成交量放大且價格守住進場區，再用停損區控風險。",
+    },
+    "2308": {
+        "bull": "AI電源、資料中心與電動車電源需求是中線題材核心。",
+        "bear": "評價已容易反映成長預期；若訂單能見度或毛利率訊號不足，短線波動會放大。",
+        "buy_note": "優先等回測進場區與量能確認，不在急漲後追價。",
+    },
+    "2881": {
+        "bull": "金融股受惠利率、股債資產回升與配息預期時，容易吸引防禦型資金。",
+        "bear": "信用利差擴大、債券評價損失或金融指數轉弱時，修復行情會被打斷。",
+        "buy_note": "觀察金控族群同步性與金融指數支撐，價格未守進場區先不加碼。",
+    },
+    "2882": {
+        "bull": "保險與銀行雙引擎在股債資產穩定時，有利金融股評價修復。",
+        "bear": "利率急變、避險成本與信用風險會壓抑金融股表現。",
+        "buy_note": "等金融族群轉強、成交量放大且價格守住停損區，再列為短中線觀察。",
+    },
+    "2485": {
+        "bull": "網通與通訊設備題材若有訂單或族群輪動，低基期個股較容易被資金注意。",
+        "bear": "中小型股流動性與訂單能見度較弱；沒有量能時容易只是題材反彈。",
+        "buy_note": "必須看到量能與新聞催化，且價格回到進場區；否則只當固定池追蹤。",
+    },
+    "3535": {
+        "bull": "設備與光電應用題材若跟隨科技股輪動，可帶來補漲想像。",
+        "bear": "中小型股籌碼與流動性風險高；若沒有訂單或法人買盤，拉回速度可能很快。",
+        "buy_note": "先看成交量是否明顯放大，再以停損區控回撤，不用小量突破追價。",
+    },
+    "3715": {
+        "bull": "PCB與車用電子題材若接上AI/車用供應鏈輪動，具備補漲觀察價值。",
+        "bear": "PCB景氣循環、車用需求與原物料成本可能壓抑毛利；族群不同步時不追。",
+        "buy_note": "等族群確認轉強與價格守進場區，再用停損區作為失效線。",
+    },
+    "2351": {
+        "bull": "導線架與半導體材料若跟隨半導體補庫存，可成為落後補漲觀察標的。",
+        "bear": "材料族群對訂單能見度與毛利率敏感；若半導體主流轉弱，補漲容易失敗。",
+        "buy_note": "只在半導體族群不弱、量能回升且價格守住進場區時觀察。",
+    },
+}
+_DEFAULT_STOCK_WATCH_PROFILE = {
+    "bull": "固定池標的仍可追蹤族群輪動與盤中量價是否轉強。",
+    "bear": "今日缺少個股訊號、估值與相對強弱證據，追價參考價值有限。",
+    "buy_note": "等價格、量能、新聞催化與停損條件都明確後再評估。",
 }
 _FIXED_MARKET_ANALYSIS_TICKERS = frozenset(FIXED_MARKET_ANALYSIS_WATCH_POOL)
 _TW_STOCK_NAME_BY_TICKER = {
@@ -164,7 +229,7 @@ def build_quote_event_trade_signals(
     analysis_date: str,
     analysis_slot: str,
     events: Iterable[Any],
-    max_signals: int = 5,
+    max_signals: int = VISIBLE_RECOMMENDATION_LIMIT,
     preferred_tickers: Iterable[Any] | None = None,
 ) -> list[TradeSignalRecord]:
     """Build fallback long signals from recent Taiwan quote/context events.
@@ -283,6 +348,249 @@ def build_quote_event_trade_signals(
             )
         )
     return signals
+
+
+def build_prior_signal_reference_trade_signals(
+    *,
+    analysis_id: int,
+    analysis_date: str,
+    analysis_slot: str,
+    prior_rows: Iterable[dict[str, Any]],
+    missing_tickers: Iterable[Any],
+) -> list[TradeSignalRecord]:
+    """Clone recent same-ticker signal rows as stale reference levels for today.
+
+    These rows are intentionally downgraded to low confidence and marked with a
+    distinct signal type. They preserve useful prior entry/stop/target levels,
+    but the visible rationale must still require same-day confirmation.
+    """
+    missing = _normalize_ticker_set(missing_tickers) & _FIXED_MARKET_ANALYSIS_TICKERS
+    signals: list[TradeSignalRecord] = []
+    seen: set[str] = set()
+    for row in prior_rows:
+        ticker = _normalize_ticker(row.get("ticker"))
+        if not ticker or ticker not in missing or ticker in seen:
+            continue
+        if is_excluded_trade_signal_ticker(ticker):
+            continue
+        direction = _normalize_direction(row.get("direction"))
+        strategy_type = _normalize_strategy_type(row.get("strategy_type"))
+        if direction != "long" or strategy_type not in {"swing", "medium"}:
+            continue
+
+        market = _normalize_market(row.get("market"))
+        idempotency_key = _build_idempotency_key(
+            analysis_id=analysis_id,
+            analysis_date=analysis_date,
+            analysis_slot=analysis_slot,
+            market=market,
+            ticker=ticker,
+            direction=direction,
+            strategy_type=strategy_type,
+        )
+        raw_json = {
+            "source": "prior_t_trade_signals",
+            "reference_signal_id": row.get("id"),
+            "reference_analysis_id": row.get("analysis_id"),
+            "reference_analysis_date": row.get("analysis_date"),
+            "reference_analysis_slot": row.get("analysis_slot"),
+            "reference_updated_at": row.get("updated_at"),
+            "guardrail": "Prior signal is stale reference only; same-day price, volume, and news confirmation required.",
+        }
+        signals.append(
+            TradeSignalRecord(
+                signal_key=f"sig_{idempotency_key[:24]}",
+                idempotency_key=idempotency_key,
+                analysis_id=analysis_id,
+                analysis_date=analysis_date,
+                analysis_slot=analysis_slot,
+                market=market,
+                ticker=ticker,
+                name=_resolve_stock_name(ticker, row.get("name")),
+                signal_type="prior_signal_stock_watch",
+                strategy_type=strategy_type,
+                direction=direction,
+                confidence="low",
+                entry_zone_json=_json_value_or_none(row.get("entry_zone")),
+                invalidation_json=_json_value_or_none(row.get("invalidation")),
+                take_profit_zone_json=_json_value_or_none(row.get("take_profit_zone")),
+                holding_horizon=_clean_text(row.get("holding_horizon")),
+                rationale=_prior_reference_rationale(row),
+                risk_notes_json=_json_value_or_none(row.get("risk_notes")),
+                source_event_ids_json=_json_value_or_none(row.get("source_event_ids")),
+                status="pending_review",
+                raw_json=json.dumps(raw_json, ensure_ascii=False),
+            )
+        )
+        seen.add(ticker)
+    return signals
+
+
+def build_fixed_pool_repair_trade_signals(
+    *,
+    analysis_id: int,
+    analysis_date: str,
+    analysis_slot: str,
+    structured_payload: dict[str, Any] | None,
+    pipeline_telemetry: dict[str, Any] | None = None,
+    events: Iterable[Any] | None = None,
+    prior_rows: Iterable[dict[str, Any]] | None = None,
+    preferred_tickers: Iterable[Any] | None = None,
+    max_signals: int = VISIBLE_RECOMMENDATION_LIMIT,
+) -> tuple[list[TradeSignalRecord], dict[str, int]]:
+    """Repair internal fixed-pool signals without changing visible reports.
+
+    This is the safe backfill path for cases where a market-analysis row exists
+    but the downstream stock-monitor watchlist was never populated. It first
+    trusts structured ``stock_watch`` rows, then fills missing reference levels
+    from recent quote/context events, and finally clones prior same-ticker
+    reference levels for still-missing fixed-pool tickers.
+    """
+    signals = build_trade_signals_from_analysis(
+        analysis_id=analysis_id,
+        analysis_date=analysis_date,
+        analysis_slot=analysis_slot,
+        structured_payload=structured_payload,
+        pipeline_telemetry=pipeline_telemetry,
+    )
+    metrics = {
+        "structured_signals": len(signals),
+        "quote_fallback_added": 0,
+        "prior_signal_references": 0,
+        "reference_levels_filled": 0,
+    }
+    if analysis_slot not in FIXED_POOL_SIGNAL_BACKFILL_SLOTS:
+        return signals, metrics
+
+    fallback_signals = build_quote_event_trade_signals(
+        analysis_id=analysis_id,
+        analysis_date=analysis_date,
+        analysis_slot=analysis_slot,
+        events=events or [],
+        max_signals=max_signals,
+        preferred_tickers=preferred_tickers,
+    )
+    signals, metrics["reference_levels_filled"] = _merge_reference_levels_from_fallbacks(
+        signals,
+        fallback_signals,
+    )
+
+    recommendation_tickers = {
+        signal.ticker
+        for signal in signals
+        if not is_excluded_trade_signal_ticker(signal.ticker)
+        if signal.direction == "long" and signal.strategy_type in {"swing", "medium"}
+    }
+    existing_tickers = {signal.ticker for signal in signals}
+    preferred = _normalize_ticker_set(preferred_tickers)
+    for fallback_signal in fallback_signals:
+        if is_excluded_trade_signal_ticker(fallback_signal.ticker):
+            continue
+        if (
+            len(recommendation_tickers) >= max_signals
+            and fallback_signal.ticker not in preferred
+        ):
+            break
+        if fallback_signal.ticker in existing_tickers:
+            continue
+        signals.append(fallback_signal)
+        existing_tickers.add(fallback_signal.ticker)
+        if fallback_signal.direction == "long" and fallback_signal.strategy_type in {"swing", "medium"}:
+            recommendation_tickers.add(fallback_signal.ticker)
+            metrics["quote_fallback_added"] += 1
+
+    signals = [
+        signal
+        for signal in signals
+        if not is_excluded_trade_signal_ticker(signal.ticker)
+    ]
+    existing_tickers = {signal.ticker for signal in signals}
+    missing_tickers = [
+        ticker
+        for ticker in FIXED_MARKET_ANALYSIS_WATCH_POOL
+        if ticker not in existing_tickers and not is_excluded_trade_signal_ticker(ticker)
+    ]
+    if missing_tickers:
+        prior_signals = build_prior_signal_reference_trade_signals(
+            analysis_id=analysis_id,
+            analysis_date=analysis_date,
+            analysis_slot=analysis_slot,
+            prior_rows=prior_rows or [],
+            missing_tickers=missing_tickers,
+        )
+        signals.extend(prior_signals)
+        metrics["prior_signal_references"] = len(prior_signals)
+    return signals, metrics
+
+
+def _merge_reference_levels_from_fallbacks(
+    signals: list[TradeSignalRecord],
+    fallback_signals: list[TradeSignalRecord],
+) -> tuple[list[TradeSignalRecord], int]:
+    """Fill missing structured-signal levels with deterministic fallback levels."""
+    fallback_by_ticker = {signal.ticker: signal for signal in fallback_signals}
+    merged: list[TradeSignalRecord] = []
+    filled = 0
+    for signal in signals:
+        fallback = fallback_by_ticker.get(signal.ticker)
+        if fallback is None:
+            merged.append(signal)
+            continue
+
+        updates: dict[str, Any] = {}
+        if not signal.entry_zone_json and fallback.entry_zone_json:
+            updates["entry_zone_json"] = fallback.entry_zone_json
+        if not signal.invalidation_json and fallback.invalidation_json:
+            updates["invalidation_json"] = fallback.invalidation_json
+        if not signal.take_profit_zone_json and fallback.take_profit_zone_json:
+            updates["take_profit_zone_json"] = fallback.take_profit_zone_json
+        if not signal.holding_horizon and fallback.holding_horizon:
+            updates["holding_horizon"] = fallback.holding_horizon
+        if not signal.confidence and fallback.confidence:
+            updates["confidence"] = fallback.confidence
+
+        if updates:
+            filled += 1
+            merged.append(replace(signal, **updates))
+        else:
+            merged.append(signal)
+    return merged, filled
+
+
+def _prior_reference_rationale(row: dict[str, Any]) -> str:
+    """Build visible stale-reference rationale with explicit confirmation caveats."""
+    ref_date = _clean_text(row.get("analysis_date")) or "前次"
+    prior_rationale = _clean_text(row.get("rationale")) or ""
+    prior_bull = _extract_labeled_reason(
+        prior_rationale,
+        ("利多", "上漲邏輯", "上漲理由", "多方邏輯"),
+    )
+    prior_bear = _extract_labeled_reason(
+        prior_rationale,
+        ("利空", "風險", "下行風險", "低估/補漲", "低估理由", "為什麼被低估", "補漲邏輯"),
+    )
+    prior_buy = _extract_labeled_reason(
+        prior_rationale,
+        ("買入注意", "買進注意", "操作注意", "買入理由", "買進理由", "操作理由"),
+    )
+    if not prior_bull and prior_rationale:
+        prior_bull = prior_rationale
+    bull = (
+        f"沿用 {ref_date} 前次固定池參考：{prior_bull}；今日仍需用盤中量價與新聞風控重新確認。"
+        if prior_bull
+        else f"沿用 {ref_date} 前次固定池參考，今日仍需用盤中量價與新聞風控重新確認。"
+    )
+    bear = (
+        f"前次條件已過期，且仍需重驗：{prior_bear}。"
+        if prior_bear
+        else "前次條件已過期，今日若量能不配合、新聞轉弱或跌破停損區，參考價值下降。"
+    )
+    buy = (
+        f"沿用前次條件：{prior_buy}；若今日未回到進場區、量能不配合或新聞轉弱，不追價。"
+        if prior_buy
+        else "沿用前次進場、停利、停損區作參考；若今日未回到進場區、量能不配合或新聞轉弱，不追價。"
+    )
+    return f"利多：{bull} 利空：{bear} 買入注意：{buy}"
 
 
 def _fallback_candidate_from_event(event: Any) -> dict[str, Any] | None:
@@ -406,34 +714,117 @@ def _clean_fallback_rationale(value: Any) -> str:
 
 
 def sync_trade_signals_from_recent_analyses(
-    store: MySqlEventStore, *, days: int = 14, limit: int = 50
+    store: MySqlEventStore,
+    *,
+    days: int = 14,
+    limit: int = 50,
+    analysis_id: int | None = None,
+    include_fixed_pool_fallback: bool = False,
+    event_days: int = 1,
+    event_limit: int = 200,
+    prior_days: int = 30,
 ) -> dict[str, int]:
-    """Backfill signals from recent stored market analyses."""
-    rows = store.fetch_recent_market_analyses_for_signals(days=days, limit=limit)
+    """Backfill signals from stored market analyses."""
+    if analysis_id is not None:
+        fetch_one = getattr(store, "fetch_market_analysis_for_signals", None)
+        if not callable(fetch_one):
+            raise RuntimeError("store does not support analysis-id signal repair")
+        row = fetch_one(int(analysis_id))
+        rows = [row] if row is not None else []
+    else:
+        rows = store.fetch_recent_market_analyses_for_signals(days=days, limit=limit)
+    recent_events: list[Any] = []
+    if include_fixed_pool_fallback:
+        fetch_events = getattr(store, "fetch_recent_summary_events", None)
+        if callable(fetch_events):
+            recent_events = fetch_events(days=max(int(event_days), 1), limit=max(int(event_limit), 1))
     analyses_processed = 0
+    analyses_skipped = 0
     signals_stored = 0
+    quote_fallback_added = 0
+    prior_signal_references = 0
+    reference_levels_filled = 0
     for row in rows:
         structured_payload = _json_object_or_none(row.structured_json)
         raw_payload = _json_object_or_none(row.raw_json)
+        if not _raw_payload_allows_signal_repair(raw_payload):
+            analyses_skipped += 1
+            continue
         pipeline_telemetry = raw_payload.get("pipeline_stages") if isinstance(raw_payload, dict) else None
-        signals = build_trade_signals_from_analysis(
-            analysis_id=row.row_id,
-            analysis_date=row.analysis_date,
-            analysis_slot=row.analysis_slot,
-            structured_payload=structured_payload,
-            pipeline_telemetry=pipeline_telemetry,
-        )
+        if include_fixed_pool_fallback:
+            prior_rows = []
+            if row.analysis_slot in FIXED_POOL_SIGNAL_BACKFILL_SLOTS:
+                fetch_prior = getattr(store, "fetch_recent_trade_signal_references", None)
+                if callable(fetch_prior):
+                    prior_rows = fetch_prior(
+                        tickers=FIXED_MARKET_ANALYSIS_WATCH_POOL,
+                        exclude_analysis_id=row.row_id,
+                        days=max(int(prior_days), 1),
+                    )
+            signals, metrics = build_fixed_pool_repair_trade_signals(
+                analysis_id=row.row_id,
+                analysis_date=row.analysis_date,
+                analysis_slot=row.analysis_slot,
+                structured_payload=structured_payload,
+                pipeline_telemetry=pipeline_telemetry,
+                events=recent_events,
+                prior_rows=prior_rows,
+                preferred_tickers=_preferred_tw_fallback_tickers_from_env(),
+            )
+            quote_fallback_added += metrics["quote_fallback_added"]
+            prior_signal_references += metrics["prior_signal_references"]
+            reference_levels_filled += metrics["reference_levels_filled"]
+        else:
+            signals = build_trade_signals_from_analysis(
+                analysis_id=row.row_id,
+                analysis_date=row.analysis_date,
+                analysis_slot=row.analysis_slot,
+                structured_payload=structured_payload,
+                pipeline_telemetry=pipeline_telemetry,
+            )
         signals_stored += store.replace_trade_signals_for_analysis(row.row_id, signals)
         analyses_processed += 1
-    return {"analyses_processed": analyses_processed, "signals_stored": signals_stored}
+    return {
+        "analyses_processed": analyses_processed,
+        "analyses_skipped": analyses_skipped,
+        "signals_stored": signals_stored,
+        "quote_fallback_added": quote_fallback_added,
+        "prior_signal_references": prior_signal_references,
+        "reference_levels_filled": reference_levels_filled,
+    }
+
+
+def _raw_payload_allows_signal_repair(raw_payload: dict[str, Any] | None) -> bool:
+    """Honor the stored trust gate when repairing signals."""
+    if not isinstance(raw_payload, dict):
+        return True
+    trust_gate = raw_payload.get("trust_gate")
+    if not isinstance(trust_gate, dict):
+        return True
+    return trust_gate.get("signals_allowed") is not False
+
+
+def _preferred_tw_fallback_tickers_from_env() -> set[str]:
+    """Return tickers configured for Taiwan tracked-stock fallback events."""
+    result: set[str] = set()
+    for raw in str(os.getenv("MARKET_CONTEXT_TW_YAHOO_SYMBOLS") or "").split(","):
+        entry = raw.strip()
+        if not entry:
+            continue
+        symbol = entry
+        for separator in (":", "|", "="):
+            if separator in symbol:
+                symbol = symbol.split(separator, 1)[0]
+                break
+        ticker = _normalize_ticker(symbol)
+        if ticker and ticker.isdigit():
+            result.add(ticker)
+    return result
 
 
 def build_trade_signal_recommendation_section(recommendations: list[dict[str, Any]]) -> str:
     """Build a deterministic report section from stored trade-signal rows."""
-    lines = ["## 今日個股觀察", "固定五檔監控池（t_trade_signals）"]
-    if not recommendations:
-        lines.append("資料缺口：目前固定五檔沒有可用的 swing/medium 觀察條件；不可硬湊下單。")
-        return "\n".join(lines)
+    lines = ["## 今日個股觀察", "固定十檔監控池（t_trade_signals）"]
 
     visible_recommendations = [
         item
@@ -441,8 +832,29 @@ def build_trade_signal_recommendation_section(recommendations: list[dict[str, An
         if not is_excluded_trade_signal_ticker(item.get("ticker"))
         and is_fixed_market_analysis_watch_ticker(item.get("ticker"))
     ]
+    rendered_items: list[dict[str, Any]] = []
+    seen_tickers: set[str] = set()
+    neutral_added = 0
+    for item in visible_recommendations:
+        ticker = _normalize_ticker(item.get("ticker"))
+        if not ticker or ticker in seen_tickers:
+            continue
+        rendered_items.append(item)
+        seen_tickers.add(ticker)
+        if len(rendered_items) >= VISIBLE_RECOMMENDATION_LIMIT:
+            break
+    for ticker in FIXED_MARKET_ANALYSIS_WATCH_POOL:
+        if len(rendered_items) >= VISIBLE_RECOMMENDATION_LIMIT:
+            break
+        if ticker in seen_tickers or is_excluded_trade_signal_ticker(ticker):
+            continue
+        rendered_items.append(_neutral_fixed_pool_item(ticker))
+        seen_tickers.add(ticker)
+        neutral_added += 1
+    if neutral_added:
+        lines.append("註：沒有完整短中線訊號的固定池股票，以中性觀察列示；等待盤中量價、新聞催化與估值資料確認。")
     rendered = 0
-    for idx, item in enumerate(visible_recommendations[:5], start=1):
+    for idx, item in enumerate(rendered_items, start=1):
         ticker = str(item.get("ticker") or "").strip()
         if not ticker:
             continue
@@ -458,17 +870,130 @@ def build_trade_signal_recommendation_section(recommendations: list[dict[str, An
         rationale = _clean_text(item.get("rationale")) or "依早盤分析訊號"
         if raw_name and name and raw_name != name and _SUSPECT_STOCK_NAME_RE.search(raw_name):
             rationale = rationale.replace(raw_name, name)
+        bull_case, bear_case, buy_note = _stock_reason_lines(
+            ticker=ticker,
+            rationale=rationale,
+            risk_notes=item.get("risk_notes"),
+            strategy=strategy,
+            entry=entry,
+            take_profit=take_profit,
+            invalidation=invalidation,
+            confidence=confidence,
+        )
         lines.append(
             f"{idx}. {label}｜{_format_action_label(strategy, confidence)}｜"
-            f"進場 {entry}｜停利 {take_profit}｜停損 {invalidation}｜信心 {confidence}｜{rationale}"
+            f"進場 {entry}｜停利 {take_profit}｜停損 {invalidation}｜信心 {confidence}\n"
+            f"   - 利多：{bull_case}\n"
+            f"   - 利空：{bear_case}\n"
+            f"   - 買入注意：{buy_note}"
         )
     if rendered == 0:
-        lines.append("資料缺口：目前固定五檔沒有可用的 swing/medium 觀察條件；不可硬湊下單。")
-    elif rendered < len(_FIXED_MARKET_ANALYSIS_TICKERS):
-        lines.append(
-            f"資料缺口：固定五檔目前只有 {rendered} 檔具備可呈現條件；其餘維持觀察，不以其他 ticker 替補。"
-        )
+        lines.append("資料缺口：固定十檔目前全數無法呈現；不可硬湊下單。")
     return "\n".join(lines) if len(lines) > 1 else ""
+
+
+def _neutral_fixed_pool_item(ticker: str) -> dict[str, Any]:
+    """Return a neutral visible row for a fixed-pool ticker with no signal."""
+    name = _resolve_stock_name(ticker)
+    profile = _stock_watch_profile(ticker)
+    return {
+        "ticker": ticker,
+        "name": name,
+        "strategy_type": "watch",
+        "direction": "watch",
+        "confidence": "low",
+        "entry_zone": None,
+        "take_profit_zone": None,
+        "invalidation": None,
+        "rationale": (
+            f"利多：{profile['bull']}；"
+            f"利空：今日缺少個股訊號與報價條件，{profile['bear']}；"
+            f"買入注意：{profile['buy_note']}；沒有明確進場區前只列中性觀察。"
+        ),
+    }
+
+
+def _stock_watch_profile(ticker: str) -> dict[str, str]:
+    """Return ticker-aware fixed-pool context for neutral or thin-evidence rows."""
+    normalized = _normalize_ticker(ticker) or ""
+    return _FIXED_STOCK_WATCH_PROFILES.get(normalized, _DEFAULT_STOCK_WATCH_PROFILE)
+
+
+def _stock_reason_lines(
+    *,
+    ticker: str,
+    rationale: str,
+    strategy: str,
+    entry: str,
+    take_profit: str,
+    invalidation: str,
+    confidence: str,
+    risk_notes: Any = None,
+) -> tuple[str, str, str]:
+    """Split or derive visible stock notes without inventing valuation facts."""
+    text = _clean_text(rationale) or "依早盤分析訊號"
+    profile = _stock_watch_profile(ticker)
+    bull = _extract_labeled_reason(
+        text,
+        ("利多", "上漲邏輯", "為什麼會漲", "會漲原因", "多方邏輯"),
+    ) or text
+    bear = _extract_labeled_reason(text, ("利空", "風險", "下行風險", "反方條件"))
+    valuation = _extract_labeled_reason(text, ("低估/補漲", "低估理由", "為什麼被低估", "補漲邏輯"))
+    risk_text = _format_risk_notes(risk_notes)
+    buy = _extract_labeled_reason(
+        text,
+        ("買入注意", "買進注意", "操作注意", "買入理由", "買進理由", "操作理由"),
+    )
+    if not bear:
+        if risk_text:
+            bear = risk_text
+        elif valuation:
+            bear = f"估值或相對位置仍需重驗：{valuation}；若量能不續或跌破停損區，先降為觀望。"
+        elif confidence.strip().lower() == "low":
+            bear = f"訊號信心低，且{profile['bear']}"
+        else:
+            bear = profile["bear"]
+    if not buy:
+        buy = (
+            f"{strategy or 'swing/medium'} 觀察；價格需落在進場區 {entry}，"
+            f"風控看停損 {invalidation}，第一段停利看 {take_profit}；信心 {confidence}。"
+        )
+    return bull, bear, buy
+
+
+def _extract_labeled_reason(text: str, labels: tuple[str, ...]) -> str | None:
+    """Extract a semicolon-separated labeled reason from model rationale."""
+    if not text:
+        return None
+    all_labels = (
+        "利多",
+        "利空",
+        "風險",
+        "下行風險",
+        "反方條件",
+        "買入注意",
+        "買進注意",
+        "操作注意",
+        "上漲邏輯",
+        "為什麼會漲",
+        "會漲原因",
+        "多方邏輯",
+        "低估/補漲",
+        "低估理由",
+        "為什麼被低估",
+        "補漲邏輯",
+        "買入理由",
+        "買進理由",
+        "操作理由",
+    )
+    label_pattern = "|".join(re.escape(label) for label in all_labels)
+    for label in labels:
+        pattern = rf"{re.escape(label)}\s*[:：]\s*(.*?)(?=(?:[；;]\s*)?(?:{label_pattern})\s*[:：]|$)"
+        match = re.search(pattern, text)
+        if match:
+            value = match.group(1).strip(" ；;。")
+            return value or None
+    return None
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -477,6 +1002,15 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--env-file", default=".env")
     parser.add_argument("--days", type=int, default=14)
     parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument("--analysis-id", type=int, default=None)
+    parser.add_argument(
+        "--fixed-pool-fallback",
+        action="store_true",
+        help="Repair fixed-pool signals from recent quote/context events and prior signal references.",
+    )
+    parser.add_argument("--event-days", type=int, default=1)
+    parser.add_argument("--event-limit", type=int, default=200)
+    parser.add_argument("--prior-days", type=int, default=30)
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser
 
@@ -496,7 +1030,16 @@ def main() -> int:
         raise RuntimeError("trade signal extraction requires RELAY_MYSQL_ENABLED=true")
     store = MySqlEventStore(settings)
     store.initialize()
-    result = sync_trade_signals_from_recent_analyses(store, days=args.days, limit=args.limit)
+    result = sync_trade_signals_from_recent_analyses(
+        store,
+        days=args.days,
+        limit=args.limit,
+        analysis_id=args.analysis_id,
+        include_fixed_pool_fallback=args.fixed_pool_fallback,
+        event_days=args.event_days,
+        event_limit=args.event_limit,
+        prior_days=args.prior_days,
+    )
     logger.info("Trade signal extraction result: %s", result)
     print(json.dumps(result, ensure_ascii=False))
     return 0
@@ -662,6 +1205,43 @@ def _json_or_none(value: Any) -> str | None:
     return json.dumps(value, ensure_ascii=False)
 
 
+def _json_value_or_none(value: Any) -> str | None:
+    """Keep existing JSON text or serialize structured optional fields."""
+    if value in (None, "", []):
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _format_risk_notes(value: Any) -> str | None:
+    """Render stored risk notes as one compact bear-case sentence."""
+    if value in (None, "", []):
+        return None
+    parsed = value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return text
+    if isinstance(parsed, list):
+        notes = [_clean_text(item) for item in parsed]
+        notes = [item for item in notes if item]
+        return "；".join(notes) if notes else None
+    if isinstance(parsed, dict):
+        notes = []
+        for key, item in parsed.items():
+            text = _clean_text(item)
+            if text:
+                notes.append(f"{key}:{text}")
+        return "；".join(notes) if notes else None
+    return _clean_text(parsed)
+
+
 def _clean_text(value: Any) -> str | None:
     """Trim scalar values and drop empty strings."""
     if value is None:
@@ -755,6 +1335,9 @@ def _format_strategy_label(value: str) -> str:
 
 def _format_action_label(strategy: str, confidence: str) -> str:
     """Render a fixed-pool watch row without recommendation wording."""
+    normalized = (strategy or "").strip().lower()
+    if normalized == "watch":
+        return "中性觀察" if (confidence or "").strip().lower() == "low" else "觀察"
     label = _format_strategy_label(strategy)
     if (confidence or "").strip().lower() == "low":
         return f"低信心{label}觀察"

@@ -143,14 +143,20 @@ Minimum evidence before reporting recovery complete:
 - `$env:PYTHONPATH='src'; python -m news_platform.main --llm-topic-fallback`
 5. Run continuous collection
 - `$env:PYTHONPATH='src'; python -m news_platform.main --loop`
-6. Verify DB evidence
+6. Reporter/byline enrichment in loop mode
+- The loop runs `ArticleDetailAuthorWorker` after keyword/topic work when `NEWSPF_AUTHOR_DETAIL_BACKFILL_ENABLED=true` (default)
+- Defaults: `NEWSPF_AUTHOR_DETAIL_BACKFILL_BATCH_SIZE=30`, `NEWSPF_AUTHOR_DETAIL_BACKFILL_SLEEP_SECONDS=0.05`, and sources `cna,storm,newtalk,ltn,ettoday,tvbs,ebc,ctee,pts`
+- The loop only retries rows still in early missing states (`NULL`, `no_detail_fetched`, `parser_not_supported`); use `scripts/backfill_news_author_detail_pages.py --retry-failed` manually for parse failures or broad repair
+7. Verify DB evidence
 - Confirm recent rows have `keywords_json IS NOT NULL`
 - Confirm classified rows have `topics_json IS NOT NULL`
+- Confirm recent rows have `author_extraction_status IS NOT NULL`
+- Check logs for `Author detail pass candidates=<n> present=<n> ... updated=<n>`
 - Treat `topics_json[0].topic_id IN ('general_social_news','general_politics_news') AND topic_classified_by='rule'` as eligible for optional LLM refinement
 - Treat category-specific general topics with `topic_classified_by='llm'` as processed by both layers but still general news
 - Review `general_social_news` and `general_politics_news` rows when tuning `news_platform.topics`
-7. After adding or tuning deterministic `TopicSpec` rules, reclassify existing rule-fallback rows for the affected category; `TopicWorker` only processes `topics_json IS NULL`, so old `general_social_news` / `general_politics_news` rows will not update unless explicitly re-run through `topic_classifier.classify` and written back only when a specific topic matches.
-8. After changing worker/topic code, restart any existing `news_platform.main --loop` process
+8. After adding or tuning deterministic `TopicSpec` rules, reclassify existing rule-fallback rows for the affected category; `TopicWorker` only processes `topics_json IS NULL`, so old `general_social_news` / `general_politics_news` rows will not update unless explicitly re-run through `topic_classifier.classify` and written back only when a specific topic matches.
+9. After changing worker/topic/author-detail code, restart any existing `news_platform.main --loop` process
 - Verify the new loop log shows current source scope and, when new rows exist, `Topic pass scanned=<n>`
 - Check live DB has `SUM(topics_json IS NULL)=0` for active categories after backfill
 
@@ -262,6 +268,9 @@ machine restart, or when the user asks whether source data has caught up.
 - Use `scripts/run_market_analysis.ps1 -Slot pre_tw_open` at `07:30`
 - Use `scripts/run_market_analysis.ps1 -Slot tw_close` at `15:30`
 - Treat `t_relay_events` as primary local evidence, not exhaustive truth
+- `MARKET_ANALYSIS_<SLOT>_PIPELINE` overrides the global `MARKET_ANALYSIS_PIPELINE`; current cost-aware default is `MARKET_ANALYSIS_US_CLOSE_PIPELINE=digest` and `MARKET_ANALYSIS_PRE_TW_OPEN_PIPELINE=multi_stage`
+- `us_close` digest mode is upstream context only: one compact call, smaller prompt context, no fixed-pool recommendation append
+- `pre_tw_open` is the main trade-decision brief and is where fixed-pool medium/short-term stock setups should be generated for review
 - If `MARKET_ANALYSIS_MODEL_ROUTER_ENABLED=true`, OpenAI is the default primary and Claude is fallback; configure budgets/Admin API keys before relying on provider fallback, and inspect `raw_json.model_router` to confirm the selected route
 - When the selected provider is Anthropic, compact context mode is applied by default to reduce rate-limit risk; inspect `raw_json.provider_context_policy` for event/RAG/market-row reductions
 - Market analysis builds a quota-managed context pack before RAG/prompting; `market_context:scorecard`, market-context rows, and important official data must remain selected even when general news volume is high
@@ -271,17 +280,24 @@ machine restart, or when the user asks whether source data has caught up.
 3. Persist analysis output
 - Generated text is upserted into `t_market_analyses` by `(analysis_date, analysis_slot)`
 - `push_enabled` means Java delivery eligibility, not Python push execution
-- Daily delivery policy is `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`
-- `us_close` remains stored and is injected into the next Taiwan pre-open analysis context only when the relevant U.S. session was open; if U.S. was closed, the pre-open prompt has no `us_close` context
+- Daily delivery policy starts from `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`; `raw_json.trust_gate` may force final `push_enabled=0`
+- If `claim_verifier.ok=false`, `market-analysis-trust-gate-v1` stores the row for audit/debug but blocks Java delivery eligibility and skips trade-signal extraction
+- `claim-verifier-v2` ignores internal parenthesized evidence/source ID lists such as `（128610,128539）`; Stage4 must keep internal IDs out of visible `summary_text` and leave evidence links in telemetry/structured fields
+- For delivery-visible fixed-pool slots, `claim_verifier` receives the configured fixed ten-stock pool as allowed structured tickers. This only allows those ticker tokens; unsupported numbers, dates, and non-pool tickers must still block delivery.
+- `us_close` remains stored as a digest/analysis and is injected into the next Taiwan pre-open analysis context only when the relevant U.S. session was open; if U.S. was closed, the pre-open prompt has no `us_close` context
 - Fixed-pool `structured_json.stock_watch` rows are extracted into `t_trade_signals`
-- For `pre_tw_open`, the visible stock section is limited to the fixed pool: `2330` 台積電, `2603` 長榮, `2882` 國泰金, `1605` 華新, and `4956` 光鋐. Do not substitute model-recommended tickers outside this pool.
+- For `pre_tw_open`, the visible stock section is limited to the fixed ten-stock pool: `2330` 台積電, `2317` 鴻海, `2454` 聯發科, `2308` 台達電, `2881` 富邦金, `2882` 國泰金, `2485` 兆赫, `3535` 晶彩科, `3715` 定穎投控, and `2351` 順德. Do not substitute model-recommended tickers outside this pool.
 - New signals use `status=pending_review`; stale pending signals for the same analysis are marked `superseded`
 - `ticker` is normalized symbol text; Taiwan signals use 4-digit codes without `.TW` / `.TWO`
-- For `pre_tw_open`, fixed-pool watch rows are read back from `t_trade_signals` and appended as `## 今日個股觀察` while preserving the full analysis text. Missing evidence should be shown as a data gap or neutral watch state.
-- Daily formatting uses date-only `raw_json.display_title` and the fixed flow `總經 Regime` -> `利率與流動性` -> `景氣循環` -> `市場情緒` -> `台股配置` -> `風險與資料缺口`
+- Daily visible reports no longer append `## 今日個股觀察`; `t_trade_signals` may still be maintained as machine-readable downstream context, but it is not rendered into the market-analysis body.
+- If today's structured/quote context misses a fixed-pool ticker, the pipeline may still copy the most recent same-ticker `t_trade_signals` row as `prior_signal_stock_watch` for downstream signal context. Treat it as stale reference only: keep `confidence=low`, show the prior date, and require same-day price, volume, and news confirmation.
+- Daily formatting uses date-only `raw_json.display_title` and the product-editor flow `今日一句話` -> `三個檢查點` -> `總經與流動性` -> `景氣循環` -> `國際新聞傳導` -> `產業板塊解析` -> `風險與資料缺口`; `三個檢查點` must contain exactly three observable checks. Do not write a dedicated `台股配置` section.
+- Individual company mentions in daily visible reports are limited to macro/sector transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write entry, stop-loss, or target-price language in the daily body.
 - In that section, `direction=long` is rendered as `可做/建議觀察` plus the strategy label; `entry_zone` means entry area, `take_profit_zone` means profit-taking/exit area, and `invalidation` is rendered as `停損`
 - Do not create orders here. Risk gate / review and outcomes stay in `t_signal_reviews` and `t_signal_outcomes`
-- For existing rows, run `scripts/run_trade_signal_extraction.ps1 -EnvFile .env`
+- For existing structured rows, run `scripts/run_trade_signal_extraction.ps1 -EnvFile .env`
+- For a specific analysis row that exists but has no monitor signals, run targeted repair: `scripts/run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback -EventDays 1 -PriorDays 30`. This may use recent quote/context events and prior same-ticker signal references, but it still honors `raw_json.trust_gate.signals_allowed=false`.
+- Strategy performance must use entry-first attribution: ignore `target_hit` / `stop_hit` before the first `entry_hit`; after entry, the first `target_hit` is a win and the first `stop_hit` is a loss. Rows without entry are `not_entered` and must not inflate win rate.
 4. Keep Python storage-only
 - `market_analysis` does not push directly or create delivery jobs
 - Java owns user-facing delivery
@@ -406,7 +422,7 @@ machine restart, or when the user asks whether source data has caught up.
 - FRED oil context: WTI, Brent, and Brent-WTI spread; optional EIA inventory context for U.S. crude stocks excluding SPR when `EIA_API_KEY` is set
 - Deterministic scorecard: `breadth_health`, `ai_capex_quality`, `energy_shock_risk`, `credit_stress`, and `liquidity_impulse` on a -2..+2 scale
 - TWSE official OpenAPI: index groups, tracked stocks, and margin balances
-- Taiwan fixed-pool Yahoo context from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS`; use `.TWO` for TPEx `4956`
+- Taiwan fixed-pool Yahoo context from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS`: `2330.TW`, `2317.TW`, `2454.TW`, `2308.TW`, `2881.TW`, `2882.TW`, `2485.TW`, `3535.TW`, `3715.TW`, `2351.TW`
 - Visible stock-analysis exclusions are controlled by `MARKET_ANALYSIS_EXCLUDED_TICKERS`; default excludes `4749` / 新應材
 3. Persist as event-only facts
 - Insert one stored-only event per context point into `t_relay_events`
