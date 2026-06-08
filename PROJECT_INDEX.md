@@ -5,6 +5,8 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 ## What This Repo Owns
 
 - News and market-data ingestion from RSS, SEC, TWSE/MOPS, X, market-context sources, Taiwan society/politics feeds, and public-record sources.
+- Free Palestine English issue-news collection for the public `/timeline` module, stored long-term in `t_palestine_news_items`.
+- Official U.S. macro release-calendar collection for CPI, PPI, nonfarm payrolls, and retail sales reminders.
 - Event relay storage into MySQL tables such as `t_relay_events`, `t_x_posts`, `t_market_index_snapshots`, and `t_market_analyses`.
 - Scheduled and manual AI market analysis, weekly summary generation, RAG indexing, claim verification, and fixed-watchlist trade-signal extraction.
 - Taiwan society/politics article collection, keyword extraction, topic classification, public-record ingestion, and article-record linking.
@@ -39,11 +41,12 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 
 | Area | Files |
 |---|---|
-| Fixed five-stock market-analysis watchlist | [spec/market-analysis-fixed-watchlist-functional-spec.md](spec/market-analysis-fixed-watchlist-functional-spec.md), [spec/market-analysis-fixed-watchlist-data-contract.md](spec/market-analysis-fixed-watchlist-data-contract.md), [spec/market-analysis-fixed-watchlist-operations.md](spec/market-analysis-fixed-watchlist-operations.md) |
+| Dynamic intraday / short-swing trade candidates | [spec/market-analysis-dynamic-trade-candidates.md](spec/market-analysis-dynamic-trade-candidates.md). The older fixed-watchlist specs remain only as superseded redirects. |
 | Taiwan society/politics topic classification | [spec/news-topic-classification-functional-spec.md](spec/news-topic-classification-functional-spec.md), [spec/news-topic-classification-data-contract.md](spec/news-topic-classification-data-contract.md), [spec/news-topic-classification-operations.md](spec/news-topic-classification-operations.md) |
 | Taiwan politics second-layer topics and event threads | [spec/political-topic-thread-technical-plan.md](spec/political-topic-thread-technical-plan.md), [spec/political-event-threads/_template.md](spec/political-event-threads/_template.md) |
 | Taiwan public-record records and links | [spec/news-public-records-data-contract.md](spec/news-public-records-data-contract.md) |
 | NEWS lightweight requirement ledger | [spec/NEWS-INDEX.md](spec/NEWS-INDEX.md), [spec/NEWS-1-author-coverage-and-reporter-relations.md](spec/NEWS-1-author-coverage-and-reporter-relations.md) |
+| U.S. macro release calendar reminders | [spec/NEWS-5-us-macro-release-calendar-reminders.md](spec/NEWS-5-us-macro-release-calendar-reminders.md) |
 | News crawler category source list | [spec/news-crawler-category-sources.md](spec/news-crawler-category-sources.md) |
 
 ## Memory Bank
@@ -81,6 +84,8 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | Market analysis | `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force` |
 | Weekly summary | `powershell -ExecutionPolicy Bypass -File .\scripts\run_weekly_summary.ps1 -Force -DryRun` |
 | Market context | `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env` |
+| Free Palestine English issue news | `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 20` |
+| U.S. macro release calendar | `powershell -ExecutionPolicy Bypass -File .\scripts\run_macro_calendar.ps1 -EnvFile .env` |
 | RAG indexing | `powershell -ExecutionPolicy Bypass -File .\scripts\run_rag_indexer.ps1 -EnvFile .env` |
 | Retention cleanup | `powershell -ExecutionPolicy Bypass -File .\scripts\run_retention_cleanup.ps1 -EnvFile .env` |
 

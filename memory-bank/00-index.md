@@ -25,8 +25,16 @@ Do not read every file by default. Load only the file needed for the current tas
 - `memory-bank/09-decisions/2026-05-05-structural-market-context-modules.md`: structural market-context module decision
 - `memory-bank/09-decisions/2026-05-05-scorecard-context-pack.md`: deterministic scorecard and prompt context-pack decision
 - `memory-bank/09-decisions/2026-05-07-hybrid-rag-stage0-claim-router.md`: hybrid RAG, stage0 thesis selector, claim verifier, and quota-aware model-routing decision
-- `memory-bank/09-decisions/2026-05-09-visible-us-close-recommendations.md`: deterministic visible fixed-pool watch section for delivery-eligible U.S. close analyses
-- `memory-bank/09-decisions/2026-05-11-fixed-market-analysis-watch-pool.md`: fixed five-stock market_analysis watch pool; no model-selected Taiwan ticker recommendations
+- `memory-bank/09-decisions/2026-06-02-dynamic-intraday-candidate-pipeline.md`: target design for Codex daily dynamic Taiwan intraday / short-swing candidates, stock-monitor top-five monitoring, and order-dispatcher max-three trading cap
+- `memory-bank/09-decisions/2026-06-04-free-palestine-english-news-watch.md`: long-term `t_palestine_news_items` storage for `/timeline` English issue news
+- `memory-bank/09-decisions/2026-06-08-us-macro-release-calendar-reminders.md`: official U.S. macro release-calendar storage and Java day-before LINE reminder boundary
+- `memory-bank/09-decisions/2026-05-09-visible-us-close-recommendations.md`: superseded deterministic visible fixed-pool watch section for delivery-eligible U.S. close analyses
+- `memory-bank/09-decisions/2026-05-11-fixed-market-analysis-watch-pool.md`: superseded fixed five-stock market_analysis watch pool decision
+- `memory-bank/09-decisions/2026-05-16-ten-stock-observation-template.md`: fixed ten-stock watch pool; superseded visible labels now render as `利多` / `利空` / `買入注意`
+- `memory-bank/09-decisions/2026-05-18-prior-signal-reference-fallback.md`: same-ticker prior `t_trade_signals` fallback for missing fixed-pool rows
+- `memory-bank/09-decisions/2026-05-20-daily-analysis-editorial-template.md`: daily analysis visible flow starts with `今日一句話` / `三個檢查點` and adds explicit international-news transmission
+- `memory-bank/09-decisions/2026-05-20-claim-verifier-trust-gate.md`: `claim_verifier.ok=false` blocks delivery eligibility and trade-signal extraction while keeping stored audit rows
+- `memory-bank/09-decisions/2026-05-29-codex-market-analysis-guards.md`: Codex guard automations inspect and locally repair market-analysis rows after scheduled jobs without paid external LLM API calls
 - `memory-bank/09-decisions/2026-05-09-weekly-three-section-contract.md`: weekly output contract for `週總經` / `下週台股配置` / `下週觀察清單`
 - `memory-bank/09-decisions/2026-05-11-news-platform-topic-classification.md`: MVP topic classification storage on `t_news_articles.topics_json`
 - `memory-bank/09-decisions/2026-05-11-news-platform-llm-topic-fallback.md`: OpenAI-first optional LLM fallback for category-specific general news topic rows

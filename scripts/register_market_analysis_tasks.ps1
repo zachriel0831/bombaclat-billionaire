@@ -3,6 +3,7 @@ param(
   [string]$UsCloseTaskName = "NewsCollector-MarketAnalysis-UsClose",
   [string]$RagIndexerTaskName = "NewsCollector-RagIndexer",
   [string]$BlsMacroTaskName = "NewsCollector-BlsMacro",
+  [string]$MacroCalendarTaskName = "NewsCollector-MacroCalendar",
   [string]$MarketContextTaskName = "NewsCollector-MarketContext-PreTwOpen",
   [string]$PreOpenTaskName = "NewsCollector-MarketAnalysis-PreTwOpen",
   [string]$TwMarketFlowTaskName = "NewsCollector-TwMarketFlow",
@@ -11,8 +12,9 @@ param(
   [string]$UsCloseAt = "05:00",
   [string]$RagIndexerAt = "04:40",
   [string]$BlsMacroAt = "04:50",
-  [string]$MarketContextAt = "07:50",
-  [string]$PreOpenAt = "08:00",
+  [string]$MacroCalendarAt = "06:00",
+  [string]$MarketContextAt = "07:20",
+  [string]$PreOpenAt = "07:30",
   [string]$TwMarketFlowAt = "15:10",
   [string]$TwCloseContextAt = "15:20",
   [string]$TwCloseAt = "15:30",
@@ -25,6 +27,7 @@ $RunScript = Join-Path $ProjectRoot "scripts\\run_market_analysis.ps1"
 $RagIndexerScript = Join-Path $ProjectRoot "scripts\\run_rag_indexer.ps1"
 $ContextScript = Join-Path $ProjectRoot "scripts\\run_market_context.ps1"
 $BlsMacroScript = Join-Path $ProjectRoot "scripts\\run_bls_macro.ps1"
+$MacroCalendarScript = Join-Path $ProjectRoot "scripts\\run_macro_calendar.ps1"
 $TwMarketFlowScript = Join-Path $ProjectRoot "scripts\\run_tw_market_flow.ps1"
 $TwCloseContextScript = Join-Path $ProjectRoot "scripts\\run_tw_close_context.ps1"
 
@@ -39,6 +42,9 @@ if (-not (Test-Path -LiteralPath $ContextScript)) {
 }
 if (-not (Test-Path -LiteralPath $BlsMacroScript)) {
   throw "run_bls_macro.ps1 not found: $BlsMacroScript"
+}
+if (-not (Test-Path -LiteralPath $MacroCalendarScript)) {
+  throw "run_macro_calendar.ps1 not found: $MacroCalendarScript"
 }
 if (-not (Test-Path -LiteralPath $TwMarketFlowScript)) {
   throw "run_tw_market_flow.ps1 not found: $TwMarketFlowScript"
@@ -162,6 +168,7 @@ function Register-TwCloseContextTask {
 
 Register-CollectorTask -TaskName $RagIndexerTaskName -ScriptPath $RagIndexerScript -At $RagIndexerAt -Description "Index recent relay events and market analyses for historical-case RAG."
 Register-CollectorTask -TaskName $BlsMacroTaskName -ScriptPath $BlsMacroScript -At $BlsMacroAt -Description "Collect BLS official macro facts into t_relay_events before U.S. close analysis."
+Register-CollectorTask -TaskName $MacroCalendarTaskName -ScriptPath $MacroCalendarScript -At $MacroCalendarAt -Description "Collect official U.S. macro release dates into t_macro_release_calendar before LINE reminder delivery."
 Register-MarketAnalysisTask -TaskName $UsCloseTaskName -Slot "us_close" -At $UsCloseAt -Description "Generate U.S. close analysis at 05:00 local time; TW holidays with U.S. trading make it Java-delivery eligible."
 Register-MarketContextTask -TaskName $MarketContextTaskName -At $MarketContextAt -Description "Collect pre-open market context and store it as event-only facts before Taiwan open."
 Register-MarketAnalysisTask -TaskName $PreOpenTaskName -Slot "pre_tw_open" -At $PreOpenAt -Description "Generate Taiwan pre-open analysis, or macro_daily when both TW and U.S. close session are closed."

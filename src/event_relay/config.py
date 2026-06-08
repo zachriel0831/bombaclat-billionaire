@@ -54,6 +54,8 @@ class RelaySettings:
     mysql_connect_timeout_seconds: int
     retention_enabled: bool
     retention_keep_days: int
+    mysql_palestine_news_table: str = "t_palestine_news_items"
+    mysql_macro_calendar_table: str = "t_macro_release_calendar"
 
 
 def parse_bool(value: str | None, default: bool = False) -> bool:
@@ -99,4 +101,10 @@ def load_settings(env_file: str = ".env") -> RelaySettings:
         mysql_connect_timeout_seconds=int(os.getenv("RELAY_MYSQL_CONNECT_TIMEOUT", "5")),
         retention_enabled=parse_bool(os.getenv("RELAY_RETENTION_ENABLED", "true"), default=True),
         retention_keep_days=max(1, min(365, int(os.getenv("RELAY_RETENTION_KEEP_DAYS", "7")))),
+        mysql_palestine_news_table=os.getenv(
+            "RELAY_MYSQL_PALESTINE_NEWS_TABLE", "t_palestine_news_items"
+        ),
+        mysql_macro_calendar_table=os.getenv(
+            "RELAY_MYSQL_MACRO_CALENDAR_TABLE", "t_macro_release_calendar"
+        ),
     )

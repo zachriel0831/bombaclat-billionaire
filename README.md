@@ -44,13 +44,20 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - RSS news rows are normalized by `news_collector` and written through the bridge into `t_relay_events`
 - RSS `--limit` is applied per feed, not globally. Current `.env` uses `OFFICIAL_RSS_FIRST_PER_FEED=true`, so one polling cycle fetches one item per configured feed; if disabled, 27 feeds with `-Limit 5` can return up to 135 RSS items before URL dedupe and topic/date filters.
 
+1a. Free Palestine English issue news (no API key)
+- Module: `event_relay.palestine_news`
+- Collects English RSS / Google News search rows for Palestine, Gaza, West Bank, and related issue terms
+- Writes accepted rows to long-term `t_palestine_news_items`
+- `news-platform-api` exposes these rows through `GET /api/timeline/news`; they do not belong in the general finance relay feed or the short-retention `t_relay_events` stream
+- Legacy `source=palestine_watch:<source_id>` relay rows can be copied once with `scripts/run_palestine_news.ps1 -BackfillRelay -BackfillOnly`
+
 2. SEC EDGAR tracked filings (no API key, declared User-Agent required)
 - Track selected tickers through official SEC ticker mapping + submissions API
 - Starter `.env` set watches `NVDA,TSM,AAPL,MSFT,AMD,TSLA`
 
 3. TWSE / MOPS official listed-company announcements (no API key)
 - Uses TWSE openapi dataset `上市公司每日重大訊息`
-- Starter `.env` set watches the listed-stock side of the fixed market-analysis pool: `2330,2603,2882,1605`
+- Starter `.env` set watches the listed-stock side of the fixed market-analysis pool: `2330,2317,2454,2308,2881,2882,2485,3535,3715,2351`
 
 4. X account stream (Bearer token required)
 - Track selected accounts with X filtered stream (near real-time)
@@ -78,7 +85,7 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - `SEC_ALLOWED_FORMS` (default high-signal filing set such as `8-K,10-Q,10-K,6-K,20-F`)
 - `SEC_MAX_FILINGS_PER_COMPANY` (default `5`)
 - `TWSE_MOPS_ENABLED` (master switch for TWSE listed-company major announcements)
-- `TWSE_MOPS_TRACKED_CODES` (comma-separated listed company codes, e.g. `2330,2603,2882,1605`; TPEx symbol `4956` is covered through Yahoo context)
+- `TWSE_MOPS_TRACKED_CODES` (comma-separated listed company codes, e.g. `2330,2317,2454,2308,2881,2882,2485,3535,3715,2351`)
 - `TWSE_MOPS_MAX_ITEMS_PER_COMPANY` (default `5`)
 - `X_BEARER_TOKEN` (required only when `X_ENABLED=true`)
 - `X_BEARER_TOKEN_FILE` (optional; encrypted local token file, default `.secrets/x_bearer_token.dpapi`)
@@ -91,6 +98,7 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - `X_BACKFILL_ENABLED` (default `true`; replay recent tracked-account tweets into the event store once when bridge starts)
 - `X_BACKFILL_MAX_RESULTS_PER_ACCOUNT` (default `10`; startup backfill size per tracked account)
 - No key required for RSS
+- No key required for Free Palestine English issue news RSS / Google News search
 - No key required for FRED public CSV market-context series
 - `SEC_USER_AGENT` is also required when `MARKET_CONTEXT_AI_CAPEX_ENABLED=true`
 - `EIA_API_KEY` is optional; when set, oil context includes weekly U.S. crude stocks excluding SPR
@@ -160,6 +168,12 @@ Optional table-name env keys:
 - `NEWSPF_MYSQL_PUBLIC_RECORD_TABLE=t_public_records`
 - `NEWSPF_MYSQL_ARTICLE_RECORD_LINK_TABLE=t_news_article_public_record_links`
 
+Optional reporter/detail-page enrichment env keys:
+- `NEWSPF_AUTHOR_DETAIL_BACKFILL_ENABLED=true`
+- `NEWSPF_AUTHOR_DETAIL_BACKFILL_BATCH_SIZE=30`
+- `NEWSPF_AUTHOR_DETAIL_BACKFILL_SOURCES=cna,storm,newtalk,ltn,ettoday,tvbs,ebc,ctee,pts`
+- `NEWSPF_AUTHOR_DETAIL_BACKFILL_SLEEP_SECONDS=0.05`
+
 Optional LLM fallback env keys:
 - `NEWSPF_TOPIC_LLM_ENABLED=false`
 - `NEWSPF_TOPIC_LLM_PROVIDER_ORDER=openai,anthropic`
@@ -200,6 +214,30 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_source_bridge.ps1 -PollIn
 
 For RSS, `-Limit 5` means up to 5 items per configured feed. SEC/TWSE/X keep their existing per-source or per-account limit behavior.
 
+Run the Free Palestine English issue-news collector once:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 20
+```
+
+Backfill legacy relay rows into long-term storage once:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -BackfillRelay -BackfillOnly
+```
+
+Safe dry run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 5 -DryRun
+```
+
+Optional feed override:
+
+```text
+PALESTINE_NEWS_RSS_FEEDS=google_news_en|https://news.google.com/rss/search?...;al_jazeera_en|https://www.aljazeera.com/xml/rss/all.xml
+```
+
 X source is now consumed by filtered stream (near real-time) with auto reconnect/backoff.
 Bridge startup also runs a one-shot X backfill before connecting the filtered stream, so tweets published while the bridge was down can be replayed into `t_relay_events` and `t_x_posts` without the event relay API running.
 When X returns `429` with `connection_issue=TooManyConnections`, bridge will auto-heal by terminating stale stream connections and retrying (configurable by `X_AUTO_HEAL_TOO_MANY_CONNECTIONS`).
@@ -216,6 +254,7 @@ MySQL defaults (editable in `.env`):
 - `RELAY_MYSQL_PASSWORD=root`
 - `RELAY_MYSQL_DATABASE=news_relay`
 - `RELAY_MYSQL_EVENT_TABLE=t_relay_events`
+- `RELAY_MYSQL_PALESTINE_NEWS_TABLE=t_palestine_news_items`
 - `RELAY_MYSQL_X_TABLE=t_x_posts`
 - `RELAY_MYSQL_MARKET_TABLE=t_market_index_snapshots`
 - `RELAY_MYSQL_ANALYSIS_TABLE=t_market_analyses`
@@ -349,7 +388,7 @@ $env:PYTHONPATH='src'; python -m news_collector.main fetch --source twse --limit
 
 Required `.env` keys for TWSE/MOPS:
 - `TWSE_MOPS_ENABLED=true`
-- `TWSE_MOPS_TRACKED_CODES=2330,2603,2882,1605`
+- `TWSE_MOPS_TRACKED_CODES=2330,2317,2454,2308,2881,2882,2485,3535,3715,2351`
 - `TWSE_MOPS_MAX_ITEMS_PER_COMPANY=5`
 
 Notes:
@@ -392,9 +431,12 @@ Prompt pipeline:
   - `raw_json.token_usage` for provider/model/token telemetry
 
 Weekly summary env keys:
+- `LLM_PROVIDER` (`openai` or `anthropic`; weekly loads `.env` before resolving the provider)
 - `WEEKLY_SUMMARY_OPENAI_API_KEY` (optional; fallback to `OPENAI_API_KEY`)
 - `WEEKLY_SUMMARY_OPENAI_API_KEY_FILE` (default `.secrets/openai_api_key.dpapi`, Windows DPAPI encrypted key)
 - `WEEKLY_SUMMARY_MODEL` (default `gpt-5`)
+- `ANTHROPIC_API_KEY` / `ANTHROPIC_API_KEY_FILE` (used when `LLM_PROVIDER=anthropic` or weekly runtime failover switches to Claude)
+- `WEEKLY_SUMMARY_RUNTIME_FAILOVER_ENABLED` (default `true`; OpenAI quota/rate/5xx failures retry once on Anthropic when configured)
 - `WEEKLY_SUMMARY_LOOKBACK_DAYS` (default `7`)
 - `WEEKLY_SUMMARY_MAX_EVENTS` (default `120`)
 - `WEEKLY_SUMMARY_WEEKDAY` (0=Mon ... 6=Sun, default `5` - Saturday)
@@ -427,6 +469,7 @@ Current behavior:
 - Optionally retrieves hybrid historical examples from `t_event_embeddings` and `t_analysis_embeddings` using metadata overlap, vector similarity, and stored outcome score; examples are analogues in the stage2 transmission prompt
 - Calls OpenAI Responses API with web search enabled by default for missing/current fact verification
 - Runs `claim_verifier` after generation and stores evidence coverage for numbers, dates, and tickers in `raw_json.claim_verifier`
+- Applies `raw_json.trust_gate`: when `claim_verifier.ok=false`, the analysis is still stored for audit/debug but `push_enabled=false` and trade-signal extraction is skipped
 - Stores the generated analysis in `t_market_analyses`
 - Uses `push_enabled` as Java delivery eligibility: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`
 - Runs a built-in 2026 TWSE / NYSE calendar guard before any LLM call:
@@ -435,12 +478,12 @@ Current behavior:
   - both closed: `pre_tw_open` task writes `macro_daily` with `push_enabled=1`
   - Sunday: market analysis skips; weekly summary owns the day
 - Keeps regular-day `us_close` analysis stored and injects it into the next Taiwan pre-open prompt only when that U.S. close session was open; TW-holiday `us_close` rows are eligible for Java LINE delivery
-- Extracts fixed-pool Taiwan stock watch rows from `structured_json.stock_watch` into `t_trade_signals`
-- `market_analysis` must not ask the model to recommend arbitrary Taiwan tickers. The fixed watch pool is `2330` 台積電, `2603` 長榮, `2882` 國泰金, `1605` 華新, and `4956` 光鋐.
-- Related specs: `spec/market-analysis-fixed-watchlist-functional-spec.md`, `spec/market-analysis-fixed-watchlist-data-contract.md`, `spec/market-analysis-fixed-watchlist-operations.md`
-- For `pre_tw_open` and TW-holiday `us_close`, uses a larger report budget and appends a fixed-pool short/medium-term watch section from `t_trade_signals`; missing structured signal price levels are filled from deterministic Taiwan quote/context fallback rows when evidence exists
-- Daily output follows a fixed macro flow for readability: `總經 Regime` -> `利率與流動性` -> `景氣循環` -> `市場情緒` -> `台股配置` -> `風險與資料缺口`; `今日個股觀察` remains the appended stock-candidate section
-- Configured fixed-pool tickers from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` are used as quote/context evidence for the visible pre-open watch section. If one of the five symbols lacks evidence, the output should mark a data gap or neutral watch state instead of substituting another ticker.
+- Target direction: Codex should generate dynamic Taiwan intraday / short-swing trade candidates from collected `t_relay_events`, market context, quote evidence, historical/RAG context, and model judgment, then store reviewable rows in `t_trade_signals`.
+- The old fixed ten-stock pool was only an observation/debugging aid and is superseded by `spec/market-analysis-dynamic-trade-candidates.md`.
+- Current implementation gap: code still contains fixed-pool paths such as `FIXED_MARKET_ANALYSIS_WATCH_POOL`; do not assume runtime dynamic candidate generation is complete.
+- `stock-monitor-service` should monitor the top five ranked `t_trade_signals` candidates.
+- Future `order-dispatcher-service` trading must cap concurrent traded symbols at three and must remain sandbox/paper until order, fill, position, PnL, reconciliation, and kill-switch state are implemented.
+- Daily visible market-analysis text follows the product-editor flow for readability: `今日一句話` -> `三個檢查點` -> `總經與流動性` -> `景氣循環` -> `國際新聞傳導` -> `產業板塊解析` -> `風險與資料缺口`; the daily body should not expose entry/stop/target lists unless a separate trading UI asks for them.
 - Does not push or create LINE delivery jobs; Java owns user-facing delivery
 - Treats `t_relay_events` as primary local evidence, not as the only possible source of truth; prompts require explicit data-gap labeling when context is insufficient
 
@@ -454,12 +497,12 @@ Manual backfill through the running relay service:
 ```
 
 Trade signal storage:
-- `t_trade_signals` stores one row per fixed-pool Taiwan ticker watch item from a market analysis.
+- `t_trade_signals` is the reviewable daily candidate table for Taiwan intraday / short-swing monitoring. The target design allows dynamic candidates, subject to evidence, ranking, validation, and review gates.
 - `ticker` is the normalized tradable symbol. For Taiwan signals this is the 4-digit stock code such as `2330`; `.TW` / `.TWO` suffixes are stripped and market type is stored in `market`.
 - Signals start as `status=pending_review`; they are not orders.
 - Each signal carries `analysis_id`, `analysis_date`, `analysis_slot`, `ticker`, `strategy_type`, `direction`, optional entry/stop/target JSON, and `source_event_ids`.
 - For Taiwan pre-open output, internal `direction=long` means buy-side / 做多, not long-term holding. `strategy_type=swing|medium` controls 波段/中線 wording. `entry_zone` is entry area, `take_profit_zone` is profit-taking exit area, and `invalidation` is shown as 停損.
-- `quote_fallback_stock_watch` / `context_fallback_stock_watch` rows are generated only for the fixed pool; they enrich or fill monitor levels but do not introduce substitute tickers. They still start as `pending_review`.
+- Fallback rows may enrich or fill monitor levels only when evidence exists. They still start as `pending_review` and are not orders.
 - `idempotency_key` prevents duplicate signals for the same analysis/ticker/strategy.
 - `t_signal_reviews` and `t_signal_outcomes` are separate follow-up tables for risk gate / human review and performance feedback.
 - LLM output stops at signal creation. Order intents and broker calls must be created only after independent review/risk approval.
@@ -500,6 +543,12 @@ BLS macro collector:
 - Writes one stored-only source fact per latest monthly observation into `t_relay_events`
 - Uses BLS Public Data API v2 with optional `BLS_API_KEY`
 
+U.S. macro release-calendar collector:
+- Module: `event_relay.macro_calendar`
+- Writes official future release dates into long-lived `t_macro_release_calendar`
+- Covers CPI, PPI, Employment Situation / nonfarm payrolls, and retail sales
+- LINE reminder delivery is owned by `line-relay-service`; Python does not push LINE
+
 Run context collection once:
 
 ```powershell
@@ -507,6 +556,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_rag_indexer.ps1 -EnvFile 
 powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env
 powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_market_flow.ps1 -EnvFile .env
 powershell -ExecutionPolicy Bypass -File .\scripts\run_bls_macro.ps1 -EnvFile .env
+powershell -ExecutionPolicy Bypass -File .\scripts\run_macro_calendar.ps1 -EnvFile .env
 powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_close_context.ps1 -EnvFile .env
 ```
 
@@ -569,8 +619,9 @@ Market analysis env keys:
 - `LLM_WEB_SEARCH_ENABLED` (default `true` for OpenAI; set `false` for local-only analysis)
 - `LLM_TIMEOUT_SECONDS` (default `120`, configured `.env` value `600`, shared OpenAI/Anthropic HTTP timeout; clamped to `15-600`)
 - `MARKET_CONTEXT_TWSE_CODES` (optional; defaults to `TWSE_MOPS_TRACKED_CODES`)
-- `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` (fixed market-analysis pool, e.g. `2330.TW:台積電,2603.TW:長榮,2882.TW:國泰金,1605.TW:華新,4956.TWO:光鋐`; use `.TWO` for TPEx symbols)
+- `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` (tracked Taiwan quote/context symbols; historically used for the fixed pool and should be generalized during dynamic-candidate migration)
 - `MARKET_ANALYSIS_EXCLUDED_TICKERS` (default `4749`; comma-separated tickers excluded from visible stock analysis)
+- `MARKET_ANALYSIS_CLAIM_GATE_ENABLED` (default `true`; set `false` only for emergency debugging to bypass the `claim_verifier.ok=false` delivery/signal block)
 - `MARKET_CONTEXT_ANALYSIS_SLOT` (default `market_context_pre_tw_open`)
 - `MARKET_CONTEXT_SCHEDULED_TIME` (default `07:20`)
 - `MARKET_CONTEXT_TIMEOUT_SECONDS` (default `15`)
@@ -583,6 +634,9 @@ Market analysis env keys:
 - `BLS_API_KEY` (optional)
 - `BLS_SERIES_IDS` (optional comma-separated subset of the built-in BLS mapping)
 - `BLS_TIMEOUT_SECONDS` (default inherited by script as `30`)
+- `MACRO_CALENDAR_BLS_YEARS` (optional comma-separated BLS calendar years; defaults to current Taipei year and next year)
+- `MACRO_CALENDAR_TIMEOUT_SECONDS` (default inherited by script as `30`)
+- `RELAY_MYSQL_MACRO_CALENDAR_TABLE` (default `t_macro_release_calendar`)
 - `TW_CLOSE_CONTEXT_SOURCE_PREFIXES` (optional comma-separated source prefixes)
 - `TW_CLOSE_CONTEXT_LOOKBACK_DAYS` (default `2`)
 - `TW_CLOSE_CONTEXT_MAX_EVENTS` (default `200`)

@@ -31,6 +31,13 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Reuters currently uses Google News RSS search as fallback because legacy Reuters RSS endpoints are unavailable from this environment
 - CNN RSS is configurable in code, but the previously tested CNN feeds were removed from the active `.env` set after returning stale items from 2016-2024 during the 2026-04-19 verification
 
+2a. Free Palestine English issue-news collector
+- Module: `src/event_relay/palestine_news.py`
+- Uses English RSS / Google News search feeds only; default sources are Google News English search, Al Jazeera English RSS, BBC Middle East RSS, and Guardian Palestine RSS
+- Filters to Palestine/Gaza/West Bank issue terms and rejects likely non-English titles before writing
+- Writes normalized rows directly to long-term `t_palestine_news_items` with `source_id=<source_id>`, `topic=free_palestine`, and `language=en`
+- Public read path: `news-platform-api` exposes `GET /api/timeline/news`, and `news-display-frontend` renders it as the `/timeline` table news column
+
 3. SEC tracked filings
 - Uses official SEC `company_tickers.json` plus `data.sec.gov/submissions/CIK##########.json`
 - Tracks allowlisted tickers from `SEC_TRACKED_TICKERS`
@@ -40,7 +47,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 4. TWSE / MOPS listed-company announcements
 - Uses official TWSE openapi dataset `t187ap04_L` (`上市公司每日重大訊息`)
 - Tracks allowlisted listed-company codes from `TWSE_MOPS_TRACKED_CODES`
-- Market analysis uses a fixed ten-stock watch pool: `2330` 台積電, `2317` 鴻海, `2454` 聯發科, `2308` 台達電, `2881` 富邦金, `2882` 國泰金, `2485` 兆赫, `3535` 晶彩科, `3715` 定穎投控, and `2351` 順德.
+- Market analysis target direction is Codex-generated dynamic Taiwan intraday / short-swing candidates stored in `t_trade_signals`; the old fixed ten-stock pool was an observation/debugging aid and remains only as a runtime migration gap.
 - Writes normalized announcement events directly into `t_relay_events` through the crawler bridge
 
 5. US index tracker
@@ -69,6 +76,17 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Average hourly earnings `CES0500000003`, average weekly hours `CES0500000002`
 - Raw event JSON keeps `series_id`, `year`, `period`, `periodName`, `value`, `footnotes`, and normalized period / year-over-year metrics for traceability
 - BLS data is monthly and may be preliminary or revised; footnote codes are preserved in `raw_json.footnotes` and `raw_json.normalized_metrics.footnote_codes`
+
+7a. U.S. official macro release calendar
+- Module: `src/event_relay/macro_calendar.py`
+- Uses official release-calendar pages:
+  - BLS annual release calendar `https://www.bls.gov/schedule/<year>/home.htm`
+  - U.S. Census Retail Trade release schedule `https://www.census.gov/retail/release_schedule.html`
+- Tracks CPI, PPI, Employment Situation / nonfarm payrolls, and Advance Monthly Retail Trade / retail sales
+- Interprets official release times as U.S. Eastern time and stores both UTC and Asia/Taipei timestamps
+- Writes long-lived rows to `t_macro_release_calendar`, not `t_relay_events` and not `t_market_analyses`
+- `reminder_date_taipei` is always the Taiwan date before `release_at_taipei`
+- LINE delivery state fields (`reminder_pushed`, `reminder_pushed_at`, `reminder_push_status`, `reminder_push_error`) are updated by `line-relay-service`; Python only upserts official calendar facts
 
 8. FRED / Fed public macro-regime context
 - Uses FRED public CSV endpoint `https://fred.stlouisfed.org/graph/fredgraph.csv`
@@ -137,6 +155,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - The route category normally maps to `t_news_articles.category`; frontend topic pages pass `topic=<topicId>` instead of parsing `topics_json` directly
   - `low_birthrate` is a cross-category issue view: `GET /api/society/topics`, `GET /api/society/articles?topic=low_birthrate`, and `GET /api/society/timeline?topic=low_birthrate` aggregate matching rows from all `t_news_articles.category` values while preserving each article's original `category`
   - Finance feed: `news-display-frontend` calls `GET /api/events` through `/api/content/events` with the public source allowlist in `news-platform-api/docs/API_SPEC.md`; the allowlist must include active Taiwan finance/public market RSS source names such as Economic Daily News, LTN finance, MoneyDJ, Anue, CNA finance, ETtoday finance, Newtalk finance, Storm, TWSE, and CBC. The API source filter matches both normal UTF-8 source names and legacy mojibake DB values before returning repaired display text.
+  - Free Palestine issue news: `/timeline` calls `GET /api/timeline/news`, which reads long-term `t_palestine_news_items`; do not add this issue-news storage to the general finance public feed or `t_relay_events` retention stream.
 - Data flow:
   1. crawler writes raw article rows; RSS/Atom and sitemap sources also fill `authors_json` when explicit author metadata or a high-confidence reporter byline is available; all new article rows also receive `author_extraction_status`
      - Articles with authors upsert normalized rows into `t_news_authors` and `t_news_article_authors`
@@ -197,6 +216,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - `t_trade_signals`
 - `t_signal_reviews`
 - `t_signal_outcomes`
+- `t_macro_release_calendar`
 - Current behavior:
   - Crawler bridge owns normal source ingestion and writes event rows directly
   - `t_relay_events` is treated as event-only storage
@@ -276,15 +296,15 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   8. Call OpenAI Responses API or Anthropic Messages API according to the selected route; OpenAI web search is enabled by default for current-fact verification
   8a. If the selected provider is Anthropic, apply `provider-context-policy-v1` compact context before prompting to reduce event rows, market rows, RAG examples, and raw JSON detail while preserving scorecard, market context, official sources, and high-importance events
   8b. Run `claim_verifier` on the final output to check whether numbers, dates, and tickers have supporting evidence in the prompt context
-      - For delivery-visible fixed-pool slots, the configured ten-stock watch pool is passed as allowed structured tickers so the visible monitor list does not fail solely because those ticker codes are contractual output.
-      - This allowance must not hide unsupported numeric/date claims or non-pool ticker claims.
+      - For dynamic trade-candidate slots, candidate tickers must be supported by evidence or explicitly marked as model-selected candidates with traceable local context.
+      - This allowance must not hide unsupported numeric/date claims or unrelated ticker claims.
   8c. Apply `market-analysis-trust-gate-v1`: when `claim_verifier.ok=false`, store the analysis for audit/debug but set final `push_enabled=0` and skip trade-signal extraction; `MARKET_ANALYSIS_CLAIM_GATE_ENABLED=false` is an emergency debug override only
   8d. Store generated text in `t_market_analyses`; `raw_json.model_router`, `raw_json.provider_context_policy`, `raw_json.rag`, `raw_json.pipeline_stages`, `raw_json.requested_pipeline_mode`, `raw_json.pipeline_mode`, `raw_json.analysis_intent`, `raw_json.claim_verifier`, and `raw_json.trust_gate` hold routing/retrieval/stage/evidence/trust telemetry
   9. Set base delivery eligibility in `push_enabled`: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`; the trust gate may lower the final stored value to `0`
   10. Inject the latest stored `us_close` digest/analysis as upstream context only when the relevant U.S. close session was open; if U.S. was closed, the Taiwan pre-open prompt intentionally has no `us_close` block
-  11. Extract fixed-pool `structured_json.stock_watch` rows into `t_trade_signals` as `pending_review` rows for full analysis modes
-  12. For delivery-visible `pre_tw_open` / delivery-eligible `us_close`, use only the fixed market-analysis pool: `2330`, `2317`, `2454`, `2308`, `2881`, `2882`, `2485`, `3535`, `3715`, `2351`. The model must not introduce substitute Taiwan tickers.
-  13. Fill missing fixed-pool signal reference levels from deterministic quote/context rows when evidence exists for downstream machine-readable signal context. Daily visible reports must not append `## 今日個股觀察`; the fixed pool remains internal to signal consumers unless a separate UI explicitly asks for it.
+  11. Target design: extract Codex-generated dynamic Taiwan intraday / short-swing candidates into `t_trade_signals` as `pending_review` rows for full analysis modes.
+  12. The old fixed ten-stock pool was an observation/debugging aid. Current runtime code still contains fixed-pool paths, so migration work is required before dynamic candidate generation is fully live.
+  13. Fill missing signal reference levels from deterministic quote/context rows only when evidence exists. Daily visible reports must not append `## 今日個股觀察`; trading candidates remain machine-readable downstream context unless a separate trading UI explicitly asks for them.
   14. For `macro_daily`, write macro-only analysis into `t_market_analyses` and do not create trade signals.
 - Daily text formatting:
   - `raw_json.display_title` is date-only (`YYYY-MM-DD`) for downstream delivery titles
@@ -296,20 +316,21 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Fallback stock rationales keep only `需開盤量價確認` as the repeated warning
 - Tracked-stock context:
   - `MARKET_CONTEXT_TWSE_CODES` reads official TWSE close/margin rows for tracked listed stocks
-  - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` provides Yahoo Taiwan quote/context rows for the fixed pool: `2330.TW:台積電`, `2317.TW:鴻海`, `2454.TW:聯發科`, `2308.TW:台達電`, `2881.TW:富邦金`, `2882.TW:國泰金`, `2485.TW:兆赫`, `3535.TW:晶彩科`, `3715.TW:定穎投控`, `2351.TW:順德`
+  - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` historically provided Yahoo Taiwan quote/context rows for the fixed pool; dynamic-candidate migration should generalize this into a broader evidence universe and ranking input.
   - `MARKET_ANALYSIS_EXCLUDED_TICKERS` defaults to `4749`, so 新應材 is excluded from visible individual-stock analysis even if old quote/context rows remain in storage
   - Official TWSE context is preferred when both sources produce the same ticker; Yahoo context fills gaps such as TPEx `.TWO` symbols
 - Trade-signal boundary:
-  - `t_trade_signals` stores fixed-pool Taiwan watch items only
+  - Target design: `t_trade_signals` stores dynamic daily Taiwan intraday / short-swing candidates. Current implementation still has fixed-pool restrictions that must be migrated.
   - `ticker` is the normalized tradable symbol; Taiwan signals use the 4-digit code without `.TW` / `.TWO`
   - Every signal keeps `analysis_id`, slot/date, ticker, strategy/direction, optional entry/stop/target JSON, and `source_event_ids`
   - Internal `direction=long` means buy-side / 做多, not long-term holding; `entry_zone` is the entry area, `take_profit_zone` is the profit-taking exit area, and `invalidation` is rendered as 停損
-  - `quote_fallback_stock_watch` / `context_fallback_stock_watch` are fixed-pool evidence sources only; they enrich or fill monitor levels and must not add tickers outside `2330`, `2317`, `2454`, `2308`, `2881`, `2882`, `2485`, `3535`, `3715`, `2351`
-  - `prior_signal_stock_watch` may fill a missing same-ticker fixed-pool row from recent `t_trade_signals` history. It is downgraded to `confidence=low`, labelled as prior reference, and must require same-day price, volume, and news confirmation before any action.
+  - `quote_fallback_stock_watch` / `context_fallback_stock_watch` may enrich or fill monitor levels only when evidence exists; they must not invent tickers.
+  - `prior_signal_stock_watch` may fill a missing same-ticker row from recent `t_trade_signals` history. It is downgraded to `confidence=low`, labelled as prior reference, and must require same-day price, volume, and news confirmation before any action.
   - Targeted signal repair for an existing analysis row uses `scripts/run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback`; it may combine structured rows, recent quote/context fallback, and prior same-ticker references, while still respecting `raw_json.trust_gate.signals_allowed=false`.
   - `idempotency_key` suppresses duplicate signals for the same analysis/ticker/strategy
   - `t_signal_reviews` is reserved for risk gate / human / model-review decisions
   - `t_signal_outcomes` is reserved for later performance feedback; any strategy report/outcome JSON must use entry-first attribution: ignore target/stop hits before the first entry, then count the first target after entry as win and first stop after entry as loss
+  - Order, fill, position state, realized PnL, and unrealized PnL are not implemented here; they belong to future `order-dispatcher-service` state tables.
   - LLM analysis never creates order intents or broker calls directly
 - Historical-case RAG:
   - Module: `src/event_relay/rag.py`
@@ -338,6 +359,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Every day 05:00, 07:30, and 15:30 (Asia/Taipei, local machine timezone) for market analysis
   - Every day 04:40 (Asia/Taipei, local machine timezone) for historical-case RAG indexing
   - Every day 04:50 (Asia/Taipei, local machine timezone) for BLS macro event collection
+  - Every day 06:00 (Asia/Taipei, local machine timezone) for U.S. macro release-calendar collection
   - Every day 07:20 (Asia/Taipei, local machine timezone) for pre-open market context collection
   - Every day 15:10 (Asia/Taipei, local machine timezone) for Taiwan official market-flow collection
   - Every day 15:20 (Asia/Taipei, local machine timezone) for Taiwan close context collection
@@ -390,6 +412,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_market_flow.ps1 -EnvFile .env`
 - Run BLS macro context once:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_bls_macro.ps1 -EnvFile .env`
+- Run U.S. macro release calendar once:
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_macro_calendar.ps1 -EnvFile .env`
 - Run Taiwan close context once:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_close_context.ps1 -EnvFile .env`
 - Run retention cleanup once:

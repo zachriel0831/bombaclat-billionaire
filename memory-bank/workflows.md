@@ -129,6 +129,21 @@ Minimum evidence before reporting recovery complete:
 - Check bridge log for `Polling source=rss fetched=<count>`
 - Query `t_relay_events` for recent RSS source rows
 
+## Workflow 3A-1: Free Palestine English Issue News
+1. Smoke fetch without DB writes
+- `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 5 -DryRun`
+2. Check source contract
+- Accepted rows must be likely English and match Palestine/Gaza/West Bank issue terms
+- Stored rows go to `t_palestine_news_items` with `source_id=<source_id>`, `topic=free_palestine`, and `language=en`
+3. Store a controlled batch
+- `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 20`
+4. Backfill legacy relay rows only when migrating old data
+- `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -BackfillRelay -BackfillOnly`
+5. Verify downstream reads
+- Query `t_palestine_news_items` for `topic='free_palestine' AND language='en'`
+- Smoke `news-platform-api` endpoint `GET /api/timeline/news?page=1&pageSize=5`
+- Confirm `/timeline` table shows the English-news column without adding these sources to the finance feed
+
 ## Workflow 3B: Taiwan Society/Politics News Topic Classification
 1. Smoke check feeds without DB writes
 - `$env:PYTHONPATH='src'; python -m news_platform.main --smoke`
@@ -269,8 +284,8 @@ machine restart, or when the user asks whether source data has caught up.
 - Use `scripts/run_market_analysis.ps1 -Slot tw_close` at `15:30`
 - Treat `t_relay_events` as primary local evidence, not exhaustive truth
 - `MARKET_ANALYSIS_<SLOT>_PIPELINE` overrides the global `MARKET_ANALYSIS_PIPELINE`; current cost-aware default is `MARKET_ANALYSIS_US_CLOSE_PIPELINE=digest` and `MARKET_ANALYSIS_PRE_TW_OPEN_PIPELINE=multi_stage`
-- `us_close` digest mode is upstream context only: one compact call, smaller prompt context, no fixed-pool recommendation append
-- `pre_tw_open` is the main trade-decision brief and is where fixed-pool medium/short-term stock setups should be generated for review
+- `us_close` digest mode is upstream context only: one compact call, smaller prompt context, no trading-candidate append in visible text
+- `pre_tw_open` is the main trade-decision brief. Target design: Codex generates dynamic Taiwan intraday / short-swing candidates from relay events, market context, quote evidence, historical/RAG context, and model judgment.
 - If `MARKET_ANALYSIS_MODEL_ROUTER_ENABLED=true`, OpenAI is the default primary and Claude is fallback; configure budgets/Admin API keys before relying on provider fallback, and inspect `raw_json.model_router` to confirm the selected route
 - When the selected provider is Anthropic, compact context mode is applied by default to reduce rate-limit risk; inspect `raw_json.provider_context_policy` for event/RAG/market-row reductions
 - Market analysis builds a quota-managed context pack before RAG/prompting; `market_context:scorecard`, market-context rows, and important official data must remain selected even when general news volume is high
@@ -283,14 +298,14 @@ machine restart, or when the user asks whether source data has caught up.
 - Daily delivery policy starts from `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`; `raw_json.trust_gate` may force final `push_enabled=0`
 - If `claim_verifier.ok=false`, `market-analysis-trust-gate-v1` stores the row for audit/debug but blocks Java delivery eligibility and skips trade-signal extraction
 - `claim-verifier-v2` ignores internal parenthesized evidence/source ID lists such as `（128610,128539）`; Stage4 must keep internal IDs out of visible `summary_text` and leave evidence links in telemetry/structured fields
-- For delivery-visible fixed-pool slots, `claim_verifier` receives the configured fixed ten-stock pool as allowed structured tickers. This only allows those ticker tokens; unsupported numbers, dates, and non-pool tickers must still block delivery.
+- For dynamic candidate slots, `claim_verifier` must verify ticker references against local evidence or explicit candidate telemetry. Unsupported numbers, dates, and unrelated tickers must still block delivery.
 - `us_close` remains stored as a digest/analysis and is injected into the next Taiwan pre-open analysis context only when the relevant U.S. session was open; if U.S. was closed, the pre-open prompt has no `us_close` context
-- Fixed-pool `structured_json.stock_watch` rows are extracted into `t_trade_signals`
-- For `pre_tw_open`, the visible stock section is limited to the fixed ten-stock pool: `2330` 台積電, `2317` 鴻海, `2454` 聯發科, `2308` 台達電, `2881` 富邦金, `2882` 國泰金, `2485` 兆赫, `3535` 晶彩科, `3715` 定穎投控, and `2351` 順德. Do not substitute model-recommended tickers outside this pool.
+- Target design: dynamic `structured_json.stock_watch` rows are extracted into `t_trade_signals`.
+- Current implementation gap: code still contains fixed-pool paths. Do not claim dynamic candidates are live until those code paths are migrated and tested.
 - New signals use `status=pending_review`; stale pending signals for the same analysis are marked `superseded`
 - `ticker` is normalized symbol text; Taiwan signals use 4-digit codes without `.TW` / `.TWO`
 - Daily visible reports no longer append `## 今日個股觀察`; `t_trade_signals` may still be maintained as machine-readable downstream context, but it is not rendered into the market-analysis body.
-- If today's structured/quote context misses a fixed-pool ticker, the pipeline may still copy the most recent same-ticker `t_trade_signals` row as `prior_signal_stock_watch` for downstream signal context. Treat it as stale reference only: keep `confidence=low`, show the prior date, and require same-day price, volume, and news confirmation.
+- If today's structured/quote context misses a ticker, the pipeline may copy only same-ticker recent `t_trade_signals` as `prior_signal_stock_watch` for downstream signal context. Treat it as stale reference only: keep `confidence=low`, show the prior date, and require same-day price, volume, and news confirmation.
 - Daily formatting uses date-only `raw_json.display_title` and the product-editor flow `今日一句話` -> `三個檢查點` -> `總經與流動性` -> `景氣循環` -> `國際新聞傳導` -> `產業板塊解析` -> `風險與資料缺口`; `三個檢查點` must contain exactly three observable checks. Do not write a dedicated `台股配置` section.
 - Individual company mentions in daily visible reports are limited to macro/sector transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write entry, stop-loss, or target-price language in the daily body.
 - In that section, `direction=long` is rendered as `可做/建議觀察` plus the strategy label; `entry_zone` means entry area, `take_profit_zone` means profit-taking/exit area, and `invalidation` is rendered as `停損`
@@ -309,6 +324,46 @@ machine restart, or when the user asks whether source data has caught up.
 - Inspect `t_market_analyses.raw_json.context_pack` for selected counts and guaranteed bucket status
 - Inspect `t_market_analyses.raw_json.model_router`, `raw_json.provider_context_policy`, `raw_json.pipeline_stages.core_tensions`, `raw_json.rag`, and `raw_json.claim_verifier`
 - Confirm rows exist as event/context facts only; Python does not contact LINE or create delivery jobs
+
+### Workflow 4C-G: Codex Market-Analysis Guard Automations
+
+Codex guard automations run after the market-analysis windows. They are agent
+jobs that can repair a failed row or create the missing prose row from local
+evidence when scheduled Python LLM prose generation is disabled.
+
+Configured Codex automations:
+- `market-analysis-codex-guard-us-close`: runs after the 05:00 `us_close` window.
+- `market-analysis-codex-guard-pre-open`: runs after the 07:30 `pre_tw_open` window.
+- `market-analysis-codex-guard-tw-close`: runs after the 15:30 `tw_close` window.
+
+Current cost-control schedule policy:
+- Keep data collection, context, and preprocessing tasks enabled:
+  `NewsCollector-RagIndexer`, `NewsCollector-BlsMacro`,
+  `NewsCollector-MarketContext-PreTwOpen`, `NewsCollector-TwMarketFlow`,
+  `NewsCollector-TwCloseContext`, and retention cleanup.
+- Disable scheduled LLM prose-generation tasks:
+  `NewsCollector-MarketAnalysis-UsClose`,
+  `NewsCollector-MarketAnalysis-PreTwOpen`,
+  `NewsCollector-MarketAnalysis-TwClose`, and
+  `NewsCollector-WeeklySummary`.
+
+Guard responsibilities:
+- Inspect the matching `t_market_analyses` row and raw telemetry.
+- If the row is healthy, do nothing.
+- If the row is missing, quota-failed, schema-failed, or blocked by fixable
+  `claim_verifier` token issues, repair it from local `t_relay_events`,
+  market-context rows, repo skills/templates, and deterministic verification.
+- Do not call OpenAI API, Anthropic API, or any paid external LLM API.
+- Write repaired rows only through `MySqlEventStore.upsert_market_analysis`.
+- Preserve Java delivery ownership: set `push_enabled` only according to
+  existing slot/calendar/trust-gate policy and keep `pushed=false`.
+- For repaired delivery/signal-eligible rows, rebuild internal
+  monitor signals with `scripts/run_trade_signal_extraction.ps1 -AnalysisId
+  <id> -FixedPoolFallback`.
+- Verify final DB state: `claim_verifier.ok`, trust-gate reason,
+  `push_enabled`, `pushed`, `structured_json`, and `t_trade_signals` count.
+- Store telemetry indicating `external_provider_api_called=false` for repaired
+  rows.
 
 ## Workflow 4L: Historical-Case RAG Indexing
 1. Build the local RAG index
@@ -362,7 +417,7 @@ machine restart, or when the user asks whether source data has caught up.
 4. Verify storage
 - Query `t_market_analyses` by `analysis_slot`
 - Weekly uses `analysis_slot=weekly_tw_preopen`
-- Daily market analysis also extracts fixed-pool watch rows to `t_trade_signals`
+- Target design: daily market analysis extracts dynamic trade candidates to `t_trade_signals`; current code still needs fixed-pool migration.
 
 ## Workflow 4E: SEC Tracked Filings Flow
 1. Define tracked universe
@@ -422,7 +477,7 @@ machine restart, or when the user asks whether source data has caught up.
 - FRED oil context: WTI, Brent, and Brent-WTI spread; optional EIA inventory context for U.S. crude stocks excluding SPR when `EIA_API_KEY` is set
 - Deterministic scorecard: `breadth_health`, `ai_capex_quality`, `energy_shock_risk`, `credit_stress`, and `liquidity_impulse` on a -2..+2 scale
 - TWSE official OpenAPI: index groups, tracked stocks, and margin balances
-- Taiwan fixed-pool Yahoo context from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS`: `2330.TW`, `2317.TW`, `2454.TW`, `2308.TW`, `2881.TW`, `2882.TW`, `2485.TW`, `3535.TW`, `3715.TW`, `2351.TW`
+- Taiwan Yahoo context from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` is currently a tracked evidence input. It historically mirrored the fixed pool and should be generalized during dynamic-candidate migration.
 - Visible stock-analysis exclusions are controlled by `MARKET_ANALYSIS_EXCLUDED_TICKERS`; default excludes `4749` / 新應材
 3. Persist as event-only facts
 - Insert one stored-only event per context point into `t_relay_events`
@@ -466,6 +521,28 @@ machine restart, or when the user asks whether source data has caught up.
 4. Verify
 - Run `python -m unittest tests.test_bls_macro -v`
 - Query `t_relay_events` by `source='market_context:bls_macro'`
+
+## Workflow 4J-1: U.S. Macro Release Calendar
+1. Collect official release dates
+- Dry run:
+  `powershell -ExecutionPolicy Bypass -File .\scripts\run_macro_calendar.ps1 -EnvFile .env -DryRun`
+- Store rows:
+  `powershell -ExecutionPolicy Bypass -File .\scripts\run_macro_calendar.ps1 -EnvFile .env`
+2. Source families
+- BLS annual release calendar for CPI, PPI, and Employment Situation / nonfarm payrolls
+- U.S. Census Retail Trade release schedule for Advance Monthly Retail Trade / retail sales
+3. Persist as long-lived calendar facts
+- Write rows to `t_macro_release_calendar`
+- Do not write these reminders to `t_relay_events`; release-calendar rows need to survive relay retention
+- Do not write them to `t_market_analyses`; they are official schedule facts, not generated prose
+4. Delivery boundary
+- `line-relay-service` reads `reminder_date_taipei = today AND reminder_pushed = 0`
+- Java sends one aggregated LINE reminder and updates `reminder_pushed` only after at least one target receives it
+- Python does not contact LINE
+5. Verify
+- Run `python -m unittest tests.test_macro_calendar -v`
+- Query `t_macro_release_calendar` for upcoming `release_at_taipei >= NOW()`
+- Confirm `reminder_date_taipei` is the date before the Taiwan release date
 
 ## Workflow 4K: Taiwan Close Context and Analysis
 1. Build close context from relay events

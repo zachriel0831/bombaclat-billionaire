@@ -18,6 +18,61 @@ CREATE TABLE IF NOT EXISTS `t_relay_events` (
   KEY idx_push_queue (is_pushed, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `t_palestine_news_items` (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  news_id VARCHAR(128) NOT NULL,
+  source_id VARCHAR(64) NOT NULL,
+  source_name VARCHAR(128) NOT NULL,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  url_hash CHAR(40) NOT NULL,
+  summary TEXT NULL,
+  published_at VARCHAR(64) NULL,
+  language VARCHAR(16) NOT NULL DEFAULT 'en',
+  topic VARCHAR(64) NOT NULL DEFAULT 'free_palestine',
+  source_url TEXT NULL,
+  original_source VARCHAR(255) NULL,
+  original_id VARCHAR(255) NULL,
+  tags_json JSON NULL,
+  raw_json JSON NULL,
+  first_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_palestine_news_hash (url_hash),
+  KEY idx_palestine_news_published (published_at),
+  KEY idx_palestine_news_source (source_id),
+  KEY idx_palestine_news_seen (last_seen_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `t_macro_release_calendar` (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  event_key CHAR(40) NOT NULL,
+  source_id VARCHAR(64) NOT NULL,
+  source_name VARCHAR(128) NOT NULL,
+  indicator_code VARCHAR(64) NOT NULL,
+  indicator_name VARCHAR(128) NOT NULL,
+  period_label VARCHAR(64) NOT NULL,
+  release_title TEXT NOT NULL,
+  release_at_utc DATETIME NOT NULL,
+  release_at_taipei DATETIME NOT NULL,
+  release_timezone VARCHAR(64) NOT NULL DEFAULT 'America/New_York',
+  importance TINYINT NOT NULL DEFAULT 3,
+  reminder_date_taipei DATE NOT NULL,
+  reminder_pushed TINYINT(1) NOT NULL DEFAULT 0,
+  reminder_pushed_at DATETIME NULL,
+  reminder_push_status VARCHAR(32) NULL,
+  reminder_push_error TEXT NULL,
+  source_url TEXT NOT NULL,
+  raw_json JSON NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_macro_release_event_key (event_key),
+  KEY idx_macro_release_reminder (reminder_date_taipei, reminder_pushed),
+  KEY idx_macro_release_time (release_at_taipei),
+  KEY idx_macro_release_indicator (indicator_code, release_at_taipei)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS `t_bot_group_info` (
   id BIGINT NOT NULL AUTO_INCREMENT,
   group_id VARCHAR(128) NOT NULL,
