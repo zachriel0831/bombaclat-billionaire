@@ -21,6 +21,16 @@ lookahead window and filters to configured heavyweight symbols. A manual JSON
 file can override or add confirmed dates, especially Taiwan local tickers whose
 exact earnings / board-meeting dates are not available from Nasdaq.
 
+The default calendar-tracking list is:
+
+- U.S. / ADR: `NVDA`, `AAPL`, `MSFT`, `AMZN`, `GOOGL`, `META`, `TSLA`,
+  `AVGO`, `AMD`, `ASML`, `QCOM`, `MU`, `ORCL`, `ARM`, `TSM`.
+- Taiwan local: `2330`, `2317`, `2454`, `2308`, `2382`, `3711`, `3231`,
+  `6669`, `2303`, `2881`, `2882`, `2891`.
+
+These symbols are for release-calendar coverage, not trade recommendation.
+Taiwan local rows still require manual confirmed dates or a future MOPS adapter.
+
 `line-relay-service` still owns delivery and sends one grouped message. It
 separates rows into `美國經濟數據` and `權值股財報`.
 

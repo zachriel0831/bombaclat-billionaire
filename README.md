@@ -647,7 +647,7 @@ Market analysis env keys:
 - `MACRO_CALENDAR_BLS_YEARS` (optional comma-separated BLS calendar years; defaults to current Taipei year and next year)
 - `MACRO_CALENDAR_TIMEOUT_SECONDS` (default inherited by script as `30`)
 - `MACRO_CALENDAR_EARNINGS_ENABLED` (default `true`; set `false` to collect only macro release dates)
-- `MACRO_CALENDAR_EARNINGS_SYMBOLS` (optional; comma-separated `SYMBOL` or `SYMBOL:Display Name:Market:Importance`; defaults to NVDA, AAPL, MSFT, AMZN, GOOGL, META, TSLA, AVGO, AMD, and TSM)
+- `MACRO_CALENDAR_EARNINGS_SYMBOLS` (optional; comma-separated `SYMBOL` or `SYMBOL:Display Name:Market:Importance`; defaults to calendar-tracking symbols `NVDA`, `AAPL`, `MSFT`, `AMZN`, `GOOGL`, `META`, `TSLA`, `AVGO`, `AMD`, `ASML`, `QCOM`, `MU`, `ORCL`, `ARM`, `TSM`, `2330`, `2317`, `2454`, `2308`, `2382`, `3711`, `3231`, `6669`, `2303`, `2881`, `2882`, `2891`)
 - `MACRO_CALENDAR_EARNINGS_LOOKAHEAD_DAYS` (default `75`; Nasdaq earnings-calendar lookahead window)
 - `MACRO_CALENDAR_EARNINGS_MANUAL_FILE` (optional JSON file for confirmed/manual earnings events such as Taiwan local heavyweight stocks)
 - `RELAY_MYSQL_MACRO_CALENDAR_TABLE` (default `t_macro_release_calendar`)

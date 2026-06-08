@@ -12,6 +12,7 @@ from event_relay.macro_calendar import (
     dedupe_releases,
     parse_bls_schedule_html,
     parse_census_retail_schedule_html,
+    parse_earnings_symbol_specs,
     parse_nasdaq_earnings_payload,
     run_once,
 )
@@ -81,6 +82,50 @@ class _FakeStore:
 
 
 class MacroCalendarTests(unittest.TestCase):
+    def test_default_earnings_watchlist_matches_calendar_tracking_scope(self) -> None:
+        specs = parse_earnings_symbol_specs("")
+        by_symbol = {item.symbol: item for item in specs}
+        expected_us_adr = [
+            "NVDA",
+            "AAPL",
+            "MSFT",
+            "AMZN",
+            "GOOGL",
+            "META",
+            "TSLA",
+            "AVGO",
+            "AMD",
+            "ASML",
+            "QCOM",
+            "MU",
+            "ORCL",
+            "ARM",
+            "TSM",
+        ]
+        expected_tw = [
+            "2330",
+            "2317",
+            "2454",
+            "2308",
+            "2382",
+            "3711",
+            "3231",
+            "6669",
+            "2303",
+            "2881",
+            "2882",
+            "2891",
+        ]
+
+        for symbol in expected_us_adr + expected_tw:
+            self.assertIn(symbol, by_symbol)
+        for symbol in expected_us_adr:
+            self.assertEqual(by_symbol[symbol].market, "US")
+        for symbol in expected_tw:
+            self.assertEqual(by_symbol[symbol].market, "TW")
+        self.assertEqual(by_symbol["NVDA"].importance, 5)
+        self.assertEqual(by_symbol["2330"].company_name, "台積電")
+
     def test_parse_bls_schedule_extracts_selected_releases(self) -> None:
         releases = parse_bls_schedule_html(BLS_SAMPLE_HTML, "https://www.bls.gov/schedule/2026/home.htm")
 

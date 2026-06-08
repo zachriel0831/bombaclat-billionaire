@@ -25,10 +25,18 @@ Primary MVP source:
 - Nasdaq public daily earnings calendar endpoint:
   `https://api.nasdaq.com/api/calendar/earnings?date=YYYY-MM-DD`
 
-Default watched symbols should focus on the names most likely to move U.S. tech
-and Taiwan AI / semiconductor sentiment:
+Default watched symbols are calendar-tracking coverage only, not trading
+recommendations. They should focus on the names most likely to move U.S. tech,
+ADR, Taiwan AI / semiconductor sentiment, and Taiwan index-heavy financials:
 
-- `NVDA`, `AAPL`, `MSFT`, `AMZN`, `GOOGL`, `META`, `TSLA`, `AVGO`, `AMD`, `TSM`
+- U.S. / ADR: `NVDA`, `AAPL`, `MSFT`, `AMZN`, `GOOGL`, `META`, `TSLA`,
+  `AVGO`, `AMD`, `ASML`, `QCOM`, `MU`, `ORCL`, `ARM`, `TSM`.
+- Taiwan local: `2330`, `2317`, `2454`, `2308`, `2382`, `3711`, `3231`,
+  `6669`, `2303`, `2881`, `2882`, `2891`.
+
+Nasdaq can populate U.S. / ADR rows automatically. Taiwan local symbols are in
+the same tracking config, but their exact earnings / board-meeting dates must
+come from `MACRO_CALENDAR_EARNINGS_MANUAL_FILE` or a future MOPS adapter.
 
 Configurable overrides:
 
