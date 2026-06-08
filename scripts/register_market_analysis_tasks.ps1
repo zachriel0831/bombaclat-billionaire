@@ -2,6 +2,7 @@ param(
   [string]$EnvFile = ".env",
   [string]$UsCloseTaskName = "NewsCollector-MarketAnalysis-UsClose",
   [string]$RagIndexerTaskName = "NewsCollector-RagIndexer",
+  [string]$PalestineNewsTaskName = "NewsCollector-PalestineNews",
   [string]$BlsMacroTaskName = "NewsCollector-BlsMacro",
   [string]$MacroCalendarTaskName = "NewsCollector-MacroCalendar",
   [string]$MarketContextTaskName = "NewsCollector-MarketContext-PreTwOpen",
@@ -11,6 +12,8 @@ param(
   [string]$TwCloseTaskName = "NewsCollector-MarketAnalysis-TwClose",
   [string]$UsCloseAt = "05:00",
   [string]$RagIndexerAt = "04:40",
+  [string]$PalestineNewsAt = "06:10",
+  [int]$PalestineNewsEveryHours = 3,
   [string]$BlsMacroAt = "04:50",
   [string]$MacroCalendarAt = "06:00",
   [string]$MarketContextAt = "07:20",
@@ -25,6 +28,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $RunScript = Join-Path $ProjectRoot "scripts\\run_market_analysis.ps1"
 $RagIndexerScript = Join-Path $ProjectRoot "scripts\\run_rag_indexer.ps1"
+$PalestineNewsScript = Join-Path $ProjectRoot "scripts\\run_palestine_news.ps1"
 $ContextScript = Join-Path $ProjectRoot "scripts\\run_market_context.ps1"
 $BlsMacroScript = Join-Path $ProjectRoot "scripts\\run_bls_macro.ps1"
 $MacroCalendarScript = Join-Path $ProjectRoot "scripts\\run_macro_calendar.ps1"
@@ -36,6 +40,9 @@ if (-not (Test-Path -LiteralPath $RunScript)) {
 }
 if (-not (Test-Path -LiteralPath $RagIndexerScript)) {
   throw "run_rag_indexer.ps1 not found: $RagIndexerScript"
+}
+if (-not (Test-Path -LiteralPath $PalestineNewsScript)) {
+  throw "run_palestine_news.ps1 not found: $PalestineNewsScript"
 }
 if (-not (Test-Path -LiteralPath $ContextScript)) {
   throw "run_market_context.ps1 not found: $ContextScript"
@@ -114,7 +121,8 @@ function Register-CollectorTask {
     [string]$ScriptPath,
     [string]$At,
     [string]$Description,
-    [string]$ExtraArgs = ""
+    [string]$ExtraArgs = "",
+    [int]$RepeatEveryHours = 0
   )
 
   $actionArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -EnvFile `"$EnvFile`" -LogLevel INFO"
@@ -122,7 +130,15 @@ function Register-CollectorTask {
     $actionArgs = "$actionArgs $ExtraArgs"
   }
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs -WorkingDirectory $ProjectRoot
-  $trigger = New-ScheduledTaskTrigger -Daily -At $At
+  if ($RepeatEveryHours -gt 0) {
+    $startAt = [DateTime]::Today.Add([TimeSpan]::Parse($At))
+    if ($startAt -le (Get-Date)) {
+      $startAt = $startAt.AddDays(1)
+    }
+    $trigger = New-ScheduledTaskTrigger -Once -At $startAt -RepetitionInterval (New-TimeSpan -Hours $RepeatEveryHours) -RepetitionDuration (New-TimeSpan -Days 3650)
+  } else {
+    $trigger = New-ScheduledTaskTrigger -Daily -At $At
+  }
   $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 1)
 
   if ($Force) {
@@ -137,6 +153,9 @@ function Register-CollectorTask {
   Write-Host "  NextRunTime: $($info.NextRunTime)"
   Write-Host "  LastRunTime: $($info.LastRunTime)"
   Write-Host "  State: $($task.State)"
+  if ($RepeatEveryHours -gt 0) {
+    Write-Host "  RepeatEveryHours: $RepeatEveryHours"
+  }
 }
 
 function Register-TwCloseContextTask {
@@ -167,6 +186,7 @@ function Register-TwCloseContextTask {
 }
 
 Register-CollectorTask -TaskName $RagIndexerTaskName -ScriptPath $RagIndexerScript -At $RagIndexerAt -Description "Index recent relay events and market analyses for historical-case RAG."
+Register-CollectorTask -TaskName $PalestineNewsTaskName -ScriptPath $PalestineNewsScript -At $PalestineNewsAt -Description "Collect English Palestine/Gaza/West Bank issue news into long-term t_palestine_news_items." -ExtraArgs "-Limit 20" -RepeatEveryHours $PalestineNewsEveryHours
 Register-CollectorTask -TaskName $BlsMacroTaskName -ScriptPath $BlsMacroScript -At $BlsMacroAt -Description "Collect BLS official macro facts into t_relay_events before U.S. close analysis."
 Register-CollectorTask -TaskName $MacroCalendarTaskName -ScriptPath $MacroCalendarScript -At $MacroCalendarAt -Description "Collect official U.S. macro release dates into t_macro_release_calendar before LINE reminder delivery."
 Register-MarketAnalysisTask -TaskName $UsCloseTaskName -Slot "us_close" -At $UsCloseAt -Description "Generate U.S. close analysis at 05:00 local time; TW holidays with U.S. trading make it Java-delivery eligible."

@@ -220,6 +220,15 @@ Run the Free Palestine English issue-news collector once:
 powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 20
 ```
 
+Register the recurring local crawler:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\register_market_analysis_tasks.ps1 -Force
+```
+
+This creates `NewsCollector-PalestineNews`, starting at 06:10 local/Taiwan time
+and repeating every 3 hours. It writes only to `t_palestine_news_items`.
+
 Backfill legacy relay rows into long-term storage once:
 
 ```powershell

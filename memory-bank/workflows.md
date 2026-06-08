@@ -137,9 +137,12 @@ Minimum evidence before reporting recovery complete:
 - Stored rows go to `t_palestine_news_items` with `source_id=<source_id>`, `topic=free_palestine`, and `language=en`
 3. Store a controlled batch
 - `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 20`
-4. Backfill legacy relay rows only when migrating old data
+4. Register recurring local crawl
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_market_analysis_tasks.ps1 -Force`
+- This registers `NewsCollector-PalestineNews` at 06:10 local/Taiwan time with a 3-hour repetition interval.
+5. Backfill legacy relay rows only when migrating old data
 - `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -BackfillRelay -BackfillOnly`
-5. Verify downstream reads
+6. Verify downstream reads
 - Query `t_palestine_news_items` for `topic='free_palestine' AND language='en'`
 - Smoke `news-platform-api` endpoint `GET /api/timeline/news?page=1&pageSize=5`
 - Confirm `/timeline` table shows the English-news column without adding these sources to the finance feed

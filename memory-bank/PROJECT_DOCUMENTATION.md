@@ -36,6 +36,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Uses English RSS / Google News search feeds only; default sources are Google News English search, Al Jazeera English RSS, BBC Middle East RSS, and Guardian Palestine RSS
 - Filters to Palestine/Gaza/West Bank issue terms and rejects likely non-English titles before writing
 - Writes normalized rows directly to long-term `t_palestine_news_items` with `source_id=<source_id>`, `topic=free_palestine`, and `language=en`
+- Scheduled task: `NewsCollector-PalestineNews`, starting at 06:10 local/Taiwan time and repeating every 3 hours
 - Public read path: `news-platform-api` exposes `GET /api/timeline/news`, and `news-display-frontend` renders it as the `/timeline` table news column
 
 3. SEC tracked filings

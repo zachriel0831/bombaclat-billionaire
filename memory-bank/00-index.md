@@ -27,6 +27,7 @@ Do not read every file by default. Load only the file needed for the current tas
 - `memory-bank/09-decisions/2026-05-07-hybrid-rag-stage0-claim-router.md`: hybrid RAG, stage0 thesis selector, claim verifier, and quota-aware model-routing decision
 - `memory-bank/09-decisions/2026-06-02-dynamic-intraday-candidate-pipeline.md`: target design for Codex daily dynamic Taiwan intraday / short-swing candidates, stock-monitor top-five monitoring, and order-dispatcher max-three trading cap
 - `memory-bank/09-decisions/2026-06-04-free-palestine-english-news-watch.md`: long-term `t_palestine_news_items` storage for `/timeline` English issue news
+- `memory-bank/09-decisions/2026-06-08-free-palestine-news-scheduled-crawl.md`: recurring `NewsCollector-PalestineNews` crawl for `/timeline` English issue news
 - `memory-bank/09-decisions/2026-06-08-us-macro-release-calendar-reminders.md`: official U.S. macro release-calendar storage and Java day-before LINE reminder boundary
 - `memory-bank/09-decisions/2026-05-09-visible-us-close-recommendations.md`: superseded deterministic visible fixed-pool watch section for delivery-eligible U.S. close analyses
 - `memory-bank/09-decisions/2026-05-11-fixed-market-analysis-watch-pool.md`: superseded fixed five-stock market_analysis watch pool decision

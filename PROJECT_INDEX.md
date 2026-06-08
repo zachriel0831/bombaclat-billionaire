@@ -46,6 +46,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | Taiwan politics second-layer topics and event threads | [spec/political-topic-thread-technical-plan.md](spec/political-topic-thread-technical-plan.md), [spec/political-event-threads/_template.md](spec/political-event-threads/_template.md) |
 | Taiwan public-record records and links | [spec/news-public-records-data-contract.md](spec/news-public-records-data-contract.md) |
 | NEWS lightweight requirement ledger | [spec/NEWS-INDEX.md](spec/NEWS-INDEX.md), [spec/NEWS-1-author-coverage-and-reporter-relations.md](spec/NEWS-1-author-coverage-and-reporter-relations.md) |
+| Free Palestine issue-news scheduled crawl | [spec/NEWS-6-free-palestine-news-scheduled-crawl.md](spec/NEWS-6-free-palestine-news-scheduled-crawl.md) |
 | U.S. macro release calendar reminders | [spec/NEWS-5-us-macro-release-calendar-reminders.md](spec/NEWS-5-us-macro-release-calendar-reminders.md) |
 | News crawler category source list | [spec/news-crawler-category-sources.md](spec/news-crawler-category-sources.md) |
 
