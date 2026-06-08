@@ -4,34 +4,31 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Schedule Free Palestine English issue-news crawler.
+- Task: Add heavyweight-stock earnings dates to market release calendar.
 - Requested by: user
 - Start date: 2026-06-08
-- Scope: Promote the existing `event_relay.palestine_news` long-term crawler into a recurring Windows Scheduled Task that refreshes `t_palestine_news_items` for `/timeline` without writing normal rows to `t_relay_events`.
+- Scope: Extend the existing long-lived release-calendar collector so day-before LINE reminders can include watched megacap / heavyweight earnings dates alongside U.S. macro data.
 
 ## Plan
-- [x] Load repo boundaries, source contract, NEWS-4 context, and scheduler workflow.
-- [x] Add `NewsCollector-PalestineNews` registration support.
-- [x] Update NEWS/spec/docs/runbook for the scheduled crawler.
-- [x] Register the local scheduled task.
-- [x] Verify focused tests, dry-run output, live write, and DB state.
+- [x] Load repo boundaries, NEWS-5 source contract, current collector, and LINE reminder reader.
+- [x] Add NEWS-7 spec and update calendar docs / workflow memory.
+- [x] Extend `event_relay.macro_calendar` with earnings-calendar rows and tests.
+- [x] Update `line-relay-service` reminder copy to group macro releases and earnings rows.
+- [x] Run focused Python and Java tests plus a dry-run collector check.
 
 ## Progress Notes
-- 2026-06-08: Existing crawler already writes accepted English Palestine/Gaza/West Bank issue rows to `t_palestine_news_items` and keeps legacy `t_relay_events` as backfill-only input.
-- 2026-06-08: Chosen schedule: every 3 hours, starting at 06:10 Taiwan/local time, with idempotent upsert by `url_hash`.
-- 2026-06-08: Added `NewsCollector-PalestineNews` registration support to `scripts/register_market_analysis_tasks.ps1`; repetition uses a Once trigger because Windows ScheduledTasks only supports `-RepetitionInterval` on that trigger type.
-- 2026-06-08: Focused unit tests passed: `tests.test_palestine_news` ran 4 tests.
-- 2026-06-08: Dry-run RSS fetch returned fetched=20, accepted=11, skipped=9, errors=0.
-- 2026-06-08: Live RSS write returned fetched=80, accepted=44, skipped=36, errors=0, inserted=28, duplicate=16.
-- 2026-06-08: DB verification found 70 `topic=free_palestine AND language=en` rows, latest `last_seen_at=2026-06-08 11:49:28`.
-- 2026-06-08: Registered Windows Scheduled Task `NewsCollector-PalestineNews`; next run is `2026-06-09 06:10`, repetition interval is `PT3H`.
+- 2026-06-08: Existing `t_macro_release_calendar` is long-lived storage; Java owns LINE delivery and sends one aggregated reminder for `reminder_date_taipei=today`.
+- 2026-06-08: Nasdaq public earnings calendar endpoint returns daily earnings rows with `time-pre-market`, `time-after-hours`, and `time-not-supplied`; Yahoo quoteSummary calendarEvents currently returns 401 without crumb/cookie handling.
+- 2026-06-08: Chosen MVP: store earnings rows in the existing table using `indicator_code=earnings_<symbol>` and `source_id=nasdaq_earnings`; no schema migration is required. Taiwan local exact dates can be supplied through a manual JSON file until a MOPS-specific adapter is added.
+- 2026-06-08: Python unit tests passed for macro calendar + earnings parsing; dry-run with CASY test symbol returned one `earnings_release` row and no errors.
+- 2026-06-08: Java focused tests passed after setting `JAVA_HOME` to local Temurin 21 because the Maven wrapper otherwise used Corretto 11.
+- 2026-06-08: Live collector write with default heavyweight symbols succeeded: releases=59, affected_rows=111, errors=0; preview included TSM, GOOGL, TSLA, META, MSFT, AAPL, and AMZN earnings rows.
 
 ## Current Verification
-- [x] Python unit tests for Palestine news filtering/storage shape.
-- [x] Dry-run RSS fetch.
-- [x] Live collector write and DB count check.
-- [x] Scheduled task registration check.
+- [x] Python unit tests for macro calendar + earnings row parsing.
+- [x] Collector dry-run with earnings enabled.
+- [x] Java reminder tests for grouped macro / earnings message.
 
 ## Current Review Summary
-- Outcome: Implemented and smoke-tested.
-- Open risks: RSS / Google News markup or rate limits can change; crawler records explicit fetch errors and preserves existing rows through idempotent upsert.
+- Outcome: Implemented and focused verification passed.
+- Open risks: Nasdaq calendar rows may be estimates and may omit Taiwan local tickers; rows preserve raw payload and use a manual override file for confirmed Taiwan-heavyweight events.

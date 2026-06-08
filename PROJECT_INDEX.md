@@ -7,6 +7,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 - News and market-data ingestion from RSS, SEC, TWSE/MOPS, X, market-context sources, Taiwan society/politics feeds, and public-record sources.
 - Free Palestine English issue-news collection for the public `/timeline` module, stored long-term in `t_palestine_news_items`.
 - Official U.S. macro release-calendar collection for CPI, PPI, nonfarm payrolls, and retail sales reminders.
+- Heavyweight-stock earnings release-calendar collection for day-before LINE reminders.
 - Event relay storage into MySQL tables such as `t_relay_events`, `t_x_posts`, `t_market_index_snapshots`, and `t_market_analyses`.
 - Scheduled and manual AI market analysis, weekly summary generation, RAG indexing, claim verification, and fixed-watchlist trade-signal extraction.
 - Taiwan society/politics article collection, keyword extraction, topic classification, public-record ingestion, and article-record linking.
@@ -48,6 +49,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | NEWS lightweight requirement ledger | [spec/NEWS-INDEX.md](spec/NEWS-INDEX.md), [spec/NEWS-1-author-coverage-and-reporter-relations.md](spec/NEWS-1-author-coverage-and-reporter-relations.md) |
 | Free Palestine issue-news scheduled crawl | [spec/NEWS-6-free-palestine-news-scheduled-crawl.md](spec/NEWS-6-free-palestine-news-scheduled-crawl.md) |
 | U.S. macro release calendar reminders | [spec/NEWS-5-us-macro-release-calendar-reminders.md](spec/NEWS-5-us-macro-release-calendar-reminders.md) |
+| Heavyweight earnings calendar reminders | [spec/NEWS-7-heavyweight-earnings-calendar-reminders.md](spec/NEWS-7-heavyweight-earnings-calendar-reminders.md) |
 | News crawler category source list | [spec/news-crawler-category-sources.md](spec/news-crawler-category-sources.md) |
 
 ## Memory Bank

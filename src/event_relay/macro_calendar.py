@@ -23,6 +23,7 @@ from html.parser import HTMLParser
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import sys
 import threading
@@ -37,9 +38,11 @@ logger = logging.getLogger(__name__)
 
 BLS_YEAR_URL_TEMPLATE = "https://www.bls.gov/schedule/{year}/home.htm"
 CENSUS_RETAIL_URL = "https://www.census.gov/retail/release_schedule.html"
+NASDAQ_EARNINGS_URL_TEMPLATE = "https://api.nasdaq.com/api/calendar/earnings?date={date}"
 TAIPEI_TIMEZONE = timezone(timedelta(hours=8), "Asia/Taipei")
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_TABLE = "t_macro_release_calendar"
+DEFAULT_EARNINGS_LOOKAHEAD_DAYS = 75
 
 DATE_LINE_RE = re.compile(
     r"^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), "
@@ -56,6 +59,21 @@ RETAIL_COMBINED_ROW_RE = re.compile(
 DATE_SHORT_RE = re.compile(
     r"^(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}$"
 )
+SYMBOL_CODE_RE = re.compile(r"[^a-z0-9]+")
+
+
+DEFAULT_EARNINGS_SYMBOLS: tuple[tuple[str, str, str, int], ...] = (
+    ("NVDA", "NVIDIA", "US", 5),
+    ("AAPL", "Apple", "US", 5),
+    ("MSFT", "Microsoft", "US", 5),
+    ("AMZN", "Amazon", "US", 5),
+    ("GOOGL", "Alphabet", "US", 5),
+    ("META", "Meta", "US", 5),
+    ("TSLA", "Tesla", "US", 5),
+    ("AVGO", "Broadcom", "US", 5),
+    ("AMD", "AMD", "US", 4),
+    ("TSM", "TSMC ADR", "US", 5),
+)
 
 
 @dataclass(frozen=True)
@@ -69,6 +87,14 @@ class MacroIndicatorSpec:
     focus: str
     higher_than_expected: str
     lower_than_expected: str
+
+
+@dataclass(frozen=True)
+class EarningsSymbolSpec:
+    symbol: str
+    company_name: str
+    market: str
+    importance: int
 
 
 @dataclass(frozen=True)
@@ -88,14 +114,14 @@ class MacroRelease:
 
     @property
     def event_key(self) -> str:
-        key = "|".join(
-            [
-                self.source_id.strip().lower(),
-                self.indicator_code.strip().lower(),
-                self.period_label.strip().lower(),
-                self.release_at_utc.isoformat(),
-            ]
-        )
+        parts = [
+            self.source_id.strip().lower(),
+            self.indicator_code.strip().lower(),
+            self.period_label.strip().lower(),
+        ]
+        if self.raw.get("event_type") != "earnings_release":
+            parts.append(self.release_at_utc.isoformat())
+        key = "|".join(parts)
         return hashlib.sha1(key.encode("utf-8")).hexdigest()
 
     @property
@@ -109,6 +135,10 @@ class MacroCalendarConfig:
     bls_years: list[int]
     timeout_seconds: int
     dry_run: bool = False
+    earnings_enabled: bool = True
+    earnings_symbols: list[EarningsSymbolSpec] | None = None
+    earnings_lookahead_days: int = DEFAULT_EARNINGS_LOOKAHEAD_DAYS
+    earnings_manual_file: str | None = None
 
 
 @dataclass(frozen=True)
@@ -175,6 +205,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional comma-separated BLS years. Defaults to current Taipei year and next year.",
     )
     parser.add_argument("--timeout-seconds", type=int, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument(
+        "--earnings-symbols",
+        default="",
+        help="Optional comma-separated earnings watch symbols. Item format: SYMBOL or SYMBOL:Name:Market:Importance.",
+    )
+    parser.add_argument(
+        "--earnings-lookahead-days",
+        type=int,
+        default=DEFAULT_EARNINGS_LOOKAHEAD_DAYS,
+        help="Number of Taipei calendar days to scan for watched earnings.",
+    )
+    parser.add_argument("--earnings-manual-file", default="", help="Optional JSON file with manual earnings events.")
+    parser.add_argument("--skip-earnings", action="store_true", help="Skip earnings-calendar collection")
     parser.add_argument("--dry-run", action="store_true", help="Fetch and print rows without writing MySQL")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser
@@ -188,12 +231,64 @@ def load_config(args: argparse.Namespace) -> MacroCalendarConfig:
     else:
         current_year = datetime.now(TAIPEI_TIMEZONE).year
         years = [current_year, current_year + 1]
+    raw_earnings_symbols = os.getenv("MACRO_CALENDAR_EARNINGS_SYMBOLS") or args.earnings_symbols or ""
+    earnings_enabled = parse_env_bool(os.getenv("MACRO_CALENDAR_EARNINGS_ENABLED"), default=True) and not args.skip_earnings
+    earnings_lookahead_days = int(
+        os.getenv("MACRO_CALENDAR_EARNINGS_LOOKAHEAD_DAYS") or args.earnings_lookahead_days
+    )
+    earnings_manual_file = (
+        os.getenv("MACRO_CALENDAR_EARNINGS_MANUAL_FILE") or args.earnings_manual_file or ""
+    ).strip()
+
     return MacroCalendarConfig(
         env_file=args.env_file,
         bls_years=sorted(set(years)),
         timeout_seconds=max(5, int(os.getenv("MACRO_CALENDAR_TIMEOUT_SECONDS") or args.timeout_seconds)),
         dry_run=bool(args.dry_run),
+        earnings_enabled=earnings_enabled,
+        earnings_symbols=parse_earnings_symbol_specs(raw_earnings_symbols),
+        earnings_lookahead_days=max(1, min(365, earnings_lookahead_days)),
+        earnings_manual_file=earnings_manual_file or None,
     )
+
+
+def parse_env_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def parse_earnings_symbol_specs(raw: str) -> list[EarningsSymbolSpec]:
+    if not raw.strip():
+        return [
+            EarningsSymbolSpec(symbol=symbol, company_name=name, market=market, importance=importance)
+            for symbol, name, market, importance in DEFAULT_EARNINGS_SYMBOLS
+        ]
+
+    specs: list[EarningsSymbolSpec] = []
+    for item in raw.split(","):
+        text = item.strip()
+        if not text:
+            continue
+        parts = [part.strip() for part in text.split(":")]
+        symbol = normalize_symbol(parts[0])
+        if not symbol:
+            continue
+        name = parts[1] if len(parts) > 1 and parts[1] else symbol
+        market = parts[2].upper() if len(parts) > 2 and parts[2] else "US"
+        try:
+            importance = int(parts[3]) if len(parts) > 3 and parts[3] else 4
+        except ValueError:
+            importance = 4
+        specs.append(
+            EarningsSymbolSpec(
+                symbol=symbol,
+                company_name=name,
+                market=market,
+                importance=max(1, min(5, importance)),
+            )
+        )
+    return specs
 
 
 def collect_macro_release_calendar(config: MacroCalendarConfig) -> MacroCalendarCollection:
@@ -218,6 +313,29 @@ def collect_macro_release_calendar(config: MacroCalendarConfig) -> MacroCalendar
         logger.warning(message)
         errors.append(message)
 
+    if config.earnings_enabled:
+        earnings_symbols = config.earnings_symbols or parse_earnings_symbol_specs("")
+        try:
+            releases.extend(
+                collect_nasdaq_earnings_calendar(
+                    symbols=earnings_symbols,
+                    lookahead_days=config.earnings_lookahead_days,
+                    timeout_seconds=config.timeout_seconds,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            message = f"Nasdaq earnings calendar fetch failed: {exc}"
+            logger.warning(message)
+            errors.append(message)
+
+        if config.earnings_manual_file:
+            try:
+                releases.extend(parse_manual_earnings_file(config.earnings_manual_file))
+            except Exception as exc:  # noqa: BLE001
+                message = f"Manual earnings calendar parse failed file={config.earnings_manual_file}: {exc}"
+                logger.warning(message)
+                errors.append(message)
+
     return MacroCalendarCollection(releases=dedupe_releases(releases), errors=errors)
 
 
@@ -238,6 +356,217 @@ def fetch_text(url: str, timeout_seconds: int) -> str:
         raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
     except URLError as exc:
         raise RuntimeError(f"request failed: {exc}") from exc
+
+
+def fetch_json(url: str, timeout_seconds: int) -> dict[str, Any]:
+    req = Request(
+        url,
+        headers={
+            "Accept": "application/json, text/plain, */*",
+            "Origin": "https://www.nasdaq.com",
+            "Referer": "https://www.nasdaq.com/",
+            "User-Agent": "Mozilla/5.0 news-collector/0.1 macro-calendar",
+        },
+    )
+    try:
+        with urlopen(req, timeout=timeout_seconds) as resp:
+            charset = resp.headers.get_content_charset() or "utf-8"
+            return json.loads(resp.read().decode(charset, errors="replace"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:300]
+        raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"request failed: {exc}") from exc
+
+
+def collect_nasdaq_earnings_calendar(
+    symbols: list[EarningsSymbolSpec],
+    lookahead_days: int,
+    timeout_seconds: int,
+    now: datetime | None = None,
+) -> list[MacroRelease]:
+    if not symbols:
+        return []
+
+    symbol_map = {spec.symbol: spec for spec in symbols}
+    start_date = (now or datetime.now(TAIPEI_TIMEZONE)).astimezone(TAIPEI_TIMEZONE).date()
+    releases: list[MacroRelease] = []
+
+    for offset in range(lookahead_days):
+        day = start_date + timedelta(days=offset)
+        source_url = NASDAQ_EARNINGS_URL_TEMPLATE.format(date=day.isoformat())
+        payload = fetch_json(source_url, timeout_seconds=timeout_seconds)
+        releases.extend(parse_nasdaq_earnings_payload(payload, source_url, day, symbol_map))
+
+    return releases
+
+
+def parse_nasdaq_earnings_payload(
+    payload: dict[str, Any],
+    source_url: str,
+    release_date: date,
+    symbol_map: dict[str, EarningsSymbolSpec],
+) -> list[MacroRelease]:
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return []
+    rows = data.get("rows", [])
+    if not isinstance(rows, list):
+        return []
+
+    releases: list[MacroRelease] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        symbol = normalize_symbol(str(row.get("symbol") or ""))
+        spec = symbol_map.get(symbol)
+        if spec is None:
+            continue
+        releases.append(build_nasdaq_earnings_release(row, spec, release_date, source_url))
+    return releases
+
+
+def build_nasdaq_earnings_release(
+    row: dict[str, Any],
+    spec: EarningsSymbolSpec,
+    release_date: date,
+    source_url: str,
+) -> MacroRelease:
+    time_type = str(row.get("time") or "time-not-supplied")
+    source_time, time_label, time_status = earnings_time_bucket(time_type)
+    release_dt = datetime.combine(release_date, source_time, tzinfo=eastern_timezone_for_date(release_date))
+    company_name = str(row.get("name") or "").strip() or spec.company_name
+    fiscal_quarter = str(row.get("fiscalQuarterEnding") or "").strip()
+    period_label = fiscal_quarter or release_date.isoformat()
+    display_name = f"{spec.symbol} {company_name}".strip()
+    indicator_name = f"{display_name} Earnings"
+    if time_label:
+        indicator_name = f"{indicator_name} ({time_label})"
+    release_title = f"{indicator_name} for {period_label}"
+
+    return build_earnings_release(
+        source_id="nasdaq_earnings",
+        source_name="Nasdaq earnings calendar",
+        symbol=spec.symbol,
+        company_name=company_name,
+        market=spec.market,
+        period_label=period_label,
+        release_title=release_title,
+        indicator_name=indicator_name,
+        release_dt=release_dt,
+        release_timezone="America/New_York",
+        importance=spec.importance,
+        source_url=source_url,
+        raw={
+            "source": "nasdaq_daily_earnings_calendar",
+            "source_payload": row,
+            "time_type": time_type,
+            "time_label": time_label,
+            "date_status": "nasdaq_calendar",
+            "time_status": time_status,
+        },
+    )
+
+
+def parse_manual_earnings_file(path: str) -> list[MacroRelease]:
+    manual_path = Path(path)
+    if not manual_path.exists():
+        raise FileNotFoundError(path)
+    payload = json.loads(manual_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError("Manual earnings file must be a JSON array")
+    return [build_manual_earnings_release(item) for item in payload if isinstance(item, dict)]
+
+
+def build_manual_earnings_release(item: dict[str, Any]) -> MacroRelease:
+    symbol = normalize_symbol(str(item.get("symbol") or ""))
+    if not symbol:
+        raise ValueError(f"Manual earnings item missing symbol: {item}")
+    company_name = str(item.get("company_name") or item.get("name") or symbol).strip()
+    market = str(item.get("market") or "US").strip().upper()
+    release_date_text = str(item.get("release_date") or "").strip()
+    if not release_date_text:
+        raise ValueError(f"Manual earnings item missing release_date: {item}")
+    release_date = date.fromisoformat(release_date_text)
+    release_time_text = str(item.get("release_time") or "08:30").strip()
+    release_time = datetime.strptime(release_time_text, "%H:%M").time()
+    timezone_name = str(item.get("timezone") or "America/New_York").strip()
+    source_tz = source_timezone_for_name(timezone_name, release_date)
+    release_dt = datetime.combine(release_date, release_time, tzinfo=source_tz)
+    period_label = str(item.get("period_label") or release_date.isoformat()).strip()
+    time_label = str(item.get("time_label") or "").strip()
+    display_name = f"{symbol} {company_name}".strip()
+    indicator_name = f"{display_name} Earnings"
+    if time_label:
+        indicator_name = f"{indicator_name} ({time_label})"
+    release_title = str(item.get("release_title") or f"{indicator_name} for {period_label}").strip()
+
+    return build_earnings_release(
+        source_id="manual_earnings",
+        source_name=str(item.get("source_name") or "Manual earnings calendar").strip(),
+        symbol=symbol,
+        company_name=company_name,
+        market=market,
+        period_label=period_label,
+        release_title=release_title,
+        indicator_name=indicator_name,
+        release_dt=release_dt,
+        release_timezone=timezone_name,
+        importance=max(1, min(5, int(item.get("importance") or 4))),
+        source_url=str(item.get("source_url") or "manual").strip(),
+        raw={
+            "source": "manual_earnings_calendar",
+            "manual_payload": item,
+            "time_type": str(item.get("time_type") or "manual"),
+            "time_label": time_label,
+            "date_status": str(item.get("date_status") or "manual").strip(),
+            "time_status": "manual",
+        },
+    )
+
+
+def build_earnings_release(
+    source_id: str,
+    source_name: str,
+    symbol: str,
+    company_name: str,
+    market: str,
+    period_label: str,
+    release_title: str,
+    indicator_name: str,
+    release_dt: datetime,
+    release_timezone: str,
+    importance: int,
+    source_url: str,
+    raw: dict[str, Any],
+) -> MacroRelease:
+    release_at_utc = release_dt.astimezone(timezone.utc)
+    release_at_taipei = release_dt.astimezone(TAIPEI_TIMEZONE)
+    normalized_symbol = normalize_symbol(symbol)
+    return MacroRelease(
+        source_id=source_id,
+        source_name=source_name,
+        indicator_code=f"earnings_{indicator_code_symbol(normalized_symbol)}",
+        indicator_name=indicator_name,
+        period_label=period_label,
+        release_title=release_title,
+        release_at_utc=release_at_utc,
+        release_at_taipei=release_at_taipei,
+        release_timezone=release_timezone,
+        importance=importance,
+        source_url=source_url,
+        raw={
+            "collector": "macro_calendar",
+            "event_type": "earnings_release",
+            "symbol": normalized_symbol,
+            "company_name": company_name,
+            "market": market,
+            "source_url": source_url,
+            "source_timezone": release_timezone,
+            "collected_at_utc": datetime.now(timezone.utc).isoformat(),
+            **raw,
+        },
+    )
 
 
 def parse_bls_schedule_html(html_text: str, source_url: str) -> list[MacroRelease]:
@@ -369,6 +698,37 @@ def extract_period_label(release_text: str, spec: MacroIndicatorSpec) -> str:
     return ""
 
 
+def normalize_symbol(value: str) -> str:
+    return value.strip().upper().replace(".", "-")
+
+
+def indicator_code_symbol(symbol: str) -> str:
+    normalized = SYMBOL_CODE_RE.sub("_", symbol.strip().lower()).strip("_")
+    return normalized or "unknown"
+
+
+def earnings_time_bucket(time_type: str) -> tuple[time, str, str]:
+    normalized = (time_type or "").strip().lower()
+    if normalized == "time-pre-market":
+        return time(8, 0), "盤前", "bucket"
+    if normalized == "time-after-hours":
+        return time(16, 5), "盤後", "bucket"
+    if normalized == "time-during-market":
+        return time(12, 0), "盤中", "bucket"
+    return time(8, 30), "未標示時間", "unknown"
+
+
+def source_timezone_for_name(name: str, day: date) -> timezone:
+    normalized = name.strip()
+    if normalized == "Asia/Taipei":
+        return TAIPEI_TIMEZONE
+    if normalized == "UTC":
+        return timezone.utc
+    if normalized == "America/New_York":
+        return eastern_timezone_for_date(day)
+    raise ValueError(f"Unsupported release timezone: {name}")
+
+
 def parse_source_datetime(date_text: str, time_text: str) -> datetime:
     parsed_date = datetime.strptime(date_text, "%A, %B %d, %Y").date()
     parsed_time = datetime.strptime(time_text.upper(), "%I:%M %p").time()
@@ -391,14 +751,27 @@ def nth_weekday_of_month(year: int, month: int, weekday: int, n: int) -> date:
 
 
 def dedupe_releases(releases: list[MacroRelease]) -> list[MacroRelease]:
-    result: list[MacroRelease] = []
-    seen: set[str] = set()
-    for release in sorted(releases, key=lambda item: (item.release_at_utc, item.indicator_code)):
-        if release.event_key in seen:
-            continue
-        seen.add(release.event_key)
-        result.append(release)
-    return result
+    selected: dict[str, MacroRelease] = {}
+    for release in sorted(releases, key=release_selection_key):
+        dedupe_key = release_dedupe_key(release)
+        selected.setdefault(dedupe_key, release)
+    return sorted(selected.values(), key=release_sort_key)
+
+
+def release_dedupe_key(release: MacroRelease) -> str:
+    if release.raw.get("event_type") == "earnings_release":
+        return "|".join(["earnings", release.indicator_code, release.period_label.strip().lower()])
+    return release.event_key
+
+
+def release_selection_key(release: MacroRelease) -> tuple[int, datetime, str]:
+    source_priority = 0 if release.source_id == "manual_earnings" else 1
+    return (source_priority, release.release_at_utc, release.indicator_code)
+
+
+def release_sort_key(release: MacroRelease) -> tuple[datetime, int, str]:
+    source_priority = 0 if release.source_id == "manual_earnings" else 1
+    return (release.release_at_utc, source_priority, release.indicator_code)
 
 
 def html_text_lines(html_text: str) -> list[str]:
@@ -640,11 +1013,13 @@ def run_once(config: MacroCalendarConfig) -> dict[str, Any]:
 def release_preview(release: MacroRelease) -> dict[str, Any]:
     return {
         "event_key": release.event_key,
+        "event_type": release.raw.get("event_type", "macro_release"),
         "indicator_code": release.indicator_code,
         "indicator_name": release.indicator_name,
         "period_label": release.period_label,
         "release_at_taipei": release.release_at_taipei.strftime("%Y-%m-%d %H:%M:%S"),
         "reminder_date_taipei": release.reminder_date_taipei.isoformat(),
+        "symbol": release.raw.get("symbol"),
         "source_url": release.source_url,
     }
 

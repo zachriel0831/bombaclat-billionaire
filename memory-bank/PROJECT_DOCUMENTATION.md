@@ -78,12 +78,15 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Raw event JSON keeps `series_id`, `year`, `period`, `periodName`, `value`, `footnotes`, and normalized period / year-over-year metrics for traceability
 - BLS data is monthly and may be preliminary or revised; footnote codes are preserved in `raw_json.footnotes` and `raw_json.normalized_metrics.footnote_codes`
 
-7a. U.S. official macro release calendar
+7a. Market release calendar
 - Module: `src/event_relay/macro_calendar.py`
-- Uses official release-calendar pages:
+- Uses official macro release-calendar pages:
   - BLS annual release calendar `https://www.bls.gov/schedule/<year>/home.htm`
   - U.S. Census Retail Trade release schedule `https://www.census.gov/retail/release_schedule.html`
 - Tracks CPI, PPI, Employment Situation / nonfarm payrolls, and Advance Monthly Retail Trade / retail sales
+- Also tracks watched heavyweight earnings rows from Nasdaq daily earnings calendar `https://api.nasdaq.com/api/calendar/earnings?date=YYYY-MM-DD`
+- Earnings rows use `indicator_code=earnings_<symbol>` and keep raw source fields plus `event_type=earnings_release`, `symbol`, `market`, `time_type`, and `date_status` in `raw_json`
+- Optional `MACRO_CALENDAR_EARNINGS_MANUAL_FILE` supports confirmed/manual Taiwan local heavyweight dates until a dedicated MOPS adapter is added
 - Interprets official release times as U.S. Eastern time and stores both UTC and Asia/Taipei timestamps
 - Writes long-lived rows to `t_macro_release_calendar`, not `t_relay_events` and not `t_market_analyses`
 - `reminder_date_taipei` is always the Taiwan date before `release_at_taipei`

@@ -534,13 +534,16 @@ Guard responsibilities:
 2. Source families
 - BLS annual release calendar for CPI, PPI, and Employment Situation / nonfarm payrolls
 - U.S. Census Retail Trade release schedule for Advance Monthly Retail Trade / retail sales
+- Nasdaq daily earnings calendar for configured heavyweight symbols; rows are stored as `indicator_code=earnings_<symbol>`
+- Optional manual earnings JSON file for confirmed Taiwan local heavyweight dates or corrections to estimated earnings dates
 3. Persist as long-lived calendar facts
 - Write rows to `t_macro_release_calendar`
 - Do not write these reminders to `t_relay_events`; release-calendar rows need to survive relay retention
 - Do not write them to `t_market_analyses`; they are official schedule facts, not generated prose
+- Earnings calendar dates from Nasdaq can be estimated; keep `raw_json.date_status` and prefer manual confirmed rows when the same symbol/period exists
 4. Delivery boundary
 - `line-relay-service` reads `reminder_date_taipei = today AND reminder_pushed = 0`
-- Java sends one aggregated LINE reminder and updates `reminder_pushed` only after at least one target receives it
+- Java sends one aggregated LINE reminder, grouping macro releases and heavyweight earnings, and updates `reminder_pushed` only after at least one target receives it
 - Python does not contact LINE
 5. Verify
 - Run `python -m unittest tests.test_macro_calendar -v`

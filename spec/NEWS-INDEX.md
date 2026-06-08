@@ -34,7 +34,8 @@ system exists.
 | `NEWS-4` | `Done` | Free Palestine issue news long-term storage | [NEWS-4-free-palestine-news-long-term-storage.md](NEWS-4-free-palestine-news-long-term-storage.md) | Normalizes `/timeline/news` English issue-news rows into `t_palestine_news_items` and keeps legacy relay rows as backfill input only. |
 | `NEWS-5` | `Done` | U.S. macro release calendar reminders | [NEWS-5-us-macro-release-calendar-reminders.md](NEWS-5-us-macro-release-calendar-reminders.md) | Collects official CPI/PPI/nonfarm payrolls/retail sales release dates into `t_macro_release_calendar`; Java sends Taiwan-time day-before reminders. |
 | `NEWS-6` | `Done` | Free Palestine news scheduled crawl | [NEWS-6-free-palestine-news-scheduled-crawl.md](NEWS-6-free-palestine-news-scheduled-crawl.md) | Runs `event_relay.palestine_news` every 3 hours into long-term `t_palestine_news_items`. |
+| `NEWS-7` | `Done` | Heavyweight earnings calendar reminders | [NEWS-7-heavyweight-earnings-calendar-reminders.md](NEWS-7-heavyweight-earnings-calendar-reminders.md) | Extends `t_macro_release_calendar` with `earnings_<symbol>` rows from Nasdaq / manual overrides; Java groups earnings with macro reminders. |
 
 ## Next ID
 
-The next requirement ID is `NEWS-7`.
+The next requirement ID is `NEWS-8`.

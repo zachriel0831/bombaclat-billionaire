@@ -554,8 +554,9 @@ BLS macro collector:
 
 U.S. macro release-calendar collector:
 - Module: `event_relay.macro_calendar`
-- Writes official future release dates into long-lived `t_macro_release_calendar`
+- Writes future macro and watched-earnings release dates into long-lived `t_macro_release_calendar`
 - Covers CPI, PPI, Employment Situation / nonfarm payrolls, and retail sales
+- Also stores watched heavyweight earnings rows as `indicator_code=earnings_<symbol>` using Nasdaq daily earnings calendar plus optional manual JSON overrides
 - LINE reminder delivery is owned by `line-relay-service`; Python does not push LINE
 
 Run context collection once:
@@ -645,6 +646,10 @@ Market analysis env keys:
 - `BLS_TIMEOUT_SECONDS` (default inherited by script as `30`)
 - `MACRO_CALENDAR_BLS_YEARS` (optional comma-separated BLS calendar years; defaults to current Taipei year and next year)
 - `MACRO_CALENDAR_TIMEOUT_SECONDS` (default inherited by script as `30`)
+- `MACRO_CALENDAR_EARNINGS_ENABLED` (default `true`; set `false` to collect only macro release dates)
+- `MACRO_CALENDAR_EARNINGS_SYMBOLS` (optional; comma-separated `SYMBOL` or `SYMBOL:Display Name:Market:Importance`; defaults to NVDA, AAPL, MSFT, AMZN, GOOGL, META, TSLA, AVGO, AMD, and TSM)
+- `MACRO_CALENDAR_EARNINGS_LOOKAHEAD_DAYS` (default `75`; Nasdaq earnings-calendar lookahead window)
+- `MACRO_CALENDAR_EARNINGS_MANUAL_FILE` (optional JSON file for confirmed/manual earnings events such as Taiwan local heavyweight stocks)
 - `RELAY_MYSQL_MACRO_CALENDAR_TABLE` (default `t_macro_release_calendar`)
 - `TW_CLOSE_CONTEXT_SOURCE_PREFIXES` (optional comma-separated source prefixes)
 - `TW_CLOSE_CONTEXT_LOOKBACK_DAYS` (default `2`)
