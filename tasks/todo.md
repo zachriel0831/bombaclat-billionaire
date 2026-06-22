@@ -4,9 +4,9 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-06-21 `pre_tw_open` market-analysis row if needed.
+- Task: Guard and repair the 2026-06-22 `pre_tw_open` market-analysis row if needed.
 - Requested by: automation
-- Start date: 2026-06-21
+- Start date: 2026-06-22
 - Scope: Inspect today's `t_market_analyses` `pre_tw_open` row plus raw telemetry, verify the Traditional Chinese readability and seven-section daily editorial contract, repair or create the row from local relay and market-context evidence only when needed, preserve Java delivery ownership, and verify final DB/trust-gate/signal state without calling paid external LLM APIs.
 
 ## Plan
@@ -28,6 +28,18 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Target `pre_tw_open` row inspected.
 - [x] Evidence set inspected.
 - [x] Post-write or healthy-row verification completed.
+
+## 2026-06-22 Run
+- [x] Read repo instructions plus Workflow 4C storage/guard and daily template decisions.
+- [x] Inspect today's `pre_tw_open` row, raw telemetry, garbled text, and visible style/template compliance.
+- [x] If needed, repair/create the row from local evidence only and preserve Java delivery ownership.
+- [x] Verify final DB state, trade-signal count, and external-provider telemetry.
+
+### 2026-06-22 Progress Notes
+- Missing `analysis_date=2026-06-22` / `analysis_slot=pre_tw_open` row repaired as `t_market_analyses.id=172` using local evidence only.
+- Calendar state allowed `pre_tw_open`: Taiwan regular trading day, relevant U.S. session weekend-closed; repaired prose labels the missing fresh pre-open context gap.
+- Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=1`, `pushed=0`, `structured_json` present, style/template check passed, garbled-text check passed, `external_provider_api_called=false`.
+- Ran `scripts/run_trade_signal_extraction.ps1 -AnalysisId 172 -FixedPoolFallback`; stored 10 internal `t_trade_signals` monitor rows.
 
 ## Current Review Summary
 - Outcome: Completed with no write; missing `2026-06-21 pre_tw_open` is calendar-correct.
