@@ -207,6 +207,14 @@ class _MigrationCursor:
         return []
 
 
+class _UpsertCaptureCursor:
+    def __init__(self) -> None:
+        self.executed: list[tuple[str, tuple]] = []
+
+    def execute(self, sql: str, params=None) -> None:
+        self.executed.append((sql, tuple(params or ())))
+
+
 class LineEventRelayTests(unittest.TestCase):
     """封裝 Line Event Relay Tests 相關資料與行為。"""
     def test_load_relay_settings_storage_defaults_and_env(self) -> None:
@@ -265,6 +273,44 @@ class LineEventRelayTests(unittest.TestCase):
         second = first.__class__(**{**first.__dict__, "event_id": "market-context-b", "published_at": "2026-04-21T00:00:00"})
 
         self.assertNotEqual(MySqlEventStore._event_hash_for_event(first), MySqlEventStore._event_hash_for_event(second))
+
+    def test_upsert_x_post_accepts_truth_social_status_payload(self) -> None:
+        cur = _UpsertCaptureCursor()
+        store = MySqlEventStore.__new__(MySqlEventStore)
+        store._x_table = "t_x_posts"
+
+        event = RelayEvent(
+            event_id="truthsocial-116819418021640869",
+            source="truthsocial:realdonaldtrump",
+            title="Hello Truth",
+            url="https://truthsocial.com/@realDonaldTrump/116819418021640869",
+            summary="Hello Truth",
+            published_at="2026-06-27T01:14:18.033+00:00",
+            log_only=False,
+            raw={
+                "raw": {
+                    "platform": "truthsocial",
+                    "account_id": "107780257626128497",
+                    "metrics": {"favourites_count": 3},
+                    "truth": {
+                        "id": "116819418021640869",
+                        "language": "en",
+                        "account": {"id": "107780257626128497"},
+                    },
+                }
+            },
+        )
+
+        store._upsert_x_post(cur, event)
+
+        self.assertEqual(len(cur.executed), 1)
+        params = cur.executed[0][1]
+        self.assertEqual(params[0], "truthsocial-116819418021640869")
+        self.assertEqual(params[1], "realdonaldtrump")
+        self.assertEqual(params[2], "107780257626128497")
+        self.assertEqual(params[3], "truthsocial:realdonaldtrump")
+        self.assertEqual(params[5], "Hello Truth")
+        self.assertIn("favourites_count", params[9])
 
     def test_daily_retention_cleanup_uses_configured_keep_days_once_per_day(self) -> None:
         """測試 test daily retention cleanup uses configured keep days once per day 的預期行為。"""

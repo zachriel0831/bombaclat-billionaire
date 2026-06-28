@@ -1,7 +1,7 @@
 """Top-level orchestrator for news source fan-out.
 
 ``build_sources()`` instantiates the configured ``NewsSource`` adapters
-(RSS / SEC / TWSE-MOPS / X) from settings; ``fetch_news()`` runs them in
+(RSS / SEC / TWSE-MOPS / X / Truth Social) from settings; ``fetch_news()`` runs them in
 parallel and returns merged ``NewsItem`` rows ready for the relay bridge."""
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from news_collector.models import NewsItem
 from news_collector.sources.base import NewsSource
 from news_collector.sources.rss import OfficialRssSource
 from news_collector.sources.sec_filings import SecFilingsSource
+from news_collector.sources.truth_social import TruthSocialAccountSource
 from news_collector.sources.twse_mops_announcements import TwseMopsAnnouncementsSource
 from news_collector.sources.x_accounts import XAccountSource
 from news_collector.utils import sort_timestamp
@@ -107,6 +108,25 @@ def build_sources(settings: Settings, source_name: str) -> list[NewsSource]:
                         include_retweets=settings.x_include_retweets,
                     )
                 )
+
+    if selected in ("all", "truthsocial", "truth_social"):
+        if not settings.truth_social_enabled:
+            if selected in ("truthsocial", "truth_social"):
+                raise ValueError("Truth Social source is disabled. Set TRUTH_SOCIAL_ENABLED=true to enable.")
+            logger.info("Skip source=truthsocial because TRUTH_SOCIAL_ENABLED=false")
+        elif not settings.truth_social_accounts:
+            if selected in ("truthsocial", "truth_social"):
+                raise ValueError("TRUTH_SOCIAL_ACCOUNTS is empty. Add handles such as @realDonaldTrump.")
+            logger.info("Skip source=truthsocial because TRUTH_SOCIAL_ACCOUNTS is empty")
+        else:
+            sources.append(
+                TruthSocialAccountSource(
+                    accounts=settings.truth_social_accounts,
+                    timeout_seconds=settings.http_timeout_seconds,
+                    max_results_per_account=settings.truth_social_max_results_per_account,
+                    user_agent=settings.truth_social_user_agent,
+                )
+            )
 
     if not sources:
         raise ValueError(f"No source enabled for source='{source_name}'.")

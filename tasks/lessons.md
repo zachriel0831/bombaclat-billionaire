@@ -27,6 +27,88 @@ This file is append-only. Add a new entry after any user correction to prevent r
 
 <!-- Add new lessons below this line -->
 
+## LESSON-20260516-03
+- Date: 2026-05-16
+- Trigger (User correction): User reminded me to check the triggered skills after verifying the Anthropic template path.
+- What was wrong: I had verified code prompts/schema/post-processing but initially missed repo-local prompt assets loaded by `market_analysis`.
+- Root cause: The template contract lives in both code and prompt skills; checking only stage code can leave stale skill text that nudges new conversations or model output back to old rules.
+- New rule (always/never): Always check and test triggered prompt skill assets when changing market-analysis templates, fixed pools, section contracts, or provider behavior.
+- Prevention checklist (before final response):
+  - [ ] Inspect `MARKET_ANALYSIS_MACRO_SKILL_PATH` and `MARKET_ANALYSIS_LINE_FORMAT_SKILL_PATH` defaults
+  - [ ] Search triggered skill files for stale fixed-pool size, ticker list, and recommendation wording
+  - [ ] Add/maintain a test that reads the loaded skill assets for the current contract
+- Repo updates made:
+  - `skills/macro-weekly-summary-skill/SKILL.md`
+  - `skills/macro-weekly-summary-skill/SKILLS.md`
+  - `skills/line-brief-format-skill/line-weekly-brief.md`
+  - `tests/test_market_analysis.py`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_market_analysis.MarketAnalysisTests.test_triggered_prompt_skills_match_fixed_ten_contract -v` passed
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_market_analysis -v` passed, 42 tests
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_analysis_stages -v` passed, 27 tests
+  - `python scripts/validate_readiness.py` passed
+- Status: active
+
+## LESSON-20260516-02
+- Date: 2026-05-16
+- Trigger (User correction): User asked why `今日個股觀察` emitted only a fixed-pool data-gap message instead of still talking through the fixed pool.
+- What was wrong: Empty `t_trade_signals` recommendations caused the visible template to render only a gap message, hiding the fixed-pool monitor rows.
+- Root cause: Rendering logic treated missing `swing/medium long` rows as no output, instead of falling back to neutral fixed-pool observations.
+- New rule (always/never): Always show the fixed-pool observation rows in the final template; never hide the pool just because actionable signal rows are missing.
+- Prevention checklist (before final response):
+  - [ ] Test `build_trade_signal_recommendation_section([])` renders fixed-pool rows
+  - [ ] Keep neutral rows clearly non-actionable when evidence is missing
+  - [ ] Search requirements/spec docs for stale fixed-pool size wording
+- Repo updates made:
+  - `src/event_relay/trade_signals.py`
+  - `tests/test_trade_signals.py`
+  - `requirements.yml`
+  - `spec/market-analysis-fixed-watchlist-functional-spec.md`
+  - `spec/market-analysis-fixed-watchlist-data-contract.md`
+  - `spec/market-analysis-fixed-watchlist-operations.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `$env:PYTHONPATH='src'; python -m py_compile src/event_relay/trade_signals.py` passed
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_trade_signals -v` passed, 12 tests
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_market_analysis -v` passed, 41 tests
+  - `python scripts/validate_readiness.py` passed
+  - Sample `build_trade_signal_recommendation_section([])` renders fixed ten neutral rows
+- Status: active
+
+## LESSON-20260516-01
+- Date: 2026-05-16
+- Trigger (User correction): User asked whether the individual-stock template actually explains why a stock could rise, why it is undervalued or lagging, and why to buy.
+- What was wrong: The visible `今日個股觀察` row had only one generic rationale plus levels, so the buy logic could be hidden or too thin.
+- Root cause: Prior verification checked fixed-pool inclusion and levels, not whether the rendered template exposed separate causal, valuation/relative, and action logic.
+- New rule (always/never): Always render stock-watch rows with explicit `利多`, `利空`, and `買入注意`; never fabricate undervaluation when valuation or relative-discount evidence is missing.
+- Prevention checklist (before final response):
+  - [ ] Check final rendered `今日個股觀察` text, not only structured JSON
+  - [ ] Confirm fixed-pool size and visible count match the current decision file
+  - [ ] Confirm valuation/laggard gaps appear under `利空` or `買入注意`, not as fabricated undervaluation
+- Repo updates made:
+  - `src/event_relay/trade_signals.py`
+  - `src/event_relay/market_analysis.py`
+  - `src/event_relay/service.py`
+  - `src/event_relay/analysis_stages/`
+  - `.env`
+  - `tests/test_trade_signals.py`
+  - `tests/test_market_analysis.py`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `memory-bank/09-decisions/`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `$env:PYTHONPATH='src'; python -m py_compile src/event_relay/trade_signals.py src/event_relay/service.py src/event_relay/analysis_stages/schemas.py src/event_relay/analysis_stages/stage3_tw_mapping.py src/event_relay/analysis_stages/stage4_synthesis.py src/event_relay/market_analysis.py` passed
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_trade_signals -v` passed, 11 tests
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_market_analysis -v` passed, 41 tests
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_analysis_stages -v` passed, 26 tests
+  - `python scripts/validate_readiness.py` passed
+- Status: active
+
 ## LESSON-20260515-04
 - Date: 2026-05-15
 - Trigger (User correction): User clarified market-analysis tone should not become overly plain-language; it should stay closer to Yutinghao-style macro commentary that general audiences still like.
@@ -388,7 +470,7 @@ This file is append-only. Add a new entry after any user correction to prevent r
 - Trigger (User correction): User clarified `market_analysis` should fixed-connect five Taiwan stocks and should not let the model recommend tickers.
 - What was wrong: Existing specs still described free-form recommendations, candidate top-up, and generic fallback ticker selection.
 - Root cause: `stock_watch` and `t_trade_signals` were documented as recommendation discovery instead of a fixed monitoring pool.
-- New rule (always/never): Always treat `market_analysis` stock output as the fixed pool `2330`, `2603`, `2882`, `1605`, `4956`; never present it as model-selected recommendations.
+- New rule (always/never): Always treat `market_analysis` stock output as the fixed ten-stock pool `2330`, `2317`, `2454`, `2308`, `2881`, `2882`, `2485`, `3535`, `3715`, `2351`; never present it as model-selected recommendations.
 - Prevention checklist (before final response):
   - [ ] Check README / memory-bank / requirements / spec wording says fixed watch pool
   - [ ] Confirm old tracked fallback tickers are absent from specs
@@ -790,4 +872,154 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `python -m unittest tests.test_trade_signals tests.test_market_analysis -v` passed
   - `python -m py_compile src\event_relay\trade_signals.py src\event_relay\market_analysis.py src\scrapers\yfinance_stocks.py` passed
   - `git diff --check -- ...` passed with CRLF warnings only
+- Status: active
+
+## LESSON-20260518-01
+- Date: 2026-05-18
+- Trigger (User correction): User showed author chips where article-detail extraction treated phrases like `收停車費兄妹`, `男子家屬`, `中央社發布`, and `王朝鈺傳真` as reporter names.
+- What was wrong: The author normalizer allowed non-person article phrases and did not trim several detail-page byline suffixes such as `傳真` and `專訪`.
+- Root cause: Detail-page repair used overly broad text-derived candidates, and regression coverage focused on ordinary bylines rather than bad chips surfaced in the UI.
+- New rule (always/never): Always verify author chips against UI-visible bad-name terms and prefer normalized existing author metadata before extracting broad raw-text candidates during repair.
+- Prevention checklist (before final response):
+  - [ ] Query API author chips for the affected sources, not only article rows
+  - [ ] Add exact false-name rejects and suffix-normalization tests for each user-reported pattern
+  - [ ] Rebuild author relations and coverage after repairing existing DB rows
+- Repo updates made:
+  - `src/news_platform/author_extractor.py`
+  - `scripts/repair_news_author_relations.py`
+  - `tests/test_news_platform_author_extractor.py`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest tests.test_news_platform_author_extractor tests.test_news_platform_article_detail_author_extractor tests.test_news_platform_author_detail_worker -v` passed
+  - DB/API bad-name query returned no matches for EBC/Newtalk screenshot terms
+  - `news_platform.main --loop` restarted and logged an author-detail pass
+- Status: active
+
+## LESSON-20260520-01
+- Date: 2026-05-20
+- Trigger (User correction): User showed `今日個股觀察` rows where `上漲邏輯 / 低估/補漲 / 買入理由` repeated boilerplate and had little finance value.
+- What was wrong: Neutral and thin-evidence rows reused generic missing-evidence text, so the fixed-pool section looked mechanically filled rather than like a finance watch note.
+- Root cause: The renderer had no ticker-aware theme/risk fallback and the visible labels pushed every row into a bullish/valuation framing even when the real information was risk or action discipline.
+- New rule (always/never): Always render fixed-pool watch rows with `利多`, `利空`, and `買入注意`, using ticker-aware context for neutral rows and putting missing valuation evidence under risk/action gaps.
+- Prevention checklist (before final response):
+  - [ ] Check sample rendered `今日個股觀察`, not only stored `t_trade_signals`
+  - [ ] Verify neutral fixed-pool rows vary by ticker theme/risk
+  - [ ] Ensure prompt assets and docs use the same visible labels
+- Repo updates made:
+  - `src/event_relay/trade_signals.py`
+  - `src/event_relay/analysis_stages/stage4_synthesis.py`
+  - `tests/test_trade_signals.py`
+  - `tests/test_market_analysis.py`
+  - `tests/test_analysis_stages.py`
+  - `README.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `memory-bank/00-index.md`
+  - `memory-bank/09-decisions/2026-04-25-auto-trading-system-boundaries.md`
+  - `memory-bank/09-decisions/2026-05-11-fixed-market-analysis-watch-pool.md`
+  - `memory-bank/09-decisions/2026-05-16-ten-stock-observation-template.md`
+  - `spec/market-analysis-fixed-watchlist-functional-spec.md`
+  - `spec/market-analysis-fixed-watchlist-data-contract.md`
+  - `skills/macro-weekly-summary-skill/SKILL.md`
+  - `skills/macro-weekly-summary-skill/SKILLS.md`
+  - `skills/line-brief-format-skill/line-weekly-brief.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest tests.test_trade_signals tests.test_analysis_stages tests.test_market_analysis -v` passed
+  - `python scripts/validate_readiness.py` passed
+  - Sample rendered section shows `利多`, `利空`, and `買入注意`
+- Status: active
+
+## LESSON-20260525-01
+- Date: 2026-05-25
+- Trigger (User correction): User asked to remove daily `台股配置` and `## 今日個股觀察`, and refocus daily analysis on macro plus industry/sector interpretation.
+- What was wrong: Prior prompt/contracts kept pushing daily visible output back toward fixed-pool stock observation rows, which made the report feel like a stock watchlist instead of a macro/sector brief.
+- Root cause: Daily visible formatting, Stage4 prompt guidance, skills, and memory-bank docs treated the fixed-pool monitor section as part of the report body rather than downstream machine-readable context.
+- New rule (always/never): Daily visible `market_analysis` must use `產業板塊解析`, not `台股配置`, and must not append `## 今日個股觀察`; individual companies can appear only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
+- Prevention checklist (before final response):
+  - [ ] Check generated prompt text for `產業板塊解析`
+  - [ ] Check daily visible summary does not append `## 今日個股觀察`
+  - [ ] Keep `t_trade_signals` wording separate from visible report wording
+- Repo updates made:
+  - `src/event_relay/market_analysis.py`
+  - `src/event_relay/analysis_stages/stage4_synthesis.py`
+  - `tests/test_market_analysis.py`
+  - `tests/test_analysis_stages.py`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `memory-bank/09-decisions/2026-05-20-daily-analysis-editorial-template.md`
+  - `skills/macro-weekly-summary-skill/SKILL.md`
+  - `skills/macro-weekly-summary-skill/SKILLS.md`
+  - `skills/line-brief-format-skill/line-weekly-brief.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest tests.test_market_analysis tests.test_analysis_stages -v` passed
+  - `python scripts/validate_readiness.py` passed
+- Status: active
+
+## LESSON-20260529-01
+- Date: 2026-05-29
+- Trigger (User correction): User said not to use OpenAI API for today's repaired daily analysis; use `data-collecting` skills/templates/staged pipeline mechanism here and write the result to DB.
+- What was wrong: The first recovery framing still treated "rerun provider pipeline" as the default next step after OpenAI quota failure.
+- Root cause: The existing scheduler is OpenAI-first with Anthropic fallback, so operational thinking followed provider rerun flow instead of using the local evidence/template repair path.
+- New rule (always/never): When OpenAI quota blocks a same-day market-analysis repair, first consider a local Codex/manual staged repair using stored `t_relay_events`, skill templates, claim verification, and `MySqlEventStore.upsert_market_analysis()` before rerunning any provider.
+- Prevention checklist (before final response):
+  - [ ] State whether external provider APIs were called
+  - [ ] Verify repaired summary with `claim_verifier`
+  - [ ] Preserve Java delivery ownership through `push_enabled` / `pushed`
+- Repo updates made:
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `t_market_analyses.id=89` updated with `claim_verifier.ok=true`, `push_enabled=1`, `pushed=0`, `pipeline_mode=codex_staged_template`
+  - `scripts/run_trade_signal_extraction.ps1 -AnalysisId 89 -FixedPoolFallback` stored 10 `pending_review` rows
+- Status: active
+
+## LESSON-20260529-02
+- Date: 2026-05-29
+- Trigger (User correction): User clarified that data collection and pre-analysis should stay scheduled, while prose-generation jobs should be stopped.
+- What was wrong: The earlier framing could be read as stopping all `data-collecting` analysis work, including context and preprocessing jobs that Codex guards still need as local evidence.
+- Root cause: The repo uses "analysis" for both data/context preparation and final LLM prose generation, so task names must be separated by cost/function.
+- New rule (always/never): Always keep local evidence-producing jobs enabled when shifting prose generation to Codex; disable only scheduled LLM prose jobs unless the user explicitly asks to stop collection too.
+- Prevention checklist (before final response):
+  - [ ] List disabled prose tasks separately from retained data/pre-analysis tasks
+  - [ ] Confirm Codex guard can still read fresh `t_relay_events` and market context
+  - [ ] Verify any pushed report has `claim_verifier.ok=true` and no forbidden visible sections
+- Repo updates made:
+  - `memory-bank/workflows.md`
+  - `memory-bank/09-decisions/2026-05-29-codex-market-analysis-guards.md`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - Scheduled-task query shows market-analysis and weekly prose jobs disabled while RAG/BLS/context/flow/retention jobs remain ready
+  - `t_market_analyses.id=89` compliance check returned true and line-relay admin push returned `pushed=19`
+- Status: active
+
+## LESSON-20260625-01
+- Date: 2026-06-25
+- Trigger (User correction): User pointed to analysis `/analyses/182` and asked future reports to avoid internal/custom parameters such as `market scorecard 為 +4` and `07:20 market_context`, using plain Chinese instead.
+- What was wrong: The visible daily analysis leaked pipeline/source labels and deterministic score handles into reader-facing prose.
+- Root cause: Prompt safety rules covered event IDs and raw evidence references, but did not explicitly forbid market-context source labels or scorecard handles in `summary_text`.
+- New rule (always/never): Visible `market_analysis` text must translate internal labels (`market scorecard`, `scorecard +4`, `market_context`, `analysis_slot`, `scheduled_time_local`, `raw_json`) into plain Chinese market implications before storage or delivery.
+- Prevention checklist (before final response):
+  - [ ] Check visible analysis text has no `market scorecard`, `market_context`, `analysis_slot`, `scheduled_time_local`, or `raw_json`
+  - [ ] Convert scorecard/source labels into implication language such as `盤前市場環境資料顯示...`
+  - [ ] Keep internal labels only in `raw_json` / telemetry / structured evidence fields
+- Repo updates made:
+  - `src/event_relay/market_analysis.py`
+  - `src/event_relay/analysis_stages/stage4_synthesis.py`
+  - `tests/test_market_analysis.py`
+  - `tests/test_analysis_stages.py`
+  - `README.md`
+  - `memory-bank/09-decisions/2026-05-20-daily-analysis-editorial-template.md`
+  - `skills/macro-weekly-summary-skill/SKILL.md`
+  - `skills/macro-weekly-summary-skill/SKILLS.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_market_analysis tests.test_analysis_stages -v` passed
+  - `python scripts/validate_readiness.py` passed
+  - `git diff --check -- ...` passed with only existing LF/CRLF warnings
 - Status: active

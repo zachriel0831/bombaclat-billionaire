@@ -47,42 +47,44 @@ COUNTERPOINT_LINE_RE = re.compile(r"^主要反方觀點：(.+)$", re.MULTILINE)
 
 _VALID_CONFIDENCE = {"low", "medium", "high"}
 
-_REGIME_FLOW_SECTIONS = [
-    "總經 Regime",
-    "利率與流動性",
+_EDITORIAL_FLOW_SECTIONS = [
+    "今日一句話",
+    "三個檢查點",
+    "總經與流動性",
     "景氣循環",
-    "市場情緒",
-    "台股配置",
+    "國際新聞傳導",
+    "產業板塊解析",
     "風險與資料缺口",
 ]
 
 _SLOT_SECTIONS = {
     "us_close": (
         "Focus on how the U.S. close changes the macro regime and Taiwan next-session setup.",
-        _REGIME_FLOW_SECTIONS,
+        _EDITORIAL_FLOW_SECTIONS,
     ),
     "pre_tw_open": (
-        "Focus on Taiwan pre-open positioning before 09:00 through the macro-regime flow.",
-        _REGIME_FLOW_SECTIONS,
+        "Focus on Taiwan pre-open macro and sector implications before 09:00: turn finance news, U.S. close context, and market data into sector tilt without writing a stock-picking list.",
+        _EDITORIAL_FLOW_SECTIONS,
     ),
     "macro_daily": (
         "Macro-only world context; both Taiwan and the relevant U.S. close session are closed.",
-        _REGIME_FLOW_SECTIONS,
+        _EDITORIAL_FLOW_SECTIONS,
     ),
     "tw_close": (
-        "Taiwan close review: diagnose today's close through macro regime, flows, sentiment, and next-session allocation.",
-        _REGIME_FLOW_SECTIONS,
+        "Taiwan close review: diagnose today's close through macro regime, flows, sentiment, and next-session sector implications.",
+        _EDITORIAL_FLOW_SECTIONS,
     ),
 }
 
 _REGIME_FLOW_GUIDE = (
-    "Yutinghao-style flow:\n"
-    "1. 總經 Regime: define the current regime first, e.g. inflation sticky / disinflation / growth scare / liquidity easing / credit stress.\n"
-    "2. 利率與流動性: connect CPI/PCE/jobs/Fed path to 2Y/10Y, DXY, SOFR, Fed balance sheet, RRP, TGA, reserves, credit spreads.\n"
-    "3. 景氣循環: explain whether consumption, labor, PMI/ISM, bank credit, earnings, or inventory imply expansion, slowdown, soft landing, or recession risk.\n"
-    "4. 市場情緒: judge whether price action is fundamentals-backed or positioning/chase-driven using VIX, SOX/Nasdaq, credit proxies, breadth, and X/news shocks.\n"
-    "5. 台股配置: translate the above into Taiwan sector tilt and fixed-pool stock-watch logic; mention semis/AI, financials, shipping, cable/copper, or small semis only when evidence supports it.\n"
-    "6. 風險與資料缺口: list what could break the chain and what must be verified next.\n"
+    "Editorial daily flow:\n"
+    "1. 今日一句話: one plain sentence naming what the market is pricing, the Taiwan bias, and the main uncertainty.\n"
+    "2. 三個檢查點: exactly three observable checks for the slot. For pre_tw_open, make them 盤前 checks; for tw_close, make them next-session checks. Each check must say what would confirm or weaken the thesis.\n"
+    "3. 總經與流動性: combine regime, Fed path, rates, USD/TWD, liquidity, and credit. Start with implication, then put dense facts in bullets. End with 對台股含意.\n"
+    "4. 景氣循環: explain whether consumption, labor, PMI/ISM, bank credit, earnings, or inventory imply expansion, slowdown, soft landing, or recession risk, then translate to Taiwan sectors.\n"
+    "5. 國際新聞傳導: use the chain 事件 -> 影響變數 -> 台股族群 -> 確認/失效. Do not amplify geopolitical, commodity, policy, or earnings stories beyond evidence.\n"
+    "6. 產業板塊解析: translate the above into industry and sector implications. Mention individual companies only as mega-cap transmission proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist, entry plan, stop-loss, or target-price list.\n"
+    "7. 風險與資料缺口: max three bullets. Include the strongest invalidation condition first, then the most important missing data.\n"
 )
 
 _POPULAR_MACRO_TONE_GUIDE = (
@@ -94,6 +96,14 @@ _POPULAR_MACRO_TONE_GUIDE = (
     "- Do not remove mechanism. Each section still needs evidence -> market mechanism -> Taiwan implication, but the first sentence should tell readers what the market is really pricing.\n"
 )
 
+_INTERNAL_CONTEXT_TRANSLATION_GUIDE = (
+    "Internal-context translation rule:\n"
+    "- Do not expose internal pipeline/source labels or custom numeric handles in summary_text, including market scorecard, scorecard +4, market_context, market_context:scorecard, analysis_slot, scheduled_time_local, raw_json, or labels such as 07:20 market_context.\n"
+    "- Translate internal context into reader-facing Traditional Chinese implications. Example: instead of 'market scorecard 為 +4', write '盤前多數流動性與風險指標偏向支撐風險資產，但仍要觀察美元、油價與信用利差是否反轉'.\n"
+    "- Instead of '07:20 market_context', write '盤前整理的市場環境資料顯示...' or '盤前資料指出...'.\n"
+    "- Keep internal source names and scores only in raw_json / structured telemetry; visible text should describe the implication, not the internal field name.\n"
+)
+
 
 def _structured_instructions() -> str:
     """執行 structured instructions 的主要流程。"""
@@ -102,7 +112,9 @@ def _structured_instructions() -> str:
         "of the same analysis.\n"
         "  - summary_text: Traditional Chinese plain text matching the length\n"
         "    budget in the user prompt. Follow the section list below and preserve\n"
-        "    the flow: 總經 Regime -> 利率與流動性 -> 景氣循環 -> 市場情緒 -> 台股配置.\n"
+        "    the flow: 今日一句話 -> 三個檢查點 -> 總經與流動性 -> 景氣循環 -> 國際新聞傳導 -> 產業板塊解析 -> 風險與資料缺口.\n"
+        "    Do not include a dedicated 台股配置 section or any ## 今日個股觀察 section.\n"
+        "    Do not expose internal labels such as market scorecard, market_context, analysis_slot, scheduled_time_local, raw_json, or 07:20 market_context; translate them into plain Chinese market implications.\n"
         "    End summary_text with two\n"
         "    final lines on their own:\n"
         "        信心等級：<low|medium|high>\n"
@@ -115,15 +127,23 @@ def _structured_instructions() -> str:
         "    when multiple independent chains agree and critic is clean.\n"
         "  - key_drivers: short bullets naming the top 2-4 events / forces.\n"
         "  - tw_sector_watch / stock_watch: copy the sector / fixed-pool ticker\n"
-        "    buckets from stage3, restated tersely. Use stage3.direction values.\n"
-        "    stock_watch is not a model recommendation list. Allowed tickers\n"
-        "    are exactly: 2330 台積電, 2603 長榮, 2882 國泰金, 1605 華新,\n"
-        "    4956 光鋐. Never add any other Taiwan ticker.\n"
+        "    buckets from stage3 for machine-readable downstream use only.\n"
+        "    Use stage3.direction values. Do not render stock_watch as a visible\n"
+        "    report section. stock_watch is not a model recommendation list. Allowed tickers\n"
+        "    are exactly: 2330 台積電, 2317 鴻海, 2454 聯發科, 2308 台達電,\n"
+        "    2881 富邦金, 2882 國泰金, 2485 兆赫, 3535 晶彩科,\n"
+        "    3715 定穎投控, 2351 順德. Never add any other Taiwan ticker.\n"
         "    For each stock_watch item, add execution-neutral fields when\n"
         "    evidence supports them: market='TW', strategy_type\n"
         "    (intraday/swing/medium/watch), entry_zone, invalidation,\n"
         "    take_profit_zone, holding_horizon, confidence, risk_notes, and\n"
-        "    evidence_ids copied from stage3. All stock_watch keys are required\n"
+        "    evidence_ids copied from stage3. The rationale must include three\n"
+        "    labeled parts: 利多, 利空, 買入注意. Use 利多 for concrete\n"
+        "    catalysts or sector support, 利空 for downside/risk/invalidation\n"
+        "    conditions, and 買入注意 for observable entry discipline. If valuation\n"
+        "    or relative discount evidence is missing, put that gap under 利空 or\n"
+        "    買入注意 instead of inventing an undervaluation claim.\n"
+        "    All stock_watch keys are required\n"
         "    by the structured schema; if price levels are not evidenced, set\n"
         "    entry_zone / invalidation / take_profit_zone to null instead of\n"
         "    guessing or omitting keys. Use [] for empty risk_notes.\n"
@@ -137,7 +157,8 @@ def _structured_instructions() -> str:
         "    evidence, leave it out and state the data gap; do not substitute.\n"
         "    Use entry_zone as the\n"
         "    planned entry area, take_profit_zone as profit-taking/exit area,\n"
-        "    and invalidation as stop/exit area. These are signals, not orders.\n"
+        "    and invalidation as stop/exit area. These are machine signals, not\n"
+        "    visible daily-analysis content and not orders.\n"
         "    If Fed path / liquidity / credit stress / sentiment-positioning\n"
         "    context exists, include it in key_drivers and use it to justify\n"
         "    whether Taiwan risk appetite should be chased, faded, or hedged.\n"
@@ -190,17 +211,28 @@ def build_prompts(
         numbered_sections,
         _REGIME_FLOW_GUIDE,
         _POPULAR_MACRO_TONE_GUIDE,
+        _INTERNAL_CONTEXT_TRANSLATION_GUIDE,
         _summary_length_instruction(slot),
         f"Now local time: {now_local_iso}",
         "Keep readability: short paragraphs, bullet dense data, no wall-of-text blocks.",
         "Each section should be 1-3 bullets or one short paragraph. Use bullets for numbers.",
         "Depth requirement: each major section should connect evidence -> market mechanism -> Taiwan implication.",
-        "If stock_watch is non-empty, summary_text must only name fixed-pool tickers and state the condition that confirms or invalidates each visible setup.",
+        "Retail usefulness requirement: make the first two sections answer 'today what should I watch?' before moving into macro detail.",
+        "Do not append or write a ## 今日個股觀察 section. Do not write 台股配置 as a section title.",
+        "If stock_watch is non-empty in structured JSON, keep it machine-readable only; summary_text may mention individual companies only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.",
         "If evidence exists, explicitly cover Fed path, liquidity, credit stress, cycle data, and sentiment/positioning.",
-        "Answer the selected stage0 core tensions directly before moving into stock implications.",
+        "Answer the selected stage0 core tensions directly before moving into sector implications.",
         "",
         "Formatting rules:",
-        "- Section 2 利率與流動性 should use bullet lines when listing market facts.",
+        "- Do not include internal event IDs, source row IDs, or citation-only numeric lists such as （128610,128539） in summary_text.",
+        "- Do not expose internal pipeline labels or custom numeric handles such as market scorecard, market_context, 07:20 market_context, analysis_slot, scheduled_time_local, or raw_json; translate them into plain Chinese market implications.",
+        "- Keep evidence references implicit in raw_json/pipeline telemetry, not visible report text.",
+        "- Section 1 今日一句話 should be one sentence, not a paragraph.",
+        "- Section 2 三個檢查點 must contain exactly three bullets.",
+        "- Section 3 總經與流動性 should use bullet lines when listing market facts.",
+        "- Section 5 國際新聞傳導 must use at least one '事件 -> 影響變數 -> 台股族群 -> 確認/失效' chain when evidence exists.",
+        "- Section 6 產業板塊解析 should focus on industries/sectors and may use only mega-cap examples; no watchlist or trading levels.",
+        "- Section 7 風險與資料缺口 must be concise: three bullets maximum.",
         "- Use the exact section titles listed above.",
         "",
         "Use only claims supported by the stage outputs below. If a section",

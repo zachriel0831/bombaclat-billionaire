@@ -129,6 +129,23 @@ Minimum evidence before reporting recovery complete:
 - Check bridge log for `Polling source=rss fetched=<count>`
 - Query `t_relay_events` for recent RSS source rows
 
+## Workflow 3A-0: Finance Relay Reporter Enrichment
+1. Understand storage scope
+- Finance RSS rows live in short-retention `t_relay_events`, not `t_news_articles`.
+- Reporter names for finance cards are display metadata in `raw_json.authors`; they are not normalized reporter identities yet.
+2. Dry-run a small batch
+- `python scripts/backfill_relay_event_authors.py --env-file .env --limit 10 --dry-run`
+3. Backfill recent rows
+- `python scripts/backfill_relay_event_authors.py --env-file .env --limit 200 --days 14 --sleep-seconds 0.2`
+4. Verify
+- Check summary counters for `present`, `updated`, `no_author_metadata`, and `parse_failed`.
+- Query recent `t_relay_events.raw_json` rows for `$.authors`.
+- Refresh the public finance page; cards should show `記者 <name>` when author data exists.
+5. Boundaries
+- The script fetches article detail pages only to extract byline metadata.
+- Do not use this workflow to store article body content.
+- Do not treat missing bylines as fake `unknown` reporters.
+
 ## Workflow 3A-1: Free Palestine English Issue News
 1. Smoke fetch without DB writes
 - `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 5 -DryRun`
@@ -221,7 +238,7 @@ machine restart, or when the user asks whether source data has caught up.
 2. Expected healthy probes
 - relay finance/public RSS: recent Taiwan finance/official RSS rows in `news_relay.t_relay_events`
 - relay international RSS: BBC/Reuters/Fox/NPR public RSS rows
-- relay X/SEC/TWSE-MOPS/US-index probes when enabled in `.env`
+- relay X/Truth Social/SEC/TWSE-MOPS/US-index probes when enabled in `.env`
 - relay market-context, BLS macro, Taiwan market-flow, and stored analysis probes
 - news platform society/politics category and per-source article probes
 - news platform public records and article-public-record link probes
@@ -259,6 +276,22 @@ machine restart, or when the user asks whether source data has caught up.
 - Query `t_x_posts` by `tweet_id`
 5. If startup still says `missing X bearer token`
 - run bridge through `scripts/run_source_bridge.ps1` so PowerShell preflight resolves DPAPI token into process env before Python starts
+
+## Workflow 4A-1: Truth Social Public-Figure Polling
+1. Confirm settings
+- `TRUTH_SOCIAL_ENABLED=true`
+- `TRUTH_SOCIAL_ACCOUNTS=https://truthsocial.com/@realDonaldTrump`
+- Keep a browser-style `TRUTH_SOCIAL_USER_AGENT` if the public endpoint returns `403`
+2. Smoke fetch without DB writes
+- `$env:PYTHONPATH='src'; python -m news_collector.main fetch --source truthsocial --limit 5 --pretty`
+3. Verify bridge storage
+- Restart or wait for `news_collector.relay_bridge` poll loop
+- Check bridge log for `Polling source=truthsocial fetched=<n>`
+- Query `t_relay_events` by `source LIKE 'truthsocial:%'`
+- Query `t_x_posts` by `tweet_id LIKE 'truthsocial-%'`
+4. Public read path
+- `news-platform-api` exposes these rows through `GET /api/celebrity-events`
+- Omit `handle` to read both `x:*` and `truthsocial:*`, or pass `handle=truthsocial:realdonaldtrump`
 
 ## Workflow 4B: US Index Stored-Only Event Flow
 1. Write normalized stored-only events

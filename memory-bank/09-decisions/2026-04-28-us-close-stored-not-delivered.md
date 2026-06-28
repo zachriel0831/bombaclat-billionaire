@@ -19,5 +19,5 @@
 ## 2026-04-28 Follow-up
 - Taiwan `pre_tw_open` prompts include the latest stored `us_close` row only when the relevant U.S. session was open.
 - `pre_tw_open` uses a larger 700-1300 Chinese-character budget so U.S. close facts and Taiwan watch rows can both fit.
-- Amended 2026-05-11: visible stock rows use the fixed pool `2330`, `2603`, `2882`, `1605`, `4956`; TWSE/Yahoo context fills evidence for those symbols only and must not top up with substitute tickers.
+- Amended 2026-05-16: visible stock rows use the current ten-stock fixed pool from `2026-05-16-ten-stock-observation-template.md`; TWSE/Yahoo context fills evidence for those symbols only and must not top up with substitute tickers.
 - Fixed-pool watch lines are appended under `## 今日個股觀察`; they remain signals/watch items, not orders.

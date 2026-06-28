@@ -16,6 +16,7 @@ import threading
 from datetime import date, datetime
 
 from news_platform.config import NewsPlatformSettings, load_settings
+from news_platform.author_detail_worker import ArticleDetailAuthorWorker
 from news_platform.keyword_extractor import KeywordExtractor
 from news_platform.keyword_worker import KeywordWorker
 from news_platform.pipeline import fetch_all, run_once
@@ -559,6 +560,10 @@ def main() -> int:
             topic_batch_size=args.topic_batch_size,
             topic_llm_enabled=settings.topic_llm_enabled,
             topic_llm_batch_size=manual_batch_size,
+            author_detail_backfill_enabled=settings.author_detail_backfill_enabled,
+            author_detail_backfill_batch_size=settings.author_detail_backfill_batch_size,
+            author_detail_backfill_sources=settings.author_detail_backfill_sources,
+            author_detail_backfill_sleep_seconds=settings.author_detail_backfill_sleep_seconds,
             public_record_link_batch_size=args.public_record_link_batch_size,
             public_record_link_lookback_days=args.public_record_link_lookback_days,
             public_record_link_min_confidence=args.public_record_link_min_confidence,
@@ -617,6 +622,10 @@ def _loop(
     topic_batch_size: int,
     topic_llm_enabled: bool,
     topic_llm_batch_size: int,
+    author_detail_backfill_enabled: bool,
+    author_detail_backfill_batch_size: int,
+    author_detail_backfill_sources: tuple[str, ...],
+    author_detail_backfill_sleep_seconds: float,
     public_record_link_batch_size: int,
     public_record_link_lookback_days: int,
     public_record_link_min_confidence: float,
@@ -639,6 +648,17 @@ def _loop(
             batch_size=topic_llm_batch_size,
         )
         if topic_llm_enabled
+        else None
+    )
+    author_detail_worker = (
+        ArticleDetailAuthorWorker(
+            store,
+            sources=author_detail_backfill_sources,
+            batch_size=author_detail_backfill_batch_size,
+            timeout_seconds=settings.http_timeout_seconds,
+            sleep_seconds=author_detail_backfill_sleep_seconds,
+        )
+        if author_detail_backfill_enabled
         else None
     )
     public_record_link_worker = PublicRecordLinkWorker(
@@ -670,6 +690,24 @@ def _loop(
                     topic_result.updated,
                     topic_result.failed,
                 )
+            if author_detail_worker is not None:
+                try:
+                    author_result = author_detail_worker.run_once()
+                    if author_result.candidates or author_result.updated or author_result.failed:
+                        logger.info(
+                            "Author detail pass candidates=%d present=%d low_confidence=%d no_author_metadata=%d "
+                            "parse_failed=%d updated=%d relations=%d failed=%d",
+                            author_result.candidates,
+                            author_result.present,
+                            author_result.low_confidence,
+                            author_result.no_author_metadata,
+                            author_result.parse_failed,
+                            author_result.updated,
+                            author_result.relations,
+                            author_result.failed,
+                        )
+                except Exception as exc:
+                    logger.warning("Author detail pass failed: %s", exc)
             if topic_llm_worker is not None:
                 llm_result = topic_llm_worker.run_until_drained()
                 if llm_result.scanned:

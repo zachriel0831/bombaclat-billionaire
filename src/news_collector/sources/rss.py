@@ -149,6 +149,7 @@ class OfficialRssSource(NewsSource):
 
         published = parse_datetime(t("pubDate", "published", "updated"))
         summary = t("description", "summary", "content")
+        author_values = self._author_values(node)
 
         tags: list[str] = []
         for child in list(node):
@@ -158,6 +159,10 @@ class OfficialRssSource(NewsSource):
                 if term:
                     tags.append(term)
 
+        raw: dict[str, object] = {"feed": feed_url}
+        if author_values:
+            raw["author_values"] = author_values
+
         return NewsItem(
             id=stable_id(source_name, title, link),
             source=source_name,
@@ -166,8 +171,17 @@ class OfficialRssSource(NewsSource):
             published_at=published,
             summary=summary,
             tags=sorted(set(tags)),
-            raw={"feed": feed_url},
+            raw=raw,
         )
+
+    @staticmethod
+    def _author_values(node: ET.Element) -> list[str]:
+        values: list[str] = []
+        for child in list(node):
+            name = local_name(child.tag).lower()
+            if name in {"author", "creator", "credit"} and (child.text or "").strip():
+                values.append(child.text.strip())
+        return _unique_text(values)
 
     @staticmethod
     def _dedupe(items: list[NewsItem]) -> list[NewsItem]:
@@ -187,3 +201,12 @@ class OfficialRssSource(NewsSource):
 def _is_missing_subject_key_identifier_error(exc: Exception) -> bool:
     text = str(exc).lower()
     return "missing subject key identifier" in text
+
+
+def _unique_text(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        normalized = " ".join(value.split())
+        if normalized and normalized not in result:
+            result.append(normalized)
+    return result

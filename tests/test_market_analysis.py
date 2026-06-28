@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 import json
 import os
@@ -13,7 +14,9 @@ from event_relay.market_analysis import (
     _normalize_text,
     _resolve_slot,
     _resolve_slot_decision,
+    _sanitize_visible_report_text,
     MarketAnalysisConfig,
+    SLOTS,
     run_once,
 )
 from event_relay.prompt_assets import TokenUsage
@@ -39,6 +42,7 @@ class _FakeAnalysisStore:
     updated_summaries = []
     summary_events = None
     latest_us_close = None
+    prior_signal_references = []
 
     def __init__(self, _settings) -> None:
         """初始化物件狀態與必要依賴。"""
@@ -104,7 +108,7 @@ class _FakeAnalysisStore:
         _FakeAnalysisStore.signals.append((analysis_id, list(signals)))
         return len(signals)
 
-    def fetch_trade_signal_recommendations(self, analysis_id: int, *, limit: int = 5) -> list[dict]:
+    def fetch_trade_signal_recommendations(self, analysis_id: int, *, limit: int = 10) -> list[dict]:
         """Return short/medium long signals for report-section tests."""
         rows = []
         for stored_analysis_id, signals in _FakeAnalysisStore.signals:
@@ -142,6 +146,22 @@ class _FakeAnalysisStore:
         )
         return rows[:limit]
 
+    def fetch_recent_trade_signal_references(
+        self,
+        *,
+        tickers,
+        exclude_analysis_id: int,
+        days: int = 30,
+        limit: int = 80,
+    ) -> list[dict]:
+        """Return test-provided prior signal references."""
+        wanted = {str(ticker).replace(".TW", "").replace(".TWO", "") for ticker in tickers}
+        return [
+            row for row in _FakeAnalysisStore.prior_signal_references
+            if str(row.get("ticker") or "") in wanted
+            and int(row.get("analysis_id") or 0) != int(exclude_analysis_id)
+        ][:limit]
+
     def update_market_analysis_summary_text(self, analysis_id: int, summary_text: str) -> None:
         """Record deterministic signal-section write-back."""
         _FakeAnalysisStore.updated_summaries.append((analysis_id, summary_text))
@@ -157,6 +177,9 @@ class MarketAnalysisTests(unittest.TestCase):
         slot = _resolve_slot(config, now_local)
 
         self.assertEqual(slot, "pre_tw_open")
+
+    def test_pre_tw_open_slot_metadata_is_0730(self) -> None:
+        self.assertEqual(SLOTS["pre_tw_open"], (7, 30))
 
     def test_resolve_slot_auto_tw_close_window(self) -> None:
         """測試 test resolve slot auto tw close window 的預期行為。"""
@@ -274,14 +297,42 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertIn("Recent events JSON includes news and stored-only market_context facts", user_prompt)
         self.assertIn("not exhaustive", user_prompt)
         self.assertIn("market_context", user_prompt)
-        self.assertIn("總經 Regime", user_prompt)
-        self.assertIn("利率與流動性", user_prompt)
+        self.assertIn("Do not expose internal pipeline labels", user_prompt)
+        self.assertIn("market scorecard", user_prompt)
+        self.assertIn("07:20 market_context", user_prompt)
+        self.assertIn("今日一句話", user_prompt)
+        self.assertIn("三個檢查點", user_prompt)
+        self.assertIn("總經與流動性", user_prompt)
         self.assertIn("景氣循環", user_prompt)
-        self.assertIn("市場情緒", user_prompt)
-        self.assertIn("台股配置", user_prompt)
-        self.assertIn("Section 2 利率與流動性", user_prompt)
+        self.assertIn("國際新聞傳導", user_prompt)
+        self.assertIn("產業板塊解析", user_prompt)
+        self.assertNotIn("6) 台股配置", user_prompt)
+        self.assertIn("Do not include a dedicated 台股配置 section", user_prompt)
+        self.assertIn("NVIDIA", user_prompt)
+        self.assertIn("Magnificent Seven", user_prompt)
+        self.assertIn("Section 2 三個檢查點", user_prompt)
+        self.assertIn("事件 -> 影響變數 -> 台股族群 -> 確認/失效", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
         self.assertIn("風險與資料缺口", user_prompt)
+
+    def test_sanitize_visible_report_text_translates_internal_labels(self) -> None:
+        """Reader-visible analysis text must not leak pipeline field names."""
+        raw = (
+            "今日一句話\n"
+            "> market scorecard 為 +4，07:20 market_context 顯示風險資產有支撐。\n"
+            "- Market scorecard 2026-06-25 overall +4、raw_json 與 analysis_slot 僅供內部稽核。"
+        )
+
+        cleaned = _sanitize_visible_report_text(raw)
+
+        self.assertNotIn("market scorecard", cleaned)
+        self.assertNotIn("Market scorecard", cleaned)
+        self.assertNotIn("market_context", cleaned)
+        self.assertNotIn("07:20", cleaned)
+        self.assertNotIn("raw_json", cleaned)
+        self.assertNotIn("analysis_slot", cleaned)
+        self.assertIn("盤前市場環境綜合指標", cleaned)
+        self.assertIn("盤前市場環境資料", cleaned)
 
     def test_build_prompts_tw_close_contains_close_review_sections(self) -> None:
         """測試 test build prompts tw close contains close review sections 的預期行為。"""
@@ -296,11 +347,28 @@ class MarketAnalysisTests(unittest.TestCase):
 
         self.assertIn("Taiwan close review", system_prompt)
         self.assertIn("market_context:tw_close", user_prompt)
-        self.assertIn("總經 Regime", user_prompt)
-        self.assertIn("利率與流動性", user_prompt)
+        self.assertIn("今日一句話", user_prompt)
+        self.assertIn("三個檢查點", user_prompt)
+        self.assertIn("總經與流動性", user_prompt)
         self.assertIn("景氣循環", user_prompt)
-        self.assertIn("市場情緒", user_prompt)
-        self.assertIn("台股配置", user_prompt)
+        self.assertIn("國際新聞傳導", user_prompt)
+        self.assertIn("產業板塊解析", user_prompt)
+        self.assertNotIn("6) 台股配置", user_prompt)
+
+    def test_triggered_prompt_skills_match_fixed_ten_contract(self) -> None:
+        """Prompt assets loaded by market_analysis must not carry stale fixed-five rules."""
+        macro_skill = Path("skills/macro-weekly-summary-skill/SKILLS.md").read_text(encoding="utf-8")
+        line_skill = Path("skills/line-brief-format-skill/line-weekly-brief.md").read_text(encoding="utf-8")
+
+        self.assertIn("固定十", macro_skill)
+        for text in (macro_skill, line_skill):
+            self.assertIn("產業板塊解析", text)
+            self.assertIn("今日個股觀察", text)
+            self.assertTrue("do not" in text.lower() or "不可" in text)
+            self.assertNotIn("固定五", text)
+        self.assertIn("`2317`", macro_skill)
+        self.assertIn("`2351`", macro_skill)
+        self.assertNotIn("`2603`", macro_skill)
 
     def test_run_once_tw_close_raw_json_dimension(self) -> None:
         """測試 test run once tw close raw json dimension 的預期行為。"""
@@ -981,8 +1049,11 @@ class MultiStagePipelineTests(unittest.TestCase):
         stage_side_effects: dict,
         summary_events: list[SummaryEvent] | None = None,
         latest_us_close=None,
+        prior_signal_references: list[dict] | None = None,
         slot: str = "pre_tw_open",
         now: datetime | None = None,
+        extra_env: dict[str, str] | None = None,
+        legacy_text: str = "legacy fallback text",
     ) -> tuple[dict, list]:
         """執行 run 方法的主要邏輯。"""
         _FakeAnalysisStore.records = []
@@ -990,6 +1061,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         _FakeAnalysisStore.updated_summaries = []
         _FakeAnalysisStore.summary_events = summary_events
         _FakeAnalysisStore.latest_us_close = latest_us_close
+        _FakeAnalysisStore.prior_signal_references = prior_signal_references or []
         from event_relay import market_analysis as module
         config = self._base_config()
         config.slot = slot
@@ -997,13 +1069,25 @@ class MultiStagePipelineTests(unittest.TestCase):
         if now is not None:
             _FixedDateTime.current = now
 
+        env = {
+            "MARKET_ANALYSIS_PIPELINE": pipeline_env,
+            "MARKET_ANALYSIS_US_CLOSE_PIPELINE": "",
+            "MARKET_ANALYSIS_US_CLOSE_DIGEST_MAX_EVENTS": "",
+            "MARKET_ANALYSIS_US_CLOSE_DIGEST_MAX_MARKET_ROWS": "",
+            "MARKET_ANALYSIS_PRE_TW_OPEN_PIPELINE": "",
+            "MARKET_ANALYSIS_TW_CLOSE_PIPELINE": "",
+            "MARKET_ANALYSIS_MACRO_DAILY_PIPELINE": "",
+            "MARKET_ANALYSIS_CLAIM_GATE_ENABLED": "",
+        }
+        if extra_env:
+            env.update(extra_env)
         patches = [
             patch("event_relay.market_analysis.load_settings", return_value=SimpleNamespace(mysql_enabled=True)),
             patch("event_relay.market_analysis.MySqlEventStore", _FakeAnalysisStore),
             patch("event_relay.market_analysis._write_prompt_snapshots", return_value=None),
-            patch("event_relay.market_analysis._call_llm", return_value=("legacy fallback text", _FAKE_LEGACY_USAGE)),
+            patch("event_relay.market_analysis._call_llm", return_value=(legacy_text, _FAKE_LEGACY_USAGE)),
             patch("event_relay.market_analysis.datetime", _FixedDateTime),
-            patch.dict(os.environ, {"MARKET_ANALYSIS_PIPELINE": pipeline_env}, clear=False),
+            patch.dict(os.environ, env, clear=False),
         ]
         for stage_target, side_effect in stage_side_effects.items():
             patches.append(patch(stage_target, side_effect=side_effect))
@@ -1032,6 +1116,31 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(token_usage["completion_tokens"], _FAKE_LEGACY_USAGE.completion_tokens)
         self.assertEqual(len(token_usage["stages"]), 1)
         self.assertEqual(token_usage["stages"][0]["stage"], "legacy_single_call")
+
+    def test_us_close_slot_digest_override_skips_multi_stage_and_recommendations(self) -> None:
+        stage_side_effects = {
+            "event_relay.analysis_stages.stage1_digest.run": _boom("stage1 should not be called"),
+        }
+        result, records = self._run(
+            pipeline_env="multi_stage",
+            stage_side_effects=stage_side_effects,
+            slot="us_close",
+            extra_env={
+                "MARKET_ANALYSIS_US_CLOSE_PIPELINE": "digest",
+                "MARKET_ANALYSIS_US_CLOSE_DIGEST_MAX_EVENTS": "12",
+                "MARKET_ANALYSIS_US_CLOSE_DIGEST_MAX_MARKET_ROWS": "2",
+            },
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["trade_signals_stored"], 0)
+        self.assertEqual(result["trade_signal_recommendations"], 0)
+        raw = json.loads(records[0].raw_json)
+        self.assertEqual(raw["requested_pipeline_mode"], "digest")
+        self.assertEqual(raw["pipeline_mode"], "digest")
+        self.assertEqual(raw["analysis_intent"], "us_close_digest_for_preopen")
+        self.assertIsNone(raw["pipeline_stages"])
+        self.assertTrue(raw["provider_context_policy"]["digest_policy"]["enabled"])
 
     def test_legacy_pre_open_prompt_includes_latest_us_close_analysis(self) -> None:
         """台股早盤 legacy prompt 會帶入上一筆美股收盤分析。"""
@@ -1114,20 +1223,20 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertFalse(raw["upstream_analysis_context"]["included"])
         self.assertEqual(raw["upstream_analysis_context"]["reason"], "us_close_session_closed")
 
-    def test_legacy_mode_appends_quote_fallback_trade_signal_section(self) -> None:
-        """Legacy fallback still appends fixed-pool watch rows from quote events."""
+    def test_legacy_mode_keeps_trade_signals_internal_without_visible_section(self) -> None:
+        """Legacy fallback keeps fixed-pool signals internal and does not append the daily section."""
         quote_events = [
             SummaryEvent(
                 row_id=901,
                 source="yfinance_taiwan",
-                title="[2026-04-24] 長榮 (2603.TW) 220.00 ▲2.50%",
-                url="https://finance.yahoo.com/quote/2603.TW",
+                title="[2026-04-24] 聯發科 (2454.TW) 1200.00 ▲2.50%",
+                url="https://finance.yahoo.com/quote/2454.TW",
                 summary=json.dumps(
                     {
-                        "symbol": "2603.TW",
-                        "name": "長榮",
-                        "price": 220.0,
-                        "prev_close": 214.5,
+                        "symbol": "2454.TW",
+                        "name": "聯發科",
+                        "price": 1200.0,
+                        "prev_close": 1170.7,
                         "change_pct": 2.5,
                         "volume": 21684950,
                     },
@@ -1147,14 +1256,85 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(result["trade_signals_stored"], 1)
         self.assertEqual(result["trade_signal_recommendations"], 1)
         signal = _FakeAnalysisStore.signals[0][1][0]
-        self.assertEqual(signal.ticker, "2603")
+        self.assertEqual(signal.ticker, "2454")
         self.assertEqual(signal.signal_type, "quote_fallback_stock_watch")
         self.assertEqual(signal.strategy_type, "swing")
-        self.assertEqual(_FakeAnalysisStore.updated_summaries[0][0], 777)
-        self.assertIn("legacy fallback text", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("## 今日個股觀察", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("固定五檔監控池", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("2603 長榮", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
+
+    def test_claim_verifier_allows_fixed_pool_tickers_without_quote_evidence(self) -> None:
+        """Fixed-pool ticker names in structured signal context are allowed claims."""
+        result, records = self._run(
+            pipeline_env="legacy",
+            stage_side_effects={},
+            summary_events=[],
+            legacy_text="Fixed pool watch: 2330 2317 2454.",
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["push_enabled"])
+        raw = json.loads(records[0].raw_json)
+        self.assertTrue(raw["claim_verifier"]["ok"])
+        self.assertEqual(raw["claim_verifier"]["unsupported_counts"]["tickers"], 0)
+        self.assertEqual(raw["trust_gate"]["reason"], "claim_verifier_ok")
+
+    def test_claim_verifier_failure_blocks_delivery_and_trade_signals(self) -> None:
+        """Unsupported claims keep the row stored but block delivery and signal extraction."""
+        quote_events = [
+            _quote_event(901, "2454.TW", "聯發科", 1200.0, 2.5, 21684950)
+        ]
+
+        result, records = self._run(
+            pipeline_env="legacy",
+            stage_side_effects={},
+            summary_events=quote_events,
+            legacy_text="2454 聯發科目標價 9999 元。",
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["push_enabled"])
+        self.assertEqual(result["trade_signals_stored"], 0)
+        self.assertEqual(result["trade_signal_recommendations"], 0)
+        self.assertEqual(_FakeAnalysisStore.signals, [])
+        self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
+        record = records[0]
+        self.assertFalse(record.push_enabled)
+        raw = json.loads(record.raw_json)
+        self.assertFalse(raw["claim_verifier"]["ok"])
+        self.assertIn("9999 元", raw["claim_verifier"]["unsupported"]["numbers"])
+        self.assertFalse(raw["delivery_eligible"])
+        self.assertTrue(raw["delivery_eligible_before_trust_gate"])
+        self.assertEqual(raw["trust_gate"]["reason"], "claim_verifier_failed")
+        self.assertTrue(raw["trust_gate"]["delivery_blocked"])
+        self.assertTrue(raw["trust_gate"]["signals_blocked"])
+        self.assertFalse(raw["trust_gate"]["signals_allowed"])
+        self.assertEqual(result["trust_gate"]["reason"], "claim_verifier_failed")
+
+    def test_claim_verifier_gate_can_be_disabled(self) -> None:
+        """Emergency override keeps old delivery behavior while retaining verifier telemetry."""
+        quote_events = [
+            _quote_event(901, "2454.TW", "聯發科", 1200.0, 2.5, 21684950)
+        ]
+
+        result, records = self._run(
+            pipeline_env="legacy",
+            stage_side_effects={},
+            summary_events=quote_events,
+            legacy_text="2454 聯發科目標價 9999 元。",
+            extra_env={"MARKET_ANALYSIS_CLAIM_GATE_ENABLED": "0"},
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["push_enabled"])
+        self.assertEqual(result["trade_signals_stored"], 1)
+        self.assertEqual(result["trade_signal_recommendations"], 1)
+        record = records[0]
+        self.assertTrue(record.push_enabled)
+        raw = json.loads(record.raw_json)
+        self.assertFalse(raw["claim_verifier"]["ok"])
+        self.assertTrue(raw["delivery_eligible"])
+        self.assertEqual(raw["trust_gate"]["reason"], "disabled")
+        self.assertFalse(raw["trust_gate"]["delivery_blocked"])
+        self.assertFalse(raw["trust_gate"]["signals_blocked"])
 
     def test_multi_stage_happy_path(self) -> None:
         """測試 test multi stage happy path 的預期行為。"""
@@ -1300,7 +1480,11 @@ class MultiStagePipelineTests(unittest.TestCase):
             ),
         }
 
-        result, _records = self._run(pipeline_env="multi_stage", stage_side_effects=stage_side_effects)
+        result, _records = self._run(
+            pipeline_env="multi_stage",
+            stage_side_effects=stage_side_effects,
+            summary_events=[_quote_event(901, "2330.TW", "台積電", 600.0, 1.0, 1000000)],
+        )
 
         self.assertEqual(result["trade_signals_stored"], 1)
         self.assertEqual(result["trade_signal_recommendations"], 1)
@@ -1311,21 +1495,14 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(signal.strategy_type, "swing")
         self.assertEqual(signal.status, "pending_review")
         self.assertEqual(json.loads(signal.source_event_ids_json), [101])
-        self.assertEqual(_FakeAnalysisStore.updated_summaries[0][0], 777)
-        self.assertIn("## 今日個股觀察", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("固定五檔監控池", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertNotIn("進場時點", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("波段觀察", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("進場 low:600, high:610", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("停利 first:630", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("停損 price:590", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
 
-    def test_us_close_appends_recommendations_and_fills_missing_levels(self) -> None:
-        """U.S. close delivery should show priced fixed-pool rows when quote evidence exists."""
+    def test_us_close_keeps_recommendations_internal_and_fills_missing_levels(self) -> None:
+        """U.S. close keeps fixed-pool rows internal while preserving price references."""
         from event_relay.analysis_stages.context import StageResult
 
         quote_events = [
-            _quote_event(901, "2603.TW", "長榮", 220.0, 6.14, 1000000)
+            _quote_event(901, "2330.TW", "台積電", 600.0, 6.14, 1000000)
         ]
         stage_side_effects = {
             "event_relay.analysis_stages.stage1_digest.run": _return(
@@ -1342,7 +1519,7 @@ class MultiStagePipelineTests(unittest.TestCase):
                         "sector_watch": [],
                         "stock_watch": [
                             {
-                                "ticker": "2603",
+                                "ticker": "2330",
                                 "direction": "bullish",
                                 "rationale": "AI demand and SOX strength support a swing setup",
                                 "evidence_ids": [901],
@@ -1383,7 +1560,7 @@ class MultiStagePipelineTests(unittest.TestCase):
                             "tw_sector_watch": [],
                             "stock_watch": [
                                 {
-                                    "ticker": "2603",
+                                    "ticker": "2330",
                                     "market": "TW",
                                     "name": None,
                                     "direction": "bullish",
@@ -1417,27 +1594,28 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(result["trade_signals_stored"], 1)
         self.assertEqual(result["trade_signal_recommendations"], 1)
         signal = _FakeAnalysisStore.signals[0][1][0]
-        self.assertEqual(signal.ticker, "2603")
+        self.assertEqual(signal.ticker, "2330")
         self.assertIsNotNone(signal.entry_zone_json)
         self.assertIsNotNone(signal.invalidation_json)
         self.assertIsNotNone(signal.take_profit_zone_json)
-        self.assertEqual(json.loads(signal.entry_zone_json)["low"], 216.5)
-        self.assertEqual(_FakeAnalysisStore.updated_summaries[0][0], 777)
-        self.assertIn("U.S. close report", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("low:", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("first:", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertEqual(json.loads(signal.entry_zone_json)["low"], 591.0)
+        self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
 
-    def test_multi_stage_tops_up_pre_open_recommendations_to_five(self) -> None:
-        """structured 觀察不足 5 檔時，只用固定池報價事件補滿。"""
+    def test_multi_stage_tops_up_pre_open_recommendations_to_ten(self) -> None:
+        """structured 觀察不足 10 檔時，只用固定池報價事件補滿。"""
         from event_relay.analysis_stages.context import StageResult
 
         quote_events = [
             _quote_event(901, "2330.TW", "台積電", 600, 1.1, 1000),
-            _quote_event(902, "2603.TW", "長榮", 220, 2.5, 900),
-            _quote_event(903, "1605.TW", "華新", 42, 0.4, 800),
-            _quote_event(904, "4956.TWO", "光鋐", 58, 0.0, 600),
-            _quote_event(905, "2882.TW", "國泰金", 70, -0.3, 700),
-            _quote_event(906, "2454.TW", "聯發科", 1200, 9.0, 9000),
+            _quote_event(902, "2454.TW", "聯發科", 1200, 9.0, 9000),
+            _quote_event(903, "2317.TW", "鴻海", 220, 7.0, 900),
+            _quote_event(904, "2308.TW", "台達電", 500, 6.0, 800),
+            _quote_event(905, "2881.TW", "富邦金", 90, 3.0, 700),
+            _quote_event(906, "2485.TW", "兆赫", 43, 2.0, 600),
+            _quote_event(907, "3535.TW", "晶彩科", 120, 1.5, 500),
+            _quote_event(908, "3715.TW", "定穎投控", 180, 0.2, 400),
+            _quote_event(909, "2351.TW", "順德", 130, 0.0, 300),
+            _quote_event(910, "2882.TW", "國泰金", 70, -0.3, 700),
         ]
         stage_side_effects = {
             "event_relay.analysis_stages.stage1_digest.run": _return(
@@ -1448,6 +1626,12 @@ class MultiStagePipelineTests(unittest.TestCase):
             ),
             "event_relay.analysis_stages.stage3_tw_mapping.run": _return(
                 StageResult(name="stage3_tw_mapping", model="m", output={"sector_watch": [], "stock_watch": []})
+            ),
+            "event_relay.analysis_stages.stage_dual_view.run": _return(
+                StageResult(name="stage_dual_view", model="m", output={"bull_case": {}, "bear_case": {}})
+            ),
+            "event_relay.analysis_stages.stage_critic.run": _return(
+                StageResult(name="stage_critic", model="m", output={"issues": []})
             ),
             "event_relay.analysis_stages.stage4_synthesis.run": _return(
                 StageResult(
@@ -1486,26 +1670,35 @@ class MultiStagePipelineTests(unittest.TestCase):
             summary_events=quote_events,
         )
 
-        self.assertEqual(result["trade_signal_recommendations"], 5)
-        self.assertEqual(result["trade_signals_stored"], 5)
+        self.assertEqual(result["trade_signal_recommendations"], 10)
+        self.assertEqual(result["trade_signals_stored"], 10)
         stored_signals = _FakeAnalysisStore.signals[0][1]
-        self.assertEqual([signal.ticker for signal in stored_signals], ["2330", "2603", "1605", "4956", "2882"])
-        self.assertIn("2882 國泰金", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertIn("2330 台積電", _FakeAnalysisStore.updated_summaries[0][1])
-        self.assertNotIn("進場時點", _FakeAnalysisStore.updated_summaries[0][1])
+        self.assertEqual(
+            [signal.ticker for signal in stored_signals],
+            ["2330", "2454", "2317", "2308", "2881", "2485", "3535", "3715", "2351", "2882"],
+        )
+        self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
 
-    def test_multi_stage_keeps_fixed_pool_fallback_visible_when_structured_has_outside_tickers(self) -> None:
-        """Configured fallback can only surface fixed-pool tickers."""
+    def test_multi_stage_keeps_fixed_pool_fallback_internal_when_structured_has_outside_tickers(self) -> None:
+        """Configured fallback can only store fixed-pool tickers and stays out of visible daily text."""
         from event_relay.analysis_stages.context import StageResult
 
-        preferred_env = "2603.TW:長榮,1605.TW:華新,4956.TWO:光鋐,4749.TWO:新應材"
+        preferred_env = "2485.TW:兆赫,3535.TW:晶彩科,3715.TW:定穎投控,2351.TW:順德,4749.TWO:新應材"
         quote_events = [
-            _market_context_quote_event(910, "2603.TW", "長榮", 220, 0.2, 100),
-            _market_context_quote_event(911, "1605.TW", "華新", 42, -0.1, 100),
-            _market_context_quote_event(912, "4956.TWO", "光鋐", 58, 0.0, 100),
+            _market_context_quote_event(901, "2330.TW", "台積電", 600, 1.0, 1000),
+            _market_context_quote_event(902, "2317.TW", "鴻海", 220, 0.8, 1000),
+            _market_context_quote_event(903, "3711.TW", "日月光投控", 180, 0.4, 1000),
+            _market_context_quote_event(904, "2382.TW", "廣達", 300, 0.3, 1000),
+            _market_context_quote_event(905, "3231.TW", "緯創", 120, 0.2, 1000),
+            _market_context_quote_event(910, "2454.TW", "聯發科", 1200, 9.0, 9000),
+            _market_context_quote_event(911, "2308.TW", "台達電", 500, 5.0, 5000),
+            _market_context_quote_event(912, "2881.TW", "富邦金", 90, 3.0, 700),
             _market_context_quote_event(914, "4749.TWO", "新應材", 205, 0.1, 100),
             _market_context_quote_event(915, "2882.TW", "國泰金", 70, 0.05, 100),
-            _market_context_quote_event(916, "2454.TW", "聯發科", 1200, 9.0, 9000),
+            _market_context_quote_event(916, "2485.TW", "兆赫", 43, 1.5, 100),
+            _market_context_quote_event(917, "3535.TW", "晶彩科", 120, 2.0, 100),
+            _market_context_quote_event(918, "3715.TW", "定穎投控", 180, 0.1, 100),
+            _market_context_quote_event(919, "2351.TW", "順德", 130, -0.1, 100),
         ]
         structured_stock_watch = [
             {"ticker": "2330", "market": "TW", "direction": "bullish", "strategy_type": "swing"},
@@ -1523,6 +1716,12 @@ class MultiStagePipelineTests(unittest.TestCase):
             ),
             "event_relay.analysis_stages.stage3_tw_mapping.run": _return(
                 StageResult(name="stage3_tw_mapping", model="m", output={"sector_watch": [], "stock_watch": []})
+            ),
+            "event_relay.analysis_stages.stage_dual_view.run": _return(
+                StageResult(name="stage_dual_view", model="m", output={"bull_case": {}, "bear_case": {}})
+            ),
+            "event_relay.analysis_stages.stage_critic.run": _return(
+                StageResult(name="stage_critic", model="m", output={"issues": []})
             ),
             "event_relay.analysis_stages.stage4_synthesis.run": _return(
                 StageResult(
@@ -1553,18 +1752,101 @@ class MultiStagePipelineTests(unittest.TestCase):
                 summary_events=quote_events,
             )
 
-        self.assertEqual(result["trade_signals_stored"], 5)
-        self.assertEqual(result["trade_signal_recommendations"], 5)
+        self.assertEqual(result["trade_signals_stored"], 10)
+        self.assertEqual(result["trade_signal_recommendations"], 10)
         stored_tickers = [signal.ticker for signal in _FakeAnalysisStore.signals[0][1]]
-        self.assertEqual(stored_tickers, ["2330", "2603", "4956", "1605", "2882"])
-        rendered = _FakeAnalysisStore.updated_summaries[0][1]
-        self.assertIn("1. 2603 長榮", rendered)
-        self.assertIn("2. 4956 光鋐", rendered)
-        self.assertIn("3. 1605 華新", rendered)
-        self.assertIn("4. 2882 國泰金", rendered)
-        self.assertNotIn("4749 新應材", rendered)
-        self.assertNotIn("2454 聯發科", rendered)
-        self.assertIn("5. 2330 台積電", rendered)
+        self.assertEqual(
+            stored_tickers,
+            ["2330", "2317", "3535", "2485", "3715", "2351", "2454", "2308", "2881", "2882"],
+        )
+        self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
+
+    def test_multi_stage_uses_prior_signal_reference_for_missing_fixed_pool_ticker(self) -> None:
+        """When today's evidence is thin, prior same-ticker levels can seed internal signal context."""
+        from event_relay.analysis_stages.context import StageResult
+
+        stage_side_effects = {
+            "event_relay.analysis_stages.stage1_digest.run": _return(
+                StageResult(name="stage1_digest", model="m", output={"events": [{"id": 101}], "market_snapshot": {}})
+            ),
+            "event_relay.analysis_stages.stage2_transmission.run": _return(
+                StageResult(name="stage2_transmission", model="m", output={"chains": []})
+            ),
+            "event_relay.analysis_stages.stage3_tw_mapping.run": _return(
+                StageResult(name="stage3_tw_mapping", model="m", output={"sector_watch": [], "stock_watch": []})
+            ),
+            "event_relay.analysis_stages.stage_dual_view.run": _return(
+                StageResult(name="stage_dual_view", model="m", output={"bull_case": {}, "bear_case": {}})
+            ),
+            "event_relay.analysis_stages.stage_critic.run": _return(
+                StageResult(name="stage_critic", model="m", output={"issues": []})
+            ),
+            "event_relay.analysis_stages.stage4_synthesis.run": _return(
+                StageResult(
+                    name="stage4_synthesis",
+                    model="m",
+                    output={
+                        "summary_text": "台股偏多，先看台積電。",
+                        "structured": {
+                            "summary_text": "台股偏多，先看台積電。",
+                            "headline": "權值偏多",
+                            "sentiment": "bullish",
+                            "confidence": "medium",
+                            "key_drivers": [],
+                            "tw_sector_watch": [],
+                            "stock_watch": [
+                                {
+                                    "ticker": "2330",
+                                    "market": "TW",
+                                    "name": "台積電",
+                                    "direction": "bullish",
+                                    "strategy_type": "swing",
+                                    "entry_zone": {"low": 1000, "high": 1020},
+                                }
+                            ],
+                            "risks": [],
+                            "data_gaps": [],
+                        },
+                    },
+                )
+            ),
+        }
+        prior_refs = [
+            {
+                "id": 61,
+                "analysis_id": 50,
+                "analysis_date": "2026-05-09",
+                "analysis_slot": "pre_tw_open",
+                "market": "TW",
+                "ticker": "2317",
+                "name": "鴻海",
+                "strategy_type": "swing",
+                "direction": "long",
+                "confidence": "medium",
+                "entry_zone": '{"low": 205, "high": 210}',
+                "invalidation": '{"price": 198}',
+                "take_profit_zone": '{"first": 225}',
+                "rationale": "上漲邏輯：AI server orders. 低估/補漲：relative laggard. 買入理由：entry zone retest.",
+                "updated_at": "2026-05-09 08:00:00",
+            }
+        ]
+
+        result, _records = self._run(
+            pipeline_env="multi_stage",
+            stage_side_effects=stage_side_effects,
+            summary_events=[_quote_event(901, "2330.TW", "台積電", 1000.0, 1.0, 1000000)],
+            prior_signal_references=prior_refs,
+        )
+
+        self.assertEqual(result["trade_signals_stored"], 2)
+        self.assertEqual(result["trade_signal_recommendations"], 2)
+        self.assertEqual(result["prior_signal_references"], 1)
+        stored = _FakeAnalysisStore.signals[0][1]
+        self.assertEqual([signal.ticker for signal in stored], ["2330", "2317"])
+        self.assertEqual(stored[1].signal_type, "prior_signal_stock_watch")
+        self.assertEqual(stored[1].confidence, "low")
+        self.assertEqual(json.loads(stored[1].entry_zone_json)["low"], 205)
+        self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
 
     def test_multi_stage_text_fallback_leaves_structured_none(self) -> None:
         """測試 test multi stage text fallback leaves structured none 的預期行為。"""

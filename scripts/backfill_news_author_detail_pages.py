@@ -24,6 +24,7 @@ from news_platform.article_detail_author_extractor import (  # noqa: E402
     ArticleDetailAuthorExtractor,
     ArticleDetailAuthorResult,
 )
+from news_platform.author_detail_worker import DEFAULT_DETAIL_AUTHOR_SOURCES  # noqa: E402
 from news_platform.author_metadata import (  # noqa: E402
     AUTHOR_METHOD_ARTICLE_DETAIL,
     AUTHOR_STATUS_LOW_CONFIDENCE,
@@ -38,7 +39,7 @@ from news_platform.http_client import http_get_bytes  # noqa: E402
 from news_platform.store import NewsPlatformStore  # noqa: E402
 
 
-FIRST_PASS_SOURCE_IDS = ("cna", "storm", "newtalk", "ltn", "ettoday")
+FIRST_PASS_SOURCE_IDS = DEFAULT_DETAIL_AUTHOR_SOURCES
 DEFAULT_ELIGIBLE_STATUSES = (
     AUTHOR_STATUS_NO_DETAIL_FETCHED,
     AUTHOR_STATUS_PARSER_NOT_SUPPORTED,

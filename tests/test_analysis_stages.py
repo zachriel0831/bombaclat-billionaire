@@ -423,18 +423,82 @@ class StageRunnerFallbackTests(unittest.TestCase):
             structured=True,
         )
 
-        self.assertIn("總經 Regime", user_prompt)
-        self.assertIn("利率與流動性", user_prompt)
+        self.assertIn("今日一句話", user_prompt)
+        self.assertIn("三個檢查點", user_prompt)
+        self.assertIn("總經與流動性", user_prompt)
         self.assertIn("景氣循環", user_prompt)
-        self.assertIn("市場情緒", user_prompt)
-        self.assertIn("台股配置", user_prompt)
-        self.assertIn("Section 2 利率與流動性", user_prompt)
+        self.assertIn("國際新聞傳導", user_prompt)
+        self.assertIn("產業板塊解析", user_prompt)
+        self.assertNotIn("6. 台股配置", user_prompt)
+        self.assertIn("Do not append or write a ## 今日個股觀察 section", user_prompt)
+        self.assertIn("NVIDIA", user_prompt)
+        self.assertIn("Magnificent Seven", user_prompt)
+        self.assertIn("Section 2 三個檢查點", user_prompt)
+        self.assertIn("事件 -> 影響變數 -> 台股族群 -> 確認/失效", user_prompt)
         self.assertIn("Stage0 core tensions JSON", user_prompt)
         self.assertIn("date-only", user_prompt)
+        self.assertIn("Do not include internal event IDs", user_prompt)
+        self.assertIn("raw_json/pipeline telemetry", user_prompt)
+        self.assertIn("Internal-context translation rule", user_prompt)
+        self.assertIn("market scorecard 為 +4", user_prompt)
+        self.assertIn("07:20 market_context", user_prompt)
         self.assertIn("professional-but-conversational macro-commentary voice", system_prompt)
         self.assertIn("市場現在在交易的是", user_prompt)
         self.assertIn("Avoid acronym piles", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
+
+    def test_stage4_anthropic_uses_same_template_contract(self) -> None:
+        """Anthropic structured path uses the same schema and visible template instructions."""
+        structured = {
+            "summary_text": "今日一句話\n市場在交易流動性改善。",
+            "headline": "流動性支撐台股",
+            "sentiment": "bullish",
+            "confidence": "medium",
+            "key_drivers": ["liquidity"],
+            "tw_sector_watch": [],
+            "stock_watch": [],
+            "risks": [],
+            "data_gaps": [],
+        }
+        captured: dict[str, Any] = {}
+        anthropic_usage = TokenUsage(provider="anthropic", model="claude-test", prompt_tokens=80, completion_tokens=40)
+
+        def fake_call(**kwargs):
+            captured.update(kwargs)
+            return structured, "raw", anthropic_usage
+
+        context = StageContext(
+            provider="anthropic",
+            api_base="https://api.anthropic.com",
+            api_key="test-key",
+            model="claude-test",
+            slot="pre_tw_open",
+            now_local=datetime(2026, 4, 22, 7, 30, tzinfo=timezone.utc),
+        )
+        with patch("event_relay.analysis_stages.stage4_synthesis.call_llm_json", side_effect=fake_call):
+            result = stage4_synthesis.run(
+                context=context,
+                stage1_output=_VALID_STAGE1,
+                stage2_output=_VALID_STAGE2,
+                stage3_output=_VALID_STAGE3,
+                macro_skill="",
+                line_skill="",
+            )
+
+        self.assertTrue(result.ok())
+        self.assertEqual(captured["provider"], "anthropic")
+        self.assertEqual(captured["schema_name"], "market_analysis_stage4_synthesis")
+        self.assertIs(captured["schema"], STAGE4_SYNTHESIS_SCHEMA)
+        self.assertIn("今日一句話", captured["user_prompt"])
+        self.assertIn("三個檢查點", captured["user_prompt"])
+        self.assertIn("總經與流動性", captured["user_prompt"])
+        self.assertIn("國際新聞傳導", captured["user_prompt"])
+        self.assertIn("產業板塊解析", captured["user_prompt"])
+        self.assertNotIn("6. 台股配置", captured["user_prompt"])
+        self.assertIn("machine-readable only", captured["user_prompt"])
+        self.assertIn("2330 台積電, 2317 鴻海, 2454 聯發科", captured["user_prompt"])
+        self.assertIn("信心等級：medium", result.output["summary_text"])
+        self.assertEqual(result.extras["usage"]["provider"], "anthropic")
 
     def test_stage4_falls_back_to_text_when_schema_fails(self) -> None:
         """測試 test stage4 falls back to text when schema fails 的預期行為。"""

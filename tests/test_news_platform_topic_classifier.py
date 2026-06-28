@@ -66,12 +66,63 @@ class TopicClassifierTests(unittest.TestCase):
             "520\u62cb\u88dc\u52a9\u5927\u79ae\u5305\uff1f\u8cf4\u6e05\u5fb7\u9080\u7da0\u59d4\u8ac7\u300c\u5c11\u5b50\u5973\u5316\u5c0d\u7b56\u300d",
             "0\u52306\u6b72\u570b\u5bb6\u4e00\u8d77\u990a\u653f\u7b56\u64ec\u64f4\u5927",
             "\u5152\u5c11TISA\u64ec\u653e\u5bec\u8cc7\u683c",
+            "柯志恩率高雄團隊參訪新北公托 侯友宜大讚育兒三箭政策",
         ]
 
         for title in titles:
             with self.subTest(title=title):
                 result = classify(title=title, summary=None, keywords=[])
                 self.assertEqual(result[0]["topic_id"], "low_birthrate")
+
+    def test_low_birthrate_does_not_match_generic_cuisheng(self):
+        result = classify(
+            title="6成鋼構工程來自宜蘭團隊 林國漳拜訪淡江大橋幕後英雄",
+            summary="淡江大橋連通，被視為世界級工程，建山機械團隊一手催生。",
+            keywords=[],
+            category="politics",
+        )
+
+        self.assertNotIn("low_birthrate", [item["topic_id"] for item in result])
+
+    def test_judicial_injustice_requires_controversy_not_plain_appeal(self):
+        result = classify(
+            title="剴剴案社工陳尚潔一審判刑2年 北檢提起上訴",
+            summary="法院依過失致死判刑，檢方對無罪及量刑部分提起上訴。",
+            keywords=[],
+            category="society",
+        )
+
+        self.assertNotIn("judicial_injustice", [item["topic_id"] for item in result])
+
+    def test_judicial_injustice_keeps_light_sentence_cases(self):
+        result = classify(
+            title="剴剴案社工判刑2年 北檢針對偽造文書無罪、量刑過輕上訴",
+            summary=None,
+            keywords=[],
+            category="society",
+        )
+
+        self.assertEqual(result[0]["topic_id"], "judicial_injustice")
+
+    def test_healthcare_burden_does_not_match_doctor_gambling_case(self):
+        result = classify(
+            title="台中榮總醫師淪莊家抽頭 廠商無照上刀一次拿3萬",
+            summary="醫療人員涉賭與廠商糾紛，檢方偵辦中。",
+            keywords=[],
+            category="society",
+        )
+
+        self.assertNotIn("healthcare_burden", [item["topic_id"] for item in result])
+
+    def test_healthcare_burden_keeps_nurse_staffing_cases(self):
+        result = classify(
+            title="三班護病比入法 工會籲速落實別再燃燒護理師",
+            summary=None,
+            keywords=[],
+            category="society",
+        )
+
+        self.assertEqual(result[0]["topic_id"], "healthcare_burden")
 
     def test_ignores_related_link_blocks_in_summary(self):
         result = classify(

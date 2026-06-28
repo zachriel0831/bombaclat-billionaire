@@ -35,7 +35,8 @@ system exists.
 | `NEWS-5` | `Done` | U.S. macro release calendar reminders | [NEWS-5-us-macro-release-calendar-reminders.md](NEWS-5-us-macro-release-calendar-reminders.md) | Collects official CPI/PPI/nonfarm payrolls/retail sales release dates into `t_macro_release_calendar`; Java sends Taiwan-time day-before reminders. |
 | `NEWS-6` | `Done` | Free Palestine news scheduled crawl | [NEWS-6-free-palestine-news-scheduled-crawl.md](NEWS-6-free-palestine-news-scheduled-crawl.md) | Runs `event_relay.palestine_news` every 3 hours into long-term `t_palestine_news_items`. |
 | `NEWS-7` | `Done` | Heavyweight earnings calendar reminders | [NEWS-7-heavyweight-earnings-calendar-reminders.md](NEWS-7-heavyweight-earnings-calendar-reminders.md) | Extends `t_macro_release_calendar` with `earnings_<symbol>` rows from Nasdaq / manual overrides; Java groups earnings with macro reminders. |
+| `NEWS-8` | `Done` | Finance relay-event reporter enrichment | [NEWS-8-finance-relay-event-reporter-enrichment.md](NEWS-8-finance-relay-event-reporter-enrichment.md) | Enriches short-retention finance RSS rows in `t_relay_events.raw_json` with byline names for frontend display. |
 
 ## Next ID
 
-The next requirement ID is `NEWS-8`.
+The next requirement ID is `NEWS-9`.

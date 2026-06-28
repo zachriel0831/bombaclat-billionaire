@@ -272,7 +272,9 @@ ORDER BY updated_at DESC;
 "
 ```
 
-For `pre_tw_open`, verify fixed-pool stock rows:
+For `pre_tw_open`, verify dynamic Taiwan intraday / short-swing candidate rows
+in `t_trade_signals`. As of 2026-06-02, runtime code may still emit historical
+fixed-pool fallback rows; treat those as a migration gap, not the target policy:
 
 ```powershell
 mysql -h 127.0.0.1 -uroot -proot news_relay -e "
@@ -352,4 +354,4 @@ Do not report restart recovery complete until there is evidence for:
 - society/politics DB check has same-day rows and no stale missing topics after catch-up
 - finance RSS DB check has same-day `official_rss` rows
 - pre-open DB check has today's `pre_tw_open` or calendar-guarded `macro_daily` row
-- if `pre_tw_open` ran, `t_trade_signals` has fixed-pool rows or the analysis records a clear data gap
+- if `pre_tw_open` ran, `t_trade_signals` has same-day dynamic candidate rows, historical fixed-pool fallback rows with a clear migration note, or the analysis records a clear data gap

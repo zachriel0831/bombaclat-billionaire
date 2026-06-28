@@ -42,6 +42,7 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - BBC / Reuters / Fox / NPR plus Taiwan finance feeds from `OFFICIAL_RSS_FEEDS`
 - Active Taiwan finance/official RSS feeds include CNA finance, LTN business, ETtoday finance, Anue, Economic Daily News, Newtalk finance, Storm finance, MoneyDJ, CBC, TWSE, and FSC feeds
 - RSS news rows are normalized by `news_collector` and written through the bridge into `t_relay_events`
+- Reporter names for finance RSS rows can be enriched into short-retention `t_relay_events.raw_json.authors` with `scripts/backfill_relay_event_authors.py`; this is separate from the long-lived society/politics reporter relation tables.
 - RSS `--limit` is applied per feed, not globally. Current `.env` uses `OFFICIAL_RSS_FIRST_PER_FEED=true`, so one polling cycle fetches one item per configured feed; if disabled, 27 feeds with `-Limit 5` can return up to 135 RSS items before URL dedupe and topic/date filters.
 
 1a. Free Palestine English issue news (no API key)
@@ -97,7 +98,12 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - `X_INCLUDE_REPLIES` / `X_INCLUDE_RETWEETS` (default `false`)
 - `X_BACKFILL_ENABLED` (default `true`; replay recent tracked-account tweets into the event store once when bridge starts)
 - `X_BACKFILL_MAX_RESULTS_PER_ACCOUNT` (default `10`; startup backfill size per tracked account)
+- `TRUTH_SOCIAL_ENABLED` (master switch for Truth Social public account source; default `false`)
+- `TRUTH_SOCIAL_ACCOUNTS` (comma-separated handles or profile URLs, e.g. `https://truthsocial.com/@realDonaldTrump`)
+- `TRUTH_SOCIAL_MAX_RESULTS_PER_ACCOUNT` (default `10`)
+- `TRUTH_SOCIAL_USER_AGENT` (optional browser-style user agent; the public endpoint may reject generic clients)
 - No key required for RSS
+- No key required for Truth Social public account pages
 - No key required for Free Palestine English issue news RSS / Google News search
 - No key required for FRED public CSV market-context series
 - `SEC_USER_AGENT` is also required when `MARKET_CONTEXT_AI_CAPEX_ENABLED=true`
@@ -189,10 +195,10 @@ Optional LLM fallback env keys:
 This repo now includes a Python data relay service:
 - Receive compatibility/manual events via HTTP `POST /events`
 - Persist events in MySQL event table
-- Store X posts, market snapshots, and generated analyses
+- Store X / Truth Social public-figure posts, market snapshots, and generated analyses
 - Python does not own LINE webhook or LINE push delivery; those belong to the Java system
 - `t_relay_events` is pure event storage; it has no LINE push queue/status columns
-- Auto-create X post table:
+- Auto-create social post table:
   - `t_x_posts`
 - Auto-create market snapshot table for US index analysis:
   - `t_market_index_snapshots`
@@ -206,13 +212,13 @@ pip install -e .
 powershell -ExecutionPolicy Bypass -File .\scripts\run_event_relay.ps1
 ```
 
-Run crawler bridge (`RSS + SEC + TWSE/MOPS + X stream + US index tracker`) and write normalized events directly to MySQL:
+Run crawler bridge (`RSS + SEC + TWSE/MOPS + X stream + Truth Social poll + US index tracker`) and write normalized events directly to MySQL:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_source_bridge.ps1 -PollIntervalSeconds 300 -Limit 5 -UsIndexPollIntervalSeconds 30
 ```
 
-For RSS, `-Limit 5` means up to 5 items per configured feed. SEC/TWSE/X keep their existing per-source or per-account limit behavior.
+For RSS, `-Limit 5` means up to 5 items per configured feed. SEC/TWSE/X/Truth Social keep their existing per-source or per-account limit behavior.
 
 Run the Free Palestine English issue-news collector once:
 
@@ -250,6 +256,7 @@ PALESTINE_NEWS_RSS_FEEDS=google_news_en|https://news.google.com/rss/search?...;a
 X source is now consumed by filtered stream (near real-time) with auto reconnect/backoff.
 Bridge startup also runs a one-shot X backfill before connecting the filtered stream, so tweets published while the bridge was down can be replayed into `t_relay_events` and `t_x_posts` without the event relay API running.
 When X returns `429` with `connection_issue=TooManyConnections`, bridge will auto-heal by terminating stale stream connections and retrying (configurable by `X_AUTO_HEAL_TOO_MANY_CONNECTIONS`).
+Truth Social public account polling uses `source=truthsocial:<handle>` and writes both `t_relay_events` and the existing social-post table `t_x_posts` with `tweet_id=truthsocial-<status_id>`. Raw status JSON is preserved in `raw_json`; display text is converted from Truth Social HTML to plain text.
 SEC tracked filings use the official SEC `company_tickers.json` mapping plus `data.sec.gov/submissions/CIK##########.json`, then write high-signal filings directly into `t_relay_events`.
 TWSE/MOPS tracked announcements use the official TWSE openapi `t187ap04_L` dataset (`上市公司每日重大訊息`) and write tracked company disclosures directly into `t_relay_events`.
 US index chain tracks DJIA and S&P 500 open/close, writes normalized stored-only events into `t_relay_events`, and stores structured quote rows in `t_market_index_snapshots` for same-day analysis.
@@ -366,6 +373,20 @@ Required `.env` keys for X:
 - `X_BACKFILL_MAX_RESULTS_PER_ACCOUNT=10`
 
 If you get `HTTP 402 Payment Required`, your X developer project/app does not currently have the required paid access for these read endpoints.
+
+## Truth Social public account source
+
+One-shot fetch:
+
+```powershell
+$env:PYTHONPATH='src'; python -m news_collector.main fetch --source truthsocial --limit 10 --pretty
+```
+
+Required `.env` keys:
+- `TRUTH_SOCIAL_ENABLED=true`
+- `TRUTH_SOCIAL_ACCOUNTS=https://truthsocial.com/@realDonaldTrump`
+
+The bridge stores Truth Social rows with `source=truthsocial:realdonaldtrump` in `t_relay_events` and mirrors them into `t_x_posts` for the existing public-figure/social-post analysis path. This source does not require an API token, but the public endpoint is protected against non-browser clients, so keep a browser-style `TRUTH_SOCIAL_USER_AGENT` if fetches return `403`.
 
 ## SEC tracked filings
 
@@ -490,9 +511,10 @@ Current behavior:
 - Target direction: Codex should generate dynamic Taiwan intraday / short-swing trade candidates from collected `t_relay_events`, market context, quote evidence, historical/RAG context, and model judgment, then store reviewable rows in `t_trade_signals`.
 - The old fixed ten-stock pool was only an observation/debugging aid and is superseded by `spec/market-analysis-dynamic-trade-candidates.md`.
 - Current implementation gap: code still contains fixed-pool paths such as `FIXED_MARKET_ANALYSIS_WATCH_POOL`; do not assume runtime dynamic candidate generation is complete.
-- `stock-monitor-service` should monitor the top five ranked `t_trade_signals` candidates.
+- `stock-monitor-service` should monitor the top five ranked `t_trade_signals` candidates that pass the deterministic risk gate.
 - Future `order-dispatcher-service` trading must cap concurrent traded symbols at three and must remain sandbox/paper until order, fill, position, PnL, reconciliation, and kill-switch state are implemented.
 - Daily visible market-analysis text follows the product-editor flow for readability: `今日一句話` -> `三個檢查點` -> `總經與流動性` -> `景氣循環` -> `國際新聞傳導` -> `產業板塊解析` -> `風險與資料缺口`; the daily body should not expose entry/stop/target lists unless a separate trading UI asks for them.
+- Daily visible text must translate internal labels such as `market scorecard`, `scorecard +4`, `market_context`, `07:20 market_context`, `analysis_slot`, `scheduled_time_local`, and `raw_json` into plain Chinese market implications.
 - Does not push or create LINE delivery jobs; Java owns user-facing delivery
 - Treats `t_relay_events` as primary local evidence, not as the only possible source of truth; prompts require explicit data-gap labeling when context is insufficient
 
@@ -510,6 +532,16 @@ Trade signal storage:
 - `ticker` is the normalized tradable symbol. For Taiwan signals this is the 4-digit stock code such as `2330`; `.TW` / `.TWO` suffixes are stripped and market type is stored in `market`.
 - Signals start as `status=pending_review`; they are not orders.
 - Each signal carries `analysis_id`, `analysis_date`, `analysis_slot`, `ticker`, `strategy_type`, `direction`, optional entry/stop/target JSON, and `source_event_ids`.
+- Each signal also stores deterministic `risk_reward_ratio`, `candidate_score`, and `avoid_reason`.
+  `risk_reward_ratio` uses `entry_zone.high` for long signals and
+  `entry_zone.low` for short signals, then compares against
+  `invalidation.price` and `take_profit_zone.first`.
+- `stock-monitor-service` enables monitoring only for complete long/short rows
+  with `risk_reward_ratio >= 1.5` and no `avoid_reason`; lower-quality rows are
+  still kept for audit and review.
+- Deterministic quote/context fallback rows calibrate `take_profit_zone.first`
+  from the generated entry/stop levels so their first target is at least 1.5R;
+  structured LLM rows are not silently adjusted and remain gated when R is low.
 - For Taiwan pre-open output, internal `direction=long` means buy-side / 做多, not long-term holding. `strategy_type=swing|medium` controls 波段/中線 wording. `entry_zone` is entry area, `take_profit_zone` is profit-taking exit area, and `invalidation` is shown as 停損.
 - Fallback rows may enrich or fill monitor levels only when evidence exists. They still start as `pending_review` and are not orders.
 - `idempotency_key` prevents duplicate signals for the same analysis/ticker/strategy.

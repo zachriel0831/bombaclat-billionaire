@@ -12,7 +12,8 @@ not provide usable byline metadata.
 
 ## Scope
 
-- First-pass media list: `cna`, `storm`, `newtalk`, `ltn`, `ettoday`.
+- Supported media list: `cna`, `storm`, `newtalk`, `ltn`, `ettoday`,
+  `tvbs`, `ebc`, `ctee`, and `pts`.
 - Only process rows whose `authors_json` is empty and whose
   `author_extraction_status` is not `present`.
 - Fetch public article detail HTML only to extract reporter/byline metadata.
@@ -25,6 +26,13 @@ not provide usable byline metadata.
   - `src/news_platform/article_detail_author_extractor.py`
   - Reads JSON-LD `author`/`creator`, author meta tags, and short visible byline
     windows around common reporter markers.
+- Loop worker:
+  - `src/news_platform/author_detail_worker.py`
+  - Runs a bounded batch from `news_platform.main --loop` when
+    `NEWSPF_AUTHOR_DETAIL_BACKFILL_ENABLED=true`.
+  - Default loop retry statuses are `NULL`, `no_detail_fetched`, and
+    `parser_not_supported`; `low_confidence` is left for manual repair to avoid
+    repeatedly fetching pages that already failed extraction.
 - Backfill script:
   - `scripts/backfill_news_author_detail_pages.py`
   - Supports `--dry-run`, `--sources`, `--limit`, `--sleep-seconds`,
@@ -72,7 +80,7 @@ Post-run first-pass source status:
 
 ## Follow-Up
 
-- Review LTN low-confidence rows and decide whether to add source-specific
-  selectors.
-- Add second-pass support for `tvbs`, `ebc`, `pts`, and `ctee` after sampling
-  their article detail templates.
+- Review LTN and EBC low-confidence rows and decide whether to add
+  source-specific selectors.
+- Keep loop batch size small enough to avoid delaying keyword/topic/public-record
+  work or overloading source sites.

@@ -310,6 +310,7 @@ def _collect_relay_probes(
                 timestamp_col="created_at",
                 where=(
                     "source NOT LIKE 'market_context:%' AND source NOT LIKE 'x:%' "
+                    "AND source NOT LIKE 'truthsocial:%' "
                     "AND source NOT LIKE 'sec:%' AND source NOT LIKE 'twse_mops:%' "
                     "AND source <> 'us_index_tracker'"
                 ),
@@ -336,6 +337,25 @@ def _collect_relay_probes(
                     stale_minutes=1440,
                     recent_minutes=1440,
                     detail="Tracked X account events; quiet accounts can naturally produce fewer rows.",
+                ),
+            )
+        )
+        probes.append(
+            _maybe_enabled_probe(
+                enabled=collector_settings.truth_social_enabled,
+                disabled_name="relay_truth_social",
+                disabled_detail="TRUTH_SOCIAL_ENABLED=false",
+                factory=lambda: _latest_probe(
+                    conn,
+                    name="relay_truth_social",
+                    table=event_table,
+                    timestamp_col="created_at",
+                    where="source LIKE 'truthsocial:%'",
+                    params=(),
+                    warn_minutes=720,
+                    stale_minutes=1440,
+                    recent_minutes=1440,
+                    detail="Tracked Truth Social public-figure events; quiet accounts can naturally produce fewer rows.",
                 ),
             )
         )

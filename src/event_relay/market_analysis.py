@@ -17,6 +17,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import sys
 from typing import Any
 
@@ -65,6 +66,8 @@ from event_relay.rag import (
 )
 from event_relay.service import MarketAnalysisRecord, MySqlEventStore, TradeSignalRecord
 from event_relay.trade_signals import (
+    FIXED_MARKET_ANALYSIS_WATCH_POOL,
+    build_prior_signal_reference_trade_signals,
     build_trade_signal_recommendation_section,
     build_quote_event_trade_signals,
     build_trade_signals_from_analysis,
@@ -78,15 +81,17 @@ logger = logging.getLogger(__name__)
 PROMPT_VERSION = "market-analysis-v1"
 MULTI_STAGE_PIPELINE_VERSION = PIPELINE_VERSION
 PROVIDER_CONTEXT_POLICY_VERSION = "provider-context-policy-v1"
+TRUST_GATE_VERSION = "market-analysis-trust-gate-v1"
 SLOTS = {
     "us_close": (5, 0),
-    "pre_tw_open": (8, 0),
+    "pre_tw_open": (7, 30),
     "macro_daily": (8, 5),
     "tw_close": (15, 30),
 }
 
 MACRO_DAILY_OWNER_SLOT = "pre_tw_open"
-RECOMMENDATION_SECTION_SLOTS = {"pre_tw_open", "us_close"}
+FIXED_POOL_SIGNAL_SLOTS = {"pre_tw_open", "us_close"}
+VISIBLE_RECOMMENDATION_SECTION_SLOTS: set[str] = set()
 
 
 @dataclass(frozen=True)
@@ -134,6 +139,8 @@ class AnalysisGenerationResult:
     """One completed analysis generation attempt."""
 
     config: MarketAnalysisConfig
+    requested_pipeline_mode: str
+    pipeline_mode: str
     events_payload: list[dict[str, Any]]
     market_payload: list[dict[str, Any]]
     rag_examples: list[dict[str, Any]]
@@ -389,9 +396,25 @@ def _preferred_tw_fallback_tickers_from_env() -> set[str]:
     return result
 
 
-def _should_emit_recommendation_section(slot: str) -> bool:
+def _should_emit_recommendation_section(slot: str, *, pipeline_mode: str | None = None) -> bool:
     """Return whether stored signals should be appended to the report text."""
-    return slot in RECOMMENDATION_SECTION_SLOTS
+    if slot == "us_close" and pipeline_mode == "digest":
+        return False
+    return slot in VISIBLE_RECOMMENDATION_SECTION_SLOTS
+
+
+def _should_build_fixed_pool_signals(slot: str, *, pipeline_mode: str | None = None) -> bool:
+    """Return whether internal fixed-pool signals should still be maintained."""
+    if slot == "us_close" and pipeline_mode == "digest":
+        return False
+    return slot in FIXED_POOL_SIGNAL_SLOTS
+
+
+def _allowed_claim_tickers_for_slot(slot: str, *, pipeline_mode: str | None = None) -> set[str]:
+    """Return structured tickers allowed by the fixed market-analysis contract."""
+    if not _should_build_fixed_pool_signals(slot, pipeline_mode=pipeline_mode):
+        return set()
+    return set(FIXED_MARKET_ANALYSIS_WATCH_POOL)
 
 
 def _merge_reference_levels_from_fallbacks(
@@ -559,7 +582,8 @@ def _build_prompts(
         "- Do not treat absence from local events as proof that nothing happened.\n"
         "- If web search is available, verify latest policy, price, war, macro, and earnings facts before using them.\n"
         "- If web search is unavailable or evidence is insufficient, explicitly label the data gap and lower confidence.\n"
-        "- Distinguish local-event facts, externally verified facts, and inference.\n\n"
+        "- Distinguish local-event facts, externally verified facts, and inference.\n"
+        "- Visible prose must translate internal source labels and numeric handles into plain Chinese implications; do not show labels such as market scorecard, market_context, analysis_slot, scheduled_time_local, raw_json, or 07:20 market_context.\n\n"
         "[Macro Skill]\n"
         f"{macro_skill}\n\n"
         "[Mobile Chat Format Skill]\n"
@@ -573,15 +597,57 @@ def _build_prompts(
         f"{required_sections}"
         f"{section_guide}"
         "Formatting rules:\n"
-        "- Section 2 利率與流動性 should use bullet lines when listing market facts.\n"
+        "- Do not include internal event IDs, source row IDs, or citation-only numeric lists such as （128610,128539） in summary_text.\n"
+        "- Do not expose internal pipeline labels or custom numeric handles such as market scorecard, market_context, 07:20 market_context, analysis_slot, scheduled_time_local, or raw_json; translate them into plain Chinese market implications.\n"
+        "- Keep evidence references implicit in raw_json/pipeline telemetry, not visible report text.\n"
+        "- Section 1 今日一句話 should be one sentence, not a paragraph.\n"
+        "- Section 2 三個檢查點 must contain exactly three bullets.\n"
+        "- Section 3 總經與流動性 should use bullet lines when listing market facts.\n"
+        "- Section 5 國際新聞傳導 must use at least one '事件 -> 影響變數 -> 台股族群 -> 確認/失效' chain when evidence exists.\n"
+        "- Section 6 產業板塊解析 should focus on industries/sectors, not a Taiwan allocation or stock-picking list.\n"
+        "- Section 7 風險與資料缺口 must be concise: three bullets maximum.\n"
+        "- Do not include a dedicated 台股配置 section or any ## 今日個股觀察 section in daily reports.\n"
+        "- Individual companies may appear only as mega-cap transmission examples, e.g. NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; avoid entry, stop-loss, or target-price language.\n"
         "- Use the exact section titles listed above.\n"
         f"{_summary_length_instruction(slot)}\n"
         f"Now local time: {now_local.strftime('%Y-%m-%d %H:%M %Z')}\n"
         "Recent events JSON includes news and stored-only market_context facts from t_relay_events.\n"
         "This local context is not exhaustive; use web search when available to verify missing/current facts.\n"
-        "If evidence exists, explicitly cover Fed path, liquidity, credit stress, and sentiment/positioning; "
+        "Retail usefulness requirement: make the first two sections answer what Taiwan investors should watch today before moving into macro detail.\n"
+        "If evidence exists, explicitly cover Fed path, liquidity, credit stress, cycle data, and sentiment/positioning; "
         "keep data in bullets and keep paragraphs short.\n"
         f"{upstream_instruction}"
+        f"Recent events JSON:\n{events_json}\n\n"
+        f"Recent market snapshot JSON:\n{market_json}\n"
+    )
+    return system_prompt, user_prompt
+
+
+def _build_us_close_digest_prompts(
+    *,
+    slot: str,
+    now_local: datetime,
+    events_json: str,
+    market_json: str,
+) -> tuple[str, str]:
+    """Build a compact U.S. close digest prompt used as pre-open input."""
+    system_prompt = (
+        "You are a Taiwan market strategist writing a compact U.S. close digest in Traditional Chinese.\n"
+        "This is an upstream input for the Taiwan pre-open trade brief, not the final trading recommendation.\n"
+        "Use only evidence from the supplied local context unless you explicitly mark a data gap.\n"
+        "Be concise, causal, and avoid stock entry recommendations.\n"
+    )
+    user_prompt = (
+        f"Generate one compact {slot} digest in Traditional Chinese.\n"
+        "Purpose: summarize the U.S. close so the later Taiwan pre-open analysis can decide sector tilt and fixed-pool stock setups.\n"
+        "Do NOT recommend Taiwan stocks, do NOT provide entry/stop/take-profit levels, and do NOT write a full research report.\n"
+        "Required sections:\n"
+        "1) 美股收盤一句話\n"
+        "2) 主要傳導因子\n"
+        "3) 台股早盤要檢查的族群\n"
+        "4) 資料缺口與反向風險\n"
+        "Length: 350-750 Chinese characters. Use bullets for market facts.\n"
+        f"Now local time: {now_local.strftime('%Y-%m-%d %H:%M %Z')}\n"
         f"Recent events JSON:\n{events_json}\n\n"
         f"Recent market snapshot JSON:\n{market_json}\n"
     )
@@ -600,14 +666,15 @@ def _summary_length_instruction(slot: str) -> str:
 
 
 def _regime_flow_sections() -> str:
-    """Return the fixed yutinghao-style section order."""
+    """Return the fixed product-editor daily section order."""
     return (
-        "1) 總經 Regime\n"
-        "2) 利率與流動性\n"
-        "3) 景氣循環\n"
-        "4) 市場情緒\n"
-        "5) 台股配置\n"
-        "6) 風險與資料缺口\n"
+        "1) 今日一句話\n"
+        "2) 三個檢查點\n"
+        "3) 總經與流動性\n"
+        "4) 景氣循環\n"
+        "5) 國際新聞傳導\n"
+        "6) 產業板塊解析\n"
+        "7) 風險與資料缺口\n"
     )
 
 
@@ -615,18 +682,53 @@ def _regime_flow_guide() -> str:
     """Explain how each section should reason without bloating the report."""
     return (
         "Reasoning flow:\n"
-        "- 總經 Regime: first define whether the market is in sticky inflation, disinflation, growth scare, liquidity easing, or credit stress.\n"
-        "- 利率與流動性: connect CPI/PCE/jobs/Fed path to 2Y/10Y, DXY, SOFR, Fed balance sheet, RRP, TGA, reserves, and credit spreads.\n"
-        "- 景氣循環: judge expansion/slowdown/soft landing/recession risk from consumption, labor, PMI/ISM, bank credit, earnings, and inventory.\n"
-        "- 市場情緒: decide whether price action is fundamentals-backed or positioning/chase-driven using VIX, SOX/Nasdaq, credit proxies, breadth, and news/X shocks.\n"
-        "- 台股配置: translate the chain into Taiwan sector tilt and stock-watch logic.\n"
-        "- 風險與資料缺口: state what could break the chain and what must be verified next.\n"
+        "- 今日一句話: one plain sentence naming what the market is pricing, the Taiwan bias, and the main uncertainty.\n"
+        "- 三個檢查點: exactly three observable checks for the slot; each check should say what confirms or weakens the thesis.\n"
+        "- 總經與流動性: combine regime, Fed path, rates, USD/TWD, liquidity, and credit; start with implication and end with 對台股含意.\n"
+        "- 景氣循環: judge expansion/slowdown/soft landing/recession risk from consumption, labor, PMI/ISM, bank credit, earnings, and inventory, then translate to Taiwan sectors.\n"
+        "- 國際新聞傳導: use 事件 -> 影響變數 -> 台股族群 -> 確認/失效; do not amplify geopolitical, commodity, policy, or earnings stories beyond evidence.\n"
+        "- 產業板塊解析: translate the chain into Taiwan sector and industry implications. Mention individual companies only as large-cap transmission proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
+        "- 風險與資料缺口: max three bullets; start with the strongest invalidation condition.\n"
     )
 
 
 def _normalize_text(text: str) -> str:
     """正規化 normalize text 對應的資料或結果。"""
     return "\n".join(line.rstrip() for line in text.strip().splitlines()).strip()[:4500]
+
+
+_VISIBLE_INTERNAL_LABEL_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"\bmarket\s+scorecard(?:\s+\d{4}-\d{2}-\d{2})?(?:\s+overall)?\s*(?:為|=|is|:)?\s*[+-]?\d+\b",
+            re.IGNORECASE,
+        ),
+        "盤前市場環境綜合指標",
+    ),
+    (
+        re.compile(r"\bscorecard(?:\s+overall)?\s*(?:為|=|is|:)?\s*[+-]?\d+\b", re.IGNORECASE),
+        "市場環境綜合指標",
+    ),
+    (
+        re.compile(r"\b\d{1,2}:\d{2}\s+market_context\b", re.IGNORECASE),
+        "盤前市場環境資料",
+    ),
+    (
+        re.compile(r"\bmarket_context(?::[A-Za-z0-9_.-]+)?\b", re.IGNORECASE),
+        "市場環境資料",
+    ),
+    (re.compile(r"\banalysis_slot\b", re.IGNORECASE), "分析時段"),
+    (re.compile(r"\bscheduled_time_local\b", re.IGNORECASE), "預定產出時間"),
+    (re.compile(r"\braw_json\b", re.IGNORECASE), "內部稽核資料"),
+)
+
+
+def _sanitize_visible_report_text(text: str) -> str:
+    """Replace pipeline-only labels before a report becomes reader-visible."""
+    sanitized = text or ""
+    for pattern, replacement in _VISIBLE_INTERNAL_LABEL_REPLACEMENTS:
+        sanitized = pattern.sub(replacement, sanitized)
+    return _normalize_text(sanitized)
 
 
 def _is_delivery_enabled_for_slot(slot: str, calendar_state: MarketCalendarState) -> bool:
@@ -638,6 +740,40 @@ def _is_delivery_enabled_for_slot(slot: str, calendar_state: MarketCalendarState
         # 中文：一般日 us_close 只當隔天台股早盤素材；只有 TW 休市且美股有交易時才開放推送。
         return (not calendar_state.tw.is_trading_day) and calendar_state.us.is_trading_day
     return False
+
+
+def _apply_claim_verifier_trust_gate(
+    *,
+    base_delivery_eligible: bool,
+    claim_verification: dict[str, Any],
+) -> dict[str, Any]:
+    """Return delivery/signal eligibility after the claim-verifier trust gate."""
+    enabled = _env_bool("MARKET_ANALYSIS_CLAIM_GATE_ENABLED", True)
+    verifier_ok = bool(claim_verification.get("ok"))
+    failed = enabled and not verifier_ok
+    delivery_eligible = bool(base_delivery_eligible and not failed)
+    signals_allowed = not failed
+    reason = (
+        "disabled"
+        if not enabled
+        else "claim_verifier_ok"
+        if verifier_ok
+        else "claim_verifier_failed"
+    )
+    return {
+        "version": TRUST_GATE_VERSION,
+        "enabled": enabled,
+        "reason": reason,
+        "claim_verifier_ok": verifier_ok,
+        "support_rate": claim_verification.get("support_rate"),
+        "unsupported_counts": claim_verification.get("unsupported_counts") or {},
+        "unsupported_sample": claim_verification.get("unsupported") or {},
+        "original_delivery_eligible": bool(base_delivery_eligible),
+        "delivery_eligible": delivery_eligible,
+        "delivery_blocked": bool(base_delivery_eligible and failed),
+        "signals_allowed": signals_allowed,
+        "signals_blocked": failed,
+    }
 
 
 def _write_prompt_snapshots(system_prompt: str, user_prompt: str, slot: str) -> None:
@@ -1061,12 +1197,38 @@ def _build_upstream_analysis_context(
     return [event], context_meta
 
 
-def _pipeline_mode_from_env() -> str:
+def _slot_env_name(slot: str | None, suffix: str) -> str:
+    safe_slot = "".join(ch if ch.isalnum() else "_" for ch in str(slot or "")).upper()
+    return f"MARKET_ANALYSIS_{safe_slot}_{suffix}"
+
+
+def _pipeline_mode_from_env(slot: str | None = None) -> str:
     """執行 pipeline mode from env 的主要流程。"""
-    raw = (os.getenv("MARKET_ANALYSIS_PIPELINE") or "multi_stage").strip().lower()
-    if raw not in {"legacy", "multi_stage", "auto"}:
+    slot_override = os.getenv(_slot_env_name(slot, "PIPELINE")) if slot else None
+    raw = (slot_override or os.getenv("MARKET_ANALYSIS_PIPELINE") or "multi_stage").strip().lower()
+    if raw not in {"legacy", "multi_stage", "auto", "digest"}:
         return "multi_stage"
     return raw
+
+
+def _analysis_intent(slot: str, pipeline_mode: str) -> str:
+    if slot == "us_close" and pipeline_mode == "digest":
+        return "us_close_digest_for_preopen"
+    if slot == "pre_tw_open":
+        return "preopen_trade_decision"
+    if slot == "tw_close":
+        return "tw_close_review"
+    if slot == "macro_daily":
+        return "macro_context_only"
+    return "daily_market_analysis"
+
+
+def _digest_limits(slot: str) -> tuple[int, int]:
+    default_events = 45 if slot == "us_close" else 60
+    default_market_rows = 8 if slot == "us_close" else 12
+    max_events = _int_env(_slot_env_name(slot, "DIGEST_MAX_EVENTS"), default_events, minimum=5)
+    max_market_rows = _int_env(_slot_env_name(slot, "DIGEST_MAX_MARKET_ROWS"), default_market_rows, minimum=0)
+    return max_events, max_market_rows
 
 
 def _run_multi_stage_pipeline(
@@ -1385,13 +1547,46 @@ def _generate_analysis_once(
         rag_examples=rag_examples,
     )
 
-    pipeline_mode = _pipeline_mode_from_env()
+    requested_pipeline_mode = _pipeline_mode_from_env(slot)
+    pipeline_mode = requested_pipeline_mode
     pipeline_telemetry: dict[str, Any] | None = None
     summary_text: str | None = None
     structured_payload: dict[str, Any] | None = None
     legacy_token_usage: dict[str, Any] | None = None
+    used_multi_stage = False
 
-    if pipeline_mode in ("multi_stage", "auto"):
+    if pipeline_mode == "digest":
+        digest_max_events, digest_max_market_rows = _digest_limits(slot)
+        provider_events = provider_events[:digest_max_events]
+        provider_market = provider_market[:digest_max_market_rows] if digest_max_market_rows else []
+        provider_rag = []
+        provider_context_policy = dict(provider_context_policy)
+        provider_context_policy["digest_policy"] = {
+            "enabled": True,
+            "max_events": digest_max_events,
+            "max_market_rows": digest_max_market_rows,
+            "rag_examples": 0,
+            "purpose": "upstream_preopen_context",
+        }
+        system_prompt, user_prompt = _build_us_close_digest_prompts(
+            slot=slot,
+            now_local=now_local,
+            events_json=json.dumps(provider_events, ensure_ascii=False),
+            market_json=json.dumps(provider_market, ensure_ascii=False),
+        )
+        _write_prompt_snapshots(system_prompt, user_prompt, slot)
+        summary_text_raw, legacy_usage = _call_llm(
+            provider=config.provider,
+            api_base=config.api_base,
+            api_key=config.api_key,
+            model=config.model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+        summary_text = _normalize_text(summary_text_raw)
+        legacy_token_usage = legacy_usage.to_dict()
+
+    if summary_text is None and pipeline_mode in ("multi_stage", "auto"):
         summary_text, structured_payload, pipeline_telemetry = _run_multi_stage_pipeline(
             config=config,
             slot=slot,
@@ -1400,13 +1595,14 @@ def _generate_analysis_once(
             market_payload=provider_market,
             rag_examples=provider_rag,
         )
-        if summary_text is None:
+        if summary_text is not None:
+            used_multi_stage = True
+        else:
             logger.warning(
                 "Multi-stage pipeline failed; falling back to legacy single-call. telemetry=%s",
                 pipeline_telemetry,
             )
-
-    used_multi_stage = summary_text is not None
+            pipeline_mode = "legacy"
 
     if summary_text is None:
         system_prompt, user_prompt = _build_prompts(
@@ -1431,6 +1627,8 @@ def _generate_analysis_once(
 
     return AnalysisGenerationResult(
         config=config,
+        requested_pipeline_mode=requested_pipeline_mode,
+        pipeline_mode="multi_stage" if used_multi_stage else pipeline_mode,
         events_payload=provider_events,
         market_payload=provider_market,
         rag_examples=provider_rag,
@@ -1625,20 +1823,34 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
     market_payload = generation.market_payload
     rag_examples = generation.rag_examples
     provider_context_policy = generation.provider_context_policy
-    summary_text = generation.summary_text
+    raw_summary_text = generation.summary_text
+    summary_text = _sanitize_visible_report_text(raw_summary_text)
+    visible_text_sanitized = summary_text != _normalize_text(raw_summary_text or "")
     structured_payload = generation.structured_payload
+    if isinstance(structured_payload, dict) and isinstance(structured_payload.get("summary_text"), str):
+        structured_payload = {
+            **structured_payload,
+            "summary_text": _sanitize_visible_report_text(structured_payload["summary_text"]),
+        }
     pipeline_telemetry = generation.pipeline_telemetry
     legacy_token_usage = generation.legacy_token_usage
     used_multi_stage = generation.used_multi_stage
+    requested_pipeline_mode = generation.requested_pipeline_mode
+    effective_pipeline_mode = generation.pipeline_mode
 
     claim_verification = verify_claim_coverage(
         summary_text=summary_text or "",
         structured_payload=structured_payload,
         events_payload=events_payload,
         market_payload=market_payload,
+        allowed_tickers=_allowed_claim_tickers_for_slot(
+            slot,
+            pipeline_mode=effective_pipeline_mode,
+        ),
     )
     if pipeline_telemetry is not None:
         pipeline_telemetry["claim_verifier"] = claim_verification
+        pipeline_telemetry["visible_text_sanitized"] = visible_text_sanitized
 
     token_usage = _aggregate_token_usage(
         pipeline_telemetry if used_multi_stage else None,
@@ -1649,7 +1861,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         "[MARKET_ANALYSIS_STORED_ONLY] slot=%s model=%s pipeline=%s tokens prompt=%d cached=%d cache_hit=%.3f",
         slot,
         config.model,
-        "multi_stage" if used_multi_stage else "legacy",
+        effective_pipeline_mode,
         token_usage.get("prompt_tokens", 0),
         token_usage.get("cached_tokens", 0),
         token_usage.get("cache_hit_ratio", 0.0),
@@ -1663,7 +1875,21 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         if slot == "macro_daily"
         else "daily_market_analysis"
     )
-    push_enabled = _is_delivery_enabled_for_slot(slot, slot_decision.calendar_state)
+    base_push_enabled = _is_delivery_enabled_for_slot(slot, slot_decision.calendar_state)
+    trust_gate = _apply_claim_verifier_trust_gate(
+        base_delivery_eligible=base_push_enabled,
+        claim_verification=claim_verification,
+    )
+    push_enabled = bool(trust_gate["delivery_eligible"])
+    if trust_gate["signals_blocked"] or trust_gate["delivery_blocked"]:
+        logger.warning(
+            "[MARKET_ANALYSIS_TRUST_GATE] slot=%s blocked_delivery=%s blocked_signals=%s support_rate=%s unsupported=%s",
+            slot,
+            trust_gate["delivery_blocked"],
+            trust_gate["signals_blocked"],
+            trust_gate.get("support_rate"),
+            trust_gate.get("unsupported_counts"),
+        )
     record = MarketAnalysisRecord(
         analysis_date=now_local.date().isoformat(),
         analysis_slot=slot,
@@ -1695,9 +1921,11 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 ),
                 "direct_push_disabled": True,
                 "delivery_eligible": push_enabled,
+                "delivery_eligible_before_trust_gate": base_push_enabled,
                 "delivery_policy": "daily_pre_tw_open_macro_or_tw_holiday_us_close",
                 "delivery_owner": "java",
                 "python_push_removed": True,
+                "analysis_intent": _analysis_intent(slot, effective_pipeline_mode),
                 "web_search_requested": config.provider == "openai" and _openai_web_search_enabled(),
                 "model_router": getattr(config, "model_router", None),
                 "runtime_failover": runtime_failover,
@@ -1706,7 +1934,9 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 "provider_context_policy": provider_context_policy,
                 "rag": rag_telemetry,
                 "claim_verifier": claim_verification,
-                "pipeline_mode": "multi_stage" if used_multi_stage else "legacy",
+                "trust_gate": trust_gate,
+                "requested_pipeline_mode": requested_pipeline_mode,
+                "pipeline_mode": effective_pipeline_mode,
                 "pipeline_stages": pipeline_telemetry,
                 "structured": structured_payload,
                 "token_usage": token_usage,
@@ -1722,7 +1952,8 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
     analysis_id = store.upsert_market_analysis(record)
     trade_signals_count = 0
     trade_signal_recommendations_count = 0
-    if analysis_id:
+    prior_reference_added = 0
+    if analysis_id and trust_gate["signals_allowed"]:
         trade_signals = []
         structured_signals_count = 0
         quote_fallback_added = 0
@@ -1736,14 +1967,14 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
             )
             structured_signals_count = len(trade_signals)
         reference_levels_filled = 0
-        if _should_emit_recommendation_section(slot):
+        if _should_build_fixed_pool_signals(slot, pipeline_mode=effective_pipeline_mode):
             preferred_fallback_tickers = _preferred_tw_fallback_tickers_from_env()
             fallback_signals = build_quote_event_trade_signals(
                 analysis_id=analysis_id,
                 analysis_date=record.analysis_date,
                 analysis_slot=record.analysis_slot,
                 events=recent_events,
-                max_signals=5,
+                max_signals=10,
                 preferred_tickers=preferred_fallback_tickers,
             )
             trade_signals, reference_levels_filled = _merge_reference_levels_from_fallbacks(
@@ -1760,7 +1991,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
             for fallback_signal in fallback_signals:
                 if is_excluded_trade_signal_ticker(fallback_signal.ticker):
                     continue
-                if len(recommendation_tickers) >= 5 and fallback_signal.ticker not in preferred_fallback_tickers:
+                if len(recommendation_tickers) >= 10 and fallback_signal.ticker not in preferred_fallback_tickers:
                     break
                 if fallback_signal.ticker in existing_tickers:
                     continue
@@ -1774,39 +2005,73 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 for signal in trade_signals
                 if not is_excluded_trade_signal_ticker(signal.ticker)
             ]
+            existing_tickers = {signal.ticker for signal in trade_signals}
+            missing_reference_tickers = [
+                ticker
+                for ticker in FIXED_MARKET_ANALYSIS_WATCH_POOL
+                if ticker not in existing_tickers and not is_excluded_trade_signal_ticker(ticker)
+            ]
+            if missing_reference_tickers:
+                prior_rows = store.fetch_recent_trade_signal_references(
+                    tickers=missing_reference_tickers,
+                    exclude_analysis_id=analysis_id,
+                    days=_int_env("MARKET_ANALYSIS_PRIOR_SIGNAL_LOOKBACK_DAYS", 30, minimum=1, maximum=180),
+                )
+                prior_signals = build_prior_signal_reference_trade_signals(
+                    analysis_id=analysis_id,
+                    analysis_date=record.analysis_date,
+                    analysis_slot=record.analysis_slot,
+                    prior_rows=prior_rows,
+                    missing_tickers=missing_reference_tickers,
+                )
+                trade_signals.extend(prior_signals)
+                prior_reference_added = len(prior_signals)
         if used_multi_stage or trade_signals:
             trade_signals_count = store.replace_trade_signals_for_analysis(analysis_id, trade_signals)
             source_label = "structured"
-            if quote_fallback_added and structured_signals_count:
+            if prior_reference_added and (quote_fallback_added or structured_signals_count):
+                source_label = "structured_plus_fallback_plus_prior"
+            elif prior_reference_added:
+                source_label = "prior_signal_reference"
+            elif quote_fallback_added and structured_signals_count:
                 source_label = "structured_plus_quote_fallback"
             elif quote_fallback_added:
                 source_label = "quote_fallback"
             logger.info(
-                "[TRADE_SIGNALS_STORED] analysis_id=%s slot=%s count=%d status=pending_review source=%s fallback_added=%d reference_levels_filled=%d",
+                "[TRADE_SIGNALS_STORED] analysis_id=%s slot=%s count=%d status=pending_review source=%s fallback_added=%d prior_reference_added=%d reference_levels_filled=%d",
                 analysis_id,
                 slot,
                 trade_signals_count,
                 source_label,
                 quote_fallback_added,
+                prior_reference_added,
                 reference_levels_filled,
             )
-        if _should_emit_recommendation_section(slot):
+        if _should_build_fixed_pool_signals(slot, pipeline_mode=effective_pipeline_mode):
             recommendations = [
                 row
                 for row in store.fetch_trade_signal_recommendations(analysis_id, limit=10)
                 if not is_excluded_trade_signal_ticker(row.get("ticker"))
                 and is_fixed_market_analysis_watch_ticker(row.get("ticker"))
             ]
-            trade_signal_recommendations_count = min(len(recommendations), 5)
-            recommendation_section = build_trade_signal_recommendation_section(recommendations)
-            if recommendation_section:
-                summary_text = f"{summary_text.rstrip()}\n\n{recommendation_section}"
-                store.update_market_analysis_summary_text(analysis_id, summary_text)
-                logger.info(
-                    "[TRADE_SIGNAL_RECOMMENDATIONS_APPENDED] analysis_id=%s count=%d",
-                    analysis_id,
-                    trade_signal_recommendations_count,
-                )
+            trade_signal_recommendations_count = min(len(recommendations), 10)
+            if _should_emit_recommendation_section(slot, pipeline_mode=effective_pipeline_mode):
+                recommendation_section = build_trade_signal_recommendation_section(recommendations)
+                if recommendation_section:
+                    summary_text = f"{summary_text.rstrip()}\n\n{recommendation_section}"
+                    store.update_market_analysis_summary_text(analysis_id, summary_text)
+                    logger.info(
+                        "[TRADE_SIGNAL_RECOMMENDATIONS_APPENDED] analysis_id=%s count=%d",
+                        analysis_id,
+                        trade_signal_recommendations_count,
+                    )
+    elif analysis_id:
+        logger.warning(
+            "[TRADE_SIGNALS_SKIPPED_BY_TRUST_GATE] analysis_id=%s slot=%s reason=%s",
+            analysis_id,
+            slot,
+            trust_gate.get("reason"),
+        )
     return {
         "ok": True,
         "slot": slot,
@@ -1819,9 +2084,10 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
         "rag_examples_used": len(rag_examples),
         "trade_signals_stored": trade_signals_count,
         "trade_signal_recommendations": trade_signal_recommendations_count,
+        "prior_signal_references": prior_reference_added,
         "push_enabled": push_enabled,
         "pushed": 0,
-        "model": config.model,
+        "trust_gate": trust_gate,
         "calendar": slot_decision.calendar_state.to_dict(),
     }
 

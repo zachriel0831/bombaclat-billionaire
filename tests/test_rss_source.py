@@ -121,6 +121,28 @@ class OfficialRssSourceTests(unittest.TestCase):
 
         self.assertEqual(items[0].url, "https://www.twse.com.tw/rwd/zh/news/newsDetail/abc")
 
+    def test_author_metadata_is_preserved_in_raw_payload(self) -> None:
+        source = OfficialRssSource(["https://example.com/rss.xml"])
+        items = source._parse_feed(
+            """
+            <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+              <channel>
+                <title>Example Feed</title>
+                <item>
+                  <title>t1</title>
+                  <link>https://example.com/t1</link>
+                  <pubDate>Wed, 22 Apr 2026 10:00:00 GMT</pubDate>
+                  <dc:creator>Reporter A</dc:creator>
+                  <author>Reporter A</author>
+                </item>
+              </channel>
+            </rss>
+            """,
+            "https://example.com/rss.xml",
+        )
+
+        self.assertEqual(items[0].raw["author_values"], ["Reporter A"])
+
 
 if __name__ == "__main__":
     unittest.main()

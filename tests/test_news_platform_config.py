@@ -9,6 +9,43 @@ from news_platform.config import load_settings
 
 
 class NewsPlatformConfigTests(unittest.TestCase):
+    def test_author_detail_backfill_settings_default_and_override(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            env_path = Path(tmp_dir) / ".env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "NEWSPF_AUTHOR_DETAIL_BACKFILL_ENABLED=false",
+                        "NEWSPF_AUTHOR_DETAIL_BACKFILL_BATCH_SIZE=12",
+                        "NEWSPF_AUTHOR_DETAIL_BACKFILL_SOURCES=tvbs,ebc,tvbs",
+                        "NEWSPF_AUTHOR_DETAIL_BACKFILL_SLEEP_SECONDS=0.2",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            keys = [
+                "NEWSPF_AUTHOR_DETAIL_BACKFILL_ENABLED",
+                "NEWSPF_AUTHOR_DETAIL_BACKFILL_BATCH_SIZE",
+                "NEWSPF_AUTHOR_DETAIL_BACKFILL_SOURCES",
+                "NEWSPF_AUTHOR_DETAIL_BACKFILL_SLEEP_SECONDS",
+            ]
+            old = {key: os.environ.get(key) for key in keys}
+            for key in keys:
+                os.environ.pop(key, None)
+            try:
+                settings = load_settings(str(env_path))
+            finally:
+                for key, value in old.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
+
+        self.assertFalse(settings.author_detail_backfill_enabled)
+        self.assertEqual(settings.author_detail_backfill_batch_size, 12)
+        self.assertEqual(settings.author_detail_backfill_sources, ("tvbs", "ebc"))
+        self.assertEqual(settings.author_detail_backfill_sleep_seconds, 0.2)
+
     def test_public_record_table_names_default_and_override(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             env_path = Path(tmp_dir) / ".env"

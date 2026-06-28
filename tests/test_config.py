@@ -35,6 +35,10 @@ class ConfigTests(unittest.TestCase):
         self.assertFalse(settings.x_include_retweets)
         self.assertTrue(settings.x_backfill_enabled)
         self.assertEqual(settings.x_backfill_max_results_per_account, 10)
+        self.assertFalse(settings.truth_social_enabled)
+        self.assertEqual(settings.truth_social_accounts, [])
+        self.assertEqual(settings.truth_social_max_results_per_account, 10)
+        self.assertIn("Mozilla/5.0", settings.truth_social_user_agent)
         self.assertEqual(settings.official_rss_feeds, DEFAULT_RSS_FEEDS)
         self.assertFalse(settings.official_rss_first_per_feed)
         self.assertGreaterEqual(settings.http_timeout_seconds, 1)
@@ -64,6 +68,10 @@ class ConfigTests(unittest.TestCase):
                         "X_INCLUDE_RETWEETS=true",
                         "X_BACKFILL_ENABLED=false",
                         "X_BACKFILL_MAX_RESULTS_PER_ACCOUNT=12",
+                        "TRUTH_SOCIAL_ENABLED=true",
+                        "TRUTH_SOCIAL_ACCOUNTS=https://truthsocial.com/@realDonaldTrump,@JDVance",
+                        "TRUTH_SOCIAL_MAX_RESULTS_PER_ACCOUNT=8",
+                        "TRUTH_SOCIAL_USER_AGENT=test-browser",
                         "OFFICIAL_RSS_FEEDS=https://a.example.com,https://b.example.com",
                         "OFFICIAL_RSS_FIRST_PER_FEED=true",
                         "HTTP_TIMEOUT_SECONDS=7",
@@ -92,6 +100,10 @@ class ConfigTests(unittest.TestCase):
                 "X_INCLUDE_RETWEETS",
                 "X_BACKFILL_ENABLED",
                 "X_BACKFILL_MAX_RESULTS_PER_ACCOUNT",
+                "TRUTH_SOCIAL_ENABLED",
+                "TRUTH_SOCIAL_ACCOUNTS",
+                "TRUTH_SOCIAL_MAX_RESULTS_PER_ACCOUNT",
+                "TRUTH_SOCIAL_USER_AGENT",
                 "OFFICIAL_RSS_FEEDS",
                 "OFFICIAL_RSS_FIRST_PER_FEED",
                 "HTTP_TIMEOUT_SECONDS",
@@ -126,6 +138,10 @@ class ConfigTests(unittest.TestCase):
         self.assertTrue(settings.x_include_retweets)
         self.assertFalse(settings.x_backfill_enabled)
         self.assertEqual(settings.x_backfill_max_results_per_account, 12)
+        self.assertTrue(settings.truth_social_enabled)
+        self.assertEqual(settings.truth_social_accounts, ["https://truthsocial.com/@realDonaldTrump", "@JDVance"])
+        self.assertEqual(settings.truth_social_max_results_per_account, 8)
+        self.assertEqual(settings.truth_social_user_agent, "test-browser")
         self.assertEqual(settings.official_rss_feeds, ["https://a.example.com", "https://b.example.com"])
         self.assertTrue(settings.official_rss_first_per_feed)
         self.assertEqual(settings.http_timeout_seconds, 7)

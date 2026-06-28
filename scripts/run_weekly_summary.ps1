@@ -29,4 +29,4 @@ if ($DryRun) {
 }
 
 & python @cmdArgs
-
+exit $LASTEXITCODE

@@ -1,56 +1,17 @@
-# Market Analysis 固定五檔觀察功能規格
+# Superseded: Fixed Watchlist Functional Spec
 
-## 1. 產品定位
+This document is superseded by:
 
-`market_analysis` 的個股區塊不是模型薦股。
+- `spec/market-analysis-dynamic-trade-candidates.md`
 
-它是固定五檔監控池的每日觀察輸出，讓中台、前端、後續 stock monitor 服務能用同一組股票追蹤市場脈絡、價格條件、風險與資料缺口。
+The old fixed ten-stock pool was an observation/debugging aid. It is no longer the target trading-candidate policy.
 
-## 2. 固定監控池
+Current target:
 
-| ticker | 名稱 | 產業 | 規模 | 流動性 | 主要驅動 |
-|---|---|---|---|---|---|
-| `2330` | 台積電 | 半導體（晶圓） | mega | 極高 | AI 需求、半導體週期 |
-| `2603` | 長榮 | 航運 | 大型 | 高 | 運價、油價、地緣 |
-| `2882` | 國泰金 | 金融 | 大型 | 高 | 利率、保險業 |
-| `1605` | 華新 | 傳產（電纜） | 中小 | 中 | 銅價、基建週期 |
-| `4956` | 光鋐 | 半導體封測 | 小型（TPEX） | 低 | 與 `2330` 同主題但量小 |
+- Codex generates daily Taiwan intraday / short-swing candidates from `t_relay_events`, market context, quote evidence, RAG/history, and model judgment.
+- `stock-monitor-service` monitors up to five ranked candidates.
+- `order-dispatcher-service` will eventually trade at most three symbols concurrently after sandbox/paper state-machine validation.
 
-## 3. 核心規則
+Implementation note:
 
-- 模型不得自由推薦其他台股。
-- `structured_json.stock_watch` 只能包含固定五檔。
-- 若某檔缺少有效證據，輸出資料缺口或中性觀察，不得用其他股票替補。
-- UI 文案使用「固定監控」「今日個股觀察」「觀察條件」，避免使用「模型推薦」「買進推薦」。
-- `t_trade_signals` 只代表待審核的觀察/信號，不是訂單。
-
-## 4. 每日輸出
-
-適用 slot：
-
-- `pre_tw_open`
-- TW 休市但美股有開盤的 `us_close`
-
-前端顯示：
-
-- 區塊標題：`今日個股觀察`
-- 區塊說明：固定五檔監控池
-- 每檔顯示名稱、ticker、觀察方向、進場區、停損、停利、理由、資料缺口
-
-若資料不足：
-
-- 顯示「資料不足，僅列觀察」
-- 不隱藏該股票
-- 不新增其他 ticker
-
-## 5. Stock Monitor 邊界
-
-stock monitor 服務應監聽固定五檔，而不是監聽模型新推薦的 ticker。
-
-監聽來源：
-
-- 固定 pool 設定
-- `t_trade_signals` 中同 analysis 的固定五檔觀察列
-- quote/context fallback 只補價格與脈絡，不擴充 pool
-
-觸發事件仍需後續 risk gate / review；不得直接下單。
+As of 2026-06-02, code still contains fixed-pool paths. Do not assume the runtime has already migrated.

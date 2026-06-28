@@ -3,10 +3,17 @@
 ## Date
 2026-05-11
 
-## Decision
-`market_analysis` no longer treats the individual-stock section as model-selected Taiwan stock recommendations.
+## Superseded
+Superseded on 2026-05-16 by `memory-bank/09-decisions/2026-05-16-ten-stock-observation-template.md`. The current visible pool is ten stocks and each visible row exposes `利多`, `利空`, and `買入注意`.
 
-It uses a fixed five-stock watch pool:
+## Decision
+Superseded on 2026-06-02 by `2026-06-02-dynamic-intraday-candidate-pipeline.md`.
+
+This fixed-pool decision is historical. The fixed pool was an observation/debugging aid, not the final trading-candidate policy.
+
+Target direction: Codex should generate dynamic daily Taiwan intraday / short-swing candidates from relay events, market context, quote evidence, historical/RAG context, and model judgment.
+
+Historical 2026-05-11 pool used five stocks:
 
 | ticker | name | market | role |
 |---|---|---|---|
@@ -26,7 +33,7 @@ The goal is stable monitoring, not ticker discovery. A fixed pool lets middle-of
 - `t_trade_signals` remains the machine-readable watch/signal table and starts rows as `pending_review`.
 - No row is an order. Risk gate, review, trigger handling, and broker execution remain separate layers.
 
-## Operational Contract
+## Historical Operational Contract
 - `TWSE_MOPS_TRACKED_CODES=2330,2603,2882,1605`
 - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS=2330.TW:台積電,2603.TW:長榮,2882.TW:國泰金,1605.TW:華新,4956.TWO:光鋐`
 - UI wording should use `今日個股觀察` / fixed watch pool language, not model recommendation language.

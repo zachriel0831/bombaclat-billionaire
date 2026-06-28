@@ -24,9 +24,18 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Auto-heal for `429 TooManyConnections` by terminating stale connections and reconnecting
 - Bridge startup performs a one-shot X backfill for tracked accounts before attaching the live stream, so recent gap tweets can still be written directly to `t_relay_events` and `t_x_posts`
 
+1a. Truth Social public account polling
+- Module: `src/news_collector/sources/truth_social.py`
+- No token required; uses Truth Social public Mastodon-compatible account lookup/status endpoints with a browser-style `TRUTH_SOCIAL_USER_AGENT`
+- Tracks allowlisted handles or profile URLs from `TRUTH_SOCIAL_ACCOUNTS`, starting with `https://truthsocial.com/@realDonaldTrump`
+- Writes normalized rows with `source=truthsocial:<handle>` into `t_relay_events`
+- Mirrors rows into the existing social-post table `t_x_posts` with `tweet_id=truthsocial-<status_id>` so the public-figure feed and social-post analysis path can reuse the Elon/X storage design
+- Raw status JSON is preserved in `raw_json`; display text is derived from Truth Social HTML content as plain text
+
 2. RSS polling
 - BBC / Reuters / Fox / NPR plus Taiwan finance and official finance/macro feeds from `OFFICIAL_RSS_FEEDS`
 - Active Taiwan finance/official RSS feeds include CNA finance, LTN business, ETtoday finance, Anue, Economic Daily News, Newtalk finance, Storm finance, MoneyDJ, CBC, TWSE, and FSC; these finance/news rows stay in `t_relay_events`, not `news_platform.t_news_articles`
+- Finance/news relay rows may carry short-retention reporter metadata in `raw_json.authors` after `scripts/backfill_relay_event_authors.py` runs. This is display enrichment for `/api/events` and is separate from the long-lived society/politics `t_news_authors` relation model.
 - RSS bridge `--limit` is applied per configured feed, then all feed items are merged, deduped, and sorted. Current `.env` uses `OFFICIAL_RSS_FIRST_PER_FEED=true`, so one polling cycle considers one item per feed; if disabled, 27 active feeds and `--limit 5` can consider up to 135 RSS items before filters.
 - Reuters currently uses Google News RSS search as fallback because legacy Reuters RSS endpoints are unavailable from this environment
 - CNN RSS is configurable in code, but the previously tested CNN feeds were removed from the active `.env` set after returning stale items from 2016-2024 during the 2026-04-19 verification
@@ -158,7 +167,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Article-linked public records: `GET /api/society/articles/{id}/public-records`, `GET /api/politics/articles/{id}/public-records`
   - The route category normally maps to `t_news_articles.category`; frontend topic pages pass `topic=<topicId>` instead of parsing `topics_json` directly
   - `low_birthrate` is a cross-category issue view: `GET /api/society/topics`, `GET /api/society/articles?topic=low_birthrate`, and `GET /api/society/timeline?topic=low_birthrate` aggregate matching rows from all `t_news_articles.category` values while preserving each article's original `category`
-  - Finance feed: `news-display-frontend` calls `GET /api/events` through `/api/content/events` with the public source allowlist in `news-platform-api/docs/API_SPEC.md`; the allowlist must include active Taiwan finance/public market RSS source names such as Economic Daily News, LTN finance, MoneyDJ, Anue, CNA finance, ETtoday finance, Newtalk finance, Storm, TWSE, and CBC. The API source filter matches both normal UTF-8 source names and legacy mojibake DB values before returning repaired display text.
+  - Finance feed: `news-display-frontend` calls `GET /api/events` through `/api/content/events` with the public source allowlist in `news-platform-api/docs/API_SPEC.md`; the allowlist must include active Taiwan finance/public market RSS source names such as Economic Daily News, LTN finance, MoneyDJ, Anue, CNA finance, ETtoday finance, Newtalk finance, Storm, TWSE, and CBC. The API source filter matches both normal UTF-8 source names and legacy mojibake DB values before returning repaired display text. Reporter names on finance event cards are read from optional event `authors[]` or `rawJson.authors`; current enrichment writes the latter in `t_relay_events.raw_json`.
   - Free Palestine issue news: `/timeline` calls `GET /api/timeline/news`, which reads long-term `t_palestine_news_items`; do not add this issue-news storage to the general finance public feed or `t_relay_events` retention stream.
 - Data flow:
   1. crawler writes raw article rows; RSS/Atom and sitemap sources also fill `authors_json` when explicit author metadata or a high-confidence reporter byline is available; all new article rows also receive `author_extraction_status`
@@ -200,7 +209,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 
 11. Data-source health tracking
 - `scripts/run_data_source_health.ps1` / `scripts/check_data_source_health.py` produce a read-only freshness report for news-analysis inputs.
-- The report checks relay-side finance/public RSS, international RSS, X, SEC, TWSE/MOPS, US index tracker, market-context facts, BLS macro facts, Taiwan market-flow facts, and stored market analyses.
+- The report checks relay-side finance/public RSS, international RSS, X, Truth Social, SEC, TWSE/MOPS, US index tracker, market-context facts, BLS macro facts, Taiwan market-flow facts, and stored market analyses.
 - It also checks news-platform society/politics article freshness per category and per source, article enrichment gaps, public-record refresh freshness based on `updated_at`, article-record link freshness, and local Python process counts.
 - Status semantics: `OK` within expected cadence, `WARN` outside warn threshold, `STALE` outside stale threshold, `MISSING` no rows, and `ERROR` for query/connect failures.
 - Public-record sources are lower cadence than news feeds; current guardrails warn after 48 hours and stale after 96 hours.
@@ -227,6 +236,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `t_relay_events` does not keep LINE delivery columns (`is_pushed`, `line_pushed_at`, `line_push_status`, `line_push_error`); Java owns delivery state outside this Python event table
   - Source/context facts must land in `t_relay_events` first; `t_market_analyses` is only for model-generated analysis after reading event windows
   - `t_trade_signals` is derived from `t_market_analyses.structured_json`; it is not a direct source-ingestion table
+  - `t_trade_signals` includes deterministic `risk_reward_ratio`, `candidate_score`, and `avoid_reason` fields for downstream watchlist gating and review
   - Signal review/risk gate and signal outcomes are independent from analysis generation
   - Python should not be considered the LINE delivery service; Java is responsible for user-facing LINE push/webhook behavior
   - Python contains no LINE push/webhook/direct-push contact path
@@ -327,8 +337,10 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Target design: `t_trade_signals` stores dynamic daily Taiwan intraday / short-swing candidates. Current implementation still has fixed-pool restrictions that must be migrated.
   - `ticker` is the normalized tradable symbol; Taiwan signals use the 4-digit code without `.TW` / `.TWO`
   - Every signal keeps `analysis_id`, slot/date, ticker, strategy/direction, optional entry/stop/target JSON, and `source_event_ids`
+  - Every signal gets `risk_reward_ratio`, `candidate_score`, and `avoid_reason`; downstream monitoring currently requires complete long/short levels, `risk_reward_ratio >= 1.5`, and empty `avoid_reason`
   - Internal `direction=long` means buy-side / 做多, not long-term holding; `entry_zone` is the entry area, `take_profit_zone` is the profit-taking exit area, and `invalidation` is rendered as 停損
   - `quote_fallback_stock_watch` / `context_fallback_stock_watch` may enrich or fill monitor levels only when evidence exists; they must not invent tickers.
+  - Deterministic quote/context fallback levels calibrate `take_profit_zone.first` from entry/stop so the first target is at least 1.5R. Structured LLM rows are not silently rewritten; low-R structured rows remain stored with `avoid_reason`.
   - `prior_signal_stock_watch` may fill a missing same-ticker row from recent `t_trade_signals` history. It is downgraded to `confidence=low`, labelled as prior reference, and must require same-day price, volume, and news confirmation before any action.
   - Targeted signal repair for an existing analysis row uses `scripts/run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback`; it may combine structured rows, recent quote/context fallback, and prior same-ticker references, while still respecting `raw_json.trust_gate.signals_allowed=false`.
   - `idempotency_key` suppresses duplicate signals for the same analysis/ticker/strategy

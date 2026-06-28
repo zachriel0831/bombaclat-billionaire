@@ -28,6 +28,7 @@ class ContextPackBuilderTests(unittest.TestCase):
         self.assertEqual(classify_event_source(_event(3, "sec:NVDA", "filing")), "official_data")
         self.assertEqual(classify_event_source(_event(4, "market_analysis:us_close", "analysis")), "upstream_analysis")
         self.assertEqual(classify_event_source(_event(5, "x:elonmusk", "tweet")), "social")
+        self.assertEqual(classify_event_source(_event(6, "truthsocial:realdonaldtrump", "truth")), "social")
 
     def test_build_context_pack_guarantees_core_buckets_under_news_flood(self) -> None:
         events = [

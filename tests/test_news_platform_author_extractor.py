@@ -44,6 +44,38 @@ class AuthorExtractorTests(unittest.TestCase):
     def test_rejects_known_non_author_phrases(self):
         self.assertEqual(normalize_authors(["分析", "不幸失聯", "其遺體在今晨", "會表示", "會的"]), [])
 
+    def test_rejects_detail_page_false_reporters(self):
+        values = [
+            "收停車費兄妹",
+            "男子家屬",
+            "附近民眾",
+            "財經政治",
+            "嫌犯蔡晉財",
+            "中央社發布",
+            "本刊編輯部",
+            "立院直播",
+            "不便評論細節",
+            "中檢偵辦",
+            "詢問表示",
+            "電訪表示",
+            "總財損約",
+            "裁定陳男",
+            "CTWANT",
+            "造咖",
+        ]
+        self.assertEqual(normalize_authors(values), [])
+
+    def test_normalizes_detail_page_suffix_variants(self):
+        values = [
+            "王朝鈺傳真",
+            "王鴻國傳真",
+            "朱蒲青專訪",
+            "吳哲豪傳真",
+            "陳韻聿倫敦",
+            "中央社記者謝君臨台北14日電",
+        ]
+        self.assertEqual(normalize_authors(values), ["王朝鈺", "王鴻國", "朱蒲青", "吳哲豪", "陳韻聿", "謝君臨"])
+
     def test_trims_detail_page_role_suffixes(self):
         self.assertEqual(normalize_authors(["張柏源綜合報導", "鄭景議翻攝"]), ["張柏源", "鄭景議"])
 

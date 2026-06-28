@@ -47,7 +47,7 @@ NEWS_SOURCE_HINTS = (
     "npr",
     "google_news",
 )
-SOCIAL_SOURCE_PREFIXES = ("x:", "twitter:", "tweet:")
+SOCIAL_SOURCE_PREFIXES = ("x:", "twitter:", "tweet:", "truthsocial:")
 
 
 def default_source_quotas(max_events: int) -> dict[str, int]:

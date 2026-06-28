@@ -8,7 +8,7 @@ LLM helpers reused by ``market_analysis``."""
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 import json
 import logging
@@ -22,7 +22,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from event_relay.config import load_settings
+from event_relay.config import load_env_file, load_settings
 from event_relay.prompt_assets import TokenUsage
 from event_relay.service import MarketAnalysisRecord, MySqlEventStore
 
@@ -67,6 +67,7 @@ class WeeklySummaryConfig:
     state_file: str
     force: bool
     provider: str = "openai"
+    runtime_failover: dict[str, Any] | None = None
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -143,6 +144,7 @@ def _resolve_llm_settings(default_openai_model: str) -> tuple[str, str, str, str
 
 def _load_weekly_config(args: argparse.Namespace) -> WeeklySummaryConfig:
     """載入 load weekly config 對應的資料或結果。"""
+    load_env_file(args.env_file)
     provider, model, api_base, api_key_file, api_key = _resolve_llm_settings(default_openai_model="gpt-5")
 
     return WeeklySummaryConfig(
@@ -171,6 +173,66 @@ def _load_weekly_config(args: argparse.Namespace) -> WeeklySummaryConfig:
         ).strip(),
         force=bool(args.force),
         provider=provider,
+    )
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    """Read a bool env var with permissive true/false handling."""
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _is_retryable_provider_error(exc: BaseException | str) -> bool:
+    """Return true when a provider error is worth trying on the backup provider."""
+    text = str(exc or "").lower()
+    retry_markers = (
+        "status=429",
+        "insufficient_quota",
+        "rate_limit",
+        "rate limited",
+        "too many requests",
+        "quota",
+        "status=500",
+        "status=502",
+        "status=503",
+        "status=504",
+        "overloaded",
+        "temporarily unavailable",
+    )
+    return any(marker in text for marker in retry_markers)
+
+
+def _weekly_runtime_failover_config(
+    config: WeeklySummaryConfig,
+    exc: BaseException | str,
+) -> WeeklySummaryConfig | None:
+    """Switch weekly summaries from OpenAI to Claude on quota/rate/5xx failures."""
+    if not _env_bool("WEEKLY_SUMMARY_RUNTIME_FAILOVER_ENABLED", True):
+        return None
+    if (config.provider or "").strip().lower() != "openai":
+        return None
+    if not _is_retryable_provider_error(exc):
+        return None
+    provider, model, api_base, api_key_file, api_key = _resolve_anthropic_settings()
+    if not api_key:
+        logger.warning("Weekly summary runtime failover skipped: missing Anthropic API key")
+        return None
+    return replace(
+        config,
+        provider=provider,
+        model=model,
+        api_base=api_base,
+        api_key=api_key,
+        api_key_file=api_key_file,
+        runtime_failover={
+            "from_provider": config.provider,
+            "from_model": config.model,
+            "to_provider": provider,
+            "to_model": model,
+            "reason": str(exc)[:500],
+        },
     )
 
 
@@ -582,6 +644,9 @@ def _store_weekly_analysis(
                     "events_used": events_used,
                     "section_contract": list(WEEKLY_SECTION_TITLES),
                     "token_usage": usage.to_dict() if usage is not None else None,
+                    "selected_provider": config.provider,
+                    "selected_model": config.model,
+                    "runtime_failover": config.runtime_failover,
                     "delivery_owner": "java",
                     "python_push_removed": True,
                     "web_search_requested": config.provider == "openai" and _openai_web_search_enabled(),
@@ -652,14 +717,36 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
     week_range = f"{config.lookback_days} days ending {now_local.strftime('%Y-%m-%d %H:%M %Z')}"
     user_prompt = reusable_prompt.format(week_range=week_range, events_json=json.dumps(events_payload, ensure_ascii=False))
 
-    summary_text, usage = _call_llm(
-        provider=config.provider,
-        api_base=config.api_base,
-        api_key=config.api_key,
-        model=config.model,
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-    )
+    try:
+        summary_text, usage = _call_llm(
+            provider=config.provider,
+            api_base=config.api_base,
+            api_key=config.api_key,
+            model=config.model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+    except Exception as exc:
+        failover_config = _weekly_runtime_failover_config(config, exc)
+        if failover_config is None:
+            raise
+        logger.warning(
+            "Weekly summary runtime LLM failover from %s/%s to %s/%s after error=%s",
+            config.provider,
+            config.model,
+            failover_config.provider,
+            failover_config.model,
+            str(exc)[:300],
+        )
+        config = failover_config
+        summary_text, usage = _call_llm(
+            provider=config.provider,
+            api_base=config.api_base,
+            api_key=config.api_key,
+            model=config.model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
     message = _normalize_line_text(summary_text)
 
     logger.info(
@@ -687,6 +774,9 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
         "dry_run": True,
         "analysis_date": analysis_date,
         "analysis_slot": WEEKLY_ANALYSIS_SLOT,
+        "provider": config.provider,
+        "model": config.model,
+        "runtime_failover": config.runtime_failover,
     }
 
 

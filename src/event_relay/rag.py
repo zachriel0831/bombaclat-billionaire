@@ -441,7 +441,7 @@ def _source_family(source: str) -> str:
         return "market_analysis"
     if text.startswith(("sec:", "twse_mops:", "fed:", "bls:", "eia:", "treasury:")):
         return "official"
-    if text.startswith(("x:", "twitter:", "tweet:")):
+    if text.startswith(("x:", "twitter:", "tweet:", "truthsocial:")):
         return "social"
     if any(name in text for name in ("reuters", "bloomberg", "bbc", "cnbc", "rss", "news")):
         return "news"

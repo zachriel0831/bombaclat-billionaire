@@ -12,8 +12,11 @@ import re
 from typing import Any
 
 
-CLAIM_VERIFIER_VERSION = "claim-verifier-v1"
+CLAIM_VERIFIER_VERSION = "claim-verifier-v2"
 _NUMBER_RE = re.compile(r"(?<![\w.])[-+]?\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|bp|pp|元|美元|億|萬|B|M)?")
+_INTERNAL_EVIDENCE_CITATION_RE = re.compile(
+    r"[（(]\s*\d{5,}(?:\s*[,，、]\s*\d{5,})*\s*[）)]"
+)
 _DATE_RE = re.compile(r"\b20\d{2}[-/]\d{1,2}[-/]\d{1,2}\b")
 _TW_TICKER_RE = re.compile(r"\b\d{4}(?:\.TW|\.TWO)?\b", re.IGNORECASE)
 _US_TICKER_RE = re.compile(r"\b[A-Z]{2,5}\b")
@@ -44,12 +47,14 @@ def verify_claim_coverage(
     structured_payload: dict[str, Any] | None,
     events_payload: list[dict[str, Any]],
     market_payload: list[dict[str, Any]],
+    allowed_tickers: set[str] | None = None,
 ) -> dict[str, Any]:
     """Check numbers, dates, and tickers against prompt evidence."""
     evidence_docs = _build_evidence_docs(events_payload, market_payload)
     evidence_text = "\n".join(doc["text"] for doc in evidence_docs)
     evidence_text_norm = _normalize_text(evidence_text)
-    summary = summary_text or ""
+    summary = _strip_internal_evidence_citations(summary_text or "")
+    allowed_ticker_set = _normalize_ticker_set(allowed_tickers)
     extracted = {
         "numbers": sorted(_extract_numbers(summary)),
         "dates": sorted(_extract_dates(summary)),
@@ -59,7 +64,7 @@ def verify_claim_coverage(
         kind: [
             item
             for item in items
-            if not _has_support(kind, item, evidence_text_norm, evidence_docs)
+            if not _has_support(kind, item, evidence_text_norm, evidence_docs, allowed_ticker_set)
         ]
         for kind, items in extracted.items()
     }
@@ -116,6 +121,10 @@ def _build_evidence_docs(
     return docs
 
 
+def _strip_internal_evidence_citations(text: str) -> str:
+    return _INTERNAL_EVIDENCE_CITATION_RE.sub("", text or "")
+
+
 def _extract_numbers(text: str) -> set[str]:
     result: set[str] = set()
     for match in _NUMBER_RE.findall(text or ""):
@@ -151,15 +160,23 @@ def _extract_tickers(text: str, structured_payload: dict[str, Any] | None, evide
     return result
 
 
-def _has_support(kind: str, item: str, evidence_text_norm: str, evidence_docs: list[dict[str, str]]) -> bool:
+def _has_support(
+    kind: str,
+    item: str,
+    evidence_text_norm: str,
+    evidence_docs: list[dict[str, str]],
+    allowed_tickers: set[str],
+) -> bool:
     if kind == "dates":
         return item in evidence_text_norm or item.replace("-", "/") in evidence_text_norm
     if kind == "numbers":
         variants = _number_variants(item)
         return any(variant and variant in evidence_text_norm for variant in variants)
     if kind == "tickers":
-        normalized = item.upper()
+        normalized = _normalize_ticker(item)
         bare = normalized.split(".", 1)[0]
+        if normalized in allowed_tickers or bare in allowed_tickers:
+            return True
         return normalized in evidence_text_norm.upper() or bare in evidence_text_norm.upper()
     return False
 
@@ -186,3 +203,18 @@ def _number_variants(item: str) -> set[str]:
     if unitless:
         variants.add(unitless)
     return variants
+
+
+def _normalize_ticker(value: Any) -> str:
+    return str(value or "").strip().upper()
+
+
+def _normalize_ticker_set(values: set[str] | None) -> set[str]:
+    result: set[str] = set()
+    for value in values or set():
+        ticker = _normalize_ticker(value)
+        if not ticker:
+            continue
+        result.add(ticker)
+        result.add(ticker.split(".", 1)[0])
+    return result

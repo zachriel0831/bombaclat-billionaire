@@ -17,7 +17,7 @@ Guide generated weekly summaries and market-analysis drafts so they are evidence
 - Stored `market_context:*` events and deterministic `market_context:scorecard`.
 - Recent `t_market_index_snapshots` rows when available.
 - Hybrid RAG historical analogues from `t_event_embeddings` and `t_analysis_embeddings`.
-- Fixed five-stock watchlist context when generating visible Taiwan stock sections.
+- Fixed ten-stock (`固定十檔`) watchlist context for machine-readable downstream signal rows when explicitly needed; daily visible reports no longer render the fixed-watchlist section.
 
 ## Output Principles
 
@@ -28,20 +28,35 @@ Guide generated weekly summaries and market-analysis drafts so they are evidence
 - Keep useful terms such as regime, liquidity, Fed path, credit spread, VIX, SOX, and DXY, but explain why each matters to Taiwan investors; avoid dense acronym piles.
 - Do not turn the report into a beginner "lazy bag"; keep the mechanism, but translate it into market implications.
 - Keep historical RAG examples as analogues only; never present them as current evidence.
+- Do not include internal event IDs, source row IDs, citation-only numeric lists, internal pipeline labels, or custom numeric handles in visible reports. Do not show terms such as `market scorecard`, `scorecard +4`, `market_context`, `market_context:scorecard`, `analysis_slot`, `scheduled_time_local`, `raw_json`, or `07:20 market_context`; translate them into reader-facing Traditional Chinese market implications instead.
 - Do not invent arbitrary Taiwan ticker recommendations outside the fixed watch pool.
+- Daily visible reports must focus on macro and industry/sector interpretation. Mention individual companies only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
 - Do not output order intents, broker actions, or automated trading instructions.
 
 ## Daily Market Analysis Sections
 
 Use this readable macro flow unless the calling code supplies a stricter section contract:
 
-1. Macro regime
-2. Rates and liquidity
-3. Cycle and earnings
-4. Market sentiment
-5. Taiwan allocation
-6. Risk and data gaps
-7. Taiwan fixed-watchlist observations when evidence exists
+1. Today in one sentence
+2. Three observable checks
+3. Macro regime and liquidity
+4. Cycle and earnings
+5. International news transmission
+6. Industry and sector analysis
+7. Risk and data gaps
+
+For daily `market_analysis`, the visible Chinese section order is:
+`今日一句話` -> `三個檢查點` -> `總經與流動性` -> `景氣循環` -> `國際新聞傳導` -> `產業板塊解析` -> `風險與資料缺口`.
+`三個檢查點` should contain exactly three observable checks. `國際新聞傳導`
+should use `事件 -> 影響變數 -> 台股族群 -> 確認/失效` when evidence
+supports the chain.
+
+For daily `market_analysis`, do not append `## 今日個股觀察` and do not write
+`台股配置` as a visible section. If the structured JSON contains `stock_watch`,
+treat it as machine-readable downstream signal context only. The visible report
+may mention companies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭
+only to explain macro/sector transmission, not as a watchlist, entry plan,
+stop-loss, or target-price list.
 
 ## Weekly Summary Sections
 
@@ -53,17 +68,22 @@ Weekly reports use:
 
 Weekly reports are allocation/watchlist briefs. They should not produce intraday entry, take-profit, stop-loss, or order-level instructions.
 
-## Fixed Watch Pool
+## Fixed Watch Pool / 固定十檔
 
-Only these Taiwan tickers may appear in visible fixed-watchlist sections unless the user changes the governing spec:
+Only these Taiwan tickers may appear in machine-readable fixed-watchlist signal context unless the user changes the governing spec. Do not render this pool as a daily visible `今日個股觀察` section.
 
 | Ticker | Name | Notes |
 |---|---|---|
 | `2330` | TSMC | AI demand and semiconductor cycle. |
-| `2603` | Evergreen Marine | Freight rates, oil, geopolitics. |
+| `2317` | Hon Hai | AI server and assembly supply-chain proxy. |
+| `2454` | MediaTek | IC design, handset cycle, edge AI / ASIC proxy. |
+| `2308` | Delta Electronics | Power supply and AI data-center infrastructure proxy. |
+| `2881` | Fubon Financial | Rates, insurance, and financial conditions proxy. |
 | `2882` | Cathay Financial | Rates and insurance/financial conditions. |
-| `1605` | Walsin Lihwa | Copper and infrastructure cycle. |
-| `4956` | Epileds | Smaller TPEx semiconductor exposure. |
+| `2485` | Zinwell | Networking and communications watch item. |
+| `3535` | Favite | Equipment / optoelectronics watch item. |
+| `3715` | Dynamic Holding | PCB and auto electronics proxy. |
+| `2351` | SDI | Lead frame and semiconductor materials proxy. |
 
 ## Related Docs
 

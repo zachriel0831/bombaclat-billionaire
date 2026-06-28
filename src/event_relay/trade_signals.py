@@ -35,6 +35,7 @@ _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 _SUSPECT_STOCK_NAME_RE = re.compile(r"[?\ufffd\ue000-\uf8ff]")
 _DEFAULT_EXCLUDED_TICKERS = "4749"
 VISIBLE_RECOMMENDATION_LIMIT = 10
+MIN_CANDIDATE_RISK_REWARD = 1.5
 FIXED_POOL_SIGNAL_BACKFILL_SLOTS = {"pre_tw_open", "us_close"}
 FIXED_MARKET_ANALYSIS_WATCH_POOL: dict[str, dict[str, str]] = {
     "2330": {"name": "台積電", "market": "TWSE", "sector": "半導體（晶圓）"},
@@ -194,7 +195,8 @@ def build_trade_signals_from_analysis(
         }
 
         signals.append(
-            TradeSignalRecord(
+            _with_candidate_metrics(
+                TradeSignalRecord(
                 signal_key=signal_key,
                 idempotency_key=idempotency_key,
                 analysis_id=analysis_id,
@@ -218,6 +220,7 @@ def build_trade_signals_from_analysis(
                 source_event_ids_json=_json_or_none(source_event_ids),
                 status="pending_review",
                 raw_json=json.dumps(raw_json, ensure_ascii=False),
+                )
             )
         )
     return signals
@@ -278,21 +281,12 @@ def build_quote_event_trade_signals(
         price = float(item["price"])
         change_pct = float(item["change_pct"])
         confidence = "medium" if change_pct >= 3 else "low"
-        entry_zone = {
-            "low": _round_tw_price(price * 0.985),
-            "high": _round_tw_price(price * 1.005),
-            "timing": _DEFAULT_ENTRY_TIMING,
-            "basis": item.get("entry_basis") or "fallback_price_reference",
-        }
-        invalidation = {
-            "price": _round_tw_price(price * 0.965),
-            "basis": item.get("stop_basis") or "fallback_stop_reference",
-        }
-        take_profit = {
-            "first": _round_tw_price(price * 1.04),
-            "second": _round_tw_price(price * 1.08),
-            "basis": item.get("target_basis") or "fallback_target_reference",
-        }
+        entry_zone, invalidation, take_profit, risk_reward_policy = _build_long_fallback_levels(
+            price=price,
+            entry_basis=item.get("entry_basis") or "fallback_price_reference",
+            stop_basis=item.get("stop_basis") or "fallback_stop_reference",
+            target_basis=item.get("target_basis") or "fallback_target_reference",
+        )
         source_event_ids = [item["event_row_id"]] if item.get("event_row_id") is not None else []
         idempotency_key = _build_idempotency_key(
             analysis_id=analysis_id,
@@ -314,37 +308,40 @@ def build_quote_event_trade_signals(
                 "analysis_slot": analysis_slot,
                 "source_event_ids": source_event_ids,
             },
+            "risk_reward_policy": risk_reward_policy,
             "guardrail": "Quote fallback signal only; review/risk gate required before order intent.",
         }
         signals.append(
-            TradeSignalRecord(
-                signal_key=f"sig_{idempotency_key[:24]}",
-                idempotency_key=idempotency_key,
-                analysis_id=analysis_id,
-                analysis_date=analysis_date,
-                analysis_slot=analysis_slot,
-                market="TW",
-                ticker=ticker,
-                name=_clean_text(item.get("name")),
-                signal_type=str(item.get("signal_type") or "quote_fallback_stock_watch"),
-                strategy_type="swing",
-                direction="long",
-                confidence=confidence,
-                entry_zone_json=json.dumps(entry_zone, ensure_ascii=False),
-                invalidation_json=json.dumps(invalidation, ensure_ascii=False),
-                take_profit_zone_json=json.dumps(take_profit, ensure_ascii=False),
-                holding_horizon="short_to_medium",
-                rationale=_clean_fallback_rationale(item.get("rationale")),
-                risk_notes_json=json.dumps(
-                    [
-                        "Fixed-pool quote/context fallback; not a model-selected ticker",
-                        "Must pass independent review and risk gate",
-                    ],
-                    ensure_ascii=False,
-                ),
-                source_event_ids_json=json.dumps(source_event_ids, ensure_ascii=False),
-                status="pending_review",
-                raw_json=json.dumps(raw_json, ensure_ascii=False),
+            _with_candidate_metrics(
+                TradeSignalRecord(
+                    signal_key=f"sig_{idempotency_key[:24]}",
+                    idempotency_key=idempotency_key,
+                    analysis_id=analysis_id,
+                    analysis_date=analysis_date,
+                    analysis_slot=analysis_slot,
+                    market="TW",
+                    ticker=ticker,
+                    name=_clean_text(item.get("name")),
+                    signal_type=str(item.get("signal_type") or "quote_fallback_stock_watch"),
+                    strategy_type="swing",
+                    direction="long",
+                    confidence=confidence,
+                    entry_zone_json=json.dumps(entry_zone, ensure_ascii=False),
+                    invalidation_json=json.dumps(invalidation, ensure_ascii=False),
+                    take_profit_zone_json=json.dumps(take_profit, ensure_ascii=False),
+                    holding_horizon="short_to_medium",
+                    rationale=_clean_fallback_rationale(item.get("rationale")),
+                    risk_notes_json=json.dumps(
+                        [
+                            "Fixed-pool quote/context fallback; not a model-selected ticker",
+                            "Must pass independent review and risk gate",
+                        ],
+                        ensure_ascii=False,
+                    ),
+                    source_event_ids_json=json.dumps(source_event_ids, ensure_ascii=False),
+                    status="pending_review",
+                    raw_json=json.dumps(raw_json, ensure_ascii=False),
+                )
             )
         )
     return signals
@@ -398,28 +395,30 @@ def build_prior_signal_reference_trade_signals(
             "guardrail": "Prior signal is stale reference only; same-day price, volume, and news confirmation required.",
         }
         signals.append(
-            TradeSignalRecord(
-                signal_key=f"sig_{idempotency_key[:24]}",
-                idempotency_key=idempotency_key,
-                analysis_id=analysis_id,
-                analysis_date=analysis_date,
-                analysis_slot=analysis_slot,
-                market=market,
-                ticker=ticker,
-                name=_resolve_stock_name(ticker, row.get("name")),
-                signal_type="prior_signal_stock_watch",
-                strategy_type=strategy_type,
-                direction=direction,
-                confidence="low",
-                entry_zone_json=_json_value_or_none(row.get("entry_zone")),
-                invalidation_json=_json_value_or_none(row.get("invalidation")),
-                take_profit_zone_json=_json_value_or_none(row.get("take_profit_zone")),
-                holding_horizon=_clean_text(row.get("holding_horizon")),
-                rationale=_prior_reference_rationale(row),
-                risk_notes_json=_json_value_or_none(row.get("risk_notes")),
-                source_event_ids_json=_json_value_or_none(row.get("source_event_ids")),
-                status="pending_review",
-                raw_json=json.dumps(raw_json, ensure_ascii=False),
+            _with_candidate_metrics(
+                TradeSignalRecord(
+                    signal_key=f"sig_{idempotency_key[:24]}",
+                    idempotency_key=idempotency_key,
+                    analysis_id=analysis_id,
+                    analysis_date=analysis_date,
+                    analysis_slot=analysis_slot,
+                    market=market,
+                    ticker=ticker,
+                    name=_resolve_stock_name(ticker, row.get("name")),
+                    signal_type="prior_signal_stock_watch",
+                    strategy_type=strategy_type,
+                    direction=direction,
+                    confidence="low",
+                    entry_zone_json=_json_value_or_none(row.get("entry_zone")),
+                    invalidation_json=_json_value_or_none(row.get("invalidation")),
+                    take_profit_zone_json=_json_value_or_none(row.get("take_profit_zone")),
+                    holding_horizon=_clean_text(row.get("holding_horizon")),
+                    rationale=_prior_reference_rationale(row),
+                    risk_notes_json=_json_value_or_none(row.get("risk_notes")),
+                    source_event_ids_json=_json_value_or_none(row.get("source_event_ids")),
+                    status="pending_review",
+                    raw_json=json.dumps(raw_json, ensure_ascii=False),
+                )
             )
         )
         seen.add(ticker)
@@ -555,6 +554,112 @@ def _merge_reference_levels_from_fallbacks(
         else:
             merged.append(signal)
     return merged, filled
+
+
+def _with_candidate_metrics(signal: TradeSignalRecord) -> TradeSignalRecord:
+    """Attach deterministic risk/reward and ranking fields to a signal."""
+    risk_reward, risk_reason = _risk_reward_ratio_for_signal(signal)
+    reasons: list[str] = []
+    if signal.avoid_reason:
+        reasons.append(signal.avoid_reason)
+    if not _is_trade_direction(signal.direction):
+        reasons.append("non_trade_direction")
+    if risk_reason:
+        reasons.append(risk_reason)
+    if risk_reward is not None and risk_reward < MIN_CANDIDATE_RISK_REWARD:
+        reasons.append("risk_reward_below_1_5")
+
+    score = _candidate_score(signal, risk_reward, reasons)
+    unique_reasons = list(dict.fromkeys(reason for reason in reasons if reason))
+    return replace(
+        signal,
+        risk_reward_ratio=round(risk_reward, 4) if risk_reward is not None else None,
+        candidate_score=round(score, 4),
+        avoid_reason=";".join(unique_reasons) if unique_reasons else None,
+    )
+
+
+def _risk_reward_ratio_for_signal(signal: TradeSignalRecord) -> tuple[float | None, str | None]:
+    """Return R multiple using the same level semantics as stock-monitor-service."""
+    if not _is_trade_direction(signal.direction):
+        return None, None
+    is_short = str(signal.direction or "").lower() == "short"
+    entry_zone = _json_object_or_none(signal.entry_zone_json)
+    invalidation = _json_object_or_none(signal.invalidation_json)
+    take_profit = _json_object_or_none(signal.take_profit_zone_json)
+    entry = _price_from_object(entry_zone, ("low", "entry", "price") if is_short else ("high", "entry", "price"))
+    stop = _price_from_object(invalidation, ("price", "stop", "stop_loss"))
+    target = _price_from_object(take_profit, ("first", "target", "price", "take_profit"))
+    if entry is None or stop is None or target is None:
+        return None, "missing_price_levels"
+    risk = stop - entry if is_short else entry - stop
+    reward = entry - target if is_short else target - entry
+    if risk <= 0 or reward <= 0:
+        return None, "invalid_risk_reward"
+    return reward / risk, None
+
+
+def _candidate_score(signal: TradeSignalRecord, risk_reward: float | None, avoid_reasons: list[str]) -> float:
+    """Score candidates on a stable 0-100 scale for watchlist ranking."""
+    score = 20.0
+    if _is_trade_direction(signal.direction):
+        score += 15.0
+    else:
+        score -= 20.0
+
+    strategy = (signal.strategy_type or "").strip().lower()
+    if strategy in {"intraday", "swing"}:
+        score += 10.0
+    elif strategy == "medium":
+        score += 6.0
+
+    if signal.entry_zone_json and signal.invalidation_json and signal.take_profit_zone_json:
+        score += 20.0
+
+    if risk_reward is not None:
+        score += min(max(risk_reward, 0.0), 3.0) / 3.0 * 25.0
+
+    confidence = (signal.confidence or "").strip().lower()
+    if confidence == "high":
+        score += 12.0
+    elif confidence == "medium":
+        score += 8.0
+    elif confidence == "low":
+        score += 2.0
+
+    score += min(_source_event_count(signal.source_event_ids_json), 5) * 2.0
+
+    if avoid_reasons:
+        score -= 25.0
+
+    return max(0.0, min(100.0, score))
+
+
+def _is_trade_direction(direction: Any) -> bool:
+    text = str(direction or "").strip().lower()
+    return text in {"long", "short"}
+
+
+def _price_from_object(value: dict[str, Any] | None, keys: tuple[str, ...]) -> float | None:
+    if not isinstance(value, dict):
+        return None
+    for key in keys:
+        price = _to_float(value.get(key))
+        if price is not None:
+            return price
+    return None
+
+
+def _source_event_count(raw: str | None) -> int:
+    if not raw:
+        return 0
+    try:
+        value = json.loads(raw)
+    except (TypeError, ValueError):
+        return 0
+    if isinstance(value, list):
+        return len(value)
+    return 1
 
 
 def _prior_reference_rationale(row: dict[str, Any]) -> str:
@@ -699,6 +804,49 @@ def _calculate_change_pct(*, price: float, previous: float | None) -> float | No
     if previous in (None, 0):
         return None
     return round((price - previous) / previous * 100.0, 2)
+
+
+def _build_long_fallback_levels(
+    *,
+    price: float,
+    entry_basis: str,
+    stop_basis: str,
+    target_basis: str,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Build deterministic long fallback levels that satisfy the monitor R gate."""
+    entry_zone = {
+        "low": _round_tw_price(price * 0.985),
+        "high": _round_tw_price(price * 1.005),
+        "timing": _DEFAULT_ENTRY_TIMING,
+        "basis": entry_basis,
+    }
+    invalidation = {
+        "price": _round_tw_price(price * 0.965),
+        "basis": stop_basis,
+    }
+    entry = float(entry_zone["high"])
+    stop = float(invalidation["price"])
+    risk = entry - stop
+    minimum_first = _round_tw_price_up(entry + risk * MIN_CANDIDATE_RISK_REWARD)
+    minimum_second = _round_tw_price_up(entry + risk * 2.0)
+    base_first = _round_tw_price(price * 1.04)
+    base_second = _round_tw_price(price * 1.08)
+    first = max(base_first, minimum_first)
+    second = max(base_second, minimum_second, first)
+    take_profit = {
+        "first": first,
+        "second": second,
+        "basis": target_basis,
+    }
+    policy = {
+        "min_risk_reward": MIN_CANDIDATE_RISK_REWARD,
+        "entry_for_gate": entry,
+        "stop_for_gate": stop,
+        "base_first_target": base_first,
+        "calibrated_first_target": first,
+        "calibrated": first != base_first,
+    }
+    return entry_zone, invalidation, take_profit, policy
 
 
 def _clean_fallback_rationale(value: Any) -> str:
@@ -1292,21 +1440,32 @@ def _safe_int(value: Any) -> int:
     return 0
 
 
+def _tw_price_tick(value: float) -> float:
+    if value < 10:
+        return 0.01
+    if value < 50:
+        return 0.05
+    if value < 100:
+        return 0.1
+    if value < 500:
+        return 0.5
+    if value < 1000:
+        return 1.0
+    return 5.0
+
+
 def _round_tw_price(value: float) -> float:
     """Round reference levels to common Taiwan stock tick sizes."""
-    if value < 10:
-        tick = 0.01
-    elif value < 50:
-        tick = 0.05
-    elif value < 100:
-        tick = 0.1
-    elif value < 500:
-        tick = 0.5
-    elif value < 1000:
-        tick = 1.0
-    else:
-        tick = 5.0
+    tick = _tw_price_tick(value)
     rounded = round(value / tick) * tick
+    return round(rounded, 2)
+
+
+def _round_tw_price_up(value: float) -> float:
+    """Round up to a Taiwan tick so minimum target math stays conservative."""
+    rounded = _round_tw_price(value)
+    if rounded < value:
+        rounded += _tw_price_tick(max(value, rounded))
     return round(rounded, 2)
 
 

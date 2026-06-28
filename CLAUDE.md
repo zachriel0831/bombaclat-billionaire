@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Claude is secondary in this workspace. [AGENTS.md](AGENTS.md) is the source of truth for repo behavior; this file only adds Claude-specific reminders.
+Claude is secondary in this workspace. [AGENTS.md](AGENTS.md) is the source of truth for repo behavior, including the global CTO standards it references; this file only adds Claude-specific reminders.
 
 ## Style
 - Default to terse responses. Skip the closing summary table unless explicitly asked.

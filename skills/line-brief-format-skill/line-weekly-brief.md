@@ -20,6 +20,8 @@ Format-only asset. Python stores generated text in `t_market_analyses`; downstre
 6. 台股觀察
 {列出 2-4 個台股族群或追蹤股的觀察重點，只能基於已知資料與明確傳導鏈。}
 
+若此格式資產被 daily `market_analysis` 使用，日報必須先用 `今日一句話` 與 exactly three `三個檢查點` 回答「今天要看什麼」，再進入 `總經與流動性`、`景氣循環`、`國際新聞傳導`、`產業板塊解析`、`風險與資料缺口`。日報不可再輸出獨立 `台股配置` 區塊，也不可追加 `今日個股觀察`；個股只能作為權值股/大型科技股傳導例子，例如 NVIDIA、台積電、Magnificent Seven / 美股七巨頭，不寫進出場、停損或目標價。
+
 7. 反證與資料缺口
 {列出會推翻主軸的條件，以及目前資料不足之處。}
 

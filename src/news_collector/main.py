@@ -57,7 +57,7 @@ def _build_parser() -> argparse.ArgumentParser:
     fetch_parser.add_argument(
         "--source",
         default="all",
-        choices=["all", "rss", "sec", "twse", "x"],
+        choices=["all", "rss", "sec", "twse", "x", "truthsocial", "truth_social"],
         help="Source selector",
     )
     fetch_parser.add_argument("--limit", type=int, default=20, help="Max records per source")

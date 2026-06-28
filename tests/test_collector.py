@@ -35,6 +35,10 @@ class CollectorTests(unittest.TestCase):
             x_include_retweets=False,
             x_backfill_enabled=True,
             x_backfill_max_results_per_account=10,
+            truth_social_enabled=False,
+            truth_social_accounts=["https://truthsocial.com/@realDonaldTrump"],
+            truth_social_max_results_per_account=10,
+            truth_social_user_agent="test-browser",
             official_rss_feeds=["https://example.com/rss.xml"],
             official_rss_first_per_feed=False,
             http_timeout_seconds=3,
@@ -71,6 +75,34 @@ class CollectorTests(unittest.TestCase):
         )
         self.assertEqual(len(sources), 1)
         self.assertEqual(sources[0].name, "x_accounts")
+
+    def test_build_sources_truth_social_enabled(self) -> None:
+        settings = self._settings(x_enabled=False, x_bearer_token=None)
+        settings = Settings(
+            **{
+                **settings.__dict__,
+                "truth_social_enabled": True,
+                "truth_social_accounts": ["https://truthsocial.com/@realDonaldTrump"],
+            }
+        )
+
+        sources = build_sources(settings, "truthsocial")
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].name, "truth_social_accounts")
+
+    def test_build_sources_truth_social_requires_accounts(self) -> None:
+        settings = self._settings(x_enabled=False, x_bearer_token=None)
+        settings = Settings(
+            **{
+                **settings.__dict__,
+                "truth_social_enabled": True,
+                "truth_social_accounts": [],
+            }
+        )
+
+        with self.assertRaises(ValueError):
+            build_sources(settings, "truthsocial")
 
     def test_build_sources_sec_enabled(self) -> None:
         """測試 test build sources sec enabled 的預期行為。"""

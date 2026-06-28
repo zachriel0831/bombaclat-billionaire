@@ -117,6 +117,9 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertEqual(first[0].status, "pending_review")
         self.assertEqual(json.loads(first[0].source_event_ids_json), [10, "11"])
         self.assertIn("review/risk gate required", first[0].raw_json)
+        self.assertEqual(first[0].risk_reward_ratio, 1.0)
+        self.assertIn("risk_reward_below_1_5", first[0].avoid_reason)
+        self.assertGreater(first[0].candidate_score, 0)
 
     def test_skips_non_tw_market_and_invalid_ticker(self) -> None:
         """只保留固定監控池內的台股。"""
@@ -314,6 +317,11 @@ class TradeSignalExtractionTests(unittest.TestCase):
         )
         self.assertEqual(len(signals), 10)
         self.assertIn("timing", signals[0].entry_zone_json)
+        for signal in signals:
+            self.assertGreaterEqual(signal.risk_reward_ratio, 1.5)
+            self.assertIsNone(signal.avoid_reason)
+        first_raw = json.loads(signals[0].raw_json)
+        self.assertTrue(first_raw["risk_reward_policy"]["calibrated"])
         self.assertIn("最新台股報價下跌 0.30%", signals[-1].rationale)
 
     def test_twse_context_fallback_builds_watchlist_signals(self) -> None:
@@ -349,6 +357,8 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertEqual(len(signals), 1)
         self.assertEqual(signals[0].ticker, "2330")
         self.assertEqual(signals[0].signal_type, "context_fallback_stock_watch")
+        self.assertGreaterEqual(signals[0].risk_reward_ratio, 1.5)
+        self.assertIsNone(signals[0].avoid_reason)
         self.assertIn("twse_openapi_tracked_stock_fallback", signals[0].raw_json)
         self.assertIn("TWSE官方收盤基準上漲", signals[0].rationale)
         self.assertIn("需開盤量價確認", signals[0].rationale)

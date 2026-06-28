@@ -1,6 +1,9 @@
 from datetime import datetime, timedelta, timezone
 import json
 import os
+from pathlib import Path
+from types import SimpleNamespace
+from tempfile import TemporaryDirectory
 import unittest
 from unittest import mock
 
@@ -14,12 +17,15 @@ from event_relay.weekly_summary import (
     _extract_text_from_anthropic,
     _extract_text_from_response,
     _llm_timeout_seconds,
+    _load_weekly_config,
     _openai_model_supports_temperature,
     _openai_web_search_enabled,
     _resolve_llm_settings,
     _should_run_now,
     _store_weekly_analysis,
+    _weekly_runtime_failover_config,
     _week_key,
+    run_once,
 )
 
 
@@ -266,6 +272,119 @@ class WeeklySummaryTests(unittest.TestCase):
         self.assertEqual(provider, "openai")
         self.assertEqual(model, "gpt-5")
         self.assertEqual(api_key, "sk-oai-test")
+
+    def test_load_weekly_config_loads_env_before_provider_resolution(self) -> None:
+        """Weekly config must honor LLM_PROVIDER from the env file."""
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / ".env"
+            env_file.write_text(
+                "\n".join(
+                    [
+                        "LLM_PROVIDER=anthropic",
+                        "ANTHROPIC_API_KEY=sk-ant-test",
+                        "ANTHROPIC_MODEL=claude-test",
+                        "ANTHROPIC_API_BASE=https://api.anthropic.com",
+                        "WEEKLY_SUMMARY_HOUR=21",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with mock.patch.dict(os.environ, {}, clear=True):
+                config = _load_weekly_config(SimpleNamespace(env_file=str(env_file), force=False))
+
+        self.assertEqual(config.provider, "anthropic")
+        self.assertEqual(config.model, "claude-test")
+        self.assertEqual(config.api_key, "sk-ant-test")
+        self.assertEqual(config.hour, 21)
+
+    def test_weekly_runtime_failover_config_switches_openai_quota_to_anthropic(self) -> None:
+        """OpenAI quota/rate failures should produce a Claude failover config."""
+        with mock.patch.dict(
+            os.environ,
+            {
+                "ANTHROPIC_API_KEY": "sk-ant-test",
+                "ANTHROPIC_MODEL": "claude-backup",
+                "ANTHROPIC_API_BASE": "https://api.anthropic.com",
+            },
+            clear=False,
+        ):
+            config = _weekly_runtime_failover_config(
+                self._config(provider="openai", model="gpt-5"),
+                RuntimeError("OpenAI HTTPError status=429 body=insufficient_quota"),
+            )
+
+        self.assertIsNotNone(config)
+        assert config is not None
+        self.assertEqual(config.provider, "anthropic")
+        self.assertEqual(config.model, "claude-backup")
+        self.assertEqual(config.api_key, "sk-ant-test")
+        assert config.runtime_failover is not None
+        self.assertEqual(config.runtime_failover["from_provider"], "openai")
+        self.assertEqual(config.runtime_failover["to_provider"], "anthropic")
+
+    def test_run_once_runtime_failover_openai_quota_to_anthropic(self) -> None:
+        """A weekly run should retry on Claude and store the fallback metadata."""
+
+        class FakeStore:
+            def __init__(self) -> None:
+                self.record = None
+
+            def initialize(self) -> None:
+                return None
+
+            def fetch_recent_summary_events(self, *, days: int, limit: int):
+                self.fetch_args = {"days": days, "limit": limit}
+                return [
+                    SimpleNamespace(
+                        row_id=1,
+                        source="test",
+                        title="event",
+                        url="https://example.test",
+                        summary="summary",
+                        published_at="2026-05-16",
+                        created_at="2026-05-16 23:00:00",
+                    )
+                ]
+
+            def upsert_market_analysis(self, record):
+                self.record = record
+                return 1
+
+        store = FakeStore()
+        usage = TokenUsage(provider="anthropic", model="claude-backup", prompt_tokens=10, completion_tokens=5)
+        with TemporaryDirectory() as tmp, \
+             mock.patch("event_relay.weekly_summary.load_settings", return_value=SimpleNamespace(mysql_enabled=True)), \
+             mock.patch("event_relay.weekly_summary.MySqlEventStore", return_value=store), \
+             mock.patch("event_relay.weekly_summary._write_prompt_snapshots"), \
+             mock.patch(
+                 "event_relay.weekly_summary._resolve_anthropic_settings",
+                 return_value=("anthropic", "claude-backup", "https://api.anthropic.com", "ant-file", "ant-key"),
+             ), \
+             mock.patch(
+                 "event_relay.weekly_summary._call_llm",
+                 side_effect=[
+                     RuntimeError("OpenAI HTTPError status=429 body=insufficient_quota"),
+                     ("weekly summary from claude", usage),
+                 ],
+             ) as call_llm:
+            result = run_once(
+                self._config(
+                    force=True,
+                    state_file=str(Path(tmp) / "weekly-state.txt"),
+                    provider="openai",
+                    model="gpt-5",
+                )
+            )
+
+        self.assertEqual(result["provider"], "anthropic")
+        self.assertEqual(result["model"], "claude-backup")
+        self.assertEqual(call_llm.call_count, 2)
+        self.assertIsNotNone(store.record)
+        self.assertEqual(store.record.model, "claude-backup")
+        raw_json = json.loads(store.record.raw_json)
+        self.assertEqual(raw_json["token_usage"]["provider"], "anthropic")
+        self.assertEqual(raw_json["runtime_failover"]["from_provider"], "openai")
+        self.assertEqual(raw_json["runtime_failover"]["to_provider"], "anthropic")
 
 
 if __name__ == "__main__":

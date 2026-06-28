@@ -9,6 +9,9 @@ These instructions apply to this repository.
 - `AGENTS.md` is the source of truth for agent behavior. `CLAUDE.md` may add Claude-specific shell/test notes, but it must not contradict this file.
 - Start at `PROJECT_INDEX.md` for whole-repo navigation, then load only the smallest task-specific context.
 
+## Global CTO Standards
+Before implementation or verification work, read and follow `D:\work_space\claude-box\rules\rules\cto-technical-standards.md`. If this repo file and the global CTO standards conflict, follow the higher-priority rule and note the conflict.
+
 ## Context Loading
 Do not preload the whole `memory-bank/`.
 Read only the smallest useful set for the task.

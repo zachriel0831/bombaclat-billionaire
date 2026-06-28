@@ -24,6 +24,7 @@ from event_relay.config import load_settings as load_relay_settings
 from event_relay.service import MySqlEventStore, RelayEvent
 from news_collector.collector import build_sources, fetch_news
 from news_collector.config import load_settings, resolve_x_bearer_token
+from news_collector.sources.truth_social import TruthSocialAccountSource
 from news_collector.sources.x_accounts import XAccountSource
 from news_collector.us_index_tracker import UsIndexTracker
 from news_collector.utils import sort_timestamp
@@ -219,8 +220,13 @@ def _allow_event_topic(event: dict[str, Any]) -> bool:
     summary = str(event.get("summary") or "")
     url = str(event.get("url") or "")
     source = str(event.get("source") or "")
-    if source.lower().startswith("x:") or source.lower().startswith("sec:") or source.lower().startswith("twse_mops:"):
-        # X account tracking, SEC filing tracking, and TWSE/MOPS tracked announcements are explicit allow-list modes.
+    if (
+        source.lower().startswith("x:")
+        or source.lower().startswith("truthsocial:")
+        or source.lower().startswith("sec:")
+        or source.lower().startswith("twse_mops:")
+    ):
+        # Social account tracking, SEC filings, and TWSE/MOPS tracked announcements are explicit allow-list modes.
         return True
     text = f"{title} {summary} {url} {source}".lower()
 
@@ -364,6 +370,8 @@ def _poll_loop(config: BridgeConfig, event_sink: DirectDbEventSink | None, stop_
             source_names.append("sec")
         if settings.twse_mops_enabled and settings.twse_mops_tracked_codes:
             source_names.append("twse")
+        if settings.truth_social_enabled and settings.truth_social_accounts:
+            source_names.append("truthsocial")
         accepted = 0
         stored = 0
         duplicates = 0
@@ -552,6 +560,70 @@ def _run_x_backfill(
         dropped_by_date,
         dropped_by_topic,
     )
+    return {
+        "fetched": len(items),
+        "pushed": pushed,
+        "stored": stored,
+        "duplicates": duplicates,
+        "failed": failed,
+        "dropped_by_date": dropped_by_date,
+        "dropped_by_topic": dropped_by_topic,
+    }
+
+
+def _run_truth_social_backfill(
+    relay_url: str,
+    settings: Any,
+    event_sink: DirectDbEventSink | None = None,
+) -> dict[str, int]:
+    """Run a controlled Truth Social replay through the same bridge path."""
+    if not getattr(settings, "truth_social_enabled", False):
+        logger.info("Truth Social backfill skipped: TRUTH_SOCIAL_ENABLED=false")
+        return {"fetched": 0, "pushed": 0, "stored": 0, "duplicates": 0, "failed": 0, "dropped_by_date": 0, "dropped_by_topic": 0}
+    if not getattr(settings, "truth_social_accounts", []):
+        logger.info("Truth Social backfill skipped: TRUTH_SOCIAL_ACCOUNTS is empty")
+        return {"fetched": 0, "pushed": 0, "stored": 0, "duplicates": 0, "failed": 0, "dropped_by_date": 0, "dropped_by_topic": 0}
+
+    source = TruthSocialAccountSource(
+        accounts=list(settings.truth_social_accounts),
+        timeout_seconds=settings.http_timeout_seconds,
+        max_results_per_account=settings.truth_social_max_results_per_account,
+        user_agent=settings.truth_social_user_agent,
+    )
+    items = source.fetch(limit=settings.truth_social_max_results_per_account)
+    pushed = 0
+    stored = 0
+    duplicates = 0
+    failed = 0
+    dropped_by_date = 0
+    dropped_by_topic = 0
+
+    for item in sorted(items, key=lambda row: sort_timestamp(row.published_at)):
+        event = item.to_dict()
+        if not _allow_event_date(event):
+            dropped_by_date += 1
+            continue
+        if not _allow_event_topic(event):
+            dropped_by_topic += 1
+            continue
+
+        result = _submit_event(event_sink, relay_url, event)
+        if result.accepted:
+            pushed += 1
+            if result.stored:
+                stored += 1
+            elif result.status == "duplicate":
+                duplicates += 1
+            logger.info(
+                "[BRIDGE_TRUTH_SOCIAL_SUBMITTED] id=%s source=%s url=%s status=%s",
+                event.get("id", "-"),
+                event.get("source", "-"),
+                event.get("url", "-"),
+                result.status,
+            )
+        elif result.status == "failed":
+            failed += 1
+
     return {
         "fetched": len(items),
         "pushed": pushed,

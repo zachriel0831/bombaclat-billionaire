@@ -56,7 +56,7 @@ tasks:
 
   # ── 模組：Analysis Engine ────────────────────────────────────────────
   - id: REQ-022
-    title: "[分析輸出] market_analysis 固定五檔觀察：產出觀察區間、失效點、風險"
+    title: "[分析輸出] market_analysis 固定十檔觀察：產出觀察區間、失效點、風險"
     module: analysis_engine
     status: pending
     trigger: schedule
@@ -77,16 +77,17 @@ tasks:
       規則：
         - 所有 stock_watch row 都必須帶 evidence_refs，能回指 t_relay_events / context source
         - 若本地事件不足，模型可用 web search 補證據，但必須標記 external_verified 與 data_gap
-        - 只產生固定五檔觀察條件，不得直接下 order，也不得推薦固定池以外台股
+        - 只產生固定十檔觀察條件，不得直接下 order，也不得推薦固定池以外台股
       2026-05-11 amendment:
         market_analysis stock output is a fixed watch pool, not model-selected recommendations.
-        Allowed Taiwan tickers are 2330, 2603, 2882, 1605, and 4956 only.
+        Superseded 2026-05-16: allowed Taiwan tickers are 2330, 2317, 2454, 2308,
+        2881, 2882, 2485, 3535, 3715, and 2351 only.
         If evidence is insufficient, output data_gap / neutral watch state instead of substituting another ticker.
     depends_on: [REQ-012, REQ-013, REQ-017, REQ-018, REQ-019, REQ-020, REQ-021]
     acceptance:
       - t_market_analyses.structured_json 新增 stock_watch / market_bias / scenario_matrix
       - 每個 stock_watch row 都具 ticker、方向、進場區、失效點、催化、風險、evidence_refs
-      - stock_watch ticker 只允許 2330、2603、2882、1605、4956
+      - stock_watch ticker 只允許 2330、2317、2454、2308、2881、2882、2485、3535、3715、2351
       - pre_tw_open / tw_close / weekly_tw_preopen 三個 slot 都可輸出觀察型結構
       - 新增測試覆蓋 schema 驗證、無資料降級、web search 補證據標記
       - 後續 watchlist / decision 流程可直接讀 structured_json，不需要再解析自由文字

@@ -132,6 +132,9 @@ class TradeSignalRecord:
     source_event_ids_json: str | None
     status: str
     raw_json: str | None
+    risk_reward_ratio: float | None = None
+    candidate_score: float | None = None
+    avoid_reason: str | None = None
 
 
 @dataclass
@@ -281,7 +284,7 @@ class MySqlEventStore:
             cur = self._cursor()
             try:
                 cur.execute(sql, values)
-                if event.source.lower().startswith("x:"):
+                if self._is_social_post_source(event.source):
                     self._upsert_x_post(cur, event)
                 if self._has_market_snapshot(event):
                     self._upsert_market_snapshot_from_event(cur, event)
@@ -792,6 +795,45 @@ class MySqlEventStore:
             # Column may have been added between our check and the ALTER; do not fail init.
             self._conn.rollback()
 
+    def _migrate_trade_signal_candidate_columns(self, cur: Any) -> None:
+        """Add candidate-ranking columns to existing trade-signal tables."""
+        if self._conn is None:
+            return
+
+        try:
+            columns = self._fetch_table_columns(cur, self._trade_signal_table)
+            indexes = self._fetch_table_indexes(cur, self._trade_signal_table)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not inspect trade signal candidate columns: %s", exc)
+            return
+
+        try:
+            if "risk_reward_ratio" not in columns:
+                cur.execute(
+                    f"ALTER TABLE `{self._trade_signal_table}` "
+                    "ADD COLUMN risk_reward_ratio DECIMAL(10,4) NULL AFTER source_event_ids"
+                )
+            if "candidate_score" not in columns:
+                cur.execute(
+                    f"ALTER TABLE `{self._trade_signal_table}` "
+                    "ADD COLUMN candidate_score DECIMAL(10,4) NULL AFTER risk_reward_ratio"
+                )
+            if "avoid_reason" not in columns:
+                cur.execute(
+                    f"ALTER TABLE `{self._trade_signal_table}` "
+                    "ADD COLUMN avoid_reason TEXT NULL AFTER candidate_score"
+                )
+            if "idx_trade_signal_candidate_rank" not in indexes:
+                cur.execute(
+                    f"ALTER TABLE `{self._trade_signal_table}` "
+                    "ADD INDEX `idx_trade_signal_candidate_rank` "
+                    "(`analysis_date`, `analysis_slot`, `status`, `candidate_score`)"
+                )
+            self._conn.commit()
+        except Exception as exc:  # noqa: BLE001
+            self._conn.rollback()
+            logger.warning("Trade signal candidate-column migration skipped: %s", exc)
+
     def _migrate_event_delivery_columns(self, cur: Any) -> None:
         """Drop old LINE delivery fields from the event-only relay table."""
         if self._conn is None:
@@ -1079,8 +1121,9 @@ class MySqlEventStore:
             f"INSERT INTO `{self._trade_signal_table}` "
             "(signal_key, idempotency_key, analysis_id, analysis_date, analysis_slot, market, ticker, name, "
             "signal_type, strategy_type, direction, confidence, entry_zone, invalidation, take_profit_zone, "
-            "holding_horizon, rationale, risk_notes, source_event_ids, status, raw_json) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "holding_horizon, rationale, risk_notes, source_event_ids, risk_reward_ratio, candidate_score, "
+            "avoid_reason, status, raw_json) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
             "ON DUPLICATE KEY UPDATE "
             "analysis_date=VALUES(analysis_date), "
             "analysis_slot=VALUES(analysis_slot), "
@@ -1098,6 +1141,9 @@ class MySqlEventStore:
             "rationale=VALUES(rationale), "
             "risk_notes=VALUES(risk_notes), "
             "source_event_ids=VALUES(source_event_ids), "
+            "risk_reward_ratio=VALUES(risk_reward_ratio), "
+            "candidate_score=VALUES(candidate_score), "
+            "avoid_reason=VALUES(avoid_reason), "
             "status=IF(status='superseded', VALUES(status), status), "
             "raw_json=VALUES(raw_json), "
             "updated_at=CURRENT_TIMESTAMP"
@@ -1124,6 +1170,9 @@ class MySqlEventStore:
                 signal.rationale,
                 signal.risk_notes_json,
                 signal.source_event_ids_json,
+                signal.risk_reward_ratio,
+                signal.candidate_score,
+                signal.avoid_reason,
                 signal.status,
                 signal.raw_json,
             ),
@@ -1580,6 +1629,9 @@ class MySqlEventStore:
           rationale TEXT NULL,
           risk_notes JSON NULL,
           source_event_ids JSON NULL,
+          risk_reward_ratio DECIMAL(10,4) NULL,
+          candidate_score DECIMAL(10,4) NULL,
+          avoid_reason TEXT NULL,
           status VARCHAR(24) NOT NULL DEFAULT 'pending_review',
           raw_json JSON NULL,
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1589,7 +1641,8 @@ class MySqlEventStore:
           UNIQUE KEY uq_trade_signal_idempotency (idempotency_key),
           KEY idx_trade_signal_analysis (analysis_id),
           KEY idx_trade_signal_ticker (market, ticker, status, created_at),
-          KEY idx_trade_signal_slot (analysis_date, analysis_slot, status)
+          KEY idx_trade_signal_slot (analysis_date, analysis_slot, status),
+          KEY idx_trade_signal_candidate_rank (analysis_date, analysis_slot, status, candidate_score)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
         ddl_signal_reviews = f"""
@@ -1646,23 +1699,40 @@ class MySqlEventStore:
             self._conn.commit()
             self._migrate_event_delivery_columns(cur)
             self._migrate_analysis_structured_json(cur)
+            self._migrate_trade_signal_candidate_columns(cur)
         finally:
             cur.close()
         # 將 X 貼文資料同步到 t_x_posts，方便後續查詢與分析。
+    @staticmethod
+    def _is_social_post_source(source: str | None) -> bool:
+        text = (source or "").strip().lower()
+        return text.startswith("x:") or text.startswith("truthsocial:")
+
     def _upsert_x_post(self, cur: Any, event: RelayEvent) -> None:
         # 解析 relay event 內的 X raw payload，取出 tweet 主要欄位。
         """新增或更新 upsert x post 對應的資料或結果。"""
         tweet_obj = {}
+        truth_obj = {}
         if isinstance(event.raw, dict):
             raw_tweet = event.raw.get("raw")
             if isinstance(raw_tweet, dict):
                 maybe_tweet = raw_tweet.get("tweet")
                 if isinstance(maybe_tweet, dict):
                     tweet_obj = maybe_tweet
+                maybe_truth = raw_tweet.get("truth")
+                if isinstance(maybe_truth, dict):
+                    truth_obj = maybe_truth
 
         source = (event.source or "").strip().lower()
+        is_truth_social = source.startswith("truthsocial:")
         username = source.split(":", 1)[1] if ":" in source else "unknown"
-        tweet_id = str(tweet_obj.get("id") or event.event_id or "").strip()
+        raw_post_id = str(truth_obj.get("id") or tweet_obj.get("id") or event.event_id or "").strip()
+        if is_truth_social and raw_post_id.startswith("truthsocial-"):
+            tweet_id = raw_post_id
+        elif is_truth_social:
+            tweet_id = f"truthsocial-{raw_post_id}" if raw_post_id else ""
+        else:
+            tweet_id = raw_post_id
         if tweet_id.startswith("x-"):
             tweet_id = tweet_id[2:]
         if not tweet_id:
@@ -1672,13 +1742,36 @@ class MySqlEventStore:
         if isinstance(event.raw, dict):
             raw_section = event.raw.get("raw")
             if isinstance(raw_section, dict):
-                value = raw_section.get("user_id")
+                value = raw_section.get("account_id") if is_truth_social else raw_section.get("user_id")
                 if value is not None:
                     user_id = str(value)
+        if user_id is None and isinstance(truth_obj.get("account"), dict):
+            value = truth_obj["account"].get("id")
+            if value is not None:
+                user_id = str(value)
 
-        lang = str(tweet_obj.get("lang") or "").strip() or None
-        text = str(tweet_obj.get("text") or event.summary or "").strip() or None
-        metrics = tweet_obj.get("public_metrics") if isinstance(tweet_obj.get("public_metrics"), dict) else None
+        lang = str((truth_obj.get("language") if is_truth_social else tweet_obj.get("lang")) or "").strip() or None
+        text = str((event.summary if is_truth_social else tweet_obj.get("text")) or event.summary or "").strip() or None
+        if is_truth_social:
+            metrics = None
+            if isinstance(event.raw, dict):
+                raw_section = event.raw.get("raw")
+                if isinstance(raw_section, dict) and isinstance(raw_section.get("metrics"), dict):
+                    metrics = raw_section.get("metrics")
+            if metrics is None:
+                metrics = {
+                    key: truth_obj.get(key)
+                    for key in (
+                        "replies_count",
+                        "reblogs_count",
+                        "favourites_count",
+                        "upvotes_count",
+                        "downvotes_count",
+                    )
+                    if truth_obj.get(key) is not None
+                }
+        else:
+            metrics = tweet_obj.get("public_metrics") if isinstance(tweet_obj.get("public_metrics"), dict) else None
 
         sql = (
             f"INSERT INTO {self._x_table} "

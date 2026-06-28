@@ -53,6 +53,10 @@ class RelayBridgeBackfillTests(unittest.TestCase):
             x_include_retweets=False,
             x_backfill_enabled=True,
             x_backfill_max_results_per_account=10,
+            truth_social_enabled=False,
+            truth_social_accounts=["https://truthsocial.com/@realDonaldTrump"],
+            truth_social_max_results_per_account=10,
+            truth_social_user_agent="test-browser",
             official_rss_feeds=["https://example.com/rss.xml"],
             official_rss_first_per_feed=False,
             http_timeout_seconds=15,
@@ -130,6 +134,16 @@ class RelayBridgeBackfillTests(unittest.TestCase):
         self.assertEqual(relay_event.title, "New post")
         self.assertEqual(relay_event.summary, "Hello world")
         self.assertIs(relay_event.raw, event)
+
+    def test_truth_social_source_is_explicitly_allowed(self) -> None:
+        event = {
+            "source": "truthsocial:realdonaldtrump",
+            "title": "non-finance public figure post",
+            "summary": "non-finance public figure post",
+            "url": "https://truthsocial.com/@realDonaldTrump/1",
+        }
+
+        self.assertTrue(_allow_event_topic(event))
 
     def test_direct_db_event_sink_writes_store(self) -> None:
         """測試 test direct db event sink writes store 的預期行為。"""

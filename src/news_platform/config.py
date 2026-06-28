@@ -35,6 +35,12 @@ def _parse_provider_order(value: str | None) -> tuple[str, ...]:
     return providers or ("openai", "anthropic")
 
 
+def _parse_csv(value: str | None, default: str) -> tuple[str, ...]:
+    raw = value if value is not None else default
+    items = tuple(dict.fromkeys(item.strip().lower() for item in raw.split(",") if item.strip()))
+    return items
+
+
 @dataclass(frozen=True)
 class NewsPlatformSettings:
     mysql_enabled: bool
@@ -56,6 +62,10 @@ class NewsPlatformSettings:
     http_timeout_seconds: int
     limit_per_feed: int
     max_age_days: int
+    author_detail_backfill_enabled: bool
+    author_detail_backfill_batch_size: int
+    author_detail_backfill_sources: tuple[str, ...]
+    author_detail_backfill_sleep_seconds: float
     topic_llm_enabled: bool
     topic_llm_provider_order: tuple[str, ...]
     topic_llm_timeout_seconds: int
@@ -101,6 +111,22 @@ def load_settings(env_file: str = ".env") -> NewsPlatformSettings:
         http_timeout_seconds=int(os.getenv("NEWSPF_HTTP_TIMEOUT_SECONDS", "15")),
         limit_per_feed=max(1, int(os.getenv("NEWSPF_LIMIT_PER_FEED", "20"))),
         max_age_days=max(1, min(30, int(os.getenv("NEWSPF_MAX_AGE_DAYS", "3")))),
+        author_detail_backfill_enabled=_parse_bool(
+            os.getenv("NEWSPF_AUTHOR_DETAIL_BACKFILL_ENABLED"),
+            default=True,
+        ),
+        author_detail_backfill_batch_size=max(
+            1,
+            int(os.getenv("NEWSPF_AUTHOR_DETAIL_BACKFILL_BATCH_SIZE", "30")),
+        ),
+        author_detail_backfill_sources=_parse_csv(
+            os.getenv("NEWSPF_AUTHOR_DETAIL_BACKFILL_SOURCES"),
+            "cna,storm,newtalk,ltn,ettoday,tvbs,ebc,ctee,pts",
+        ),
+        author_detail_backfill_sleep_seconds=max(
+            0.0,
+            float(os.getenv("NEWSPF_AUTHOR_DETAIL_BACKFILL_SLEEP_SECONDS", "0.05")),
+        ),
         topic_llm_enabled=_parse_bool(os.getenv("NEWSPF_TOPIC_LLM_ENABLED"), default=False),
         topic_llm_provider_order=_parse_provider_order(os.getenv("NEWSPF_TOPIC_LLM_PROVIDER_ORDER")),
         topic_llm_timeout_seconds=max(2, int(os.getenv("NEWSPF_TOPIC_LLM_TIMEOUT_SECONDS", "20"))),

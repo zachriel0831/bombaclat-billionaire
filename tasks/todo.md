@@ -4,16 +4,66 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-06-22 `pre_tw_open` market-analysis row if needed.
-- Requested by: automation
-- Start date: 2026-06-22
-- Scope: Inspect today's `t_market_analyses` `pre_tw_open` row plus raw telemetry, verify the Traditional Chinese readability and seven-section daily editorial contract, repair or create the row from local relay and market-context evidence only when needed, preserve Java delivery ownership, and verify final DB/trust-gate/signal state without calling paid external LLM APIs.
+- Task: Add reporter names to finance relay-event news cards.
+- Requested by: user
+- Start date: 2026-06-27
+- Scope: Enrich short-retention finance RSS rows in `t_relay_events.raw_json` with reporter names when article detail pages expose byline metadata, then render the names on finance event cards without changing the public API record shape.
 
 ## Plan
-- [x] Read repo instructions plus Workflow 4C storage/guard and daily template decisions.
-- [x] Inspect today's `pre_tw_open` row, `raw_json`, and visible text quality/template compliance.
-- [x] If needed, gather supporting `t_relay_events` and market-context evidence, then repair/create the row through `MySqlEventStore.upsert_market_analysis()` or a targeted same-row update.
-- [x] Verify final DB state, trust-gate/signal eligibility, and post-repair readability/style checks.
+- [x] Read repo instructions, workflow docs, API/frontend skill, API spec, and current finance relay-event display path.
+- [x] Add `NEWS-8` spec and update the requirement index.
+- [x] Preserve RSS author metadata when feeds expose it.
+- [x] Add a manual relay-event author backfill script that fetches article detail pages only for byline metadata and writes `raw_json.authors`.
+- [x] Render relay-event reporter names in finance cards from either `authors[]` or `rawJson.authors`.
+- [x] Run focused parser/frontend verification and record results.
+
+## 2026-06-27 Relay Finance Reporter Progress Notes
+- Finance cards read `GET /api/events?region=TW`, which maps to short-retention `t_relay_events`, not the Taiwan society/politics `t_news_articles` tables that already have normalized reporter relations.
+- Sampling recent Taiwan finance RSS rows showed most feed payloads do not include `<author>` / `dc:creator`, so reporter names require the same conservative article-detail byline extraction used by `NEWS-2`.
+- Chosen MVP path: keep the API shape stable and write enrichment into `t_relay_events.raw_json.authors` plus `raw_json.author_extraction`; do not add a schema migration unless finance reporter pages need long-lived identity relations later.
+- Implemented `scripts/backfill_relay_event_authors.py`, updated RSS raw metadata preservation, and added frontend card rendering through `relayEventReporterNames()`.
+- Added a relay-specific author sanitizer after dry-run found MoneyUDN site slug `edn`; it is now treated as low confidence instead of a reporter.
+- Backfilled latest 50 eligible relay-event rows: `present=37`, `low_confidence=13`, `parse_failed=0`, `updated=50`.
+
+## 2026-06-27 Relay Finance Reporter Verification
+- [x] `python -m unittest tests.test_rss_source tests.test_relay_event_author_backfill -v` passed: 10 tests.
+- [x] `python -m py_compile scripts/backfill_relay_event_authors.py src/news_collector/sources/rss.py` passed.
+- [x] `npm run lint -- src/lib/content-api.ts src/components/news-platform-dashboard.tsx src/components/infinite-news-feed.tsx` passed.
+- [x] Dry-run sanity check: 5 eligible rows produced `present=3`, `low_confidence=2`, and no parse failures after slug filtering.
+- [x] API smoke: `GET http://localhost:8081/api/events?page=1&pageSize=8&region=TW` returns `rawJson.authors` for recent finance rows.
+- [x] Frontend proxy smoke: `GET http://localhost:3000/api/content/events?page=1&pageSize=5&region=TW` returns authors such as `江明晏` and `李靚慧`.
+- [x] Frontend page smoke: `GET http://localhost:3000/` rendered HTML contains `記者`, `江明晏`, and `李靚慧`.
+
+## 2026-06-27 Truth Social Progress Notes
+- Added `TRUTH_SOCIAL_ENABLED`, `TRUTH_SOCIAL_ACCOUNTS`, `TRUTH_SOCIAL_MAX_RESULTS_PER_ACCOUNT`, and `TRUTH_SOCIAL_USER_AGENT` settings. Local `.env` now enables `https://truthsocial.com/@realDonaldTrump` without adding secrets.
+- Added `TruthSocialAccountSource`, wired it into `news_collector.main --source truthsocial`, `build_sources()`, relay polling, direct DB backfill helper, source-health probes, RAG/context source family, and the social-post upsert path.
+- Truth Social posts use `source=truthsocial:<handle>` in `t_relay_events` and mirror into the existing `t_x_posts` table with `tweet_id=truthsocial-<status_id>`, `username=<handle>`, and Truth Social metrics in `metrics_json`.
+- `news-platform-api` now defaults `GET /api/celebrity-events` to both `x:*` and `truthsocial:*`, and accepts `handle=truthsocial:realdonaldtrump` or a Truth Social profile URL.
+- `news-display-frontend` no longer hardcodes the home celebrity fetch to Elon only; source labels render `truthsocial:realdonaldtrump` as `Donald Trump`.
+- Ran a one-shot direct DB backfill: fetched 10 Trump Truth Social posts, stored 10 `t_relay_events` rows and 10 mirrored `t_x_posts` rows, with 0 duplicates and 0 failures.
+
+## 2026-06-27 Truth Social Verification
+- [x] `python -m unittest tests.test_truth_social tests.test_config tests.test_collector tests.test_relay_bridge tests.test_event_relay tests.test_context_pack_builder -v` passed: 38 tests.
+- [x] `python -m news_collector.main fetch --source truthsocial --limit 3 --title-url-only` fetched 3 recent Trump Truth Social items and respected the local limit guard.
+- [x] `mvnw.cmd -Dtest=ContentControllerCelebrityEventsTest test` passed with `JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.10.7-hotspot`.
+- [x] `npm run lint -- src/app/page.tsx src/lib/content-api.ts src/components/event-list.tsx src/components/infinite-news-feed.tsx src/components/news-platform-dashboard.tsx` passed.
+- [x] Restarted `news-platform-api` with `scripts/start_local_stack.ps1 -RestartApi -Check`.
+- [x] Verified `http://localhost:8081/api/celebrity-events?handle=truthsocial:realdonaldtrump&page=1&pageSize=3` returns Trump Truth Social rows.
+- [x] Verified `http://localhost:3000/api/content/celebrity-events?page=1&pageSize=3` returns Trump Truth Social rows through the frontend proxy.
+
+## Previous Automation Task
+- Task: Guard and repair the 2026-06-27 `pre_tw_open` market-analysis row if needed.
+- Requested by: automation
+- Start date: 2026-06-27
+- Scope: Inspect today's `t_market_analyses` `pre_tw_open` row plus raw telemetry, verify the Traditional Chinese readability and seven-section daily editorial contract, repair or create the row from local relay and market-context evidence only when needed, preserve Java delivery ownership, and verify final DB/trust-gate/signal state without calling paid external LLM APIs.
+
+## 2026-06-27 Pre-Open Guard Run
+- [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
+- [x] Confirmed calendar state for `2026-06-27 08:00` Taiwan time: Taiwan market is weekend-closed; relevant U.S. session date `2026-06-26` is open; allowed slots are `us_close` only.
+- [x] Confirmed no `analysis_date=2026-06-27` / `analysis_slot=pre_tw_open` row exists in `t_market_analyses`.
+- [x] No repair performed because creating a `pre_tw_open` row on a Taiwan weekend would violate market-calendar policy.
+- [x] No trade-signal extraction run; no repaired analysis id exists.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
 
 ## Progress Notes
 - 2026-06-21: Workspace already had many unrelated dirty files; this run stays scoped to `tasks/todo.md`, automation memory, and the target `pre_tw_open` analysis row.
@@ -44,3 +94,24 @@ Move completed or stale task logs to `tasks/archive/`.
 ## Current Review Summary
 - Outcome: Completed with no write; missing `2026-06-21 pre_tw_open` is calendar-correct.
 - Open risks: The automation still fires on a Sunday with no eligible daily slot, so the same no-op will recur unless the schedule skips weekly-summary days.
+
+## 2026-06-23 Run
+- [x] Read repo instructions plus Workflow 4C storage/guard and daily template decisions.
+- [x] Inspect today's `pre_tw_open` row, raw telemetry, garbled text, and visible style/template compliance.
+- [x] Repair/create the missing row from local evidence only and preserve Java delivery ownership.
+- [x] Verify final DB state, trade-signal count, and external-provider telemetry.
+
+### 2026-06-23 Progress Notes
+- Missing `analysis_date=2026-06-23` / `analysis_slot=pre_tw_open` row found; calendar allows `pre_tw_open` because Taiwan and the relevant U.S. session are regular trading days.
+- Repaired missing row as `t_market_analyses.id=174` through `MySqlEventStore.upsert_market_analysis()` using local relay/market-context evidence only.
+- Ran `scripts/run_trade_signal_extraction.ps1 -AnalysisId 174 -FixedPoolFallback`; stored 10 internal `t_trade_signals` monitor rows.
+- Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=1`, `pushed=0`, `structured_json` present, style/template check passed, garbled-text check passed, `external_provider_api_called=false`.
+
+## 2026-06-23 TW Close Guard Run
+- [x] Read repo instructions plus Workflow 4C storage/guard and daily template decisions.
+- [x] Found missing `analysis_date=2026-06-23` / `analysis_slot=tw_close` row while calendar allowed `tw_close`.
+- [x] Repaired missing row as `t_market_analyses.id=175` through `MySqlEventStore.upsert_market_analysis()` using local `market_context:tw_close` evidence only.
+- [x] Corrected an initial PowerShell stdin encoding write by rewriting the same row through a UTF-8 Python helper path, then removed the helper.
+- [x] Final verification: readable Traditional Chinese text, required seven-section daily editorial flow, exactly three `三個檢查點` bullets, no `台股配置`, no `今日個股觀察`, no entry/stop/target-price language.
+- [x] Final DB state: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `trust_gate.signals_allowed=false`, `push_enabled=0`, `pushed=0`, `structured_json` present, `external_provider_api_called=false`.
+- [x] Internal signal extraction skipped because current policy keeps `tw_close` storage-only and `trust_gate.signals_allowed=false`; `t_trade_signals` count for analysis id 175 is 0.

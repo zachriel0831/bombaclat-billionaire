@@ -167,6 +167,14 @@ def fetch_candidates(
 
 
 def repair_decision(candidate: RepairCandidate) -> RepairDecision:
+    normalized = normalize_authors(_parse_authors(candidate.authors_json))
+    if normalized:
+        return RepairDecision(
+            authors=normalized,
+            status=AUTHOR_STATUS_PRESENT,
+            method=candidate.method or AUTHOR_METHOD_LEGACY_AUTHORS_JSON,
+            confidence=candidate.confidence if candidate.confidence is not None else 1.0,
+        )
     raw_authors = extract_authors_from_text(candidate.raw_text)
     if raw_authors:
         return RepairDecision(
@@ -181,15 +189,6 @@ def repair_decision(candidate: RepairCandidate) -> RepairDecision:
             status=AUTHOR_STATUS_LOW_CONFIDENCE,
             method=AUTHOR_METHOD_ARTICLE_DETAIL,
             confidence=0.0,
-        )
-
-    normalized = normalize_authors(_parse_authors(candidate.authors_json))
-    if normalized:
-        return RepairDecision(
-            authors=normalized,
-            status=AUTHOR_STATUS_PRESENT,
-            method=candidate.method or AUTHOR_METHOD_LEGACY_AUTHORS_JSON,
-            confidence=candidate.confidence if candidate.confidence is not None else 1.0,
         )
 
     return RepairDecision(

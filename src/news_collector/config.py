@@ -50,6 +50,10 @@ class Settings:
     x_include_retweets: bool
     x_backfill_enabled: bool
     x_backfill_max_results_per_account: int
+    truth_social_enabled: bool
+    truth_social_accounts: list[str]
+    truth_social_max_results_per_account: int
+    truth_social_user_agent: str
     official_rss_feeds: list[str]
     official_rss_first_per_feed: bool
     http_timeout_seconds: int
@@ -69,6 +73,7 @@ def load_settings(env_file: str = ".env") -> Settings:
     feeds = os.getenv("OFFICIAL_RSS_FEEDS", "")
     feed_list = [s.strip() for s in feeds.split(",") if s.strip()] or DEFAULT_RSS_FEEDS
     x_accounts = [s.strip() for s in os.getenv("X_ACCOUNTS", "").split(",") if s.strip()]
+    truth_social_accounts = [s.strip() for s in os.getenv("TRUTH_SOCIAL_ACCOUNTS", "").split(",") if s.strip()]
     sec_tracked_tickers = [s.strip() for s in os.getenv("SEC_TRACKED_TICKERS", "").split(",") if s.strip()]
     twse_mops_tracked_codes = [s.strip() for s in os.getenv("TWSE_MOPS_TRACKED_CODES", "").split(",") if s.strip()]
     sec_allowed_forms = [
@@ -98,6 +103,17 @@ def load_settings(env_file: str = ".env") -> Settings:
         x_include_retweets=_parse_bool(os.getenv("X_INCLUDE_RETWEETS", "false")),
         x_backfill_enabled=_parse_bool(os.getenv("X_BACKFILL_ENABLED", "true")),
         x_backfill_max_results_per_account=max(1, min(100, int(os.getenv("X_BACKFILL_MAX_RESULTS_PER_ACCOUNT", "10")))),
+        truth_social_enabled=_parse_bool(os.getenv("TRUTH_SOCIAL_ENABLED", "false")),
+        truth_social_accounts=truth_social_accounts,
+        truth_social_max_results_per_account=max(1, min(40, int(os.getenv("TRUTH_SOCIAL_MAX_RESULTS_PER_ACCOUNT", "10")))),
+        truth_social_user_agent=(
+            os.getenv(
+                "TRUTH_SOCIAL_USER_AGENT",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "Chrome/126 Safari/537.36",
+            )
+            or ""
+        ).strip(),
         official_rss_feeds=feed_list,
         official_rss_first_per_feed=_parse_bool(os.getenv("OFFICIAL_RSS_FIRST_PER_FEED", "false")),
         http_timeout_seconds=int(os.getenv("HTTP_TIMEOUT_SECONDS", "15")),

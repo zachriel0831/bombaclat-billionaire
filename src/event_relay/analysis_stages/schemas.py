@@ -35,7 +35,18 @@ _EVENT_CATEGORY_ENUM = [
 _SENTIMENT_ENUM = ["bullish", "bearish", "neutral"]
 _DIRECTION_ENUM = ["bullish", "bearish", "mixed"]
 _CONFIDENCE_ENUM = ["low", "medium", "high"]
-_FIXED_TW_STOCK_WATCH_TICKERS = ["2330", "2603", "2882", "1605", "4956"]
+_FIXED_TW_STOCK_WATCH_TICKERS = [
+    "2330",
+    "2317",
+    "2454",
+    "2308",
+    "2881",
+    "2882",
+    "2485",
+    "3535",
+    "3715",
+    "2351",
+]
 _NULLABLE_STRING = ["string", "null"]
 _NULLABLE_NUMBER_OR_STRING = ["number", "string", "null"]
 

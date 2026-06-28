@@ -17,6 +17,11 @@ Set-Location $ProjectRoot
 $env:PYTHONPATH = "src"
 Write-Host "Extracting trade signals from market analyses..." -ForegroundColor Cyan
 
+$PythonExe = Join-Path $ProjectRoot ".venv\\Scripts\\python.exe"
+if (-not (Test-Path $PythonExe)) {
+  $PythonExe = "python"
+}
+
 $argsList = @(
   "-m", "event_relay.trade_signals",
   "--env-file", $EnvFile,
@@ -36,7 +41,7 @@ if ($FixedPoolFallback.IsPresent) {
   $argsList += "--fixed-pool-fallback"
 }
 
-& python @argsList
+& $PythonExe @argsList
 
 if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
