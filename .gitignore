@@ -8,12 +8,15 @@ __pycache__/
 .claude/worktrees/
 .secrets/
 .cache/
+.playwright-mcp/
 .trigger_state.json
 *.egg-info/
+logs/
 runtime/logs/
 runtime/prompts/
 runtime/state/
 runtime/*.log
+runtime/codex_guard_*_summary.txt
 daily_analysis_*.md
 query_output.txt
 data/stocks/*.json

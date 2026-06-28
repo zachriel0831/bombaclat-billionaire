@@ -1,9 +1,0 @@
-=src : 無法辨識 '=src' 詞彙是否為 Cmdlet、函數、指令檔或可執行程式的名稱。請檢查名稱拼字是否正確，如果包含路徑的話，請
-確認路徑是否正確，然後再試一次。
-位於 線路:1 字元:1
-+ ='src'; & '.\.venv\Scripts\python.exe' -m news_platform.main --env-fi ...
-+ ~~~~~~
-    + CategoryInfo          : ObjectNotFound: (=src:String) [], CommandNotFoundException
-    + FullyQualifiedErrorId : CommandNotFoundException
- 
-D:\work_space\stock\data-collecting\.venv\Scripts\python.exe: Error while finding module specification for 'news_platform.main' (ModuleNotFoundError: No module named 'news_platform')
