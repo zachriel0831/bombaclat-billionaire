@@ -12,6 +12,12 @@ These instructions apply to this repository.
 ## Global CTO Standards
 Before implementation or verification work, read and follow `D:\work_space\claude-box\rules\rules\cto-technical-standards.md`. If this repo file and the global CTO standards conflict, follow the higher-priority rule and note the conflict.
 
+## Git Commit And Push Workflow
+
+- After implementation and verification, stage only task-related files, create a local commit, and push the current branch to its configured upstream remote without waiting for an extra prompt.
+- If no upstream/remote exists, or push fails, report it clearly.
+- Never push secrets, ignored runtime files, or unrelated dirty changes.
+
 ## Context Loading
 Do not preload the whole `memory-bank/`.
 Read only the smallest useful set for the task.
