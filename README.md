@@ -4,6 +4,10 @@
 
 `data-collecting` is the ingestion, enrichment, analysis, and decision-memory center of the financial news platform. It collects market/news/public-record data, stores normalized events, runs scheduled market-analysis and weekly-summary jobs, extracts trade-signal candidates, and maintains the platform's richest documentation set.
 
+It also provides the context collection and Redis write helpers for the
+Codex-generated four-hour cross-section news digest. Codex automation writes the
+short-lived generated digest to Redis; this repo does not expose the public API.
+
 It does not own LINE delivery, the public API runtime, frontend rendering, live quote WebSocket monitoring, or broker order placement. Those boundaries are handled by sibling services.
 
 ## Total Index
@@ -76,6 +80,16 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - `KeywordWorker` writes `keywords_json`; `TopicWorker` writes deterministic issue classifications into `topics_json`; optional LLM fallback refines rule-fallback general rows
 - Topic MVP uses deterministic `TopicSpec` rules. Existing social/policy topics stay unscoped; politics second-layer topics are scoped to `category=politics` so political terms do not classify unrelated society rows. Rule no-hit rows temporarily fall back by article category: `general_social_news` / 一般社會新聞 or `general_politics_news` / 一般政治新聞.
 - Politics second-layer topic IDs are `elections`, `cross_strait_relations`, `foreign_affairs`, `legislative_policy`, `party_politics`, `political_accountability`, `defense_security`, and `public_budget`. Event-thread templates are specified in [spec/political-topic-thread-technical-plan.md](spec/political-topic-thread-technical-plan.md); persistent thread tables are deferred.
+
+7. Four-hour Codex news digest
+- `scripts/collect_four_hour_digest_context.py` reads compact context from
+  finance relay rows, society/politics articles, celebrity relay rows, and Free
+  Palestine long-term issue news.
+- Codex automation generates the Traditional Chinese digest from that context.
+- `scripts/store_four_hour_digest_to_redis.py` writes the latest digest to Redis
+  with a 15,000 second TTL for `news-platform-api` to read.
+- This digest is not stored in `t_market_analyses` and does not create LINE
+  delivery jobs.
 
 ## API key requirements
 

@@ -209,6 +209,10 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 
 11. Data-source health tracking
 - `scripts/run_data_source_health.ps1` / `scripts/check_data_source_health.py` produce a read-only freshness report for news-analysis inputs.
+- `scripts/run_four_hour_digest_context.ps1` collects compact context for the
+  Codex-generated four-hour cross-section news digest. Codex automation writes
+  the final JSON to Redis through `scripts/store_four_hour_digest_to_redis.ps1`
+  with a 15,000 second TTL; public API reads are owned by `news-platform-api`.
 - The report checks relay-side finance/public RSS, international RSS, X, Truth Social, SEC, TWSE/MOPS, US index tracker, market-context facts, BLS macro facts, Taiwan market-flow facts, and stored market analyses.
 - It also checks news-platform society/politics article freshness per category and per source, article enrichment gaps, public-record refresh freshness based on `updated_at`, article-record link freshness, and local Python process counts.
 - Status semantics: `OK` within expected cadence, `WARN` outside warn threshold, `STALE` outside stale threshold, `MISSING` no rows, and `ERROR` for query/connect failures.
@@ -221,15 +225,15 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `GET /healthz`
 - Storage: MySQL
   - `t_relay_events`
-- `t_x_posts`
-- `t_market_index_snapshots`
-- `t_market_analyses`
-- `t_event_embeddings`
-- `t_analysis_embeddings`
-- `t_trade_signals`
-- `t_signal_reviews`
-- `t_signal_outcomes`
-- `t_macro_release_calendar`
+  - `t_x_posts`
+  - `t_market_index_snapshots`
+  - `t_market_analyses`
+  - `t_event_embeddings`
+  - `t_analysis_embeddings`
+  - `t_trade_signals`
+  - `t_signal_reviews`
+  - `t_signal_outcomes`
+  - `t_macro_release_calendar`
 - Current behavior:
   - Crawler bridge owns normal source ingestion and writes event rows directly
   - `t_relay_events` is treated as event-only storage
@@ -241,6 +245,19 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Python should not be considered the LINE delivery service; Java is responsible for user-facing LINE push/webhook behavior
   - Python contains no LINE push/webhook/direct-push contact path
   - Daily retention cleanup for old event rows
+
+### Four-hour cross-section digest
+- Context source tables:
+  - `t_relay_events` for Taiwan finance/public news and celebrity/public-figure rows
+  - `news_platform.t_news_articles` for society and politics articles
+  - `t_palestine_news_items` for Free Palestine English issue news
+- Generated digest storage:
+  - Redis `news:digest:four-hour:latest`
+  - Redis `news:digest:four-hour:current-key`
+  - Versioned Redis keys under `news:digest:four-hour:*`
+- TTL is 15,000 seconds.
+- The digest is short-lived product state and is not persisted to
+  `t_market_analyses`.
 - Retention cleanup:
   - Default `RELAY_RETENTION_KEEP_DAYS=7`
   - Deletes old rows from both `t_relay_events` and `t_x_posts`

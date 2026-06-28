@@ -10,6 +10,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 - Heavyweight-stock earnings release-calendar collection for day-before LINE reminders.
 - Event relay storage into MySQL tables such as `t_relay_events`, `t_x_posts`, `t_market_index_snapshots`, and `t_market_analyses`.
 - Scheduled and manual AI market analysis, weekly summary generation, RAG indexing, claim verification, and fixed-watchlist trade-signal extraction.
+- Four-hour Codex-generated cross-section news digest context and Redis publish helpers.
 - Taiwan society/politics article collection, keyword extraction, topic classification, public-record ingestion, and article-record linking.
 - Engineering memory: architecture, workflows, decisions, lessons, and skill definitions.
 
@@ -50,6 +51,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | Free Palestine issue-news scheduled crawl | [spec/NEWS-6-free-palestine-news-scheduled-crawl.md](spec/NEWS-6-free-palestine-news-scheduled-crawl.md) |
 | U.S. macro release calendar reminders | [spec/NEWS-5-us-macro-release-calendar-reminders.md](spec/NEWS-5-us-macro-release-calendar-reminders.md) |
 | Heavyweight earnings calendar reminders | [spec/NEWS-7-heavyweight-earnings-calendar-reminders.md](spec/NEWS-7-heavyweight-earnings-calendar-reminders.md) |
+| Four-hour AI news digest | [spec/NEWS-9-four-hour-ai-news-digest.md](spec/NEWS-9-four-hour-ai-news-digest.md) |
 | News crawler category source list | [spec/news-crawler-category-sources.md](spec/news-crawler-category-sources.md) |
 
 ## Memory Bank
@@ -88,6 +90,8 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | Weekly summary | `powershell -ExecutionPolicy Bypass -File .\scripts\run_weekly_summary.ps1 -Force -DryRun` |
 | Market context | `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env` |
 | Free Palestine English issue news | `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 20` |
+| Four-hour digest context | `powershell -ExecutionPolicy Bypass -File .\scripts\run_four_hour_digest_context.ps1 -EnvFile .env -Hours 4 -OutFile runtime\four-hour-digest\context.json` |
+| Four-hour digest Redis store | `powershell -ExecutionPolicy Bypass -File .\scripts\store_four_hour_digest_to_redis.ps1 -InputFile runtime\four-hour-digest\digest.json -TtlSeconds 15000` |
 | U.S. macro release calendar | `powershell -ExecutionPolicy Bypass -File .\scripts\run_macro_calendar.ps1 -EnvFile .env` |
 | RAG indexing | `powershell -ExecutionPolicy Bypass -File .\scripts\run_rag_indexer.ps1 -EnvFile .env` |
 | Retention cleanup | `powershell -ExecutionPolicy Bypass -File .\scripts\run_retention_cleanup.ps1 -EnvFile .env` |

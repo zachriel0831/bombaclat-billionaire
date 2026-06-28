@@ -13,6 +13,7 @@ __pycache__/
 *.egg-info/
 logs/
 runtime/logs/
+runtime/four-hour-digest/
 runtime/prompts/
 runtime/state/
 runtime/*.log

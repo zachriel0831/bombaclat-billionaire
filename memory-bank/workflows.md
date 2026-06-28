@@ -164,6 +164,29 @@ Minimum evidence before reporting recovery complete:
 - Smoke `news-platform-api` endpoint `GET /api/timeline/news?page=1&pageSize=5`
 - Confirm `/timeline` table shows the English-news column without adding these sources to the finance feed
 
+## Workflow 3A-2: Four-Hour Codex News Digest
+Use this when refreshing the short-lived cross-section digest shown by
+`news-platform-api`.
+
+Codex automation id: `four-hour-cross-section-news-digest`.
+
+1. Collect context
+- `powershell -ExecutionPolicy Bypass -File .\scripts\run_four_hour_digest_context.ps1 -EnvFile .env -Hours 4 -OutFile runtime\four-hour-digest\context.json`
+- Confirm `sourceCounts` includes finance, society, politics, celebrity, and
+  Free Palestine keys.
+2. Generate digest
+- A Codex automation reads the context JSON and writes a concise Traditional
+  Chinese digest following `spec/NEWS-9-four-hour-ai-news-digest.md`.
+- Do not call paid OpenAI API from this repo.
+- Repair mojibake or replacement characters before storage.
+3. Store to Redis
+- `powershell -ExecutionPolicy Bypass -File .\scripts\store_four_hour_digest_to_redis.ps1 -InputFile runtime\four-hour-digest\digest.json -TtlSeconds 15000`
+- New version writes must complete before deleting the old version key.
+4. Verify API
+- `GET http://localhost:8081/api/digest/four-hour`
+- `available=true` when Redis has a valid digest; `available=false` is acceptable
+  only when no digest is ready or Redis is unavailable.
+
 ## Workflow 3B: Taiwan Society/Politics News Topic Classification
 1. Smoke check feeds without DB writes
 - `$env:PYTHONPATH='src'; python -m news_platform.main --smoke`

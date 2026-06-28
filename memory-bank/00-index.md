@@ -30,6 +30,7 @@ Do not read every file by default. Load only the file needed for the current tas
 - `memory-bank/09-decisions/2026-06-08-free-palestine-news-scheduled-crawl.md`: recurring `NewsCollector-PalestineNews` crawl for `/timeline` English issue news
 - `memory-bank/09-decisions/2026-06-08-us-macro-release-calendar-reminders.md`: official U.S. macro release-calendar storage and Java day-before LINE reminder boundary
 - `memory-bank/09-decisions/2026-06-08-heavyweight-earnings-calendar-reminders.md`: watched heavyweight earnings rows reuse `t_macro_release_calendar` and the grouped Java reminder
+- `memory-bank/09-decisions/2026-06-28-four-hour-codex-news-digest.md`: Codex-generated four-hour cross-section digest stored in Redis for API reads
 - `memory-bank/09-decisions/2026-05-09-visible-us-close-recommendations.md`: superseded deterministic visible fixed-pool watch section for delivery-eligible U.S. close analyses
 - `memory-bank/09-decisions/2026-05-11-fixed-market-analysis-watch-pool.md`: superseded fixed five-stock market_analysis watch pool decision
 - `memory-bank/09-decisions/2026-05-16-ten-stock-observation-template.md`: fixed ten-stock watch pool; superseded visible labels now render as `利多` / `利空` / `買入注意`

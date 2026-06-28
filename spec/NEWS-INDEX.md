@@ -36,7 +36,8 @@ system exists.
 | `NEWS-6` | `Done` | Free Palestine news scheduled crawl | [NEWS-6-free-palestine-news-scheduled-crawl.md](NEWS-6-free-palestine-news-scheduled-crawl.md) | Runs `event_relay.palestine_news` every 3 hours into long-term `t_palestine_news_items`. |
 | `NEWS-7` | `Done` | Heavyweight earnings calendar reminders | [NEWS-7-heavyweight-earnings-calendar-reminders.md](NEWS-7-heavyweight-earnings-calendar-reminders.md) | Extends `t_macro_release_calendar` with `earnings_<symbol>` rows from Nasdaq / manual overrides; Java groups earnings with macro reminders. |
 | `NEWS-8` | `Done` | Finance relay-event reporter enrichment | [NEWS-8-finance-relay-event-reporter-enrichment.md](NEWS-8-finance-relay-event-reporter-enrichment.md) | Enriches short-retention finance RSS rows in `t_relay_events.raw_json` with byline names for frontend display. |
+| `NEWS-9` | `In Progress` | Four-hour AI news digest | [NEWS-9-four-hour-ai-news-digest.md](NEWS-9-four-hour-ai-news-digest.md) | Codex automation summarizes finance, society, politics, celebrity, and Free Palestine context into Redis for API reads. |
 
 ## Next ID
 
-The next requirement ID is `NEWS-9`.
+The next requirement ID is `NEWS-10`.
