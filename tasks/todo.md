@@ -81,6 +81,14 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] No trade-signal extraction run; no repaired analysis id exists.
 - [x] No OpenAI, Anthropic, or paid external LLM API was called.
 
+## 2026-06-29 Pre-Open Guard Run
+- [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
+- [x] Confirmed calendar state for `2026-06-29 08:00` Taiwan time: Taiwan market open; relevant U.S. session date `2026-06-28` weekend-closed; `pre_tw_open` is eligible without fresh U.S. close context.
+- [x] Found missing `analysis_date=2026-06-29` / `analysis_slot=pre_tw_open` row and repaired it as `t_market_analyses.id=191` through `MySqlEventStore.upsert_market_analysis()` using local relay and market-context evidence only.
+- [x] Ran `scripts/run_trade_signal_extraction.ps1 -AnalysisId 191 -FixedPoolFallback`; stored 10 internal monitor rows.
+- [x] Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=1`, `pushed=0`, `structured_json` present, style/template check passed, garbled-text check passed, `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
+
 ## Progress Notes
 - 2026-06-21: Workspace already had many unrelated dirty files; this run stays scoped to `tasks/todo.md`, automation memory, and the target `pre_tw_open` analysis row.
 - 2026-06-21: The global CTO standards file still renders as mojibake in this shell, but repo-local AGENTS and Workflow 4C decisions provide the actionable guard/storage rules and no conflicting instruction was found.
