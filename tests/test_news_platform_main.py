@@ -51,6 +51,8 @@ class MainConfigTests(unittest.TestCase):
             ("moj_prosecution_disposition_stats", "mojac_daily_custody"),
         )
         self.assertEqual(parse_public_sources("housing,housing-price-index"), ("taipei_housing_price_index",))
+        self.assertEqual(parse_public_sources("low-birthrate,birth-monthly"), ("ris_birth_monthly_stats",))
+        self.assertEqual(parse_public_sources("drug-abuse,drug-case-stats"), ("npa_drug_case_stats",))
 
     def test_parse_public_sources_defaults_to_all_stable_sources(self):
         self.assertEqual(parse_public_sources(None), DEFAULT_PUBLIC_RECORD_SOURCES)

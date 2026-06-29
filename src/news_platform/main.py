@@ -45,6 +45,10 @@ from news_platform.public_sources.npa_public_records import (
     NpaTrafficAccidentA1Source,
     NpaTrafficAccidentA2StatsSource,
 )
+from news_platform.public_sources.society_public_records import (
+    NpaDrugCaseStatsSource,
+    RisBirthMonthlyStatsSource,
+)
 from news_platform.registry import FeedSpec, SUPPORTED_TW_CATEGORIES, tw_news_feeds
 from news_platform.sources.base import NewsSource
 from news_platform.sources.ettoday_list import EttodayNewsListSource
@@ -77,6 +81,8 @@ DEFAULT_PUBLIC_RECORD_SOURCES = (
     "moj_prosecution_disposition_stats",
     "mojac_daily_custody",
     "taipei_housing_price_index",
+    "ris_birth_monthly_stats",
+    "npa_drug_case_stats",
 )
 
 HEALTHCARE_PUBLIC_RECORD_SOURCES = (
@@ -96,6 +102,14 @@ JUSTICE_PUBLIC_RECORD_SOURCES = (
 
 HOUSING_PUBLIC_RECORD_SOURCES = (
     "taipei_housing_price_index",
+)
+
+BIRTHRATE_PUBLIC_RECORD_SOURCES = (
+    "ris_birth_monthly_stats",
+)
+
+DRUG_PUBLIC_RECORD_SOURCES = (
+    "npa_drug_case_stats",
 )
 
 
@@ -216,6 +230,12 @@ def build_public_record_sources(
             continue
         if name == "taipei_housing_price_index":
             sources.append(TaipeiHousingPriceIndexSource(timeout_seconds=settings.http_timeout_seconds))
+            continue
+        if name == "ris_birth_monthly_stats":
+            sources.append(RisBirthMonthlyStatsSource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
+            continue
+        if name == "npa_drug_case_stats":
+            sources.append(NpaDrugCaseStatsSource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
             continue
         supported = ", ".join(DEFAULT_PUBLIC_RECORD_SOURCES)
         raise ValueError(f"Unsupported public record source: {name}. Supported: {supported}")
@@ -404,6 +424,16 @@ def parse_public_sources(value: str | None) -> tuple[str, ...]:
                 if housing_source not in sources:
                     sources.append(housing_source)
             continue
+        if normalized in {"birthrate", "low_birthrate", "fertility", "population", "birth"}:
+            for birthrate_source in BIRTHRATE_PUBLIC_RECORD_SOURCES:
+                if birthrate_source not in sources:
+                    sources.append(birthrate_source)
+            continue
+        if normalized in {"drug", "drugs", "drug_abuse", "campus_drug", "emerging_drug"}:
+            for drug_source in DRUG_PUBLIC_RECORD_SOURCES:
+                if drug_source not in sources:
+                    sources.append(drug_source)
+            continue
         if normalized == "all":
             for default_source in DEFAULT_PUBLIC_RECORD_SOURCES:
                 if default_source not in sources:
@@ -455,6 +485,10 @@ def parse_public_sources(value: str | None) -> tuple[str, ...]:
             normalized = "mojac_daily_custody"
         elif normalized in {"taipei_housing", "taipei_home_price", "housing_price_index"}:
             normalized = "taipei_housing_price_index"
+        elif normalized in {"ris_birth", "ris_birth_stats", "birth_monthly", "birth_monthly_stats"}:
+            normalized = "ris_birth_monthly_stats"
+        elif normalized in {"npa_drug", "npa_drug_case", "drug_case", "drug_case_stats"}:
+            normalized = "npa_drug_case_stats"
         if normalized not in sources:
             sources.append(normalized)
     return tuple(sources or DEFAULT_PUBLIC_RECORD_SOURCES)

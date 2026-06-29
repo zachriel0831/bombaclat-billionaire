@@ -229,12 +229,16 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - Healthcare-only public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources healthcare`
 - Justice/corrections public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources justice`
 - Housing public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources housing`
+- Low-birthrate public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources low_birthrate`
+- Drug-abuse public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources drug_abuse`
 - Date window override: add `--public-record-from YYYY-MM-DD --public-record-to YYYY-MM-DD`
 2. Collect one batch into `t_public_records`
 - `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources all`
 - Healthcare-only public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources healthcare`
 - Justice/corrections public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources justice`
 - Housing public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources housing`
+- Low-birthrate public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources low_birthrate`
+- Drug-abuse public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources drug_abuse`
 - Use `--public-record-limit N` for controlled smoke writes
 3. Link articles to public records
 - `$env:PYTHONPATH='src'; python -m news_platform.main --link-public-records`
