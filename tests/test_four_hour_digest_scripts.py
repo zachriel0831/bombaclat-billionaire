@@ -17,6 +17,7 @@ from store_four_hour_digest_to_redis import (  # noqa: E402
     load_payload,
     redis_config,
     safe_key_fragment,
+    store_digest,
     validate_digest,
 )
 
@@ -93,6 +94,26 @@ class FourHourDigestScriptTest(unittest.TestCase):
         self.assertEqual(config.host, "127.0.0.1")
         self.assertEqual(config.port, 6379)
         self.assertEqual(config.db, 0)
+
+    def test_store_digest_keeps_latest_without_ttl(self) -> None:
+        class FakeRedis:
+            def __init__(self) -> None:
+                self.commands: list[tuple[str, ...]] = []
+
+            def execute(self, *args: str):
+                self.commands.append(args)
+                if args[0] == "GET":
+                    return b"old-version"
+                return "OK"
+
+        client = FakeRedis()
+        store_digest(client, "latest", "current", "version", '{"ok":true}', 15000)
+
+        self.assertIn(("SET", "version", '{"ok":true}', "EX", "15000"), client.commands)
+        self.assertIn(("SET", "latest", '{"ok":true}'), client.commands)
+        self.assertIn(("SET", "current", "version"), client.commands)
+        self.assertNotIn(("SET", "latest", '{"ok":true}', "EX", "15000"), client.commands)
+        self.assertIn(("DEL", "old-version"), client.commands)
 
 
 if __name__ == "__main__":

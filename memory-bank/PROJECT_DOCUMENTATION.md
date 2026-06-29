@@ -252,11 +252,10 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `news_platform.t_news_articles` for society and politics articles
   - `t_palestine_news_items` for Free Palestine English issue news
 - Generated digest storage:
-  - Redis `news:digest:four-hour:latest`
-  - Redis `news:digest:four-hour:current-key`
-  - Versioned Redis keys under `news:digest:four-hour:*`
-- TTL is 15,000 seconds.
-- The digest is short-lived product state and is not persisted to
+  - Redis `news:digest:four-hour:latest` stores the non-expiring latest display payload
+  - Redis `news:digest:four-hour:current-key` stores the non-expiring current version pointer
+  - Versioned Redis keys under `news:digest:four-hour:*` expire after 15,000 seconds
+- The digest is Redis product state and is not persisted to
   `t_market_analyses`.
 - Retention cleanup:
   - Default `RELAY_RETENTION_KEEP_DAYS=7`

@@ -38,7 +38,8 @@ calls from `data-collecting`.
 2. The Codex scheduled task summarizes the context into plain Traditional
    Chinese, sectioned by product area.
 3. `scripts/store_four_hour_digest_to_redis.py` writes the generated JSON to
-   Redis with TTL `15000` seconds.
+   Redis: versioned keys expire, while the latest display key persists until a
+   newer valid digest replaces it.
 4. `news-platform-api` reads only the latest Redis key via:
    - `GET /api/digest/four-hour`
 
@@ -53,13 +54,15 @@ Default keys:
 Replacement behavior:
 
 1. Write the new versioned key with TTL.
-2. Write `latest` with the same payload and TTL.
-3. Write `current-key` with the new version key and TTL.
+2. Write `latest` with the same payload and no TTL.
+3. Write `current-key` with the new version key and no TTL.
 4. Delete the previous version key only after the new writes succeed.
 
 TTL:
 
-- `15000` seconds, equal to 4 hours and 10 minutes.
+- Versioned digest keys use `15000` seconds, equal to 4 hours and 10 minutes.
+- `latest` and `current-key` intentionally do not expire, so the homepage keeps
+  showing the last successful digest if one automation run is missed.
 
 ## Digest JSON Shape
 
@@ -118,13 +121,15 @@ Healthy response:
 {
   "available": true,
   "key": "news:digest:four-hour:latest",
-  "ttlSeconds": 14722,
   "digest": {
     "summaryId": "four-hour-2026-06-28T12-00-00+08-00"
   },
   "servedAt": "2026-06-28T04:03:00Z"
 }
 ```
+
+`ttlSeconds` is optional; the API may omit it when the latest key has no Redis
+expiry.
 
 Missing/unavailable Redis response:
 

@@ -184,6 +184,9 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 3. Store to Redis
 - `powershell -ExecutionPolicy Bypass -File .\scripts\store_four_hour_digest_to_redis.ps1 -InputFile runtime\four-hour-digest\digest.json -TtlSeconds 15000`
 - New version writes must complete before deleting the old version key.
+- Versioned keys expire after the TTL; `latest` and `current-key` do not expire,
+  so the public homepage keeps the last successful digest between automation
+  runs.
 4. Verify API
 - `GET http://localhost:8081/api/digest/four-hour`
 - `available=true` when Redis has a valid digest; `available=false` is acceptable

@@ -1,7 +1,8 @@
 """Store a generated four-hour digest JSON document in Redis.
 
-The latest key is replaced only after a versioned key write succeeds. After the
-new latest value is committed, the previous version key is deleted.
+The latest display key is replaced only after a versioned key write succeeds.
+Version keys expire; the latest key and current pointer do not, so one missed
+automation run does not blank the homepage.
 """
 
 from __future__ import annotations
@@ -50,14 +51,7 @@ def main() -> int:
     client = RedisRespClient(config)
     try:
         client.connect()
-        old_key = decode_bulk(client.execute("GET", args.current_key))
-        client.execute("MULTI")
-        client.execute("SET", version_key, payload, "EX", str(ttl))
-        client.execute("SET", args.latest_key, payload, "EX", str(ttl))
-        client.execute("SET", args.current_key, version_key, "EX", str(ttl))
-        client.execute("EXEC")
-        if old_key and old_key != version_key:
-            client.execute("DEL", old_key)
+        store_digest(client, args.latest_key, args.current_key, version_key, payload, ttl)
     finally:
         client.close()
 
@@ -98,6 +92,17 @@ def decode_bulk(value):
     if isinstance(value, bytes):
         return value.decode("utf-8")
     return str(value)
+
+
+def store_digest(client, latest_key: str, current_key: str, version_key: str, payload: str, ttl: int) -> None:
+    old_key = decode_bulk(client.execute("GET", current_key))
+    client.execute("MULTI")
+    client.execute("SET", version_key, payload, "EX", str(ttl))
+    client.execute("SET", latest_key, payload)
+    client.execute("SET", current_key, version_key)
+    client.execute("EXEC")
+    if old_key and old_key != version_key:
+        client.execute("DEL", old_key)
 
 
 @dataclass(frozen=True)

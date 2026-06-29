@@ -6,7 +6,7 @@
 
 It also provides the context collection and Redis write helpers for the
 Codex-generated four-hour cross-section news digest. Codex automation writes the
-short-lived generated digest to Redis; this repo does not expose the public API.
+latest successful digest to Redis; this repo does not expose the public API.
 
 It does not own LINE delivery, the public API runtime, frontend rendering, live quote WebSocket monitoring, or broker order placement. Those boundaries are handled by sibling services.
 
@@ -86,8 +86,9 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
   finance relay rows, society/politics articles, celebrity relay rows, and Free
   Palestine long-term issue news.
 - Codex automation generates the Traditional Chinese digest from that context.
-- `scripts/store_four_hour_digest_to_redis.py` writes the latest digest to Redis
-  with a 15,000 second TTL for `news-platform-api` to read.
+- `scripts/store_four_hour_digest_to_redis.py` writes versioned digest keys with
+  a 15,000 second TTL, then updates the non-expiring latest display key for
+  `news-platform-api` to read.
 - This digest is not stored in `t_market_analyses` and does not create LINE
   delivery jobs.
 
