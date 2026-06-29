@@ -73,6 +73,19 @@ Move completed or stale task logs to `tasks/archive/`.
 - Start date: 2026-06-27
 - Scope: Inspect today's `t_market_analyses` `pre_tw_open` row plus raw telemetry, verify the Traditional Chinese readability and seven-section daily editorial contract, repair or create the row from local relay and market-context evidence only when needed, preserve Java delivery ownership, and verify final DB/trust-gate/signal state without calling paid external LLM APIs.
 
+## 2026-06-30 Pre-Open Guard Run
+- [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
+- [x] Inspect today's `pre_tw_open` row, raw telemetry, garbled text, and visible style/template compliance.
+- [x] Repair only if missing or unhealthy, using local evidence only.
+- [x] Verify final DB state, trade-signal count, and external-provider telemetry.
+
+### 2026-06-30 Progress Notes
+- Missing `analysis_date=2026-06-30` / `analysis_slot=pre_tw_open` row found; calendar allows `pre_tw_open` because Taiwan and relevant U.S. session are regular trading days.
+- Repaired missing row as `t_market_analyses.id=195` through `MySqlEventStore.upsert_market_analysis()` using local relay, market-context, and market-snapshot evidence only.
+- Ran `scripts/run_trade_signal_extraction.ps1 -AnalysisId 195 -FixedPoolFallback`; stored 10 internal monitor rows.
+- Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=1`, `pushed=0`, `structured_json` present, style/template check passed, garbled-text check passed, `external_provider_api_called=false`.
+- No OpenAI, Anthropic, or paid external LLM API was called.
+
 ## 2026-06-27 Pre-Open Guard Run
 - [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
 - [x] Confirmed calendar state for `2026-06-27 08:00` Taiwan time: Taiwan market is weekend-closed; relevant U.S. session date `2026-06-26` is open; allowed slots are `us_close` only.
