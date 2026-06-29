@@ -35,6 +35,12 @@ The tone should read like a professional public-affairs column, not a raw model
 report. Internal field names such as `scorecard`, `context_pack`, or pipeline
 stage labels must not be shown to users.
 
+`body_markdown` must be long-form enough to stand alone as an analysis article:
+target 1,200 to 2,000 Chinese characters for the MVP root-cause article. Use
+plain Markdown with a blank line after every heading, for example
+`## 一句話\n\n...`, so frontend renderers do not merge section titles and body
+copy into one oversized heading.
+
 ## Non-Goals
 
 - No full CMS or rich editor in this step.
