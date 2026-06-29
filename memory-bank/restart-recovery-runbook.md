@@ -158,9 +158,26 @@ Look for:
 
 - `X token preflight: resolved` if X is expected
 - `Starting X account stream` or reconnect/backfill messages
+- `X startup backfill complete` and `X filtered stream connected` when X is enabled
+- `Polling source=truthsocial fetched=<n>` when Truth Social is enabled
 - `Polling source=rss fetched=<n>`
 - stored/duplicate counts for RSS/SEC/TWSE/MOPS
 - US index tracker messages if enabled
+
+If X is stale and the log shows `X stream got 429 and X_STOP_ON_429=true`,
+restart the source bridge; this mode intentionally stops the stream until a
+fresh process starts.
+
+If Truth Social is stale, first prove the source still works without writing:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m news_collector.main fetch --source truthsocial --limit 5 --env-file .env --title-url-only --pretty --log-level INFO
+```
+
+If the no-write fetch succeeds but the bridge log has no
+`Polling source=truthsocial`, restart the source bridge so it reloads `.env`
+and resumes polling.
 
 News platform:
 
@@ -353,5 +370,9 @@ Do not report restart recovery complete until there is evidence for:
 - `news_platform` log has a recent cycle and topic pass or no pending work
 - society/politics DB check has same-day rows and no stale missing topics after catch-up
 - finance RSS DB check has same-day `official_rss` rows
+- if X is enabled, bridge log shows X backfill/stream evidence or a current
+  X health row
+- if Truth Social is enabled, bridge log shows `Polling source=truthsocial` or
+  a current Truth Social health row
 - pre-open DB check has today's `pre_tw_open` or calendar-guarded `macro_daily` row
 - if `pre_tw_open` ran, `t_trade_signals` has same-day dynamic candidate rows, historical fixed-pool fallback rows with a clear migration note, or the analysis records a clear data gap

@@ -52,6 +52,8 @@ Minimum evidence before reporting recovery complete:
 - `event_relay.main`, `news_collector.relay_bridge`, and `news_platform.main --loop` are running
 - `http://127.0.0.1:18090/healthz` returns `{"ok": true}`
 - source bridge log shows recent `Polling source=rss fetched=<n>`
+- if enabled, X has current backfill/stream evidence or a current health row
+- if enabled, Truth Social has `Polling source=truthsocial` evidence or a current health row
 - `news_platform` log shows a recent crawl/keyword/topic cycle
 - DB checks show same-day society/politics rows in `news_platform.t_news_articles`
 - DB checks show same-day finance RSS rows in `news_relay.t_relay_events`
