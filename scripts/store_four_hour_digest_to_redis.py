@@ -21,6 +21,7 @@ DEFAULT_TTL_SECONDS = 15_000
 DEFAULT_LATEST_KEY = "news:digest:four-hour:latest"
 DEFAULT_CURRENT_KEY = "news:digest:four-hour:current-key"
 DEFAULT_PREFIX = "news:digest:four-hour:"
+MOJIBAKE_RE = re.compile(r"[\ufffd\u0080-\u009f\ue000-\uf8ff]|\?{3,}")
 
 
 def main() -> int:
@@ -64,21 +65,53 @@ def load_payload(input_file: str) -> str:
         payload = sys.stdin.read()
     else:
         payload = Path(input_file).read_text(encoding="utf-8-sig")
-    return json.dumps(json.loads(payload), ensure_ascii=False, separators=(",", ":"))
+    return json.dumps(repair_mojibake(json.loads(payload)), ensure_ascii=False, separators=(",", ":"))
 
 
 def validate_digest(payload: str) -> dict:
-    if "\ufffd" in payload:
-        raise ValueError("digest contains replacement characters")
-    if re.search(r"\?{3,}", payload):
-        raise ValueError("digest contains repeated question-mark blocks")
     digest = json.loads(payload)
     if not isinstance(digest, dict):
         raise ValueError("digest must be a JSON object")
+    if contains_mojibake(digest):
+        raise ValueError("digest contains likely mojibake text")
     for field in ("windowStart", "windowEnd", "generatedAt", "sections"):
         if field not in digest:
             raise ValueError(f"missing required digest field: {field}")
     return digest
+
+
+def repair_mojibake(value):
+    if isinstance(value, dict):
+        return {key: repair_mojibake(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [repair_mojibake(item) for item in value]
+    if isinstance(value, str):
+        return repair_mojibake_text(value)
+    return value
+
+
+def repair_mojibake_text(value: str) -> str:
+    if not looks_mojibake(value):
+        return value
+    try:
+        repaired = value.encode("latin-1").decode("utf-8")
+    except UnicodeError:
+        return value
+    return repaired if not looks_mojibake(repaired) else value
+
+
+def contains_mojibake(value) -> bool:
+    if isinstance(value, dict):
+        return any(contains_mojibake(item) for item in value.values())
+    if isinstance(value, list):
+        return any(contains_mojibake(item) for item in value)
+    if isinstance(value, str):
+        return looks_mojibake(value)
+    return False
+
+
+def looks_mojibake(value: str) -> bool:
+    return bool(MOJIBAKE_RE.search(value))
 
 
 def safe_key_fragment(value: str) -> str:

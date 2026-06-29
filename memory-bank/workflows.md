@@ -183,6 +183,9 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - Repair mojibake or replacement characters before storage.
 3. Store to Redis
 - `powershell -ExecutionPolicy Bypass -File .\scripts\store_four_hour_digest_to_redis.ps1 -InputFile runtime\four-hour-digest\digest.json -TtlSeconds 15000`
+- The store helper repairs obvious UTF-8/Latin-1 mojibake and rejects payloads
+  that still contain replacement characters, private-use glyphs, or repeated
+  question-mark blocks.
 - New version writes must complete before deleting the old version key.
 - Versioned keys expire after the TTL; `latest` and `current-key` do not expire,
   so the public homepage keeps the last successful digest between automation

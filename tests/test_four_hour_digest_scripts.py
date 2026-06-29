@@ -16,6 +16,7 @@ from collect_four_hour_digest_context import clean_text, filter_usable_items, lo
 from store_four_hour_digest_to_redis import (  # noqa: E402
     load_payload,
     redis_config,
+    repair_mojibake_text,
     safe_key_fragment,
     store_digest,
     validate_digest,
@@ -72,6 +73,10 @@ class FourHourDigestScriptTest(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             validate_digest(payload)
+
+    def test_repair_mojibake_text_fixes_latin1_decoded_utf8(self) -> None:
+        bad = "近四小時".encode("utf-8").decode("latin-1")
+        self.assertEqual(repair_mojibake_text(bad), "近四小時")
 
     def test_load_payload_accepts_utf8_bom_files(self) -> None:
         path = ROOT / "runtime" / "four-hour-digest" / "bom-test.json"

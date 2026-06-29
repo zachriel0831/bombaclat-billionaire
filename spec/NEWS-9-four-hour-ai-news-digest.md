@@ -80,16 +80,16 @@ TTL:
     "celebrity": 4,
     "free_palestine": 3
   },
-  "headline": "過去四小時，台股消息集中在權值股與資金面，社會與政治新聞則以即時突發與政策攻防為主。",
+  "headline": "過去四小時，財經、社會與政治新聞同步升溫。",
   "sections": [
     {
       "key": "finance",
       "title": "財經",
-      "summary": "權值股與產業新聞仍是主要焦點，市場等待下一批總經與企業財報訊號。",
+      "summary": "財經新聞集中在半導體、匯率與大型權值股動向。",
       "items": [
         {
-          "title": "台股權值股盤中震盪，市場關注外資與電子族群動向",
-          "source": "公開財經新聞來源",
+          "title": "半導體供應鏈延續資金關注",
+          "source": "公開財經新聞",
           "publishedAt": "2026-06-28 10:30:00",
           "url": "https://example.com"
         }
@@ -164,3 +164,4 @@ temporarily unavailable.
 - `powershell -ExecutionPolicy Bypass -File .\scripts\run_four_hour_digest_context.ps1 -EnvFile .env -Hours 4 -OutFile runtime\four-hour-digest\context.json`
 - `powershell -ExecutionPolicy Bypass -File .\scripts\store_four_hour_digest_to_redis.ps1 -InputFile <generated-json> -TtlSeconds 15000`
 - `GET http://localhost:8081/api/digest/four-hour`
+
