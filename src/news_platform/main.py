@@ -22,6 +22,7 @@ from news_platform.keyword_worker import KeywordWorker
 from news_platform.pipeline import fetch_all, run_once
 from news_platform.public_record_matcher import PublicRecordLinkWorker
 from news_platform.public_record_pipeline import fetch_all_public_records, run_public_records_once
+from news_platform.public_sources.housing_public_records import TaipeiHousingPriceIndexSource
 from news_platform.public_sources.healthcare_public_records import (
     HealthcareLegislativeBillSource,
     MohwClinicWorkforceSource,
@@ -75,6 +76,7 @@ DEFAULT_PUBLIC_RECORD_SOURCES = (
     "mohw_nursing_staff_stats",
     "moj_prosecution_disposition_stats",
     "mojac_daily_custody",
+    "taipei_housing_price_index",
 )
 
 HEALTHCARE_PUBLIC_RECORD_SOURCES = (
@@ -90,6 +92,10 @@ HEALTHCARE_PUBLIC_RECORD_SOURCES = (
 JUSTICE_PUBLIC_RECORD_SOURCES = (
     "moj_prosecution_disposition_stats",
     "mojac_daily_custody",
+)
+
+HOUSING_PUBLIC_RECORD_SOURCES = (
+    "taipei_housing_price_index",
 )
 
 
@@ -207,6 +213,9 @@ def build_public_record_sources(
             continue
         if name == "mojac_daily_custody":
             sources.append(MojacDailyCustodyStatsSource(timeout_seconds=settings.http_timeout_seconds))
+            continue
+        if name == "taipei_housing_price_index":
+            sources.append(TaipeiHousingPriceIndexSource(timeout_seconds=settings.http_timeout_seconds))
             continue
         supported = ", ".join(DEFAULT_PUBLIC_RECORD_SOURCES)
         raise ValueError(f"Unsupported public record source: {name}. Supported: {supported}")
@@ -390,6 +399,11 @@ def parse_public_sources(value: str | None) -> tuple[str, ...]:
                 if justice_source not in sources:
                     sources.append(justice_source)
             continue
+        if normalized in {"housing", "housing_justice", "housing_price", "home_price"}:
+            for housing_source in HOUSING_PUBLIC_RECORD_SOURCES:
+                if housing_source not in sources:
+                    sources.append(housing_source)
+            continue
         if normalized == "all":
             for default_source in DEFAULT_PUBLIC_RECORD_SOURCES:
                 if default_source not in sources:
@@ -439,6 +453,8 @@ def parse_public_sources(value: str | None) -> tuple[str, ...]:
             "prison_custody",
         }:
             normalized = "mojac_daily_custody"
+        elif normalized in {"taipei_housing", "taipei_home_price", "housing_price_index"}:
+            normalized = "taipei_housing_price_index"
         if normalized not in sources:
             sources.append(normalized)
     return tuple(sources or DEFAULT_PUBLIC_RECORD_SOURCES)

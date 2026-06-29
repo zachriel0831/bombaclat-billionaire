@@ -160,9 +160,11 @@ $env:PYTHONPATH='src'; python -m news_platform.main --llm-topic-fallback
 $env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources all
 $env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources healthcare
 $env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources justice
+$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources housing
 $env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources all
 $env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources healthcare
 $env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources justice
+$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources housing
 $env:PYTHONPATH='src'; python -m news_platform.main --link-public-records
 $env:PYTHONPATH='src'; python -m news_platform.main --loop
 ```
@@ -182,7 +184,7 @@ Storage:
 - Rule no-hit politics rows use `[{"topic_id":"general_politics_news","label":"一般政治新聞","score":0.0,"source":"rule_fallback"}]`
 - LLM fallback results use `source:"llm"` plus `provider` and `model`; if LLM still finds no specific topic, the row stays in its category-specific general topic with `source:"llm_fallback"`
 - Structured official datasets do not go into `t_news_articles`; they are upserted into `t_public_records` and linked back to related articles through `t_news_article_public_record_links`.
-- Official public-record sources: Legislative Yuan legal proposals (`ly_bills`), healthcare-filtered Legislative Yuan proposals (`ly_healthcare_bills`), NPA 165 fraud-rumor open data (`npa_fraud_rumors`), NPA A1 traffic accident open data (`npa_traffic_a1`), NPA A2 traffic accident monthly statistics (`npa_traffic_a2_stats`), NPA drunk-driving annual statistics (`npa_drunk_driving_stats`), NPA fraud blocked-domain statistics (`npa_fraud_blocked_domain_stats`), NPA fraud enforcement dashboard statistics (`npa_fraud_enforcement_stats`), NHI healthcare capacity sources (`nhi_hospital_nursing_staff`, `nhi_hospital_bed_occupancy`), MOHW annual healthcare capacity sources (`mohw_hospital_workforce`, `mohw_clinic_workforce`, `mohw_hospital_beds`, `mohw_nursing_staff_stats`), MOJ prosecution disposition statistics (`moj_prosecution_disposition_stats`), and Agency of Corrections daily custody statistics (`mojac_daily_custody`). Use `--public-sources healthcare` or `--public-sources justice` for focused subsets.
+- Official public-record sources: Legislative Yuan legal proposals (`ly_bills`), healthcare-filtered Legislative Yuan proposals (`ly_healthcare_bills`), NPA 165 fraud-rumor open data (`npa_fraud_rumors`), NPA A1 traffic accident open data (`npa_traffic_a1`), NPA A2 traffic accident monthly statistics (`npa_traffic_a2_stats`), NPA drunk-driving annual statistics (`npa_drunk_driving_stats`), NPA fraud blocked-domain statistics (`npa_fraud_blocked_domain_stats`), NPA fraud enforcement dashboard statistics (`npa_fraud_enforcement_stats`), NHI healthcare capacity sources (`nhi_hospital_nursing_staff`, `nhi_hospital_bed_occupancy`), MOHW annual healthcare capacity sources (`mohw_hospital_workforce`, `mohw_clinic_workforce`, `mohw_hospital_beds`, `mohw_nursing_staff_stats`), MOJ prosecution disposition statistics (`moj_prosecution_disposition_stats`), Agency of Corrections daily custody statistics (`mojac_daily_custody`), and Taipei housing price index (`taipei_housing_price_index`). Use `--public-sources healthcare`, `--public-sources justice`, or `--public-sources housing` for focused subsets.
 - Article-record matching uses deterministic high-precision rules for Legislative Yuan bills, healthcare-filtered Legislative Yuan bills, and NPA 165 fraud-rumor records. Links are written with source-specific `matched_by` values and evidence in `evidence_json`.
 
 Optional table-name env keys:

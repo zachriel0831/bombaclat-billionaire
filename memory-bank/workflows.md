@@ -228,11 +228,13 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources all`
 - Healthcare-only public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources healthcare`
 - Justice/corrections public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources justice`
+- Housing public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources housing`
 - Date window override: add `--public-record-from YYYY-MM-DD --public-record-to YYYY-MM-DD`
 2. Collect one batch into `t_public_records`
 - `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources all`
 - Healthcare-only public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources healthcare`
 - Justice/corrections public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources justice`
+- Housing public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources housing`
 - Use `--public-record-limit N` for controlled smoke writes
 3. Link articles to public records
 - `$env:PYTHONPATH='src'; python -m news_platform.main --link-public-records`
@@ -251,6 +253,8 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - Query justice/corrections public records by:
   - `source_id='moj' AND record_type='moj_prosecution_disposition_stat'`
   - `source_id='mojac' AND record_type='mojac_daily_custody_stat'`
+- Query housing public records by:
+  - `source_id='taipei_open_data' AND record_type='taipei_housing_price_index'`
 - Confirm `raw_json` keeps upstream API params and source fields
 - Confirm `metrics_json` includes term/session fields and `cosignatory_count` for Legislative Yuan records, content length for NPA 165 records, casualty/party/geolocation fields for A1 traffic records, monthly/yearly aggregate count fields for NPA statistic records, nurse/staff/bed counts for healthcare capacity records, bed occupancy rates for NHI occupancy records, prosecution-disposition counts for MOJ records, and custody/capacity/over-capacity fields for corrections records
 - Query `t_news_article_public_record_links` joined with article/record tables; inspect `confidence`, `matched_by`, and `evidence_json`
