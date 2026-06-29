@@ -186,6 +186,8 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - The store helper repairs obvious UTF-8/Latin-1 mojibake and rejects payloads
   that still contain replacement characters, private-use glyphs, or repeated
   question-mark blocks.
+- It also rejects internal quality-control copy about encoding failures,
+  unreliable identification, or intentionally omitting concrete details.
 - New version writes must complete before deleting the old version key.
 - Versioned keys expire after the TTL; `latest` and `current-key` do not expire,
   so the public homepage keeps the last successful digest between automation

@@ -155,6 +155,8 @@ temporarily unavailable.
 - Mention data gaps only when a section is empty or query failed.
 - Reject or repair mojibake, replacement characters, and repeated question-mark
   blocks before Redis storage.
+- Reject internal quality-control copy such as encoding-failure notes,
+  "cannot reliably identify" wording, or "do not list concrete details" wording.
 - Store to Redis only after JSON validates.
 
 ## Verification

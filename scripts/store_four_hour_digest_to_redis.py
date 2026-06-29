@@ -22,6 +22,11 @@ DEFAULT_LATEST_KEY = "news:digest:four-hour:latest"
 DEFAULT_CURRENT_KEY = "news:digest:four-hour:current-key"
 DEFAULT_PREFIX = "news:digest:four-hour:"
 MOJIBAKE_RE = re.compile(r"[\ufffd\u0080-\u009f\ue000-\uf8ff]|\?{3,}")
+INVALID_DIGEST_TEXT_RE = re.compile(
+    "\u7de8\u78bc|\u7121\u6cd5\u53ef\u9760|\u4e0d\u5217\u5177\u9ad4|"
+    "\u4e0d\u505a(?:\u4eba\u7269|\u653f\u7b56|\u89e3\u8b80)|"
+    "\u9700\u5148\u4fee\u6b63|\u5148\u4fdd\u7559\u91cd\u9ede\u8a0a\u865f|\u907f\u514d\u8aa4\u5c0e"
+)
 
 
 def main() -> int:
@@ -111,7 +116,7 @@ def contains_mojibake(value) -> bool:
 
 
 def looks_mojibake(value: str) -> bool:
-    return bool(MOJIBAKE_RE.search(value))
+    return bool(MOJIBAKE_RE.search(value) or INVALID_DIGEST_TEXT_RE.search(value))
 
 
 def safe_key_fragment(value: str) -> str:

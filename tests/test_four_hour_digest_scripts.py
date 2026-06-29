@@ -74,6 +74,20 @@ class FourHourDigestScriptTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_digest(payload)
 
+    def test_validate_digest_rejects_internal_encoding_failure_copy(self) -> None:
+        payload = json.dumps(
+            {
+                "windowStart": "2026-06-28T08:00:00+08:00",
+                "windowEnd": "2026-06-28T12:00:00+08:00",
+                "generatedAt": "2026-06-28T12:01:00+08:00",
+                "headline": "\u672c\u5730\u4e2d\u6587\u5167\u5bb9\u9700\u5148\u4fee\u6b63\u7de8\u78bc",
+                "sections": [],
+            },
+            ensure_ascii=False,
+        )
+        with self.assertRaises(ValueError):
+            validate_digest(payload)
+
     def test_repair_mojibake_text_fixes_latin1_decoded_utf8(self) -> None:
         bad = "近四小時".encode("utf-8").decode("latin-1")
         self.assertEqual(repair_mojibake_text(bad), "近四小時")
