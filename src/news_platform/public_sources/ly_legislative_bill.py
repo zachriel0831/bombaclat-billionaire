@@ -93,6 +93,91 @@ class LegislativeBillSource:
         return records
 
 
+BUDGET_BILL_KEYWORDS = (
+    "預算",
+    "歲入",
+    "歲出",
+    "決算",
+    "財政",
+    "舉債",
+    "公債",
+    "採購",
+    "補助",
+    "津貼",
+    "支援金",
+    "統籌分配款",
+    "公共建設",
+    "基金",
+)
+
+
+class BudgetLegislativeBillSource:
+    source_id = "ly"
+    record_type = "budget_legislative_bill"
+    category = "politics"
+
+    def __init__(
+        self,
+        *,
+        timeout_seconds: int = 20,
+        lookback_days: int = 365,
+        keywords: tuple[str, ...] = BUDGET_BILL_KEYWORDS,
+    ) -> None:
+        self.timeout_seconds = timeout_seconds
+        self.lookback_days = max(1, int(lookback_days))
+        self.keywords = keywords
+        self.name = "ly:budget_legislative_bill"
+        self._base = LegislativeBillSource(
+            timeout_seconds=timeout_seconds,
+            lookback_days=self.lookback_days,
+        )
+
+    def fetch(self, *, limit: int | None = None, **kwargs: Any) -> list[PublicRecord]:
+        records = self._base.fetch(limit=None, **kwargs)
+        filtered = []
+        for record in records:
+            terms = matched_budget_bill_terms(record, self.keywords)
+            if terms:
+                filtered.append(budget_bill_record_from_base(record, terms))
+        filtered.sort(key=lambda r: r.occurred_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        if limit is not None:
+            filtered = filtered[: max(1, int(limit))]
+        return filtered
+
+
+def matched_budget_bill_terms(record: PublicRecord, keywords: tuple[str, ...] = BUDGET_BILL_KEYWORDS) -> tuple[str, ...]:
+    haystack = " ".join(
+        str(value or "")
+        for value in (
+            record.title,
+            record.raw.get("billName"),
+            record.raw.get("billStatus"),
+        )
+    )
+    return tuple(keyword for keyword in keywords if keyword in haystack)
+
+
+def budget_bill_record_from_base(record: PublicRecord, matched_terms: tuple[str, ...]) -> PublicRecord:
+    raw = dict(record.raw)
+    raw["base_record_id"] = record.record_id
+    raw["base_record_type"] = record.record_type
+    raw["matched_budget_terms"] = list(matched_terms)
+    return PublicRecord(
+        record_id="ly:budget_legislative_bill:" + stable_id(record.record_id),
+        source_id=record.source_id,
+        record_type="budget_legislative_bill",
+        country=record.country,
+        category=record.category,
+        title=record.title,
+        url=record.url,
+        occurred_at=record.occurred_at,
+        region=record.region,
+        metrics=record.metrics,
+        tags=["預算與公共資源", *matched_terms],
+        raw=raw,
+    )
+
+
 def parse_legislative_bill_payload(payload: str | bytes) -> list[dict[str, Any]]:
     text = payload.decode("utf-8", errors="replace") if isinstance(payload, bytes) else payload
     stripped = text.strip()

@@ -8,6 +8,7 @@ from datetime import date
 from unittest.mock import patch
 
 from news_platform.public_sources.ly_legislative_bill import (
+    BudgetLegislativeBillSource,
     LegislativeBillSource,
     parse_legislative_bill_payload,
     parse_roc_date,
@@ -28,6 +29,29 @@ ROWS = [
         "billCosignatory": "陳玉珍 ; 王鴻薇 ; 翁曉玲",
         "billStatus": "",
     }
+]
+
+BUDGET_ROWS = [
+    {
+        "date": "1150626",
+        "term": "11",
+        "sessionPeriod": "05",
+        "sessionTimes": "15",
+        "billName": "中央政府總預算案",
+        "billProposer": "行政院",
+        "billCosignatory": "",
+        "billStatus": "",
+    },
+    {
+        "date": "1150626",
+        "term": "11",
+        "sessionPeriod": "05",
+        "sessionTimes": "15",
+        "billName": "道路交通管理處罰條例部分條文修正草案",
+        "billProposer": "委員",
+        "billCosignatory": "",
+        "billStatus": "",
+    },
 ]
 
 
@@ -74,6 +98,21 @@ class LegislativeBillSourceTests(unittest.TestCase):
 
     def test_split_names_trims_semicolon_rows(self):
         self.assertEqual(split_names("陳玉珍 ; 王鴻薇   ; "), ["陳玉珍", "王鴻薇"])
+
+    def test_budget_source_filters_budget_related_bills(self):
+        source = BudgetLegislativeBillSource(timeout_seconds=5, lookback_days=3)
+        with patch(
+            "news_platform.public_sources.ly_legislative_bill.http_get_text",
+            return_value=json.dumps(BUDGET_ROWS, ensure_ascii=False),
+        ):
+            records = source.fetch(from_date=date(2026, 6, 20), to_date=date(2026, 6, 26), limit=10)
+
+        self.assertEqual(len(records), 1)
+        self.assertTrue(records[0].record_id.startswith("ly:budget_legislative_bill:"))
+        self.assertEqual(records[0].record_type, "budget_legislative_bill")
+        self.assertEqual(records[0].title, "中央政府總預算案")
+        self.assertIn("預算與公共資源", records[0].tags)
+        self.assertEqual(records[0].raw["base_record_type"], "legislative_bill")
 
 
 if __name__ == "__main__":

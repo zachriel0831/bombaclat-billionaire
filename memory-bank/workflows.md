@@ -231,6 +231,7 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 ## Workflow 3C: Taiwan Official Public Records
 1. Smoke check official public-record sources without DB writes
 - `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources all`
+- Budget/public-resource public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources public_budget`
 - Healthcare-only public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources healthcare`
 - Justice/corrections public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources justice`
 - Housing public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources housing`
@@ -239,6 +240,7 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - Date window override: add `--public-record-from YYYY-MM-DD --public-record-to YYYY-MM-DD`
 2. Collect one batch into `t_public_records`
 - `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources all`
+- Budget/public-resource public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources public_budget`
 - Healthcare-only public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources healthcare`
 - Justice/corrections public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources justice`
 - Housing public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources housing`

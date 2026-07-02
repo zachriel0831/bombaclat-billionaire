@@ -36,7 +36,7 @@ from news_platform.public_sources.justice_public_records import (
     MojProsecutionDispositionStatsSource,
     MojacDailyCustodyStatsSource,
 )
-from news_platform.public_sources.ly_legislative_bill import LegislativeBillSource
+from news_platform.public_sources.ly_legislative_bill import BudgetLegislativeBillSource, LegislativeBillSource
 from news_platform.public_sources.npa_public_records import (
     NpaDrunkDrivingStatsSource,
     NpaFraudBlockedDomainStatsSource,
@@ -65,6 +65,7 @@ logger = logging.getLogger("news_platform")
 
 DEFAULT_PUBLIC_RECORD_SOURCES = (
     "ly_bills",
+    "ly_budget_bills",
     "ly_healthcare_bills",
     "npa_fraud_rumors",
     "npa_traffic_a1",
@@ -93,6 +94,10 @@ HEALTHCARE_PUBLIC_RECORD_SOURCES = (
     "mohw_clinic_workforce",
     "mohw_hospital_beds",
     "mohw_nursing_staff_stats",
+)
+
+BUDGET_PUBLIC_RECORD_SOURCES = (
+    "ly_budget_bills",
 )
 
 JUSTICE_PUBLIC_RECORD_SOURCES = (
@@ -175,6 +180,14 @@ def build_public_record_sources(
                 LegislativeBillSource(
                     timeout_seconds=settings.http_timeout_seconds,
                     lookback_days=lookback_days,
+                )
+            )
+            continue
+        if name == "ly_budget_bills":
+            sources.append(
+                BudgetLegislativeBillSource(
+                    timeout_seconds=settings.http_timeout_seconds,
+                    lookback_days=max(lookback_days, 365),
                 )
             )
             continue
@@ -414,6 +427,11 @@ def parse_public_sources(value: str | None) -> tuple[str, ...]:
                 if healthcare_source not in sources:
                     sources.append(healthcare_source)
             continue
+        if normalized in {"budget", "public_budget", "budget_bills", "ly_budget", "ly_budget_bills"}:
+            for budget_source in BUDGET_PUBLIC_RECORD_SOURCES:
+                if budget_source not in sources:
+                    sources.append(budget_source)
+            continue
         if normalized in {"justice", "judicial", "judicial_burden", "judicial_injustice", "case_backlog"}:
             for justice_source in JUSTICE_PUBLIC_RECORD_SOURCES:
                 if justice_source not in sources:
@@ -441,6 +459,8 @@ def parse_public_sources(value: str | None) -> tuple[str, ...]:
             continue
         if normalized in {"ly", "legislative_bill", "legislative_bills"}:
             normalized = "ly_bills"
+        elif normalized in {"budget_legislative_bill", "budget_legislative_bills"}:
+            normalized = "ly_budget_bills"
         elif normalized in {"ly_healthcare", "healthcare_bills", "healthcare_legislative_bill"}:
             normalized = "ly_healthcare_bills"
         elif normalized in {"165", "npa_165", "fraud_rumor", "fraud_rumors"}:

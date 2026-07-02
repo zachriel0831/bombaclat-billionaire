@@ -24,6 +24,7 @@ class MainConfigTests(unittest.TestCase):
     def test_parse_public_sources_normalizes_aliases(self):
         self.assertEqual(parse_public_sources("ly, legislative-bills,ly_bills"), ("ly_bills",))
         self.assertEqual(parse_public_sources("healthcare-bills"), ("ly_healthcare_bills",))
+        self.assertEqual(parse_public_sources("public-budget,budget-bills"), ("ly_budget_bills",))
         self.assertEqual(parse_public_sources("165, traffic-a1"), ("npa_fraud_rumors", "npa_traffic_a1"))
         self.assertEqual(
             parse_public_sources("traffic-a2,drunk-driving,blocked-domains,anti-fraud-dashboard"),
