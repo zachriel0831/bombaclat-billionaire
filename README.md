@@ -389,7 +389,7 @@ $env:PYTHONPATH='src'; python -m news_collector.main fetch --source x --limit 10
 Required `.env` keys for X:
 - `X_ENABLED=true`
 - `X_BEARER_TOKEN_FILE=.secrets/x_bearer_token.dpapi` (or `X_BEARER_TOKEN`)
-- `X_ACCOUNTS=https://x.com/elonmusk,https://x.com/realDonaldTrump`
+- `X_ACCOUNTS=https://x.com/elonmusk,https://x.com/realDonaldTrump,https://x.com/aleabitoreddit`
 - `X_AUTO_HEAL_TOO_MANY_CONNECTIONS=true` (recommended)
 - `X_HEAL_COOLDOWN_SECONDS=45`
 - `X_BACKFILL_ENABLED=true`

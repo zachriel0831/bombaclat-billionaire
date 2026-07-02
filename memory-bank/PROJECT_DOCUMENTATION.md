@@ -20,7 +20,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 ## Ingestion Sources
 1. X filtered stream
 - Requires X bearer token (supports DPAPI file fallback)
-- Tracks allowlisted accounts
+- Tracks allowlisted accounts from `X_ACCOUNTS`; current local allowlist includes Elon Musk, Donald Trump, and Serenity (`https://x.com/aleabitoreddit`)
 - Auto-heal for `429 TooManyConnections` by terminating stale connections and reconnecting
 - Bridge startup performs a one-shot X backfill for tracked accounts before attaching the live stream, so recent gap tweets can still be written directly to `t_relay_events` and `t_x_posts`
 
