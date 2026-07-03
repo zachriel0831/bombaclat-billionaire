@@ -4,16 +4,25 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-03 `pre_tw_open` market-analysis row if needed.
+- Task: Guard and repair the 2026-07-04 pre-open-owned market-analysis row if needed.
 - Requested by: automation
-- Start date: 2026-07-03
-- Scope: Inspect today's `t_market_analyses` `pre_tw_open` row plus raw telemetry, verify readability and the seven-section daily editorial contract, repair or create the row from local relay and market-context evidence only when needed, preserve Java delivery ownership, run internal fixed-pool signal extraction only after a successful repair, and verify final DB/trust-gate/signal state without calling paid external LLM APIs.
+- Start date: 2026-07-04
+- Scope: Inspect today's `t_market_analyses` `pre_tw_open` or calendar-owned `macro_daily` row plus raw telemetry, verify readability and the seven-section daily editorial contract, repair or create the row from local relay and market-context evidence only when needed, preserve Java delivery ownership, run internal fixed-pool signal extraction only after a successful signal-eligible repair, and verify final DB/trust-gate/signal state without calling paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, automation memory, Workflow 4C guard rules, and daily template decisions.
 - [x] Inspect today's `pre_tw_open` row, raw telemetry, garbled text, and visible style/template compliance.
 - [x] Repair/create the row from local evidence only if missing or unhealthy.
 - [x] Verify final DB state, trade-signal count, and external-provider telemetry.
+
+## 2026-07-04 Pre-Open Guard Run
+- [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
+- [x] Confirmed calendar allows only `macro_daily` for 2026-07-04 because Taiwan is weekend-closed and the relevant U.S. session is the NYSE Independence Day observed holiday.
+- [x] Found no `analysis_date=2026-07-04` / `analysis_slot IN ('pre_tw_open','macro_daily')` row.
+- [x] Repaired missing row as `t_market_analyses.id=206` / `analysis_slot=macro_daily` through `MySqlEventStore.upsert_market_analysis()` using local relay, market-context, and market-snapshot evidence only.
+- [x] Ran `scripts/run_trade_signal_extraction.ps1 -AnalysisId 206 -FixedPoolFallback`; macro row produced 0 internal monitor rows as expected.
+- [x] Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=1`, `pushed=0`, `structured_json` present, style/template check passed with 3 checkpoint bullets, garbled-text check passed, `t_trade_signals` count 0, `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
 
 ## 2026-07-03 Pre-Open Guard Run
 - [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
