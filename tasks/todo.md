@@ -4,16 +4,24 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-04 pre-open-owned market-analysis row if needed.
+- Task: Guard and repair the 2026-07-05 weekly pre-open market-analysis row if needed.
 - Requested by: automation
 - Start date: 2026-07-04
-- Scope: Inspect today's `t_market_analyses` `pre_tw_open` or calendar-owned `macro_daily` row plus raw telemetry, verify readability and the seven-section daily editorial contract, repair or create the row from local relay and market-context evidence only when needed, preserve Java delivery ownership, run internal fixed-pool signal extraction only after a successful signal-eligible repair, and verify final DB/trust-gate/signal state without calling paid external LLM APIs.
+- Scope: Inspect target Sunday `t_market_analyses` `weekly_tw_preopen` row, verify the three-section Traditional Chinese weekly contract, repair or create the row from local relay, market-context, and history/RAG evidence only when needed, preserve Java delivery ownership, and verify final DB state without calling paid external LLM APIs.
 
 ## Plan
-- [x] Read repo instructions, automation memory, Workflow 4C guard rules, and daily template decisions.
-- [x] Inspect today's `pre_tw_open` row, raw telemetry, garbled text, and visible style/template compliance.
+- [x] Read repo instructions, automation memory, Workflow 4C/4D weekly storage rules, weekly contract decision, and active lessons.
+- [x] Inspect target Sunday `weekly_tw_preopen` row, raw telemetry, garbled text, and section compliance.
 - [x] Repair/create the row from local evidence only if missing or unhealthy.
-- [x] Verify final DB state, trade-signal count, and external-provider telemetry.
+- [x] Verify final DB state, section order, garbled-text checks, delivery flags, evidence counts, and external-provider telemetry.
+
+## 2026-07-05 Weekly Guard Run
+- [x] Read repo instructions, automation memory, Workflow 4C/4D weekly storage rules, weekly contract decision, and active lessons.
+- [x] Found no `analysis_date=2026-07-05` / `analysis_slot=weekly_tw_preopen` row.
+- [x] Repaired missing weekly row as `t_market_analyses.id=208` through `MySqlEventStore.upsert_market_analysis()` using local relay events, market-context rows, recent analysis history, and local RAG availability only.
+- [x] Final verification: section order `週總經` -> `下週台股配置` -> `下週觀察清單`, exactly 3 headings, garbled/mojibake check passed, no entry/stop-loss/target-price wording, `push_enabled=1`, `pushed=0`, `raw_json.dimension=weekly`, `raw_json.delivery_owner=java`, `raw_json.external_provider_api_called=false`.
+- [x] Evidence counts: `events_used=4159`, `market_rows_used=418`, local RAG available with `t_event_embeddings=26969` and `t_analysis_embeddings=153`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
 
 ## 2026-07-04 Pre-Open Guard Run
 - [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
