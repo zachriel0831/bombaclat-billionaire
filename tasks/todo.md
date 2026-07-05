@@ -4,6 +4,26 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
+- Task: Produce the 2026-W27 Free Palestine weekly editorial.
+- Requested by: automation
+- Start date: 2026-07-05
+- Scope: Read local `t_palestine_news_items` rows for 2026-06-28 through 2026-07-05 exclusive Asia/Taipei, draft one Traditional Chinese editorial from sourced facts only, upsert `t_palestine_editorials`, validate the saved row, and avoid paid external LLM APIs.
+
+## Plan
+- [x] Read repo instructions and prior automation memory.
+- [x] Extract and review matching Palestine issue-news rows.
+- [x] Upsert the weekly editorial row.
+- [x] Read back and validate the saved editorial.
+- [x] Update automation memory and report result.
+
+## 2026-07-05 Free Palestine Weekly Editorial Run
+- [x] Source window: 2026-06-28 through 2026-07-05 exclusive, Asia/Taipei.
+- [x] Reviewed 102 local `t_palestine_news_items` rows: google_news_en 49, al_jazeera_en 45, bbc_middle_east_en 3, guardian_palestine_en 5.
+- [x] Upserted `t_palestine_editorials.editorial_id=palestine-weekly-2026-W27` with `status=published`.
+- [x] Validation passed: readable Traditional Chinese, no mojibake/question-mark block, source count matches saved source IDs, no raw JSON dump in body, no fabricated URL citations in body.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
+
+## Previous Task
 - Task: Guard and repair the 2026-07-05 weekly pre-open market-analysis row if needed.
 - Requested by: automation
 - Start date: 2026-07-04
