@@ -4,6 +4,28 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
+- Task: Guard and repair the 2026-07-07 pre-open market-analysis row if needed.
+- Requested by: automation
+- Start date: 2026-07-07
+- Scope: Inspect today's `pre_tw_open` row, repair missing/unhealthy storage from local relay and market-context evidence only, preserve Java delivery ownership, run fixed-pool monitor extraction after repair, and verify DB state without paid external LLM APIs.
+
+## Plan
+- [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's daily analysis row.
+- [x] Repair/create the row from local evidence only if missing or unhealthy.
+- [x] Run targeted internal trade-signal extraction after repair.
+- [x] Verify final DB state, visible template, garbled text, and provider telemetry.
+
+## 2026-07-07 Pre-Open Guard Run
+- [x] Calendar allows `pre_tw_open`: Taiwan regular trading day and relevant U.S. close session date 2026-07-06 was a regular trading day.
+- [x] Found no `analysis_date=2026-07-07` / `analysis_slot IN ('pre_tw_open','macro_daily')` row.
+- [x] Repaired missing row as `t_market_analyses.id=215` through `MySqlEventStore.upsert_market_analysis()` using local relay and market-context evidence only.
+- [x] Rewrote the same row through a UTF-8 helper path after PowerShell stdin mangled the first Chinese write, then removed the helper.
+- [x] Ran `scripts/run_trade_signal_extraction.ps1 -AnalysisId 215 -FixedPoolFallback`; stored 10 internal monitor rows.
+- [x] Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `trust_gate.signals_allowed=true`, `push_enabled=1`, `pushed=0`, `structured_json` present, style/template check passed with 3 checkpoint bullets, garbled-text check passed, `t_trade_signals` count 10, `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
+
+## Previous Task
 - Task: Produce the 2026-W27 Free Palestine weekly editorial.
 - Requested by: automation
 - Start date: 2026-07-05
