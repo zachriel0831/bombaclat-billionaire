@@ -22,6 +22,10 @@ from news_platform.keyword_worker import KeywordWorker
 from news_platform.pipeline import fetch_all, run_once
 from news_platform.public_record_matcher import PublicRecordLinkWorker
 from news_platform.public_record_pipeline import fetch_all_public_records, run_public_records_once
+from news_platform.public_sources.cwa_disaster_public_records import (
+    CwaEarthquakeReportSource,
+    CwaTyphoonReportSource,
+)
 from news_platform.public_sources.housing_public_records import TaipeiHousingPriceIndexSource
 from news_platform.public_sources.healthcare_public_records import (
     HealthcareLegislativeBillSource,
@@ -116,6 +120,13 @@ BIRTHRATE_PUBLIC_RECORD_SOURCES = (
 DRUG_PUBLIC_RECORD_SOURCES = (
     "npa_drug_case_stats",
 )
+
+WEATHER_PUBLIC_RECORD_SOURCES = (
+    "cwa_typhoon_report",
+    "cwa_earthquake_report",
+)
+
+SUPPORTED_PUBLIC_RECORD_SOURCES = DEFAULT_PUBLIC_RECORD_SOURCES + WEATHER_PUBLIC_RECORD_SOURCES
 
 
 def build_source(spec: FeedSpec, settings: NewsPlatformSettings) -> NewsSource:
@@ -250,7 +261,13 @@ def build_public_record_sources(
         if name == "npa_drug_case_stats":
             sources.append(NpaDrugCaseStatsSource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
             continue
-        supported = ", ".join(DEFAULT_PUBLIC_RECORD_SOURCES)
+        if name == "cwa_typhoon_report":
+            sources.append(CwaTyphoonReportSource(timeout_seconds=max(settings.http_timeout_seconds, 20)))
+            continue
+        if name == "cwa_earthquake_report":
+            sources.append(CwaEarthquakeReportSource(timeout_seconds=max(settings.http_timeout_seconds, 20)))
+            continue
+        supported = ", ".join(SUPPORTED_PUBLIC_RECORD_SOURCES)
         raise ValueError(f"Unsupported public record source: {name}. Supported: {supported}")
     return sources
 
@@ -327,7 +344,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=",".join(DEFAULT_PUBLIC_RECORD_SOURCES),
         help=(
             "Comma-separated public-record sources. "
-            f"Supported: {', '.join(DEFAULT_PUBLIC_RECORD_SOURCES)}."
+            f"Supported: {', '.join(SUPPORTED_PUBLIC_RECORD_SOURCES)}."
         ),
     )
     parser.add_argument(
@@ -452,8 +469,13 @@ def parse_public_sources(value: str | None) -> tuple[str, ...]:
                 if drug_source not in sources:
                     sources.append(drug_source)
             continue
+        if normalized in {"weather", "cwa", "cwa_weather", "cwa_disaster", "disaster"}:
+            for weather_source in WEATHER_PUBLIC_RECORD_SOURCES:
+                if weather_source not in sources:
+                    sources.append(weather_source)
+            continue
         if normalized == "all":
-            for default_source in DEFAULT_PUBLIC_RECORD_SOURCES:
+            for default_source in SUPPORTED_PUBLIC_RECORD_SOURCES:
                 if default_source not in sources:
                     sources.append(default_source)
             continue
@@ -509,6 +531,10 @@ def parse_public_sources(value: str | None) -> tuple[str, ...]:
             normalized = "ris_birth_monthly_stats"
         elif normalized in {"npa_drug", "npa_drug_case", "drug_case", "drug_case_stats"}:
             normalized = "npa_drug_case_stats"
+        elif normalized in {"typhoon", "cwa_typhoon"}:
+            normalized = "cwa_typhoon_report"
+        elif normalized in {"earthquake", "cwa_earthquake"}:
+            normalized = "cwa_earthquake_report"
         if normalized not in sources:
             sources.append(normalized)
     return tuple(sources or DEFAULT_PUBLIC_RECORD_SOURCES)

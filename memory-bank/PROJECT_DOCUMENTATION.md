@@ -205,6 +205,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Taipei housing price index (`taipei_housing_price_index`, included in `housing`): `https://data.gov.tw/dataset/121381`, stored as `source_id=taipei_open_data`, `record_type=taipei_housing_price_index`, `category=society`, tagged `housing_justice`; rows track monthly index, change rates, standard total price, and unit price per ping
   - RIS monthly birth statistics (`ris_birth_monthly_stats`, included in `low_birthrate`): `https://data.gov.tw/dataset/77140`, stored as `source_id=ris`, `record_type=ris_birth_monthly_stat`, `category=society`, tagged `low_birthrate`; rows aggregate village-level monthly births/deaths/marriages/divorces into region and national records
   - NPA drug-case statistics (`npa_drug_case_stats`, included in `drug_abuse`): `https://data.gov.tw/dataset/57268`, stored as `source_id=npa`, `record_type=npa_drug_case_stat`, `category=society`, tagged `drug_abuse`; rows aggregate quarterly case records into monthly region records with suspect count, net weight, school-place count, and top drug kinds
+  - CWA typhoon and earthquake reports (`cwa_typhoon_report`, `cwa_earthquake_report`, included in `cwa_weather`): Central Weather Administration OpenData API, stored as `source_id=cwa`, `category=society`, tagged `weather`; configured through local `.env` key `CWA_AUTHORIZATION`, with optional `CWA_TYPHOON_DATASET_ID` and `CWA_EARTHQUAKE_DATASET_ID`
 - Current article-record matchers:
   - Legislative Yuan bills and healthcare-filtered bills: deterministic `ly_bill_rule`, using full bill title, law names, proposer/cosignatory names, and date distance; CLI `--link-public-records`
   - NPA 165 fraud rumors: deterministic `npa_fraud_rumor_rule`, using full title or fraud-context title terms plus date distance; A1 traffic records, NPA statistic records, healthcare capacity records, and justice/corrections statistics are ingested but not auto-linked until higher-precision location/event/stat-context matching is available
@@ -212,6 +213,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 
 11. Data-source health tracking
 - `scripts/run_data_source_health.ps1` / `scripts/check_data_source_health.py` produce a read-only freshness report for news-analysis inputs.
+- `scripts/run_cwa_weather.ps1` collects CWA typhoon/earthquake public records; `scripts/register_cwa_weather_task.ps1` registers `NewsCollector-CwaWeather` on a 30-minute cadence by default.
 - `scripts/run_four_hour_digest_context.ps1` collects compact context for the
   Codex-generated four-hour cross-section news digest. Codex automation writes
   the final JSON to Redis through `scripts/store_four_hour_digest_to_redis.ps1`

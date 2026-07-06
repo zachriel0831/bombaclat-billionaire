@@ -92,6 +92,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | Free Palestine English issue news | `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 20` |
 | Four-hour digest context | `powershell -ExecutionPolicy Bypass -File .\scripts\run_four_hour_digest_context.ps1 -EnvFile .env -Hours 4 -OutFile runtime\four-hour-digest\context.json` |
 | Four-hour digest Redis store | `powershell -ExecutionPolicy Bypass -File .\scripts\store_four_hour_digest_to_redis.ps1 -InputFile runtime\four-hour-digest\digest.json -TtlSeconds 15000` |
+| CWA typhoon/earthquake records | `powershell -ExecutionPolicy Bypass -File .\scripts\run_cwa_weather.ps1 -EnvFile .env` |
 | U.S. macro release calendar | `powershell -ExecutionPolicy Bypass -File .\scripts\run_macro_calendar.ps1 -EnvFile .env` |
 | RAG indexing | `powershell -ExecutionPolicy Bypass -File .\scripts\run_rag_indexer.ps1 -EnvFile .env` |
 | Retention cleanup | `powershell -ExecutionPolicy Bypass -File .\scripts\run_retention_cleanup.ps1 -EnvFile .env` |
