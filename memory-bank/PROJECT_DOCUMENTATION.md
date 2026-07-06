@@ -179,6 +179,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   3. `TopicWorker` reads rows where `topics_json IS NULL AND keywords_json IS NOT NULL`
   4. deterministic classifier writes up to three specific topic hits into `topics_json`; `TopicSpec.categories` scopes category-specific rules such as politics L2 topics to `category=politics`; no-hit rows become category-specific general topics (`general_social_news` / 一般社會新聞 or `general_politics_news` / 一般政治新聞) with `source=rule_fallback`, `topic_classified_by=rule`
       - `low_birthrate` includes common policy variants such as `少子女化`, `0到6歲國家一起養`, and `兒少TISA`
+      - `weather` classifies society news about typhoons, earthquakes, heavy rain, flooding, landslides, and CWA warnings so the frontend weather page can place related news below CWA public-record panels.
       - Related-link sections in summaries (`延伸閱讀`, `相關新聞`, `更多新聞`) are ignored before deterministic matching to avoid misclassifying unrelated articles
       - Politics second-layer topics are `elections`, `cross_strait_relations`, `foreign_affairs`, `legislative_policy`, `party_politics`, `political_accountability`, `defense_security`, and `public_budget`; persistent thread tables remain deferred
   5. Optional `TopicLlmFallbackWorker` can refine rule fallback rows where the first topic is a general fallback topic and `topic_classified_by` is NULL or `rule`

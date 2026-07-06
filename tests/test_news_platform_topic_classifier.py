@@ -60,6 +60,16 @@ class TopicClassifierTests(unittest.TestCase):
 
         self.assertEqual(result[0]["topic_id"], "drug_abuse")
 
+    def test_classifies_weather_news(self):
+        result = classify(
+            title="中央氣象署發布颱風海上警報 北部留意豪雨",
+            summary=None,
+            keywords=[],
+            category="society",
+        )
+
+        self.assertEqual(result[0]["topic_id"], "weather")
+
     def test_classifies_low_birthrate_policy_variants(self):
         titles = [
             "\u8cf4\u6e05\u5fb7\u9080\u7da0\u59d4\u8ac7\u5c11\u5b50\u5973\u5316\u653f\u7b56 520\u5927\u79ae\u5305",
