@@ -4,6 +4,27 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
+- Task: Guard and repair the 2026-07-09 pre-open market-analysis row if needed.
+- Requested by: automation
+- Start date: 2026-07-09
+- Scope: Inspect today's `pre_tw_open` row, repair missing/unhealthy storage from local relay and market-context evidence only, preserve Java delivery ownership, run fixed-pool monitor extraction after repair only when eligible, and verify DB state without paid external LLM APIs.
+
+## Plan
+- [x] Read repo instructions, automation memory, and Workflow 4C guard rules.
+- [x] Confirm calendar eligibility and inspect today's `pre_tw_open` row.
+- [x] Repair/create the row from local evidence only if missing or unhealthy.
+- [x] Run targeted internal trade-signal extraction only if a repaired row is eligible.
+- [x] Verify final DB state, visible template, garbled text, and provider telemetry.
+
+## 2026-07-09 Pre-Open Guard Run
+- [x] Calendar allows `pre_tw_open`: Taiwan regular trading day and relevant U.S. close session date 2026-07-08 was a regular trading day.
+- [x] Found no `analysis_date=2026-07-09` / `analysis_slot=pre_tw_open` row.
+- [x] Repaired missing row as `t_market_analyses.id=223` through `MySqlEventStore.upsert_market_analysis()` using local market-context, U.S. close, and index snapshot evidence only.
+- [x] Ran `scripts/run_trade_signal_extraction.ps1 -AnalysisId 223 -FixedPoolFallback`; stored 10 internal monitor rows.
+- [x] Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `trust_gate.signals_allowed=true`, `push_enabled=1`, `pushed=0`, `structured_json` present, style/template check passed with 3 checkpoint bullets, garbled-text check passed, `t_trade_signals` count 10, `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
+
+## Previous Task
 - Task: Guard and repair the 2026-07-09 US-close market-analysis row if needed.
 - Requested by: automation
 - Start date: 2026-07-09
