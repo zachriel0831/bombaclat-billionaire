@@ -4,17 +4,25 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-08 pre-open market-analysis row if needed.
+- Task: Guard and repair the 2026-07-09 US-close market-analysis row if needed.
 - Requested by: automation
-- Start date: 2026-07-08
-- Scope: Inspect today's `pre_tw_open` row, repair missing/unhealthy storage from local relay and market-context evidence only, preserve Java delivery ownership, run fixed-pool monitor extraction after repair, and verify DB state without paid external LLM APIs.
+- Start date: 2026-07-09
+- Scope: Inspect today's latest `us_close` row, repair missing/unhealthy storage from local relay and market-context evidence only, preserve Java delivery ownership, run fixed-pool monitor extraction after repair only when eligible, and verify DB state without paid external LLM APIs.
 
 ## Plan
-- [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
-- [x] Confirm calendar eligibility and inspect today's daily analysis row.
+- [x] Read repo instructions, automation memory, and Workflow 4C guard rules.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row.
 - [x] Repair/create the row from local evidence only if missing or unhealthy.
-- [x] Run targeted internal trade-signal extraction after repair.
+- [x] Run targeted internal trade-signal extraction only if a repaired row is eligible.
 - [x] Verify final DB state, visible template, garbled text, and provider telemetry.
+
+## 2026-07-09 US-Close Guard Run
+- [x] Calendar allows `us_close`: Taiwan local date 2026-07-09 and U.S. close session date 2026-07-08 are both regular trading days.
+- [x] Found no `analysis_date=2026-07-09` / `analysis_slot=us_close` row; latest existing `us_close` row was 2026-07-08.
+- [x] Repaired missing row as `t_market_analyses.id=222` through `MySqlEventStore.upsert_market_analysis()` using local U.S. index close, BLS macro, and Taiwan flow evidence only.
+- [x] Ran `scripts/run_trade_signal_extraction.ps1 -AnalysisId 222 -FixedPoolFallback`; stored 10 internal monitor rows.
+- [x] Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `trust_gate.signals_allowed=true`, `push_enabled=0`, `pushed=0`, `structured_json` present, style/template check passed with 3 checkpoint bullets, garbled-text check passed, LINE excerpt check passed, `t_trade_signals` count 10, `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
 
 ## 2026-07-08 Pre-Open Guard Run
 - [x] Calendar allows `pre_tw_open`: Taiwan regular trading day and relevant U.S. close session date 2026-07-07 was a regular trading day.
