@@ -4,16 +4,22 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-12 weekly pre-open market-analysis row if needed.
+- Task: Guard and repair the 2026-07-12 pre-open market-analysis row if needed.
 - Requested by: automation
-- Start date: 2026-07-11
-- Scope: Inspect the delivery-Sunday `weekly_tw_preopen` row, repair missing/unhealthy storage from local relay, market-context, and history/RAG evidence only, preserve Java delivery ownership, and verify the three-section Traditional Chinese weekly contract without paid external LLM APIs.
+- Start date: 2026-07-12
+- Scope: Inspect today's `pre_tw_open` row, repair missing/unhealthy storage from local relay and market-context evidence only when calendar policy allows it, preserve Java delivery ownership, and verify DB state without paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, automation memory, and Workflow 4C guard rules.
-- [x] Inspect the target Sunday `weekly_tw_preopen` row and relevant raw telemetry.
-- [x] Repair/create the row from local evidence only if missing or unhealthy.
-- [x] Verify final DB state, section contract, garbled text, delivery flags, and provider telemetry.
+- [x] Confirm calendar eligibility and inspect today's daily analysis row.
+- [x] Repair/create the row from local evidence only if missing/unhealthy and calendar-eligible.
+- [x] Verify final DB state and provider telemetry.
+
+## 2026-07-12 Pre-Open Guard Run
+- [x] Calendar disallows daily `pre_tw_open`: Taiwan local date 2026-07-12 is Sunday and `allowed_analysis_slots=[]`.
+- [x] Found no `analysis_date=2026-07-12` / `analysis_slot IN ('pre_tw_open','macro_daily')` row; no repair performed because creating one would violate market-calendar policy.
+- [x] Confirmed Sunday owner row exists: `t_market_analyses.id=232`, `analysis_slot=weekly_tw_preopen`, `push_enabled=1`, `pushed=1`, `structured_json` present, `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
 
 ## 2026-07-12 Weekly Guard Run
 - [x] Found no `analysis_date=2026-07-12` / `analysis_slot=weekly_tw_preopen` row.
