@@ -4,17 +4,22 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-11 US-close market-analysis row if needed.
+- Task: Guard and repair the 2026-07-12 weekly pre-open market-analysis row if needed.
 - Requested by: automation
 - Start date: 2026-07-11
-- Scope: Inspect today's `us_close` row, repair missing/unhealthy storage from local relay and market-context evidence only, preserve Java delivery ownership, run fixed-pool monitor extraction after repair only when eligible, and verify DB state without paid external LLM APIs.
+- Scope: Inspect the delivery-Sunday `weekly_tw_preopen` row, repair missing/unhealthy storage from local relay, market-context, and history/RAG evidence only, preserve Java delivery ownership, and verify the three-section Traditional Chinese weekly contract without paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, automation memory, and Workflow 4C guard rules.
-- [x] Inspect today's `us_close` row and relevant raw telemetry.
+- [x] Inspect the target Sunday `weekly_tw_preopen` row and relevant raw telemetry.
 - [x] Repair/create the row from local evidence only if missing or unhealthy.
-- [x] Run targeted internal trade-signal extraction only if a repaired row is eligible.
-- [x] Verify final DB state, visible template, garbled text, LINE excerpt, and provider telemetry.
+- [x] Verify final DB state, section contract, garbled text, delivery flags, and provider telemetry.
+
+## 2026-07-12 Weekly Guard Run
+- [x] Found no `analysis_date=2026-07-12` / `analysis_slot=weekly_tw_preopen` row.
+- [x] Repaired missing weekly row as `t_market_analyses.id=232` through `MySqlEventStore.upsert_market_analysis()` using local relay events, market-context rows, market snapshots, recent analysis history, and local RAG availability only.
+- [x] Final verification: section order `週總經` -> `下週台股配置` -> `下週觀察清單`, exactly 3 headings, garbled/mojibake check passed, no entry/stop-loss/target-price wording, `push_enabled=1`, `pushed=0`, `raw_json.dimension=weekly`, `raw_json.delivery_owner=java`, `raw_json.external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
 
 ## 2026-07-11 US-Close Guard Run
 - [x] Found no `analysis_date=2026-07-11` / `analysis_slot=us_close` row.
