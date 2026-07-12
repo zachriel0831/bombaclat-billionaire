@@ -15,6 +15,14 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Repair/create the row from local evidence only if missing/unhealthy and calendar-eligible.
 - [x] Verify final DB state and provider telemetry.
 
+## 2026-07-13 Pre-Open Guard Run
+- [x] Calendar allows `pre_tw_open`: Taiwan regular trading day; relevant U.S. close session date 2026-07-12 was weekend-closed.
+- [x] Found missing `analysis_date=2026-07-13` / `analysis_slot=pre_tw_open` row.
+- [x] Repaired missing row as `t_market_analyses.id=235` through `MySqlEventStore.upsert_market_analysis()` using local relay/context evidence only.
+- [x] Ran `scripts/run_trade_signal_extraction.ps1 -AnalysisId 235 -FixedPoolFallback`; stored 10 internal monitor rows.
+- [x] Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `trust_gate.signals_allowed=true`, `push_enabled=1`, `pushed=0`, `structured_json` present, style/template check passed with 3 checkpoint bullets, garbled-text check passed, `t_trade_signals` count 10, `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
+
 ## 2026-07-12 Pre-Open Guard Run
 - [x] Calendar disallows daily `pre_tw_open`: Taiwan local date 2026-07-12 is Sunday and `allowed_analysis_slots=[]`.
 - [x] Found no `analysis_date=2026-07-12` / `analysis_slot IN ('pre_tw_open','macro_daily')` row; no repair performed because creating one would violate market-calendar policy.
