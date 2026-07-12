@@ -317,6 +317,17 @@ Move completed or stale task logs to `tasks/archive/`.
 - Outcome: Completed with no write; missing `2026-06-21 pre_tw_open` is calendar-correct.
 - Open risks: The automation still fires on a Sunday with no eligible daily slot, so the same no-op will recur unless the schedule skips weekly-summary days.
 
+## 2026-07-12 Free Palestine Weekly Editorial Run
+- [x] Extract and review 2026-W28 local `t_palestine_news_items` rows.
+- [x] Upsert the weekly editorial row.
+- [x] Read back and validate the saved editorial.
+
+### 2026-07-12 Progress Notes
+- Generated and upserted `t_palestine_editorials.editorial_id=palestine-weekly-2026-W28`.
+- Source window: 2026-07-05 through 2026-07-12 exclusive; 129 rows from `t_palestine_news_items`.
+- Validation passed: readable Traditional Chinese, no mojibake/question blocks, source count matched saved IDs, no raw JSON body, no fabricated Markdown URLs.
+- No OpenAI, Anthropic, or paid external LLM API was called.
+
 ## 2026-06-23 Run
 - [x] Read repo instructions plus Workflow 4C storage/guard and daily template decisions.
 - [x] Inspect today's `pre_tw_open` row, raw telemetry, garbled text, and visible style/template compliance.
