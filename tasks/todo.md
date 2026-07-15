@@ -4,16 +4,26 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-15 pre-open market-analysis row if needed.
+- Task: Guard and repair the 2026-07-16 US-close market-analysis row if needed.
 - Requested by: automation
-- Start date: 2026-07-15
-- Scope: Inspect today's `pre_tw_open` row, repair missing/unhealthy storage from local relay and market-context evidence only when calendar policy allows it, preserve Java delivery ownership, and verify DB state without paid external LLM APIs.
+- Start date: 2026-07-16
+- Scope: Inspect today's `us_close` row, repair missing/unhealthy storage from local relay and market-context evidence only when calendar policy allows it, preserve Java delivery ownership, and verify DB state without paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, automation memory, and Workflow 4C guard rules.
 - [x] Confirm calendar eligibility and inspect today's daily analysis row.
 - [x] Repair/create the row from local evidence only if missing/unhealthy and calendar-eligible.
+- [x] Run targeted internal signal extraction when eligible.
 - [x] Verify final DB state and provider telemetry.
+
+## 2026-07-16 US-Close Guard Run
+- [x] Found missing `analysis_date=2026-07-16` / `analysis_slot=us_close` row.
+- [x] Calendar allows `us_close`: Taiwan local date 2026-07-16 and U.S. close session date 2026-07-15 are regular trading days.
+- [x] Confirmed local evidence gap: no 2026-07-15 U.S. index-close snapshot was present at guard time; repair must not invent closing prices.
+- [x] Repaired missing row as `t_market_analyses.id=250` through `MySqlEventStore.upsert_market_analysis()` using local BLS and Taiwan flow evidence only.
+- [x] Ran `scripts/run_trade_signal_extraction.ps1 -AnalysisId 250 -FixedPoolFallback`; stored 10 internal monitor rows.
+- [x] Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=0`, `pushed=0`, seven headings in order, exactly 3 checkpoint bullets, garbled/LINE excerpt checks passed, `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
 
 ## 2026-07-15 Pre-Open Guard Run
 - [x] Found missing `analysis_date=2026-07-15` / `analysis_slot=pre_tw_open` row.
