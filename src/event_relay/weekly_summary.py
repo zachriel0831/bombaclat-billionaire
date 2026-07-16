@@ -293,11 +293,12 @@ def _compile_prompts(config: WeeklySummaryConfig) -> tuple[str, str]:
         "Use plain text only. Do not output code blocks. Do not fabricate facts.\n"
         "Focus on international politics, macro/finance, and technology.\n\n"
         "Evidence policy:\n"
-        "- Treat t_relay_events and stored market_context rows as the primary local evidence.\n"
+        "- Treat local relay events and stored market facts as the primary evidence.\n"
         "- Do not treat absence from local events as proof that nothing happened.\n"
         "- If web search is available, verify latest policy, price, war, macro, and earnings facts before using them.\n"
         "- If web search is unavailable or evidence is insufficient, explicitly label the data gap and lower confidence.\n"
         "- Distinguish local-event facts, externally verified facts, and inference.\n\n"
+        "- Visible prose must not expose internal table names, source labels, API/guard implementation notes, or telemetry terms such as t_relay_events, t_market_analyses, market_context, raw_json, structured_json, Codex guard, or LLM API; translate them into reader-facing Chinese.\n\n"
         "[Macro Skill]\n"
         f"{macro_skill}\n\n"
         "[Mobile Chat Format Skill]\n"
@@ -318,6 +319,7 @@ def _compile_prompts(config: WeeklySummaryConfig) -> tuple[str, str]:
         "- 下週觀察清單 should be a concrete checklist with confirmation and invalidation signals.\n"
         "- Each section must connect evidence -> mechanism -> Taiwan implication.\n"
         "- Weekly reports should not output intraday entry / take-profit / stop-loss prices.\n"
+        "- Do not mention implementation details such as whether OpenAI, Anthropic, Claude, Codex, or other LLM APIs were called.\n"
         "- If evidence is insufficient, name the data gap and lower confidence.\n"
         "- Total length 1200-2200 Chinese characters. Keep it readable in mobile chat.\n\n"
         "Time range: {week_range}\n"
@@ -605,9 +607,27 @@ def _call_llm(
     return _call_openai_response(api_base, api_key, model, system_str, user_prompt)
 
 
+_VISIBLE_INTERNAL_WEEKLY_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(r"未呼叫(?:付費)?(?:外部\s*)?(?:OpenAI|Anthropic|Claude)?\s*LLM\s+API", re.IGNORECASE),
+        "部分即時外部資料未納入",
+    ),
+    (re.compile(r"\bt_relay_events\b", re.IGNORECASE), "本地新聞與事件資料"),
+    (re.compile(r"\bt_market_analyses\b", re.IGNORECASE), "分析資料"),
+    (re.compile(r"\bt_market_index_snapshots\b", re.IGNORECASE), "行情快照"),
+    (re.compile(r"\bmarket_context(?::[A-Za-z0-9_.-]+)?\b", re.IGNORECASE), "市場環境資料"),
+    (re.compile(r"\braw_json\b", re.IGNORECASE), "內部稽核資料"),
+    (re.compile(r"\bstructured_json\b", re.IGNORECASE), "結構化稽核資料"),
+    (re.compile(r"\bCodex\s+guard\b", re.IGNORECASE), "分析品質檢查"),
+    (re.compile(r"\b(?:OpenAI|Anthropic|Claude)?\s*LLM\s+API\b", re.IGNORECASE), "外部模型服務"),
+)
+
+
 def _normalize_line_text(text: str) -> str:
     """正規化 normalize line text 對應的資料或結果。"""
     compact = re.sub(r"[ \t]+", " ", text).strip()
+    for pattern, replacement in _VISIBLE_INTERNAL_WEEKLY_REPLACEMENTS:
+        compact = pattern.sub(replacement, compact)
     return compact[:4500]
 
 

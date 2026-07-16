@@ -583,7 +583,7 @@ def _build_prompts(
         "- If web search is available, verify latest policy, price, war, macro, and earnings facts before using them.\n"
         "- If web search is unavailable or evidence is insufficient, explicitly label the data gap and lower confidence.\n"
         "- Distinguish local-event facts, externally verified facts, and inference.\n"
-        "- Visible prose must translate internal source labels and numeric handles into plain Chinese implications; do not show labels such as market scorecard, market_context, analysis_slot, scheduled_time_local, raw_json, or 07:20 market_context.\n\n"
+        "- Visible prose must translate internal source labels and numeric handles into plain Chinese implications; do not show labels such as market scorecard, market_context, t_relay_events, t_market_analyses, t_market_index_snapshots, analysis_slot, scheduled_time_local, raw_json, structured_json, claim_verifier, Codex guard, LLM API, or 07:20 market_context.\n\n"
         "[Macro Skill]\n"
         f"{macro_skill}\n\n"
         "[Mobile Chat Format Skill]\n"
@@ -598,7 +598,7 @@ def _build_prompts(
         f"{section_guide}"
         "Formatting rules:\n"
         "- Do not include internal event IDs, source row IDs, or citation-only numeric lists such as （128610,128539） in summary_text.\n"
-        "- Do not expose internal pipeline labels or custom numeric handles such as market scorecard, market_context, 07:20 market_context, analysis_slot, scheduled_time_local, or raw_json; translate them into plain Chinese market implications.\n"
+        "- Do not expose internal pipeline labels, table names, API/guard implementation notes, or custom numeric handles such as market scorecard, market_context, t_relay_events, t_market_analyses, t_market_index_snapshots, 07:20 market_context, analysis_slot, scheduled_time_local, raw_json, structured_json, claim_verifier, Codex guard, or LLM API; translate them into plain Chinese market implications.\n"
         "- Keep evidence references implicit in raw_json/pipeline telemetry, not visible report text.\n"
         "- Section 1 今日一句話 should be one sentence, not a paragraph.\n"
         "- Section 2 三個檢查點 must contain exactly three bullets.\n"
@@ -611,7 +611,7 @@ def _build_prompts(
         "- Use the exact section titles listed above.\n"
         f"{_summary_length_instruction(slot)}\n"
         f"Now local time: {now_local.strftime('%Y-%m-%d %H:%M %Z')}\n"
-        "Recent events JSON includes news and stored-only market_context facts from t_relay_events.\n"
+        "Recent events JSON includes local news and stored-only market facts.\n"
         "This local context is not exhaustive; use web search when available to verify missing/current facts.\n"
         "Retail usefulness requirement: make the first two sections answer what Taiwan investors should watch today before moving into macro detail.\n"
         "If evidence exists, explicitly cover Fed path, liquidity, credit stress, cycle data, and sentiment/positioning; "
@@ -717,9 +717,26 @@ _VISIBLE_INTERNAL_LABEL_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = 
         re.compile(r"\bmarket_context(?::[A-Za-z0-9_.-]+)?\b", re.IGNORECASE),
         "市場環境資料",
     ),
+    (
+        re.compile(r"未呼叫(?:付費)?(?:外部\s*)?(?:OpenAI|Anthropic|Claude)?\s*LLM\s+API", re.IGNORECASE),
+        "部分即時外部資料未納入",
+    ),
+    (re.compile(r"\bt_relay_events\b", re.IGNORECASE), "本地新聞與事件資料"),
+    (re.compile(r"\bt_market_analyses\b", re.IGNORECASE), "分析資料"),
+    (re.compile(r"\bt_market_index_snapshots\b", re.IGNORECASE), "行情快照"),
+    (re.compile(r"\bt_trade_signals\b", re.IGNORECASE), "交易訊號資料"),
     (re.compile(r"\banalysis_slot\b", re.IGNORECASE), "分析時段"),
     (re.compile(r"\bscheduled_time_local\b", re.IGNORECASE), "預定產出時間"),
     (re.compile(r"\braw_json\b", re.IGNORECASE), "內部稽核資料"),
+    (re.compile(r"\bstructured_json\b", re.IGNORECASE), "結構化稽核資料"),
+    (re.compile(r"\bclaim_verifier\b", re.IGNORECASE), "事實查核流程"),
+    (re.compile(r"\bCodex\s+guard\b", re.IGNORECASE), "分析品質檢查"),
+    (re.compile(r"\b(?:OpenAI|Anthropic|Claude)?\s*LLM\s+API\b", re.IGNORECASE), "外部模型服務"),
+    (re.compile(r"\bpipeline\s+telemetry\b", re.IGNORECASE), "內部稽核資料"),
+    (
+        re.compile(r"本次修復[^。；;\n]*(?:[。；;]|$)", re.IGNORECASE),
+        "本次分析主要依據本地新聞、行情與公開資料；",
+    ),
 )
 
 

@@ -1023,3 +1023,27 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `python scripts/validate_readiness.py` passed
   - `git diff --check -- ...` passed with only existing LF/CRLF warnings
 - Status: active
+
+## LESSON-20260717-01
+- Date: 2026-07-17
+- Trigger (User correction): User asked to self-review the latest seven days of daily analyses plus weekly analysis and tighten skills/knowledge/templates when quality gaps appear.
+- What was wrong: Recent pushed reports were mostly compliant, but older fallback/repair prose could leak implementation details such as table names, guard names, or LLM API usage into reader-visible analysis.
+- Root cause: The visible-text guard only covered scorecard and `market_context` labels, while Codex repair/fallback wording introduced a wider class of internal implementation terms.
+- New rule (always/never): Before push or publication, visible market-analysis text must have no internal table names, API/provider implementation notes, guard names, telemetry field names, or repair-process phrasing; translate them into reader-facing data-gap or evidence-source language.
+- Prevention checklist (before final response):
+  - [ ] Inspect the actual stored/pushed text, not only the prompt
+  - [ ] Check for mojibake and internal terms such as `t_relay_events`, `t_market_analyses`, `structured_json`, `claim_verifier`, `Codex guard`, and `LLM API`
+  - [ ] Confirm the daily/weekly section contract and no entry/stop/target language
+- Repo updates made:
+  - `src/event_relay/market_analysis.py`
+  - `src/event_relay/weekly_summary.py`
+  - `skills/macro-weekly-summary-skill/SKILL.md`
+  - `skills/macro-weekly-summary-skill/SKILLS.md`
+  - `memory-bank/09-decisions/2026-05-20-daily-analysis-editorial-template.md`
+  - `memory-bank/09-decisions/2026-05-09-weekly-three-section-contract.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `$env:PYTHONPATH='src'; python -m unittest tests.test_market_analysis tests.test_weekly_summary -v` passed
+  - `python scripts/validate_readiness.py` passed
+  - Latest-seven-day DB audit checked 16 valid daily/weekly rows and returned no forbidden internal terms or mojibake markers after backfilling rows `226`, `236`, and `244`
+- Status: active

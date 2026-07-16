@@ -294,7 +294,7 @@ class MarketAnalysisTests(unittest.TestCase):
 
         self.assertIn("Traditional Chinese", system_prompt)
         self.assertIn("Evidence policy", system_prompt)
-        self.assertIn("Recent events JSON includes news and stored-only market_context facts", user_prompt)
+        self.assertIn("Recent events JSON includes local news and stored-only market facts", user_prompt)
         self.assertIn("not exhaustive", user_prompt)
         self.assertIn("market_context", user_prompt)
         self.assertIn("Do not expose internal pipeline labels", user_prompt)
@@ -321,6 +321,8 @@ class MarketAnalysisTests(unittest.TestCase):
             "今日一句話\n"
             "> market scorecard 為 +4，07:20 market_context 顯示風險資產有支撐。\n"
             "- Market scorecard 2026-06-25 overall +4、raw_json 與 analysis_slot 僅供內部稽核。"
+            "- 本次修復只使用本地 t_relay_events、t_market_index_snapshots 與 structured_json，未呼叫外部 LLM API；claim_verifier 由 Codex guard 補查。"
+            "另未呼叫外部 LLM API。"
         )
 
         cleaned = _sanitize_visible_report_text(raw)
@@ -331,8 +333,16 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertNotIn("07:20", cleaned)
         self.assertNotIn("raw_json", cleaned)
         self.assertNotIn("analysis_slot", cleaned)
+        self.assertNotIn("t_relay_events", cleaned)
+        self.assertNotIn("t_market_index_snapshots", cleaned)
+        self.assertNotIn("structured_json", cleaned)
+        self.assertNotIn("LLM API", cleaned)
+        self.assertNotIn("claim_verifier", cleaned)
+        self.assertNotIn("Codex guard", cleaned)
         self.assertIn("盤前市場環境綜合指標", cleaned)
         self.assertIn("盤前市場環境資料", cleaned)
+        self.assertIn("本次分析主要依據本地新聞、行情與公開資料", cleaned)
+        self.assertIn("部分即時外部資料未納入", cleaned)
 
     def test_build_prompts_tw_close_contains_close_review_sections(self) -> None:
         """測試 test build prompts tw close contains close review sections 的預期行為。"""

@@ -4,6 +4,8 @@
 - Weekly summaries use the fixed section contract: `週總經` -> `下週台股配置` -> `下週觀察清單`.
 - Weekly summaries are allocation/watchlist briefs, not intraday trade-signal reports.
 - Weekly prompt output must connect evidence -> mechanism -> Taiwan implication.
+- Weekly visible reports must not expose table names, source labels, API/guard implementation notes, or telemetry terms such as `t_relay_events`, `t_market_analyses`, `market_context`, `raw_json`, `structured_json`, `Codex guard`, or `LLM API`.
+- Weekly visible reports should usually land around 1000-1800 Chinese characters: enough to connect the macro chain, Taiwan allocation stance, and next-week checklist without becoming a raw headline dump.
 
 ## Rationale
 - The previous weekly template reused daily macro-regime section labels and produced shallow prose.

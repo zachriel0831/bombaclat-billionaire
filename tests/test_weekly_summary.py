@@ -18,6 +18,7 @@ from event_relay.weekly_summary import (
     _extract_text_from_response,
     _llm_timeout_seconds,
     _load_weekly_config,
+    _normalize_line_text,
     _openai_model_supports_temperature,
     _openai_web_search_enabled,
     _resolve_llm_settings,
@@ -52,6 +53,23 @@ class WeeklySummaryTests(unittest.TestCase):
         return WeeklySummaryConfig(**data)
 
     """封裝 Weekly Summary Tests 相關資料與行為。"""
+    def test_normalize_line_text_translates_internal_labels(self) -> None:
+        text = (
+            "週總經\n"
+            "本週只使用 t_relay_events、market_context、raw_json 與 structured_json，"
+            "未呼叫外部 LLM API，並由 Codex guard 檢查。"
+        )
+
+        cleaned = _normalize_line_text(text)
+
+        self.assertNotIn("t_relay_events", cleaned)
+        self.assertNotIn("market_context", cleaned)
+        self.assertNotIn("raw_json", cleaned)
+        self.assertNotIn("structured_json", cleaned)
+        self.assertNotIn("LLM API", cleaned)
+        self.assertNotIn("Codex guard", cleaned)
+        self.assertIn("部分即時外部資料未納入", cleaned)
+
     def test_extract_text_from_response_output_text(self) -> None:
         """測試 test extract text from response output text 的預期行為。"""
         text = _extract_text_from_response({"output_text": "hello"})

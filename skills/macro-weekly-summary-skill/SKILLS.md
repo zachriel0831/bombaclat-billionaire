@@ -13,9 +13,9 @@ Guide generated weekly summaries and market-analysis drafts so they are evidence
 
 ## Inputs
 
-- Recent `t_relay_events` source facts.
+- Recent local relay event source facts.
 - Stored `market_context:*` events and deterministic `market_context:scorecard`.
-- Recent `t_market_index_snapshots` rows when available.
+- Recent market index snapshots when available.
 - Hybrid RAG historical analogues from `t_event_embeddings` and `t_analysis_embeddings`.
 - Fixed ten-stock (`固定十檔`) watchlist context for machine-readable downstream signal rows when explicitly needed; daily visible reports no longer render the fixed-watchlist section.
 
@@ -28,9 +28,10 @@ Guide generated weekly summaries and market-analysis drafts so they are evidence
 - Keep useful terms such as regime, liquidity, Fed path, credit spread, VIX, SOX, and DXY, but explain why each matters to Taiwan investors; avoid dense acronym piles.
 - Do not turn the report into a beginner "lazy bag"; keep the mechanism, but translate it into market implications.
 - Keep historical RAG examples as analogues only; never present them as current evidence.
-- Do not include internal event IDs, source row IDs, citation-only numeric lists, internal pipeline labels, or custom numeric handles in visible reports. Do not show terms such as `market scorecard`, `scorecard +4`, `market_context`, `market_context:scorecard`, `analysis_slot`, `scheduled_time_local`, `raw_json`, or `07:20 market_context`; translate them into reader-facing Traditional Chinese market implications instead.
+- Do not include internal event IDs, source row IDs, citation-only numeric lists, internal pipeline labels, table names, API/guard implementation notes, or custom numeric handles in visible reports. Do not show terms such as `market scorecard`, `scorecard +4`, `market_context`, `market_context:scorecard`, `t_relay_events`, `t_market_analyses`, `t_market_index_snapshots`, `analysis_slot`, `scheduled_time_local`, `raw_json`, `structured_json`, `claim_verifier`, `Codex guard`, `LLM API`, or `07:20 market_context`; translate them into reader-facing Traditional Chinese market implications instead.
 - Do not invent arbitrary Taiwan ticker recommendations outside the fixed watch pool.
 - Daily visible reports must focus on macro and industry/sector interpretation. Mention individual companies only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
+- Pushed daily reports should usually land around 800-1400 Chinese characters; shorter close digests are acceptable only when the data window is thin and all required sections still exist.
 - Do not output order intents, broker actions, or automated trading instructions.
 
 ## Daily Market Analysis Sections
