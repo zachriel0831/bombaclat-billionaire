@@ -31,6 +31,17 @@ _TRACKING_PARAM_NAMES = frozenset(
 )
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
+_RELATED_SUMMARY_MARKERS = (
+    "延伸閱讀：",
+    "延伸閱讀:",
+    "延伸閱讀",
+    "相關新聞：",
+    "相關新聞:",
+    "相關新聞",
+    "更多新聞：",
+    "更多新聞:",
+    "更多新聞",
+)
 
 
 def parse_datetime(value: str | None) -> datetime | None:
@@ -115,6 +126,10 @@ def clean_summary(value: str | None, *, max_chars: int = 1200) -> str | None:
     text = html.unescape(value)
     text = _HTML_TAG_RE.sub(" ", text)
     text = " ".join(text.split())
+    for marker in _RELATED_SUMMARY_MARKERS:
+        if marker in text:
+            text = text.split(marker, 1)[0].strip()
+            break
     if not text:
         return None
     if len(text) > max_chars:

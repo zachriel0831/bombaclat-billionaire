@@ -45,6 +45,14 @@ class CleanSummaryTests(unittest.TestCase):
     def test_collapses_whitespace(self):
         self.assertEqual(clean_summary("a   b\n\nc\t d"), "a b c d")
 
+    def test_strips_related_reading_blocks(self):
+        raw = "正文第一段 延伸閱讀： ● 不相關標題 ● 更多標題"
+        self.assertEqual(clean_summary(raw), "正文第一段")
+
+    def test_strips_related_reading_heading_without_colon(self):
+        raw = "正文第二段 延伸閱讀 ● 不相關標題 ● 更多標題"
+        self.assertEqual(clean_summary(raw), "正文第二段")
+
     def test_returns_none_for_empty_or_only_tags(self):
         self.assertIsNone(clean_summary(None))
         self.assertIsNone(clean_summary(""))
