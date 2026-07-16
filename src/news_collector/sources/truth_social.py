@@ -72,6 +72,37 @@ def _plain_text_from_html(value: str | None) -> str:
     return " ".join(html.unescape(text).split()).strip()
 
 
+def _display_account(username: str) -> str:
+    known = {"realdonaldtrump": "Donald Trump"}
+    return known.get(username.lower(), f"@{username}")
+
+
+def _media_text(value: object, *, username: str) -> str:
+    if not isinstance(value, list) or not value:
+        return ""
+
+    kinds: list[str] = []
+    for media in value:
+        if not isinstance(media, dict):
+            continue
+        description = _plain_text_from_html(str(media.get("description") or ""))
+        if description:
+            return description
+        kind = str(media.get("type") or "").strip().lower()
+        if kind:
+            kinds.append(kind)
+
+    if "video" in kinds:
+        label = "a video"
+    elif "image" in kinds:
+        label = "an image"
+    elif "gifv" in kinds:
+        label = "a GIF"
+    else:
+        label = "media"
+    return f"{_display_account(username)} shared {label} on Truth Social"
+
+
 class TruthSocialAccountSource(NewsSource):
     """Truth Social account timeline source."""
 
@@ -176,7 +207,9 @@ class TruthSocialAccountSource(NewsSource):
                     if part
                 ).strip()
         if not text:
-            text = "Truth Social media post"
+            text = _media_text(status.get("media_attachments"), username=username)
+        if not text:
+            text = f"{_display_account(username)} published a Truth Social post without text"
 
         published_at = parse_datetime(str(status.get("created_at") or ""))
         post_url = str(status.get("url") or status.get("uri") or "").strip()

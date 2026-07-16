@@ -67,6 +67,24 @@ class TruthSocialSourceTests(unittest.TestCase):
         self.assertEqual(item.raw["platform"], "truthsocial")
         self.assertEqual(item.raw["metrics"]["favourites_count"], 3)
 
+    def test_media_only_status_gets_readable_text(self) -> None:
+        source = TruthSocialAccountSource(accounts=["@realDonaldTrump"])
+        item = source._to_news_item(
+            {
+                "id": "116928021654827754",
+                "created_at": "2026-07-16T05:33:00.000Z",
+                "url": "https://truthsocial.com/@realDonaldTrump/116928021654827754",
+                "content": "<p></p>",
+                "media_attachments": [{"type": "video", "description": None}],
+            },
+            username="realdonaldtrump",
+            account_id="107780257626128497",
+        )
+
+        self.assertIsNotNone(item)
+        self.assertEqual(item.title, "Donald Trump shared a video on Truth Social")
+        self.assertEqual(item.summary, "Donald Trump shared a video on Truth Social")
+
     def test_fetch_applies_local_limit_when_api_returns_more(self) -> None:
         source = TruthSocialAccountSource(
             accounts=["@realDonaldTrump"],

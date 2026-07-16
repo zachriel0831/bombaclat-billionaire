@@ -274,6 +274,27 @@ class LineEventRelayTests(unittest.TestCase):
 
         self.assertNotEqual(MySqlEventStore._event_hash_for_event(first), MySqlEventStore._event_hash_for_event(second))
 
+    def test_social_event_hash_uses_event_id_not_display_text(self) -> None:
+        first = RelayEvent(
+            event_id="truthsocial-116928021654827754",
+            source="truthsocial:realdonaldtrump",
+            title="Truth Social media post",
+            url="https://truthsocial.com/@realDonaldTrump/116928021654827754",
+            summary="Truth Social media post",
+            published_at="2026-07-16T05:33:37.992+00:00",
+            log_only=False,
+            raw={},
+        )
+        second = first.__class__(
+            **{
+                **first.__dict__,
+                "title": "Donald Trump shared a video on Truth Social",
+                "summary": "Donald Trump shared a video on Truth Social",
+            }
+        )
+
+        self.assertEqual(MySqlEventStore._event_hash_for_event(first), MySqlEventStore._event_hash_for_event(second))
+
     def test_upsert_x_post_accepts_truth_social_status_payload(self) -> None:
         cur = _UpsertCaptureCursor()
         store = MySqlEventStore.__new__(MySqlEventStore)

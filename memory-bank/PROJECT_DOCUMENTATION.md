@@ -30,7 +30,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Tracks allowlisted handles or profile URLs from `TRUTH_SOCIAL_ACCOUNTS`, starting with `https://truthsocial.com/@realDonaldTrump`
 - Writes normalized rows with `source=truthsocial:<handle>` into `t_relay_events`
 - Mirrors rows into the existing social-post table `t_x_posts` with `tweet_id=truthsocial-<status_id>` so the public-figure feed and social-post analysis path can reuse the Elon/X storage design
-- Raw status JSON is preserved in `raw_json`; display text is derived from Truth Social HTML content as plain text
+- Raw status JSON is preserved in `raw_json`; display text is derived from Truth Social HTML content as plain text, with readable image/video fallbacks for media-only posts
 
 2. RSS polling
 - BBC / Reuters / Fox / NPR plus Taiwan finance and official finance/macro feeds from `OFFICIAL_RSS_FEEDS`

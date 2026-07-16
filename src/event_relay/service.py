@@ -1948,7 +1948,7 @@ class MySqlEventStore:
         source = (event.source or "").strip().lower()
         # market_context 類事件常常 url/title 長得很像；若仍只靠 title+url 去重，
         # 同一天不同資料點可能互相吃掉，所以改用 event_id 做穩定去重。
-        if source.startswith("market_context:") and event.event_id:
+        if event.event_id and (source.startswith("market_context:") or MySqlEventStore._is_social_post_source(source)):
             return hashlib.sha1(f"{source}::{event.event_id}".encode("utf-8")).hexdigest()
         return MySqlEventStore._event_hash(event.title, event.url)
 
