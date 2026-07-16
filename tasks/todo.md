@@ -383,3 +383,15 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Final verification: readable Traditional Chinese text, required seven-section daily editorial flow, exactly three `三個檢查點` bullets, no `台股配置`, no `今日個股觀察`, no entry/stop/target-price language.
 - [x] Final DB state: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `trust_gate.signals_allowed=false`, `push_enabled=0`, `pushed=0`, `structured_json` present, `external_provider_api_called=false`.
 - [x] Internal signal extraction skipped because current policy keeps `tw_close` storage-only and `trust_gate.signals_allowed=false`; `t_trade_signals` count for analysis id 175 is 0.
+
+## 2026-07-17 Pre-Open Guard Run
+- [x] Read automation memory, repo rules, Workflow 4C guard rules, prompt skill, and active lessons.
+- [x] Confirm today's `pre_tw_open` row is missing and inspect local evidence.
+- [x] Repair through `MySqlEventStore.upsert_market_analysis`, extract internal monitor signals, and verify final DB state.
+
+### 2026-07-17 Re-plan
+- Initial helper stopped before DB write because Windows Python lacked IANA timezone data.
+- Use the standard-library fixed UTC+8 offset, then rerun the same calendar, claim, style, and garbled-text gates.
+- Repaired the missing row as analysis `255` from nine local evidence rows; no external provider API was called.
+- Stored 10 fixed-pool internal monitor signals.
+- Final verification: claim verifier and style/garbled checks passed; trust gate reason is `claim_verifier_ok`; `push_enabled=1`, `pushed=0`, structured JSON present.
