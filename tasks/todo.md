@@ -4,9 +4,9 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-16 US-close market-analysis row if needed.
+- Task: Guard and repair the 2026-07-18 US-close market-analysis row if needed.
 - Requested by: automation
-- Start date: 2026-07-16
+- Start date: 2026-07-18
 - Scope: Inspect today's `us_close` row, repair missing/unhealthy storage from local relay and market-context evidence only when calendar policy allows it, preserve Java delivery ownership, and verify DB state without paid external LLM APIs.
 
 ## Plan
@@ -15,6 +15,15 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Repair/create the row from local evidence only if missing/unhealthy and calendar-eligible.
 - [x] Run targeted internal signal extraction when eligible.
 - [x] Verify final DB state and provider telemetry.
+
+## 2026-07-18 US-Close Guard Run
+- [x] Found missing `analysis_date=2026-07-18` / `analysis_slot=us_close` row.
+- [x] Calendar allows `us_close`: Taiwan is weekend-closed and the relevant 2026-07-17 U.S. session was open.
+- [x] Confirmed fresh local U.S. close snapshots and relay evidence are available.
+- [x] Repaired missing row as `t_market_analyses.id=261` through `MySqlEventStore.upsert_market_analysis()` using local evidence only.
+- [x] Ran targeted fixed-pool signal extraction; stored 10 internal `pending_review` monitor rows.
+- [x] Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=1`, `pushed=0`, `structured_json` present, author-style heading order and exactly three evidence bullets passed, garbled/internal-label checks passed, `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
 
 ## 2026-07-16 US-Close Guard Run
 - [x] Found missing `analysis_date=2026-07-16` / `analysis_slot=us_close` row.
