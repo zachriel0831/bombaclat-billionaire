@@ -940,6 +940,7 @@ This file is append-only. Add a new entry after any user correction to prevent r
 - New rule (always/never): Daily visible `market_analysis` must stay out of `台股配置` and must not append `## 今日個股觀察`. As of 2026-07-17, use the author-style flow `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與資料缺口`; individual companies can appear only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
 - Prevention checklist (before final response):
   - [ ] Check generated prompt text for `今日主命題`, `三個證據`, and `市場正在定價什麼`
+  - [ ] Check both legacy `market_analysis.py` and multi-stage `stage4_synthesis.py` prompts
   - [ ] Check daily visible summary does not append `## 今日個股觀察`
   - [ ] Keep `t_trade_signals` wording separate from visible report wording
 - Repo updates made:

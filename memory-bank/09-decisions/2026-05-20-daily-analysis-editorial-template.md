@@ -25,6 +25,17 @@ As of 2026-07-17, this rule also covers table names, API/guard implementation no
 
 Pushed daily reports should usually land around 800-1400 Chinese characters. `tw_close` and thin-data windows may be shorter, but visible text must still preserve the section order and avoid internal labels.
 
+As of 2026-07-17, the clean daily visible order is:
+
+1. `今日主命題`
+2. `三個證據`
+3. `市場正在定價什麼`
+4. `台股傳導`
+5. `反證條件`
+6. `風險與資料缺口`
+
+`三個證據` must contain exactly three bullets. Each bullet should connect source fact -> market mechanism -> why it matters now. The report should read like a professional market column: decisive thesis first, then evidence, repricing, Taiwan transmission, invalidation, and data gaps.
+
 ## Consequences
 
 - Multi-stage Stage4 and legacy fallback prompts share the same visible section order.

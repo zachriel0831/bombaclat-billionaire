@@ -42,8 +42,7 @@ class ClaimVerifierTests(unittest.TestCase):
         )
 
         self.assertFalse(result["ok"])
-        self.assertIn("1200 元", result["unsupported"]["numbers"])
-
+        self.assertTrue(any(item.startswith("1200") for item in result["unsupported"]["numbers"]))
 
     def test_verify_claim_coverage_ignores_internal_evidence_id_citations(self) -> None:
         result = verify_claim_coverage(
@@ -67,6 +66,47 @@ class ClaimVerifierTests(unittest.TestCase):
         self.assertNotIn("128610", result["unsupported"]["numbers"])
         self.assertIn("12345", result["unsupported"]["numbers"])
 
+    def test_verify_claim_coverage_allows_common_number_format_variants(self) -> None:
+        result = verify_claim_coverage(
+            summary_text="台股收 45,625 點，銀行準備金 3.14 兆美元，逆回購 1.25 億美元。",
+            structured_payload=None,
+            events_payload=[
+                {
+                    "id": 1,
+                    "source": "market_context:scorecard",
+                    "title": "market context",
+                    "summary": "加權指數 45625.1，銀行準備金 3.141 兆美元，逆回購 1.25億美元。",
+                    "raw": {
+                        "taiex": 45625.1,
+                        "reserve_trillion_usd": 3.141,
+                        "reverse_repo": "1.25億美元",
+                    },
+                }
+            ],
+            market_payload=[],
+        )
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["unsupported_counts"]["numbers"], 0)
+
+    def test_verify_claim_coverage_does_not_treat_range_delimiter_as_negative(self) -> None:
+        result = verify_claim_coverage(
+            summary_text="聯準會利率區間維持 3.5%-3.75% 不變。",
+            structured_payload=None,
+            events_payload=[
+                {
+                    "id": 1,
+                    "source": "market_context:fed",
+                    "title": "fed rate range",
+                    "summary": "policy rate range 3.5%-3.75%",
+                    "raw": {"lower": "3.5%", "upper": "3.75%"},
+                }
+            ],
+            market_payload=[],
+        )
+
+        self.assertTrue(result["ok"], result)
+        self.assertNotIn("-3.75%", result["unsupported"]["numbers"])
 
     def test_verify_claim_coverage_allows_configured_tickers(self) -> None:
         result = verify_claim_coverage(

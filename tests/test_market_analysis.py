@@ -1309,7 +1309,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertFalse(record.push_enabled)
         raw = json.loads(record.raw_json)
         self.assertFalse(raw["claim_verifier"]["ok"])
-        self.assertIn("9999 元", raw["claim_verifier"]["unsupported"]["numbers"])
+        self.assertTrue(any(item.startswith("9999") for item in raw["claim_verifier"]["unsupported"]["numbers"]))
         self.assertFalse(raw["delivery_eligible"])
         self.assertTrue(raw["delivery_eligible_before_trust_gate"])
         self.assertEqual(raw["trust_gate"]["reason"], "claim_verifier_failed")

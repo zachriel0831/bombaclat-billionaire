@@ -48,12 +48,11 @@ COUNTERPOINT_LINE_RE = re.compile(r"^主要反方觀點：(.+)$", re.MULTILINE)
 _VALID_CONFIDENCE = {"low", "medium", "high"}
 
 _EDITORIAL_FLOW_SECTIONS = [
-    "今日一句話",
-    "三個檢查點",
-    "總經與流動性",
-    "景氣循環",
-    "國際新聞傳導",
-    "產業板塊解析",
+    "今日主命題",
+    "三個證據",
+    "市場正在定價什麼",
+    "台股傳導",
+    "反證條件",
     "風險與資料缺口",
 ]
 
@@ -78,13 +77,12 @@ _SLOT_SECTIONS = {
 
 _REGIME_FLOW_GUIDE = (
     "Editorial daily flow:\n"
-    "1. 今日一句話: one plain sentence naming what the market is pricing, the Taiwan bias, and the main uncertainty.\n"
-    "2. 三個檢查點: exactly three observable checks for the slot. For pre_tw_open, make them 盤前 checks; for tw_close, make them next-session checks. Each check must say what would confirm or weaken the thesis.\n"
-    "3. 總經與流動性: combine regime, Fed path, rates, USD/TWD, liquidity, and credit. Start with implication, then put dense facts in bullets. End with 對台股含意.\n"
-    "4. 景氣循環: explain whether consumption, labor, PMI/ISM, bank credit, earnings, or inventory imply expansion, slowdown, soft landing, or recession risk, then translate to Taiwan sectors.\n"
-    "5. 國際新聞傳導: use the chain 事件 -> 影響變數 -> 台股族群 -> 確認/失效. Do not amplify geopolitical, commodity, policy, or earnings stories beyond evidence.\n"
-    "6. 產業板塊解析: translate the above into industry and sector implications. Mention individual companies only as mega-cap transmission proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist, entry plan, stop-loss, or target-price list.\n"
-    "7. 風險與資料缺口: max three bullets. Include the strongest invalidation condition first, then the most important missing data.\n"
+    "1. 今日主命題: one plain sentence stating the investable thesis, Taiwan bias, and main uncertainty.\n"
+    "2. 三個證據: exactly three evidence bullets; each bullet must connect source fact -> mechanism -> why it matters now.\n"
+    "3. 市場正在定價什麼: explain what expectations are already reflected in prices and what still has room for repricing.\n"
+    "4. 台股傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
+    "5. 反證條件: state the cleanest data or market moves that would make the thesis wrong.\n"
+    "6. 風險與資料缺口: max three bullets; list missing data, stale data, and event risks.\n"
 )
 
 _POPULAR_MACRO_TONE_GUIDE = (
@@ -112,7 +110,7 @@ def _structured_instructions() -> str:
         "of the same analysis.\n"
         "  - summary_text: Traditional Chinese plain text matching the length\n"
         "    budget in the user prompt. Follow the section list below and preserve\n"
-        "    the flow: 今日一句話 -> 三個檢查點 -> 總經與流動性 -> 景氣循環 -> 國際新聞傳導 -> 產業板塊解析 -> 風險與資料缺口.\n"
+        "    the flow: 今日主命題 -> 三個證據 -> 市場正在定價什麼 -> 台股傳導 -> 反證條件 -> 風險與資料缺口.\n"
         "    Do not include a dedicated 台股配置 section or any ## 今日個股觀察 section.\n"
         "    Do not expose internal labels such as market scorecard, market_context, analysis_slot, scheduled_time_local, raw_json, or 07:20 market_context; translate them into plain Chinese market implications.\n"
         "    End summary_text with two\n"
@@ -227,12 +225,12 @@ def build_prompts(
         "- Do not include internal event IDs, source row IDs, or citation-only numeric lists such as （128610,128539） in summary_text.",
         "- Do not expose internal pipeline labels or custom numeric handles such as market scorecard, market_context, 07:20 market_context, analysis_slot, scheduled_time_local, or raw_json; translate them into plain Chinese market implications.",
         "- Keep evidence references implicit in raw_json/pipeline telemetry, not visible report text.",
-        "- Section 1 今日一句話 should be one sentence, not a paragraph.",
-        "- Section 2 三個檢查點 must contain exactly three bullets.",
-        "- Section 3 總經與流動性 should use bullet lines when listing market facts.",
-        "- Section 5 國際新聞傳導 must use at least one '事件 -> 影響變數 -> 台股族群 -> 確認/失效' chain when evidence exists.",
-        "- Section 6 產業板塊解析 should focus on industries/sectors and may use only mega-cap examples; no watchlist or trading levels.",
-        "- Section 7 風險與資料缺口 must be concise: three bullets maximum.",
+        "- Section 1 今日主命題 should be one sentence, not a paragraph.",
+        "- Section 2 三個證據 must contain exactly three bullets and each bullet must include the source fact and why it matters.",
+        "- Section 3 市場正在定價什麼 should state what expectations are already in prices and what is not fully priced yet.",
+        "- Section 4 台股傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.",
+        "- Section 5 反證條件 should name the cleanest conditions that would break the thesis.",
+        "- Section 6 風險與資料缺口 must be concise: three bullets maximum.",
         "- Use the exact section titles listed above.",
         "",
         "Use only claims supported by the stage outputs below. If a section",

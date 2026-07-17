@@ -12,10 +12,12 @@ import re
 from typing import Any
 
 
-CLAIM_VERIFIER_VERSION = "claim-verifier-v2"
-_NUMBER_RE = re.compile(r"(?<![\w.])[-+]?\d+(?:,\d{3})*(?:\.\d+)?\s*(?:%|bp|pp|元|美元|億|萬|B|M)?")
+CLAIM_VERIFIER_VERSION = "claim-verifier-v3"
+_NUMBER_UNITS = r"%|bp|pp|元|美元|億|萬|兆|B|M"
+_NUMBER_RE = re.compile(rf"(?<![\w.%])[-+]?\d+(?:,\d{{3}})*(?:\.\d+)?\s*(?:{_NUMBER_UNITS})?")
+_NUMBER_UNIT_SPACE_RE = re.compile(rf"(\d(?:\.\d+)?)\s+(?=(?:{_NUMBER_UNITS}))")
 _INTERNAL_EVIDENCE_CITATION_RE = re.compile(
-    r"[（(]\s*\d{5,}(?:\s*[,，、]\s*\d{5,})*\s*[）)]"
+    r"[（(]\s*\d{5,}(?:\s*[,、，]\s*\d{5,})*\s*[）)]"
 )
 _DATE_RE = re.compile(r"\b20\d{2}[-/]\d{1,2}[-/]\d{1,2}\b")
 _TW_TICKER_RE = re.compile(r"\b\d{4}(?:\.TW|\.TWO)?\b", re.IGNORECASE)
@@ -53,6 +55,7 @@ def verify_claim_coverage(
     evidence_docs = _build_evidence_docs(events_payload, market_payload)
     evidence_text = "\n".join(doc["text"] for doc in evidence_docs)
     evidence_text_norm = _normalize_text(evidence_text)
+    evidence_number_values = _extract_number_values(evidence_text_norm)
     summary = _strip_internal_evidence_citations(summary_text or "")
     allowed_ticker_set = _normalize_ticker_set(allowed_tickers)
     extracted = {
@@ -64,7 +67,7 @@ def verify_claim_coverage(
         kind: [
             item
             for item in items
-            if not _has_support(kind, item, evidence_text_norm, evidence_docs, allowed_ticker_set)
+            if not _has_support(kind, item, evidence_text_norm, allowed_ticker_set, evidence_number_values)
         ]
         for kind, items in extracted.items()
     }
@@ -164,29 +167,38 @@ def _has_support(
     kind: str,
     item: str,
     evidence_text_norm: str,
-    evidence_docs: list[dict[str, str]],
     allowed_tickers: set[str],
+    evidence_number_values: list[float],
 ) -> bool:
     if kind == "dates":
         return item in evidence_text_norm or item.replace("-", "/") in evidence_text_norm
     if kind == "numbers":
         variants = _number_variants(item)
-        return any(variant and variant in evidence_text_norm for variant in variants)
+        if any(variant and variant in evidence_text_norm for variant in variants):
+            return True
+        claim_value = _parse_number_value(item)
+        return claim_value is not None and any(
+            _numbers_close(claim_value, evidence_value)
+            for evidence_value in evidence_number_values
+        )
     if kind == "tickers":
         normalized = _normalize_ticker(item)
         bare = normalized.split(".", 1)[0]
         if normalized in allowed_tickers or bare in allowed_tickers:
             return True
-        return normalized in evidence_text_norm.upper() or bare in evidence_text_norm.upper()
+        evidence_upper = evidence_text_norm.upper()
+        return normalized in evidence_upper or bare in evidence_upper
     return False
 
 
 def _normalize_text(text: str) -> str:
-    return str(text or "").replace(",", "").replace("％", "%")
+    normalized = str(text or "").replace(",", "").replace("，", "").replace("％", "%")
+    return _NUMBER_UNIT_SPACE_RE.sub(r"\1", normalized)
 
 
 def _normalize_number(text: str) -> str:
-    return str(text or "").replace(",", "").replace("％", "%").strip()
+    normalized = str(text or "").replace(",", "").replace("，", "").replace("％", "%").strip()
+    return _NUMBER_UNIT_SPACE_RE.sub(r"\1", normalized)
 
 
 def _normalize_date(text: str) -> str:
@@ -198,11 +210,35 @@ def _normalize_date(text: str) -> str:
 
 def _number_variants(item: str) -> set[str]:
     compact = _normalize_number(item)
-    variants = {compact}
-    unitless = re.sub(r"\s*(%|bp|pp|元|美元|億|萬|B|M)$", "", compact)
+    variants = {compact, compact.replace(" ", "")}
+    unitless = re.sub(rf"\s*(?:{_NUMBER_UNITS})$", "", compact)
     if unitless:
         variants.add(unitless)
     return variants
+
+
+def _extract_number_values(text: str) -> list[float]:
+    values: list[float] = []
+    for match in _NUMBER_RE.findall(text or ""):
+        value = _parse_number_value(match)
+        if value is not None:
+            values.append(value)
+    return values
+
+
+def _parse_number_value(text: str) -> float | None:
+    match = re.search(r"[-+]?\d+(?:\.\d+)?", _normalize_number(text))
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except ValueError:
+        return None
+
+
+def _numbers_close(claim_value: float, evidence_value: float) -> bool:
+    tolerance = max(0.005, max(abs(claim_value), abs(evidence_value), 1.0) * 0.00001)
+    return abs(claim_value - evidence_value) <= tolerance
 
 
 def _normalize_ticker(value: Any) -> str:

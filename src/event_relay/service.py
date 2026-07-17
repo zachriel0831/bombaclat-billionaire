@@ -795,6 +795,34 @@ class MySqlEventStore:
             # Column may have been added between our check and the ALTER; do not fail init.
             self._conn.rollback()
 
+    def _migrate_market_analysis_indexes(self, cur: Any) -> None:
+        """Add recency indexes used by scheduled analysis reads."""
+        if self._conn is None:
+            return
+
+        try:
+            analysis_indexes = self._fetch_table_indexes(cur, self._analysis_table)
+            market_indexes = self._fetch_table_indexes(cur, self._market_table)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not inspect market analysis indexes: %s", exc)
+            return
+
+        try:
+            if "idx_analysis_slot_updated" not in analysis_indexes:
+                cur.execute(
+                    f"ALTER TABLE `{self._analysis_table}` "
+                    "ADD INDEX `idx_analysis_slot_updated` (`analysis_slot`, `updated_at`, `id`)"
+                )
+            if "idx_market_created_id" not in market_indexes:
+                cur.execute(
+                    f"ALTER TABLE `{self._market_table}` "
+                    "ADD INDEX `idx_market_created_id` (`created_at`, `id`)"
+                )
+            self._conn.commit()
+        except Exception as exc:  # noqa: BLE001
+            self._conn.rollback()
+            logger.warning("Market analysis index migration skipped: %s", exc)
+
     def _migrate_trade_signal_candidate_columns(self, cur: Any) -> None:
         """Add candidate-ranking columns to existing trade-signal tables."""
         if self._conn is None:
@@ -1503,7 +1531,8 @@ class MySqlEventStore:
           updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY (id),
           UNIQUE KEY uq_market_event_symbol (event_id, symbol),
-          KEY idx_market_trade_date (trade_date, market_session, symbol, created_at)
+          KEY idx_market_trade_date (trade_date, market_session, symbol, created_at),
+          KEY idx_market_created_id (created_at, id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
         ddl_quote_snapshot = f"""
@@ -1549,7 +1578,8 @@ class MySqlEventStore:
           updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY (id),
           UNIQUE KEY uq_analysis_slot_date (analysis_date, analysis_slot),
-          KEY idx_analysis_created (created_at, analysis_slot)
+          KEY idx_analysis_created (created_at, analysis_slot),
+          KEY idx_analysis_slot_updated (analysis_slot, updated_at, id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
         ddl_annotation = f"""
@@ -1699,6 +1729,7 @@ class MySqlEventStore:
             self._conn.commit()
             self._migrate_event_delivery_columns(cur)
             self._migrate_analysis_structured_json(cur)
+            self._migrate_market_analysis_indexes(cur)
             self._migrate_trade_signal_candidate_columns(cur)
         finally:
             cur.close()
