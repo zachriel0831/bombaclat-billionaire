@@ -4,10 +4,10 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-18 US-close market-analysis row if needed.
+- Task: Guard and repair the 2026-07-18 pre-open market-analysis row if needed.
 - Requested by: automation
 - Start date: 2026-07-18
-- Scope: Inspect today's `us_close` row, repair missing/unhealthy storage from local relay and market-context evidence only when calendar policy allows it, preserve Java delivery ownership, and verify DB state without paid external LLM APIs.
+- Scope: Inspect today's `pre_tw_open` row, repair only when calendar policy allows it, preserve Java delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, automation memory, and Workflow 4C guard rules.
@@ -15,6 +15,12 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Repair/create the row from local evidence only if missing/unhealthy and calendar-eligible.
 - [x] Run targeted internal signal extraction when eligible.
 - [x] Verify final DB state and provider telemetry.
+
+## 2026-07-18 Pre-Open Guard Run
+- [x] Today's `pre_tw_open` row is absent.
+- [x] Calendar guard allows only `us_close`: Taiwan is weekend-closed and the relevant 2026-07-17 U.S. session was open.
+- [x] Left the absent `pre_tw_open` row unchanged; no LINE-eligible row or trade signals were created.
+- [x] No OpenAI, Anthropic, or paid external LLM API was called.
 
 ## 2026-07-18 US-Close Guard Run
 - [x] Found missing `analysis_date=2026-07-18` / `analysis_slot=us_close` row.
