@@ -344,11 +344,11 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   14. For `macro_daily`, write macro-only analysis into `t_market_analyses` and do not create trade signals.
 - Daily text formatting:
   - `raw_json.display_title` is date-only (`YYYY-MM-DD`) for downstream delivery titles
-  - Daily analysis uses the product-editor flow: `今日一句話` -> `三個檢查點` -> `總經與流動性` -> `景氣循環` -> `國際新聞傳導` -> `產業板塊解析` -> `風險與資料缺口`
+  - Daily analysis uses the author-style flow: `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與資料缺口`
   - Do not write a dedicated `台股配置` section or append `## 今日個股觀察` in daily visible reports.
   - Individual companies may appear only as macro/sector transmission examples, such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; daily visible reports should not include entry, stop-loss, or target-price language.
-  - `三個檢查點` must contain exactly three observable checks, and `總經與流動性` should use bullets for dense market facts
-  - `國際新聞傳導` should show `事件 -> 影響變數 -> 台股族群 -> 確認/失效` when evidence supports a chain
+  - `三個證據` must contain exactly three bullets, each connecting source fact -> market mechanism -> why it matters now; `市場正在定價什麼` should name what is already reflected in prices and what can still be repriced
+  - `台股傳導` should show `事件 -> 影響變數 -> 台股族群 -> 確認/失效` when evidence supports a chain
   - Fallback stock rationales keep only `需開盤量價確認` as the repeated warning
 - Tracked-stock context:
   - `MARKET_CONTEXT_TWSE_CODES` reads official TWSE close/margin rows for tracked listed stocks

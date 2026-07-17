@@ -539,7 +539,7 @@ Current behavior:
 - Current implementation gap: code still contains fixed-pool paths such as `FIXED_MARKET_ANALYSIS_WATCH_POOL`; do not assume runtime dynamic candidate generation is complete.
 - `stock-monitor-service` should monitor the top five ranked `t_trade_signals` candidates that pass the deterministic risk gate.
 - Future `order-dispatcher-service` trading must cap concurrent traded symbols at three and must remain sandbox/paper until order, fill, position, PnL, reconciliation, and kill-switch state are implemented.
-- Daily visible market-analysis text follows the product-editor flow for readability: `今日一句話` -> `三個檢查點` -> `總經與流動性` -> `景氣循環` -> `國際新聞傳導` -> `產業板塊解析` -> `風險與資料缺口`; the daily body should not expose entry/stop/target lists unless a separate trading UI asks for them.
+- Daily visible market-analysis text follows the author-style flow for readability: `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與資料缺口`; `三個證據` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. The daily body should not expose entry/stop/target lists unless a separate trading UI asks for them.
 - Daily visible text must translate internal labels such as `market scorecard`, `scorecard +4`, `market_context`, `07:20 market_context`, `analysis_slot`, `scheduled_time_local`, and `raw_json` into plain Chinese market implications.
 - Does not push or create LINE delivery jobs; Java owns user-facing delivery
 - Treats `t_relay_events` as primary local evidence, not as the only possible source of truth; prompts require explicit data-gap labeling when context is insufficient
