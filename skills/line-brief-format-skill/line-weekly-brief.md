@@ -2,6 +2,8 @@
 
 Format-only asset. Python stores generated text in `t_market_analyses`; downstream Java owns LINE delivery and webhook behavior.
 
+## Weekly Brief Shape
+
 1. 核心 Regime
 {用 2-4 句說明本週市場主軸、主要定價變數、最大風險與最重要反證。}
 
@@ -20,14 +22,26 @@ Format-only asset. Python stores generated text in `t_market_analyses`; downstre
 6. 台股觀察
 {列出 2-4 個台股族群或追蹤股的觀察重點，只能基於已知資料與明確傳導鏈。}
 
-若此格式資產被 daily `market_analysis` 使用，日報必須先用 `今日一句話` 與 exactly three `三個檢查點` 回答「今天要看什麼」，再進入 `總經與流動性`、`景氣循環`、`國際新聞傳導`、`產業板塊解析`、`風險與資料缺口`。日報不可再輸出獨立 `台股配置` 區塊，也不可追加 `今日個股觀察`；個股只能作為權值股/大型科技股傳導例子，例如 NVIDIA、台積電、Magnificent Seven / 美股七巨頭，不寫進出場、停損或目標價。
-
 7. 反證與資料缺口
 {列出會推翻主軸的條件，以及目前資料不足之處。}
 
-格式規則：
+## Daily Market Analysis Override
+
+若此格式資產被 daily `market_analysis` 使用，日報必須使用：
+
+`今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與資料缺口`
+
+- `今日主命題` 是一句話：市場正在交易什麼、對台股偏多/偏空/中性、最大不確定性。
+- `三個證據` 必須剛好三點，每點都要連接「資料事實 -> 傳導機制 -> 為什麼現在重要」。
+- `市場正在定價什麼` 要說明價格已反映的期待，以及還可能被重新定價的部分。
+- `台股傳導` 可提 NVIDIA、台積電、Magnificent Seven / 美股七巨頭等權值傳導例子，但不可寫成推薦清單。
+- 日報不可輸出獨立 `台股配置` 區塊，也不可追加 `今日個股觀察`。
+- 不寫進出場、停損或目標價。
+
+## Format Rules
+
 - 使用繁體中文。
 - 每段 2-5 行，適合手機閱讀。
-- 不要加教學文字、不要加 markdown 表格、不要用 title card。
-- 不要寫沒有來源或沒有資料支撐的數字。
+- 不加教學文字、不加 markdown 表格、不用 title card。
+- 不寫沒有來源或沒有資料支撐的數字。
 - 若資料過期或缺失，直接寫「資料不足」或「需等待更新」。

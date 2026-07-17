@@ -937,9 +937,9 @@ This file is append-only. Add a new entry after any user correction to prevent r
 - Trigger (User correction): User asked to remove daily `台股配置` and `## 今日個股觀察`, and refocus daily analysis on macro plus industry/sector interpretation.
 - What was wrong: Prior prompt/contracts kept pushing daily visible output back toward fixed-pool stock observation rows, which made the report feel like a stock watchlist instead of a macro/sector brief.
 - Root cause: Daily visible formatting, Stage4 prompt guidance, skills, and memory-bank docs treated the fixed-pool monitor section as part of the report body rather than downstream machine-readable context.
-- New rule (always/never): Daily visible `market_analysis` must use `產業板塊解析`, not `台股配置`, and must not append `## 今日個股觀察`; individual companies can appear only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
+- New rule (always/never): Daily visible `market_analysis` must stay out of `台股配置` and must not append `## 今日個股觀察`. As of 2026-07-17, use the author-style flow `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與資料缺口`; individual companies can appear only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
 - Prevention checklist (before final response):
-  - [ ] Check generated prompt text for `產業板塊解析`
+  - [ ] Check generated prompt text for `今日主命題`, `三個證據`, and `市場正在定價什麼`
   - [ ] Check daily visible summary does not append `## 今日個股觀察`
   - [ ] Keep `t_trade_signals` wording separate from visible report wording
 - Repo updates made:
@@ -1046,4 +1046,17 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `$env:PYTHONPATH='src'; python -m unittest tests.test_market_analysis tests.test_weekly_summary -v` passed
   - `python scripts/validate_readiness.py` passed
   - Latest-seven-day DB audit checked 16 valid daily/weekly rows and returned no forbidden internal terms or mojibake markers after backfilling rows `226`, `236`, and `244`
+- Status: active
+
+## LESSON-20260717-02
+- Date: 2026-07-17
+- Trigger (User correction): User compared our market analysis with well-known finance writers and asked to upgrade the daily analysis style.
+- What was wrong: The daily report was useful as a fast market brief, but it still read too much like structured news/event summarization and not enough like an authored finance thesis.
+- Root cause: The section contract forced macro/cycle/international/sector buckets, so the model organized evidence by category instead of leading with a main thesis, market pricing, and invalidation logic.
+- New rule (always/never): Daily visible analysis should lead with `今日主命題`, then exactly three `三個證據`, then `市場正在定價什麼`, `台股傳導`, `反證條件`, and `風險與資料缺口`; do not regress to headline digest or category-only summaries.
+- Prevention checklist:
+  - [ ] One clear thesis, not just a list of news
+  - [ ] Evidence connects source fact -> mechanism -> why it matters now
+  - [ ] Pricing section says what is already reflected and what can still reprice
+  - [ ] Invalidation section names what would make the thesis wrong
 - Status: active

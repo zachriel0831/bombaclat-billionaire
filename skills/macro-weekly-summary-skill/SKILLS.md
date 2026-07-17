@@ -36,21 +36,18 @@ Guide generated weekly summaries and market-analysis drafts so they are evidence
 
 ## Daily Market Analysis Sections
 
-Use this readable macro flow unless the calling code supplies a stricter section contract:
+Use this readable author-style macro flow unless the calling code supplies a stricter section contract:
 
-1. Today in one sentence
-2. Three observable checks
-3. Macro regime and liquidity
-4. Cycle and earnings
-5. International news transmission
-6. Industry and sector analysis
-7. Risk and data gaps
+1. Main thesis
+2. Three evidence points
+3. What the market is pricing
+4. Taiwan transmission
+5. Invalidation conditions
+6. Risk and data gaps
 
 For daily `market_analysis`, the visible Chinese section order is:
-`今日一句話` -> `三個檢查點` -> `總經與流動性` -> `景氣循環` -> `國際新聞傳導` -> `產業板塊解析` -> `風險與資料缺口`.
-`三個檢查點` should contain exactly three observable checks. `國際新聞傳導`
-should use `事件 -> 影響變數 -> 台股族群 -> 確認/失效` when evidence
-supports the chain.
+`今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與資料缺口`.
+`三個證據` should contain exactly three bullets. Each bullet should connect source fact -> mechanism -> why it matters now. `市場正在定價什麼` should name what is already reflected in prices and what can still be repriced.
 
 For daily `market_analysis`, do not append `## 今日個股觀察` and do not write
 `台股配置` as a visible section. If the structured JSON contains `stock_watch`,

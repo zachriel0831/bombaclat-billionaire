@@ -6,17 +6,16 @@ After several days of generated daily market analysis, the visible output was to
 
 ## Decision
 
-Daily `market_analysis` reports use the product-editor visible flow:
+Daily `market_analysis` reports use the author-style visible flow:
 
-1. `今日一句話`
-2. `三個檢查點`
-3. `總經與流動性`
-4. `景氣循環`
-5. `國際新聞傳導`
-6. `產業板塊解析`
-7. `風險與資料缺口`
+1. `今日主命題`
+2. `三個證據`
+3. `市場正在定價什麼`
+4. `台股傳導`
+5. `反證條件`
+6. `風險與資料缺口`
 
-`三個檢查點` must contain exactly three observable checks. `國際新聞傳導` should use `事件 -> 影響變數 -> 台股族群 -> 確認/失效` when there is supporting evidence.
+`三個證據` must contain exactly three bullets. Each bullet should connect `資料事實 -> 傳導機制 -> 為什麼現在重要`. `市場正在定價什麼` must explain what expectations are already in prices and what still has room for repricing. `反證條件` must state what would make the thesis wrong.
 
 As of 2026-05-25, daily visible reports must not include a dedicated `台股配置` section and must not append the deterministic `## 今日個股觀察` fixed-pool section. The fixed-pool / `t_trade_signals` flow may continue as machine-readable downstream context, but the daily body should focus on macro and industry/sector interpretation. Individual companies may be mentioned only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
 
@@ -29,7 +28,7 @@ Pushed daily reports should usually land around 800-1400 Chinese characters. `tw
 ## Consequences
 
 - Multi-stage Stage4 and legacy fallback prompts share the same visible section order.
-- The first two sections must answer what a Taiwan investor should watch before macro detail.
-- Macro, cycle, international-news, and industry/sector sections must translate evidence into Taiwan-market implications.
+- The first section must state a clear investable thesis, not just summarize headlines.
+- Evidence, pricing, transmission, and invalidation sections must translate facts into Taiwan-market implications.
 - Daily visible output should not contain entry, stop-loss, or target-price language.
 - The failed `claim_verifier` delivery/signal block is implemented separately in `2026-05-20-claim-verifier-trust-gate.md`.

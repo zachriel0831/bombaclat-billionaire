@@ -600,12 +600,12 @@ def _build_prompts(
         "- Do not include internal event IDs, source row IDs, or citation-only numeric lists such as （128610,128539） in summary_text.\n"
         "- Do not expose internal pipeline labels, table names, API/guard implementation notes, or custom numeric handles such as market scorecard, market_context, t_relay_events, t_market_analyses, t_market_index_snapshots, 07:20 market_context, analysis_slot, scheduled_time_local, raw_json, structured_json, claim_verifier, Codex guard, or LLM API; translate them into plain Chinese market implications.\n"
         "- Keep evidence references implicit in raw_json/pipeline telemetry, not visible report text.\n"
-        "- Section 1 今日一句話 should be one sentence, not a paragraph.\n"
-        "- Section 2 三個檢查點 must contain exactly three bullets.\n"
-        "- Section 3 總經與流動性 should use bullet lines when listing market facts.\n"
-        "- Section 5 國際新聞傳導 must use at least one '事件 -> 影響變數 -> 台股族群 -> 確認/失效' chain when evidence exists.\n"
-        "- Section 6 產業板塊解析 should focus on industries/sectors, not a Taiwan allocation or stock-picking list.\n"
-        "- Section 7 風險與資料缺口 must be concise: three bullets maximum.\n"
+        "- Section 1 今日主命題 should be one sentence, not a paragraph.\n"
+        "- Section 2 三個證據 must contain exactly three bullets and each bullet must include the source fact and why it matters.\n"
+        "- Section 3 市場正在定價什麼 should state what expectations are already in prices and what is not fully priced yet.\n"
+        "- Section 4 台股傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.\n"
+        "- Section 5 反證條件 should name the cleanest conditions that would break the thesis.\n"
+        "- Section 6 風險與資料缺口 must be concise: three bullets maximum.\n"
         "- Do not include a dedicated 台股配置 section or any ## 今日個股觀察 section in daily reports.\n"
         "- Individual companies may appear only as mega-cap transmission examples, e.g. NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; avoid entry, stop-loss, or target-price language.\n"
         "- Use the exact section titles listed above.\n"
@@ -613,7 +613,7 @@ def _build_prompts(
         f"Now local time: {now_local.strftime('%Y-%m-%d %H:%M %Z')}\n"
         "Recent events JSON includes local news and stored-only market facts.\n"
         "This local context is not exhaustive; use web search when available to verify missing/current facts.\n"
-        "Retail usefulness requirement: make the first two sections answer what Taiwan investors should watch today before moving into macro detail.\n"
+        "Retail usefulness requirement: make the opening thesis, evidence, and pricing sections answer what Taiwan investors should watch today before moving into supporting detail.\n"
         "If evidence exists, explicitly cover Fed path, liquidity, credit stress, cycle data, and sentiment/positioning; "
         "keep data in bullets and keep paragraphs short.\n"
         f"{upstream_instruction}"
@@ -668,13 +668,12 @@ def _summary_length_instruction(slot: str) -> str:
 def _regime_flow_sections() -> str:
     """Return the fixed product-editor daily section order."""
     return (
-        "1) 今日一句話\n"
-        "2) 三個檢查點\n"
-        "3) 總經與流動性\n"
-        "4) 景氣循環\n"
-        "5) 國際新聞傳導\n"
-        "6) 產業板塊解析\n"
-        "7) 風險與資料缺口\n"
+        "1) 今日主命題\n"
+        "2) 三個證據\n"
+        "3) 市場正在定價什麼\n"
+        "4) 台股傳導\n"
+        "5) 反證條件\n"
+        "6) 風險與資料缺口\n"
     )
 
 
@@ -682,13 +681,12 @@ def _regime_flow_guide() -> str:
     """Explain how each section should reason without bloating the report."""
     return (
         "Reasoning flow:\n"
-        "- 今日一句話: one plain sentence naming what the market is pricing, the Taiwan bias, and the main uncertainty.\n"
-        "- 三個檢查點: exactly three observable checks for the slot; each check should say what confirms or weakens the thesis.\n"
-        "- 總經與流動性: combine regime, Fed path, rates, USD/TWD, liquidity, and credit; start with implication and end with 對台股含意.\n"
-        "- 景氣循環: judge expansion/slowdown/soft landing/recession risk from consumption, labor, PMI/ISM, bank credit, earnings, and inventory, then translate to Taiwan sectors.\n"
-        "- 國際新聞傳導: use 事件 -> 影響變數 -> 台股族群 -> 確認/失效; do not amplify geopolitical, commodity, policy, or earnings stories beyond evidence.\n"
-        "- 產業板塊解析: translate the chain into Taiwan sector and industry implications. Mention individual companies only as large-cap transmission proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
-        "- 風險與資料缺口: max three bullets; start with the strongest invalidation condition.\n"
+        "- 今日主命題: one plain sentence stating the investable thesis, Taiwan bias, and main uncertainty.\n"
+        "- 三個證據: exactly three evidence bullets; each bullet must connect source fact -> mechanism -> why it matters now.\n"
+        "- 市場正在定價什麼: explain what expectations are already reflected in prices and what still has room for repricing.\n"
+        "- 台股傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
+        "- 反證條件: state the cleanest data or market moves that would make the thesis wrong.\n"
+        "- 風險與資料缺口: max three bullets; list missing data, stale data, and event risks.\n"
     )
 
 
