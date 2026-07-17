@@ -298,8 +298,8 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertIn("not exhaustive", user_prompt)
         self.assertIn("market_context", user_prompt)
         self.assertIn("Do not expose internal pipeline labels", user_prompt)
-        self.assertIn("market scorecard", user_prompt)
-        self.assertIn("07:20 market_context", user_prompt)
+        self.assertIn("snake_case fields", user_prompt)
+        self.assertIn("plain Chinese market implications", user_prompt)
         self.assertIn("今日主命題", user_prompt)
         self.assertIn("三個證據", user_prompt)
         self.assertIn("市場正在定價什麼", user_prompt)
@@ -312,7 +312,7 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertIn("Section 2 三個證據", user_prompt)
         self.assertIn("what expectations are already in prices", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
-        self.assertIn("風險與資料缺口", user_prompt)
+        self.assertIn("風險與觀察限制", user_prompt)
 
     def test_sanitize_visible_report_text_translates_internal_labels(self) -> None:
         """Reader-visible analysis text must not leak pipeline field names."""
@@ -368,13 +368,12 @@ class MarketAnalysisTests(unittest.TestCase):
         macro_skill = Path("skills/macro-weekly-summary-skill/SKILLS.md").read_text(encoding="utf-8")
         line_skill = Path("skills/line-brief-format-skill/line-weekly-brief.md").read_text(encoding="utf-8")
 
-        self.assertIn("固定十", macro_skill)
+        self.assertIn("Fixed Watch Pool", macro_skill)
+        self.assertIn("Do not", macro_skill)
         for text in (macro_skill, line_skill):
-            self.assertIn("市場正在定價什麼", text)
-            self.assertIn("台股傳導", text)
-            self.assertIn("今日個股觀察", text)
-            self.assertTrue("do not" in text.lower() or "不可" in text)
-            self.assertNotIn("固定五", text)
+            self.assertIn("Daily Market Analysis", text)
+            self.assertIn("visible", text.lower())
+            self.assertNotIn("fixed-five", text.lower())
         self.assertIn("`2317`", macro_skill)
         self.assertIn("`2351`", macro_skill)
         self.assertNotIn("`2603`", macro_skill)

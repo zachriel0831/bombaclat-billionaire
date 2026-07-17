@@ -1,6 +1,6 @@
 ---
 name: weekly-macro-line-brief
-description: Build market-analysis and weekly-summary prompts for Taiwan investors from relay events, market context, scorecard, RAG analogues, and fixed-watchlist rules. Use when changing macro weekly summary, daily market analysis prompt assets, LINE brief shape, section contracts, or prompt safety rules in data-collecting.
+description: Build market-analysis and weekly-summary prompts for Taiwan investors from recent event facts, market context, RAG analogues, and fixed-watchlist rules. Use when changing macro weekly summary, daily market analysis prompt assets, LINE brief shape, section contracts, or prompt safety rules in data-collecting.
 ---
 
 # Weekly Macro Summary Skill
@@ -14,59 +14,53 @@ Guide generated weekly summaries and market-analysis drafts so they are evidence
 ## Inputs
 
 - Recent local relay event source facts.
-- Stored `market_context:*` events and deterministic `market_context:scorecard`.
+- Stored market-context facts and deterministic market signal rows.
 - Recent market index snapshots when available.
-- Hybrid RAG historical analogues from `t_event_embeddings` and `t_analysis_embeddings`.
-- Fixed ten-stock (`固定十檔`) watchlist context for machine-readable downstream signal rows when explicitly needed; daily visible reports no longer render the fixed-watchlist section.
+- Hybrid RAG historical analogues from embeddings.
+- Fixed ten-stock watchlist context for machine-readable downstream signal rows when explicitly needed; daily visible reports no longer render the fixed-watchlist section.
 
 ## Output Principles
 
 - Explain evidence -> transmission mechanism -> Taiwan market implication.
 - Use short paragraphs and compact bullets.
-- Label data gaps explicitly.
+- If evidence is stale or thin, lower confidence and describe observation limits in reader-facing language.
 - Use a professional-but-conversational Taiwan macro commentary tone: first say what the market is trading, then explain which data supports or breaks that chain.
-- Keep useful terms such as regime, liquidity, Fed path, credit spread, VIX, SOX, and DXY, but explain why each matters to Taiwan investors; avoid dense acronym piles.
-- Do not turn the report into a beginner "lazy bag"; keep the mechanism, but translate it into market implications.
+- Keep useful terms such as regime, liquidity, Fed path, credit spread, VIX, SOX, and DXY, but explain why each matters to Taiwan investors.
+- Do not turn the report into a beginner lazy bag; keep the mechanism, but translate it into market implications.
 - Keep historical RAG examples as analogues only; never present them as current evidence.
-- Do not include internal event IDs, source row IDs, citation-only numeric lists, internal pipeline labels, table names, API/guard implementation notes, or custom numeric handles in visible reports. Do not show terms such as `market scorecard`, `scorecard +4`, `market_context`, `market_context:scorecard`, `t_relay_events`, `t_market_analyses`, `t_market_index_snapshots`, `analysis_slot`, `scheduled_time_local`, `raw_json`, `structured_json`, `claim_verifier`, `Codex guard`, `LLM API`, or `07:20 market_context`; translate them into reader-facing Traditional Chinese market implications instead.
+- Do not include internal event IDs, source row IDs, citation-only numeric lists, internal pipeline labels, table names, API/guard implementation notes, provider names, quota notes, or custom numeric handles in visible reports.
+- Do not show internal source labels, table names, snake_case fields, scheduled task names, provider names, guard names, or custom score labels; translate them into reader-facing Traditional Chinese market implications.
 - Do not invent arbitrary Taiwan ticker recommendations outside the fixed watch pool.
 - Daily visible reports must focus on macro and industry/sector interpretation. Mention individual companies only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
-- Pushed daily reports should usually land around 800-1400 Chinese characters; shorter close digests are acceptable only when the data window is thin and all required sections still exist.
+- Pushed daily reports should usually land around 800-1400 Chinese characters; shorter close digests are acceptable only when the window is thin and all required sections still exist.
 - Do not output order intents, broker actions, or automated trading instructions.
 
 ## Daily Market Analysis Sections
 
 Use this readable author-style macro flow unless the calling code supplies a stricter section contract:
 
-1. Main thesis
-2. Three evidence points
-3. What the market is pricing
-4. Taiwan transmission
-5. Invalidation conditions
-6. Risk and data gaps
+1. 今日主命題
+2. 三個證據
+3. 市場正在定價什麼
+4. 台股傳導
+5. 反證條件
+6. 風險與觀察限制
 
-For daily `market_analysis`, the visible Chinese section order is:
-`今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與資料缺口`.
 `三個證據` should contain exactly three bullets. Each bullet should connect source fact -> mechanism -> why it matters now. `市場正在定價什麼` should name what is already reflected in prices and what can still be repriced.
 
-For daily `market_analysis`, do not append `## 今日個股觀察` and do not write
-`台股配置` as a visible section. If the structured JSON contains `stock_watch`,
-treat it as machine-readable downstream signal context only. The visible report
-may mention companies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭
-only to explain macro/sector transmission, not as a watchlist, entry plan,
-stop-loss, or target-price list.
+For daily `market_analysis`, do not append `今日個股觀察` and do not write `台股配置` as a visible section. If the structured JSON contains `stock_watch`, treat it as machine-readable downstream signal context only. The visible report may mention companies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭 only to explain macro/sector transmission, not as a watchlist, entry plan, stop-loss, or target-price list.
 
 ## Weekly Summary Sections
 
 Weekly reports use:
 
-1. Weekly macro
-2. Next-week Taiwan allocation
-3. Next-week watchlist
+1. 週總經
+2. 下週台股配置
+3. 下週觀察清單
 
 Weekly reports are allocation/watchlist briefs. They should not produce intraday entry, take-profit, stop-loss, or order-level instructions.
 
-## Fixed Watch Pool / 固定十檔
+## Fixed Watch Pool
 
 Only these Taiwan tickers may appear in machine-readable fixed-watchlist signal context unless the user changes the governing spec. Do not render this pool as a daily visible `今日個股觀察` section.
 

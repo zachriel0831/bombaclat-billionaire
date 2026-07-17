@@ -395,3 +395,8 @@ Move completed or stale task logs to `tasks/archive/`.
 - Repaired the missing row as analysis `255` from nine local evidence rows; no external provider API was called.
 - Stored 10 fixed-pool internal monitor signals.
 - Final verification: claim verifier and style/garbled checks passed; trust gate reason is `claim_verifier_ok`; `push_enabled=1`, `pushed=0`, structured JSON present.
+
+## 2026-07-17 Client-Visible Template Audit
+- [x] Scan frontend analysis pages, market-analysis prompt templates, LINE/weekly skills, and memory docs for raw internal labels that could leak to client-visible text.
+- [x] Replace prompt and skill wording with generic reader-facing rules: no source labels, table names, snake_case fields, scheduled task names, provider names, guard names, custom score labels, or missing-data implementation notes in visible prose.
+- [x] Align daily analysis wording with `風險與觀察限制` and `主要反向觀點`.

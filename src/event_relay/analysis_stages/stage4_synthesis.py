@@ -7,7 +7,7 @@ stored in ``t_market_analyses.structured_json``.
 
 The summary_text always ends with two regex-extractable lines:
     信心等級：<low|medium|high>
-    主要反方觀點：<one sentence>
+    主要反向觀點：<one sentence>
 so downstream consumers can pick those out without LLM reparsing.
 
 Primary path: structured-output call (OpenAI ``json_schema`` / Anthropic
@@ -41,9 +41,9 @@ STAGE_NAME = "stage4_synthesis"
 _SCHEMA_NAME = "market_analysis_stage4_synthesis"
 
 CONFIDENCE_LINE_PREFIX = "信心等級："
-COUNTERPOINT_LINE_PREFIX = "主要反方觀點："
+COUNTERPOINT_LINE_PREFIX = "主要反向觀點："
 CONFIDENCE_LINE_RE = re.compile(r"^信心等級：(low|medium|high)\s*$", re.MULTILINE)
-COUNTERPOINT_LINE_RE = re.compile(r"^主要反方觀點：(.+)$", re.MULTILINE)
+COUNTERPOINT_LINE_RE = re.compile(r"^主要反向觀點：(.+)$", re.MULTILINE)
 
 _VALID_CONFIDENCE = {"low", "medium", "high"}
 
@@ -53,7 +53,7 @@ _EDITORIAL_FLOW_SECTIONS = [
     "市場正在定價什麼",
     "台股傳導",
     "反證條件",
-    "風險與資料缺口",
+    "風險與觀察限制",
 ]
 
 _SLOT_SECTIONS = {
@@ -82,24 +82,24 @@ _REGIME_FLOW_GUIDE = (
     "3. 市場正在定價什麼: explain what expectations are already reflected in prices and what still has room for repricing.\n"
     "4. 台股傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
     "5. 反證條件: state the cleanest data or market moves that would make the thesis wrong.\n"
-    "6. 風險與資料缺口: max three bullets; list missing data, stale data, and event risks.\n"
+    "6. 風險與觀察限制: max three bullets; describe event risks, stale information, or observation limits in reader-facing language.\n"
 )
 
 _POPULAR_MACRO_TONE_GUIDE = (
     "Tone target: professional macro commentary with a popular Taiwan market-commentary feel, not an institutional research note and not an over-simplified beginner explainer.\n"
     "- Keep macro terms such as Regime, Fed path, liquidity, credit spread, VIX, SOX, and DXY when they matter, but immediately translate why they matter to Taiwan investors.\n"
-    "- Prefer wording like: 市場現在在交易的是..., 重點不是數字本身，而是..., 對台股的意思是..., 這條鏈會失效如果...\n"
-    "- Put raw indicators after the implication, not before it. Example: 先寫「資金環境沒有收緊，科技股比較有人接」，再列 TGA/RRP/OAS evidence.\n"
+    "- Prefer wording like: market is trading this, the key is the implication rather than the number, and the thesis fails if the next data point goes the other way.\n"
+    "- Put raw indicators after the implication, not before it.\n"
     "- Avoid acronym piles. If using SOFR, RRP, TGA, OAS, or NFCI, add a short appositive explanation or keep it inside a data bullet.\n"
     "- Do not remove mechanism. Each section still needs evidence -> market mechanism -> Taiwan implication, but the first sentence should tell readers what the market is really pricing.\n"
 )
 
 _INTERNAL_CONTEXT_TRANSLATION_GUIDE = (
     "Internal-context translation rule:\n"
-    "- Do not expose internal pipeline/source labels or custom numeric handles in summary_text, including market scorecard, scorecard +4, market_context, market_context:scorecard, analysis_slot, scheduled_time_local, raw_json, or labels such as 07:20 market_context.\n"
-    "- Translate internal context into reader-facing Traditional Chinese implications. Example: instead of 'market scorecard 為 +4', write '盤前多數流動性與風險指標偏向支撐風險資產，但仍要觀察美元、油價與信用利差是否反轉'.\n"
-    "- Instead of '07:20 market_context', write '盤前整理的市場環境資料顯示...' or '盤前資料指出...'.\n"
-    "- Keep internal source names and scores only in raw_json / structured telemetry; visible text should describe the implication, not the internal field name.\n"
+    "- Do not expose internal pipeline/source labels, table names, snake_case fields, scheduled task names, or custom numeric handles in summary_text.\n"
+    "- Translate internal context into reader-facing Traditional Chinese implications, for example: liquidity and risk indicators are leaning supportive, but confirmation still depends on rates and FX.\n"
+    "- Write latest market context or pre-market information in plain Chinese, not the internal source or job name.\n"
+    "- Keep internal source names and scores only in structured telemetry; visible text should describe the implication, not the field name.\n"
 )
 
 
@@ -110,13 +110,13 @@ def _structured_instructions() -> str:
         "of the same analysis.\n"
         "  - summary_text: Traditional Chinese plain text matching the length\n"
         "    budget in the user prompt. Follow the section list below and preserve\n"
-        "    the flow: 今日主命題 -> 三個證據 -> 市場正在定價什麼 -> 台股傳導 -> 反證條件 -> 風險與資料缺口.\n"
-        "    Do not include a dedicated 台股配置 section or any ## 今日個股觀察 section.\n"
-        "    Do not expose internal labels such as market scorecard, market_context, analysis_slot, scheduled_time_local, raw_json, or 07:20 market_context; translate them into plain Chinese market implications.\n"
+        "    the flow: 今日主命題 -> 三個證據 -> 市場正在定價什麼 -> 台股傳導 -> 反證條件 -> 風險與觀察限制.\n"
+        "    Do not append or write a ## 今日個股觀察 section. Do not write 台股配置 as a section title.\n"
+        "    Do not expose internal source labels, snake_case fields, table names, task names, or telemetry handles; translate them into plain Chinese market implications.\n"
         "    End summary_text with two\n"
         "    final lines on their own:\n"
         "        信心等級：<low|medium|high>\n"
-        "        主要反方觀點：<one sentence stating the strongest opposing view>\n"
+        "        主要反向觀點：<one sentence stating the strongest opposing view>\n"
         "  - headline: a single Traditional-Chinese sentence (<=40 chars).\n"
         "  - sentiment: bullish / bearish / neutral (global risk-on/risk-off view).\n"
         "  - confidence: low / medium / high. Match the value used inside\n"
@@ -192,17 +192,17 @@ def build_prompts(
         "Write with a professional-but-conversational macro-commentary voice: keep the framework, but make every indicator answer what the market is trading and why it matters for Taiwan.\n"
         "You are the final stage of a multi-stage pipeline. Do not introduce new\n"
         "facts: restate what earlier stages produced, keep evidence-backed claims,\n"
-        "and clearly mark items coming from risks / data_gaps.\n"
+        "and translate risks / data_gaps into reader-facing observation limits when they appear in visible prose.\n"
         "Treat the dual-view bull/bear and the critic's findings as constraints:\n"
         "if critic flags overconfidence, lower the confidence; if dual-view bear\n"
-        "is strong, surface its top point as 主要反方觀點.\n\n"
+        "is strong, surface its top point as 主要反向觀點.\n\n"
         "[Macro Skill]\n"
         f"{macro_skill}\n\n"
         "[Mobile Chat Format Skill]\n"
         f"{line_skill}\n"
     )
     user_lines = [
-        f"Generate one {slot} market analysis in Traditional Chinese.",
+        "Generate one market analysis in Traditional Chinese.",
         focus,
         "Do not include a bracketed title like [Market Analysis]; downstream title should be date-only.",
         "Required sections (used inside summary_text):",
@@ -222,19 +222,19 @@ def build_prompts(
         "Answer the selected stage0 core tensions directly before moving into sector implications.",
         "",
         "Formatting rules:",
-        "- Do not include internal event IDs, source row IDs, or citation-only numeric lists such as （128610,128539） in summary_text.",
-        "- Do not expose internal pipeline labels or custom numeric handles such as market scorecard, market_context, 07:20 market_context, analysis_slot, scheduled_time_local, or raw_json; translate them into plain Chinese market implications.",
-        "- Keep evidence references implicit in raw_json/pipeline telemetry, not visible report text.",
-        "- Section 1 今日主命題 should be one sentence, not a paragraph.",
-        "- Section 2 三個證據 must contain exactly three bullets and each bullet must include the source fact and why it matters.",
-        "- Section 3 市場正在定價什麼 should state what expectations are already in prices and what is not fully priced yet.",
-        "- Section 4 台股傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.",
-        "- Section 5 反證條件 should name the cleanest conditions that would break the thesis.",
-        "- Section 6 風險與資料缺口 must be concise: three bullets maximum.",
+        "- Do not include internal event IDs, source row IDs, or citation-only numeric lists in summary_text.\n"
+        "- Do not expose internal pipeline labels, table names, snake_case fields, task names, or custom numeric handles; translate them into plain Chinese market implications.",
+        "- Keep evidence references in structured telemetry, not visible report text.",
+        "- Section 1 今日主命題 should be one sentence, not a paragraph.\n"
+        "- Section 2 三個證據 must contain exactly three bullets and each bullet must include the source fact and why it matters.\n"
+        "- Section 3 市場正在定價什麼 should state what expectations are already in prices and what is not fully priced yet.\n"
+        "- Section 4 台股傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.\n"
+        "- Section 5 反證條件 should name the cleanest conditions that would break the thesis.\n"
+        "- Section 6 風險與觀察限制 must be concise: three bullets maximum.\n"
         "- Use the exact section titles listed above.",
         "",
         "Use only claims supported by the stage outputs below. If a section",
-        "has no supporting material, state the data gap rather than inventing.",
+        "has no supporting material, leave it out or describe the observation limit in reader-facing language rather than inventing.",
         "",
         "summary_text MUST end with two lines, each on its own line:",
         f"    {CONFIDENCE_LINE_PREFIX}<low|medium|high>",

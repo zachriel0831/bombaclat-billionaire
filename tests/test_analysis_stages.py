@@ -407,7 +407,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         summary = result.output["summary_text"]
         self.assertTrue(summary.startswith("最終中文報告"))
         self.assertIn("信心等級：medium", summary)
-        self.assertIn("主要反方觀點：", summary)
+        self.assertIn("主要反向觀點：", summary)
         self.assertEqual(result.output["structured"]["sentiment"], "bullish")
         self.assertTrue(result.extras["has_structured"])
 
@@ -428,7 +428,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("市場正在定價什麼", user_prompt)
         self.assertIn("台股傳導", user_prompt)
         self.assertIn("反證條件", user_prompt)
-        self.assertIn("風險與資料缺口", user_prompt)
+        self.assertIn("風險與觀察限制", user_prompt)
         self.assertNotIn("6. 台股配置", user_prompt)
         self.assertIn("Do not append or write a ## 今日個股觀察 section", user_prompt)
         self.assertIn("NVIDIA", user_prompt)
@@ -438,12 +438,12 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("Stage0 core tensions JSON", user_prompt)
         self.assertIn("date-only", user_prompt)
         self.assertIn("Do not include internal event IDs", user_prompt)
-        self.assertIn("raw_json/pipeline telemetry", user_prompt)
+        self.assertIn("structured telemetry", user_prompt)
         self.assertIn("Internal-context translation rule", user_prompt)
-        self.assertIn("market scorecard 為 +4", user_prompt)
-        self.assertIn("07:20 market_context", user_prompt)
+        self.assertIn("snake_case fields", user_prompt)
+        self.assertIn("plain Chinese market implications", user_prompt)
         self.assertIn("professional-but-conversational macro-commentary voice", system_prompt)
-        self.assertIn("市場現在在交易的是", user_prompt)
+        self.assertIn("market is trading this", user_prompt)
         self.assertIn("Avoid acronym piles", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
 
@@ -521,7 +521,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         summary = result.output["summary_text"]
         self.assertTrue(summary.startswith("純文字降級報告"))
         self.assertIn("信心等級：", summary)
-        self.assertIn("主要反方觀點：", summary)
+        self.assertIn("主要反向觀點：", summary)
         self.assertIsNone(result.output["structured"])
         self.assertFalse(result.extras["has_structured"])
         self.assertIn("schema_failed", result.extras["structured_fallback"])

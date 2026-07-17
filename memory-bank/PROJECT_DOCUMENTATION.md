@@ -272,7 +272,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 ## Analysis Context Policy
 - `t_relay_events` is the primary local event/fact context for weekly and scheduled daily analyses, but it is not treated as the complete universe of relevant market information.
 - OpenAI analysis calls request the Responses API `web_search` tool by default so the model can verify missing, stale, or fast-moving facts beyond local rows.
-- If web search is unavailable or returns insufficient evidence, prompts require the model to label the data gap and lower confidence instead of fabricating certainty.
+- If web search is unavailable or returns insufficient evidence, prompts require the model to lower confidence and describe observation limits in reader-facing language instead of fabricating certainty or exposing internal missing-data notes.
 - Skill docs are retained as prompt assets for macro reasoning and mobile-chat readability; they do not create any Python-owned LINE delivery behavior.
 
 ## Weekly Summary
@@ -344,7 +344,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   14. For `macro_daily`, write macro-only analysis into `t_market_analyses` and do not create trade signals.
 - Daily text formatting:
   - `raw_json.display_title` is date-only (`YYYY-MM-DD`) for downstream delivery titles
-  - Daily analysis uses the author-style flow: `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與資料缺口`
+  - Daily analysis uses the author-style flow: `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與觀察限制`
   - Do not write a dedicated `台股配置` section or append `## 今日個股觀察` in daily visible reports.
   - Individual companies may appear only as macro/sector transmission examples, such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; daily visible reports should not include entry, stop-loss, or target-price language.
   - `三個證據` must contain exactly three bullets, each connecting source fact -> market mechanism -> why it matters now; `市場正在定價什麼` should name what is already reflected in prices and what can still be repriced

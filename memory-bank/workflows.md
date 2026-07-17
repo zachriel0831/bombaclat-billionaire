@@ -370,7 +370,7 @@ machine restart, or when the user asks whether source data has caught up.
 - Market analysis builds a quota-managed context pack before RAG/prompting; `market_context:scorecard`, market-context rows, and important official data must remain selected even when general news volume is high
 - Stage0 selects 1-2 deterministic core tensions before LLM stages; later stage prompts should answer those tensions directly
 - Stage2 transmission may receive hybrid retrieved historical examples from `t_event_embeddings` / `t_analysis_embeddings`; these are analogues only, not current evidence IDs
-- OpenAI runs request web search by default; if unavailable, the prompt must label missing context instead of fabricating
+- OpenAI runs request web search by default; if unavailable, the prompt must lower confidence and describe observation limits in reader-facing language instead of fabricating
 3. Persist analysis output
 - Generated text is upserted into `t_market_analyses` by `(analysis_date, analysis_slot)`
 - `push_enabled` means Java delivery eligibility, not Python push execution
@@ -385,7 +385,7 @@ machine restart, or when the user asks whether source data has caught up.
 - `ticker` is normalized symbol text; Taiwan signals use 4-digit codes without `.TW` / `.TWO`
 - Daily visible reports no longer append `## 今日個股觀察`; `t_trade_signals` may still be maintained as machine-readable downstream context, but it is not rendered into the market-analysis body.
 - If today's structured/quote context misses a ticker, the pipeline may copy only same-ticker recent `t_trade_signals` as `prior_signal_stock_watch` for downstream signal context. Treat it as stale reference only: keep `confidence=low`, show the prior date, and require same-day price, volume, and news confirmation.
-- Daily formatting uses date-only `raw_json.display_title` and the author-style flow `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與資料缺口`; `三個證據` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. Do not write a dedicated `台股配置` section.
+- Daily formatting uses date-only `raw_json.display_title` and the author-style flow `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與觀察限制`; `三個證據` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. Do not write a dedicated `台股配置` section.
 - Individual company mentions in daily visible reports are limited to macro/sector transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write entry, stop-loss, or target-price language in the daily body.
 - In that section, `direction=long` is rendered as `可做/建議觀察` plus the strategy label; `entry_zone` means entry area, `take_profit_zone` means profit-taking/exit area, and `invalidation` is rendered as `停損`
 - Do not create orders here. Risk gate / review and outcomes stay in `t_signal_reviews` and `t_signal_outcomes`
@@ -468,7 +468,7 @@ Guard responsibilities:
 2. Generate the weekly brief
 - Read the last 7 days from `t_relay_events`
 - Call OpenAI Responses API with weekly summary prompts and web search enabled by default for current-fact verification
-- If local events or web verification are insufficient, explicitly mark the data gap in the stored analysis
+- If local events or web verification are insufficient, lower confidence and describe observation limits in reader-facing language; do not surface internal missing-data notes
 3. Store for downstream delivery
 - Upsert into `t_market_analyses`
 - Java owns user-facing LINE delivery
