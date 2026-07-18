@@ -4,16 +4,25 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-19 weekly market-analysis row if needed.
+- Task: Guard and repair the 2026-07-19 US-close market-analysis row if needed.
 - Requested by: automation
-- Start date: 2026-07-18
-- Scope: Inspect the target Sunday `weekly_tw_preopen` row, repair it from local evidence only when missing or unhealthy, preserve Java delivery ownership, and use no paid external LLM APIs.
+- Start date: 2026-07-19
+- Scope: Inspect today's `us_close` row, repair it from local evidence only when missing or unhealthy, preserve Java delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, automation memory, and Workflow 4C guard rules.
 - [x] Inspect the target row and collect recent local evidence/history availability.
 - [x] Repair/create the row through `MySqlEventStore.upsert_market_analysis()` only if needed.
 - [x] Verify section order, text integrity, storage fields, and provider telemetry.
+
+## 2026-07-19 US-Close Guard Run
+- [x] Found no `analysis_date=2026-07-19` / `analysis_slot=us_close` row.
+- [x] Confirmed local 2026-07-17 U.S. close snapshots and recent macro/geopolitical/AI evidence are available.
+- [x] Re-planned after the first dry verification exposed non-JSON database datetime values; normalize verifier inputs before writing.
+- [x] Second dry verification stopped on a combined style assertion before DB write; split assertions to identify the exact failed condition.
+- [x] Repaired the missing row as `t_market_analyses.id=263` using local evidence only.
+- [x] Ran targeted signal extraction; stored 10 `pending_review` rows.
+- [x] Final verification passed: claim/trust/style/garbled checks, delivery flags, structured data, and external-provider telemetry.
 
 ## 2026-07-19 Weekly Guard Run
 - [x] Found no `analysis_date=2026-07-19` / `analysis_slot=weekly_tw_preopen` row.
