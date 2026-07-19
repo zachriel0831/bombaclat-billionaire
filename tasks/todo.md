@@ -4,18 +4,26 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-20 `us_close` market-analysis row from local evidence only.
+- Task: Guard and repair the 2026-07-20 `pre_tw_open` market-analysis row from local evidence only.
 - Requested by: automation
 - Start date: 2026-07-20
-- Scope: Inspect today's `us_close` row, repair it when missing or unhealthy, preserve calendar/delivery ownership, and use no paid external LLM APIs.
+- Scope: Inspect today's `pre_tw_open` row, repair it when missing or unhealthy, preserve calendar/delivery ownership, rebuild internal fixed-pool monitor signals after a delivery-ready write, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, Workflow 4C guard rules, prompt skill, and active lessons.
-- [x] Confirm the target row is missing.
-- [x] Gather local U.S.-close, macro, geopolitical, liquidity, and Taiwan-transmission evidence.
-- [x] Create the row through `MySqlEventStore.upsert_market_analysis()`.
-- [x] Run internal signal extraction only if existing policy marks the row eligible.
-- [x] Verify DB flags, claim/trust/style/garbled checks, structured data, and provider telemetry.
+- [x] Inspect the target row and calendar eligibility.
+- [x] Gather local relay and market-context evidence.
+- [x] Repair through `MySqlEventStore.upsert_market_analysis()` only if needed.
+- [x] Run targeted fixed-pool monitor extraction after a delivery-ready write.
+- [x] Verify DB flags, claim/trust/style/garbled checks, structured data, signals, and provider telemetry.
+
+## 2026-07-20 Pre-Open Guard Run
+- [x] Found no `analysis_date=2026-07-20` / `analysis_slot=pre_tw_open` row.
+- [x] Calendar allows `pre_tw_open`: Taiwan is a regular trading day and the relevant U.S. session is weekend-closed.
+- [x] Repaired the missing row as `t_market_analyses.id=266` through `MySqlEventStore.upsert_market_analysis()` using local evidence only.
+- [x] Ran targeted fixed-pool extraction; stored 10 internal `pending_review` monitor rows.
+- [x] Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `trust_gate.signals_allowed=true`, `push_enabled=1`, `pushed=0`, `structured_json` present, six headings in order, exactly three evidence bullets, garbled/internal-label/trade-language checks passed, and `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, paid external LLM API, or LINE delivery call occurred.
 
 ## 2026-07-20 US-Close Guard Run
 - [x] Found no `analysis_date=2026-07-20` / `analysis_slot=us_close` row.
