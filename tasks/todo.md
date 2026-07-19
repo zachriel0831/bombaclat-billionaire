@@ -4,16 +4,24 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-19 US-close market-analysis row if needed.
+- Task: Guard and repair the 2026-07-19 TW-close market-analysis row if needed.
 - Requested by: automation
 - Start date: 2026-07-19
-- Scope: Inspect today's `us_close` row, repair it from local evidence only when missing or unhealthy, preserve Java delivery ownership, and use no paid external LLM APIs.
+- Scope: Inspect today's `tw_close` row, repair it from local evidence only when allowed and missing or unhealthy, keep it storage-only, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, automation memory, and Workflow 4C guard rules.
-- [x] Inspect the target row and collect recent local evidence/history availability.
-- [x] Repair/create the row through `MySqlEventStore.upsert_market_analysis()` only if needed.
-- [x] Verify section order, text integrity, storage fields, and provider telemetry.
+- [x] Inspect the calendar, target row, and same-day local context.
+- [x] Repair/create the row through `MySqlEventStore.upsert_market_analysis()` only if calendar policy allows and repair is needed.
+- [x] Verify final DB state and signal-extraction eligibility.
+
+## 2026-07-19 TW-Close Guard Run
+- [x] Re-planned after the first read-only check exposed missing Windows `tzdata`; use the repo-compatible fixed UTC+8 timezone.
+- [x] Re-planned after the second read-only check used nonexistent flattened status columns; verify claim/trust status from `raw_json`.
+- [x] Confirmed Taiwan and U.S. sessions are weekend-closed and `allowed_analysis_slots=[]`.
+- [x] Confirmed today's `tw_close` row is absent, which is intentional under calendar policy.
+- [x] Confirmed one same-day `market_context:tw_close` event exists; no analysis write or signal extraction is eligible.
+- [x] No OpenAI, Anthropic, paid external LLM API, or LINE contact occurred.
 
 ## 2026-07-19 US-Close Guard Run
 - [x] Found no `analysis_date=2026-07-19` / `analysis_slot=us_close` row.
