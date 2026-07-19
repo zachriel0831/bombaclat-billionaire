@@ -4,16 +4,26 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-19 TW-close market-analysis row if needed.
+- Task: Guard and repair the 2026-07-20 `us_close` market-analysis row from local evidence only.
 - Requested by: automation
-- Start date: 2026-07-19
-- Scope: Inspect today's `tw_close` row, repair it from local evidence only when allowed and missing or unhealthy, keep it storage-only, and use no paid external LLM APIs.
+- Start date: 2026-07-20
+- Scope: Inspect today's `us_close` row, repair it when missing or unhealthy, preserve calendar/delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
-- [x] Read repo instructions, automation memory, and Workflow 4C guard rules.
-- [x] Inspect the calendar, target row, and same-day local context.
-- [x] Repair/create the row through `MySqlEventStore.upsert_market_analysis()` only if calendar policy allows and repair is needed.
-- [x] Verify final DB state and signal-extraction eligibility.
+- [x] Read repo instructions, Workflow 4C guard rules, prompt skill, and active lessons.
+- [x] Confirm the target row is missing.
+- [x] Gather local U.S.-close, macro, geopolitical, liquidity, and Taiwan-transmission evidence.
+- [x] Create the row through `MySqlEventStore.upsert_market_analysis()`.
+- [x] Run internal signal extraction only if existing policy marks the row eligible.
+- [x] Verify DB flags, claim/trust/style/garbled checks, structured data, and provider telemetry.
+
+## 2026-07-20 US-Close Guard Run
+- [x] Found no `analysis_date=2026-07-20` / `analysis_slot=us_close` row.
+- [x] Used the 2026-07-17 U.S. close plus local rates, liquidity, energy, geopolitical, and Taiwan-transmission evidence only.
+- [x] Repaired the missing row as `t_market_analyses.id=265` through `MySqlEventStore.upsert_market_analysis()`.
+- [x] Ran targeted signal extraction; stored 10 internal `pending_review` monitor rows.
+- [x] Final verification: `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=0`, `pushed=0`, `structured_json` present, six headings in order, exactly three evidence bullets, garbled/internal-label/trade-language checks passed, and `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, paid external LLM API, or LINE delivery call occurred.
 
 ## 2026-07-19 TW-Close Guard Run
 - [x] Re-planned after the first read-only check exposed missing Windows `tzdata`; use the repo-compatible fixed UTC+8 timezone.
