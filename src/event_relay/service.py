@@ -997,7 +997,7 @@ class MySqlEventStore:
                 cur.close()
 
     def fetch_trade_signal_recommendations(self, analysis_id: int, *, limit: int = 10) -> list[dict[str, Any]]:
-        """Fetch fixed-pool short/medium-term watch rows for one analysis."""
+        """Fetch dynamic short/medium-term Taiwan watch rows for one analysis."""
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
 
@@ -1007,7 +1007,6 @@ class MySqlEventStore:
             "invalidation, take_profit_zone, holding_horizon, rationale, risk_notes, status "
             f"FROM `{self._trade_signal_table}` "
             "WHERE analysis_id=%s "
-            "AND ticker IN ('2330','2317','2454','2308','2881','2882','2485','3535','3715','2351') "
             "AND direction='long' "
             "AND strategy_type IN ('swing','medium') "
             "AND status IN ('pending_review','new','watch') "
@@ -1054,7 +1053,7 @@ class MySqlEventStore:
         days: int = 30,
         limit: int = 80,
     ) -> list[dict[str, Any]]:
-        """Fetch latest prior fixed-pool signal rows that can seed reference levels."""
+        """Fetch latest prior same-ticker signal rows that can seed reference levels."""
         if self._conn is None:
             raise RuntimeError("MySQL not initialized")
 

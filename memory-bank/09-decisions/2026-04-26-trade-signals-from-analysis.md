@@ -12,7 +12,7 @@ Date: 2026-04-26
 ## Decision
 - Add `t_trade_signals` as the structured watch/signal table.
 - Derive signals only from `t_market_analyses.structured_json` after the analysis row is stored.
-- Target design: allow evidence-backed dynamic Taiwan candidates instead of limiting `market_analysis` stock rows to the old fixed pool. Runtime code still needs migration from the fixed-pool implementation.
+- Implemented 2026-07-20: `market_analysis` stock rows now allow evidence-backed dynamic Taiwan candidates and no longer pad from the old fixed pool.
 - Add separate `t_signal_reviews` and `t_signal_outcomes` tables for later risk gate / human review and performance feedback.
 - Store every signal with `analysis_id`, slot/date, ticker, strategy, direction, optional entry/stop/target fields, source event IDs, and a stable `idempotency_key`.
 - Default signal status is `pending_review`.

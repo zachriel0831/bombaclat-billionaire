@@ -2,9 +2,9 @@
 
 ## Status
 
-Partial runtime implementation. `t_trade_signals` now stores deterministic
-candidate ranking fields, but the full fixed-pool removal / broad dynamic
-candidate universe is not complete yet.
+Runtime implementation is live for `data-collecting`. `t_trade_signals` now
+stores deterministic candidate ranking fields, and the daily strategy no
+longer pads recommendations from the historical fixed ten-stock pool.
 
 This supersedes the earlier fixed-pool watchlist documents:
 
@@ -90,8 +90,8 @@ Selection constraints:
 - Reads `t_trade_signals`.
 - Projects selected rows into `t_trade_watchlist`.
 - Subscribes to the top five ranked symbols.
-- Ranks monitorable rows by `candidate_score` first, falling back to older
-  fixed-pool priority only when score is missing.
+- Ranks monitorable rows by `candidate_score` first, then by deterministic
+  freshness/ticker ordering when score is missing.
 - Writes `t_watchlist_trigger_events`.
 - Does not create order intents.
 - Writes a local paper-trading observation ledger for virtual fills from
@@ -176,11 +176,15 @@ PnL fields required on position/order reporting:
 - entry trigger event id
 - exit trigger event id
 
-## Current Implementation Gap
+## Current Implementation State
 
-As of 2026-06-02:
+As of 2026-07-20:
 
-- `data-collecting` still contains fixed-pool code paths such as `FIXED_MARKET_ANALYSIS_WATCH_POOL`.
+- `data-collecting` accepts evidence-backed dynamic Taiwan tickers as four-digit
+  stock codes and no longer uses a fixed pool for padding.
+- Legacy CLI/API names such as `build_fixed_pool_repair_trade_signals` and
+  `--fixed-pool-fallback` remain as compatibility aliases, but their behavior
+  is dynamic-candidate repair.
 - `t_trade_signals` has deterministic `risk_reward_ratio`, `candidate_score`,
   and `avoid_reason` fields for downstream filtering.
 - `stock-monitor-service` can monitor five qualified symbols, write trigger
@@ -190,6 +194,6 @@ As of 2026-06-02:
 
 Therefore the next implementation work should be:
 
-1. Replace fixed-pool signal generation with Codex daily dynamic candidate generation.
-2. Backtest and tune `candidate_score` inputs against paper-trading outcomes.
+1. Backtest and tune `candidate_score` inputs against paper-trading outcomes.
+2. Broaden same-day evidence sources for dynamic ticker discovery.
 3. Implement `order-dispatcher-service` sandbox state machine before any live order path.

@@ -379,8 +379,8 @@ machine restart, or when the user asks whether source data has caught up.
 - `claim-verifier-v2` ignores internal parenthesized evidence/source ID lists such as `（128610,128539）`; Stage4 must keep internal IDs out of visible `summary_text` and leave evidence links in telemetry/structured fields
 - For dynamic candidate slots, `claim_verifier` must verify ticker references against local evidence or explicit candidate telemetry. Unsupported numbers, dates, and unrelated tickers must still block delivery.
 - `us_close` remains stored as a digest/analysis and is injected into the next Taiwan pre-open analysis context only when the relevant U.S. session was open; if U.S. was closed, the pre-open prompt has no `us_close` context
-- Target design: dynamic `structured_json.stock_watch` rows are extracted into `t_trade_signals`.
-- Current implementation gap: code still contains fixed-pool paths. Do not claim dynamic candidates are live until those code paths are migrated and tested.
+- Dynamic `structured_json.stock_watch` rows are extracted into `t_trade_signals`.
+- Do not pad empty or thin analyses from the historical fixed ten-stock pool.
 - New signals use `status=pending_review`; stale pending signals for the same analysis are marked `superseded`
 - `ticker` is normalized symbol text; Taiwan signals use 4-digit codes without `.TW` / `.TWO`
 - Daily visible reports no longer append `## 今日個股觀察`; `t_trade_signals` may still be maintained as machine-readable downstream context, but it is not rendered into the market-analysis body.
@@ -496,7 +496,7 @@ Guard responsibilities:
 4. Verify storage
 - Query `t_market_analyses` by `analysis_slot`
 - Weekly uses `analysis_slot=weekly_tw_preopen`
-- Target design: daily market analysis extracts dynamic trade candidates to `t_trade_signals`; current code still needs fixed-pool migration.
+- Daily market analysis extracts dynamic trade candidates to `t_trade_signals`; old fixed-pool behavior is superseded.
 
 ## Workflow 4E: SEC Tracked Filings Flow
 1. Define tracked universe
@@ -556,7 +556,7 @@ Guard responsibilities:
 - FRED oil context: WTI, Brent, and Brent-WTI spread; optional EIA inventory context for U.S. crude stocks excluding SPR when `EIA_API_KEY` is set
 - Deterministic scorecard: `breadth_health`, `ai_capex_quality`, `energy_shock_risk`, `credit_stress`, and `liquidity_impulse` on a -2..+2 scale
 - TWSE official OpenAPI: index groups, tracked stocks, and margin balances
-- Taiwan Yahoo context from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` is currently a tracked evidence input. It historically mirrored the fixed pool and should be generalized during dynamic-candidate migration.
+- Taiwan Yahoo context from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` is an optional tracked evidence input and fallback preference list. It must not be treated as a fixed trading universe.
 - Visible stock-analysis exclusions are controlled by `MARKET_ANALYSIS_EXCLUDED_TICKERS`; default excludes `4749` / 新應材
 3. Persist as event-only facts
 - Insert one stored-only event per context point into `t_relay_events`

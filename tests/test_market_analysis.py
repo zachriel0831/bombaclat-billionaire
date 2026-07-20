@@ -1232,7 +1232,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(raw["upstream_analysis_context"]["reason"], "us_close_session_closed")
 
     def test_legacy_mode_keeps_trade_signals_internal_without_visible_section(self) -> None:
-        """Legacy fallback keeps fixed-pool signals internal and does not append the daily section."""
+        """Legacy fallback keeps dynamic quote signals internal and does not append the daily section."""
         quote_events = [
             SummaryEvent(
                 row_id=901,
@@ -1269,8 +1269,8 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(signal.strategy_type, "swing")
         self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
 
-    def test_claim_verifier_allows_fixed_pool_tickers_without_quote_evidence(self) -> None:
-        """Fixed-pool ticker names in structured signal context are allowed claims."""
+    def test_claim_verifier_blocks_tickers_without_current_evidence(self) -> None:
+        """Dynamic ticker names still need current evidence before delivery or signal extraction."""
         result, records = self._run(
             pipeline_env="legacy",
             stage_side_effects={},
@@ -1279,11 +1279,11 @@ class MultiStagePipelineTests(unittest.TestCase):
         )
 
         self.assertTrue(result["ok"])
-        self.assertTrue(result["push_enabled"])
+        self.assertFalse(result["push_enabled"])
         raw = json.loads(records[0].raw_json)
-        self.assertTrue(raw["claim_verifier"]["ok"])
-        self.assertEqual(raw["claim_verifier"]["unsupported_counts"]["tickers"], 0)
-        self.assertEqual(raw["trust_gate"]["reason"], "claim_verifier_ok")
+        self.assertFalse(raw["claim_verifier"]["ok"])
+        self.assertEqual(raw["claim_verifier"]["unsupported_counts"]["tickers"], 3)
+        self.assertEqual(raw["trust_gate"]["reason"], "claim_verifier_failed")
 
     def test_claim_verifier_failure_blocks_delivery_and_trade_signals(self) -> None:
         """Unsupported claims keep the row stored but block delivery and signal extraction."""
@@ -1506,7 +1506,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
 
     def test_us_close_keeps_recommendations_internal_and_fills_missing_levels(self) -> None:
-        """U.S. close keeps fixed-pool rows internal while preserving price references."""
+        """U.S. close keeps dynamic rows internal while preserving price references."""
         from event_relay.analysis_stages.context import StageResult
 
         quote_events = [
@@ -1610,7 +1610,7 @@ class MultiStagePipelineTests(unittest.TestCase):
         self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
 
     def test_multi_stage_tops_up_pre_open_recommendations_to_ten(self) -> None:
-        """structured 觀察不足 10 檔時，只用固定池報價事件補滿。"""
+        """structured 觀察不足 10 檔時，只用有效動態台股報價事件補足。"""
         from event_relay.analysis_stages.context import StageResult
 
         quote_events = [
@@ -1687,8 +1687,8 @@ class MultiStagePipelineTests(unittest.TestCase):
         )
         self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
 
-    def test_multi_stage_keeps_fixed_pool_fallback_internal_when_structured_has_outside_tickers(self) -> None:
-        """Configured fallback can only store fixed-pool tickers and stays out of visible daily text."""
+    def test_multi_stage_keeps_dynamic_fallback_internal_when_structured_has_extra_tickers(self) -> None:
+        """Configured fallback stores valid dynamic tickers and stays out of visible daily text."""
         from event_relay.analysis_stages.context import StageResult
 
         preferred_env = "2485.TW:兆赫,3535.TW:晶彩科,3715.TW:定穎投控,2351.TW:順德,4749.TWO:新應材"
@@ -1765,12 +1765,12 @@ class MultiStagePipelineTests(unittest.TestCase):
         stored_tickers = [signal.ticker for signal in _FakeAnalysisStore.signals[0][1]]
         self.assertEqual(
             stored_tickers,
-            ["2330", "2317", "3535", "2485", "3715", "2351", "2454", "2308", "2881", "2882"],
+            ["2330", "3711", "2382", "3231", "2317", "3535", "2485", "3715", "2351", "2454"],
         )
         self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
 
-    def test_multi_stage_uses_prior_signal_reference_for_missing_fixed_pool_ticker(self) -> None:
-        """When today's evidence is thin, prior same-ticker levels can seed internal signal context."""
+    def test_multi_stage_ignores_unpreferred_prior_signal_reference(self) -> None:
+        """Prior same-ticker levels are not added unless the ticker is explicitly preferred today."""
         from event_relay.analysis_stages.context import StageResult
 
         stage_side_effects = {
@@ -1846,14 +1846,11 @@ class MultiStagePipelineTests(unittest.TestCase):
             prior_signal_references=prior_refs,
         )
 
-        self.assertEqual(result["trade_signals_stored"], 2)
-        self.assertEqual(result["trade_signal_recommendations"], 2)
-        self.assertEqual(result["prior_signal_references"], 1)
+        self.assertEqual(result["trade_signals_stored"], 1)
+        self.assertEqual(result["trade_signal_recommendations"], 1)
+        self.assertEqual(result["prior_signal_references"], 0)
         stored = _FakeAnalysisStore.signals[0][1]
-        self.assertEqual([signal.ticker for signal in stored], ["2330", "2317"])
-        self.assertEqual(stored[1].signal_type, "prior_signal_stock_watch")
-        self.assertEqual(stored[1].confidence, "low")
-        self.assertEqual(json.loads(stored[1].entry_zone_json)["low"], 205)
+        self.assertEqual([signal.ticker for signal in stored], ["2330"])
         self.assertEqual(_FakeAnalysisStore.updated_summaries, [])
 
     def test_multi_stage_text_fallback_leaves_structured_none(self) -> None:

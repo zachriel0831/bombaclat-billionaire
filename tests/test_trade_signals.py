@@ -122,12 +122,12 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertGreater(first[0].candidate_score, 0)
 
     def test_skips_non_tw_market_and_invalid_ticker(self) -> None:
-        """只保留固定監控池內的台股。"""
+        """Only Taiwan four-digit stock codes are accepted for dynamic candidates."""
         structured = {
             "stock_watch": [
                 {"ticker": "NVDA", "market": "US", "direction": "bullish", "rationale": "AI"},
                 {"ticker": "bad ticker prose", "market": "TW", "direction": "bullish", "rationale": "bad"},
-                {"ticker": "3711", "direction": "mixed", "rationale": "outside fixed pool"},
+                {"ticker": "3711", "direction": "mixed", "rationale": "dynamic evidence-backed ticker"},
                 {"ticker": "2330", "direction": "mixed", "rationale": "watch only"},
             ]
         }
@@ -139,9 +139,8 @@ class TradeSignalExtractionTests(unittest.TestCase):
             structured_payload=structured,
         )
 
-        self.assertEqual(len(signals), 1)
-        self.assertEqual(signals[0].ticker, "2330")
-        self.assertEqual(signals[0].direction, "watch")
+        self.assertEqual([signal.ticker for signal in signals], ["3711", "2330"])
+        self.assertEqual([signal.direction for signal in signals], ["watch", "watch"])
 
     def test_known_tickers_fill_missing_chinese_names(self) -> None:
         """LLM structured rows only carrying ticker still get visible Chinese names."""
@@ -177,13 +176,14 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertEqual(store.writes[0][1][0].ticker, "2330")
         self.assertEqual(json.loads(store.writes[0][1][0].source_event_ids_json), [123])
 
-    def test_fixed_pool_repair_uses_prior_references_when_structured_empty(self) -> None:
-        """A stored analysis with empty stock_watch can still rebuild monitor signals."""
+    def test_dynamic_repair_uses_prior_references_for_preferred_tickers(self) -> None:
+        """A stored analysis can rebuild same-ticker monitor signals when explicitly preferred."""
         signals, metrics = build_fixed_pool_repair_trade_signals(
             analysis_id=78,
             analysis_date="2026-05-25",
             analysis_slot="pre_tw_open",
             structured_payload={"stock_watch": []},
+            preferred_tickers={"2330"},
             prior_rows=[
                 {
                     "id": 170,
@@ -254,7 +254,7 @@ class TradeSignalExtractionTests(unittest.TestCase):
         )
 
         self.assertIn("## 今日個股觀察", text)
-        self.assertIn("固定十檔監控池", text)
+        self.assertIn("動態個股候選", text)
         self.assertIn("2330 台積電", text)
         self.assertIn("波段觀察", text)
         self.assertIn("利多：AI demand", text)
@@ -270,8 +270,8 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertIn("停損 price:590", text)
         self.assertNotIn("basis", text)
 
-    def test_quote_fallback_accepts_flat_and_negative_quotes_for_fixed_pool(self) -> None:
-        """Fallback 只補固定十檔，包含持平/小跌報價。"""
+    def test_quote_fallback_accepts_flat_and_negative_quotes_for_dynamic_tickers(self) -> None:
+        """Fallback can use any valid dynamic Taiwan ticker, including flat/small-negative quotes."""
         events = [
             SimpleNamespace(
                 row_id=200 + idx,
@@ -364,8 +364,8 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertIn("需開盤量價確認", signals[0].rationale)
         self.assertNotIn("作為早盤 watchlist 補位", signals[0].rationale)
 
-    def test_yahoo_market_context_fallback_supports_fixed_pool_symbol(self) -> None:
-        """Yahoo market_context 可補固定十檔個股 signal。"""
+    def test_yahoo_market_context_fallback_supports_dynamic_symbol(self) -> None:
+        """Yahoo market_context can backfill a valid Taiwan ticker signal."""
         raw_json = {
             "point": {
                 "source": "yahoo_chart",
@@ -402,8 +402,8 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertIn("yahoo_chart_tracked_stock_fallback", signals[0].raw_json)
         self.assertIn("市場情境報價上漲", signals[0].rationale)
 
-    def test_quote_fallback_prefers_configured_fixed_pool_stocks(self) -> None:
-        """Configured fixed-pool stocks rank ahead of other fixed-pool rows."""
+    def test_quote_fallback_prefers_configured_dynamic_tickers(self) -> None:
+        """Configured dynamic tickers rank ahead of other valid Taiwan rows."""
         events = [
             SimpleNamespace(
                 row_id=400 + idx,
@@ -519,26 +519,17 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertEqual(signal.signal_type, "prior_signal_stock_watch")
         self.assertEqual(signal.confidence, "low")
         self.assertEqual(signal.entry_zone_json, '{"low": 205, "high": 210}')
-        self.assertIn("利多：沿用 2026-05-09 前次固定池參考", signal.rationale)
+        self.assertIn("利多：沿用 2026-05-09 前次同股參考", signal.rationale)
         self.assertIn("利空：前次條件已過期", signal.rationale)
         self.assertIn("買入注意：沿用前次條件", signal.rationale)
         self.assertIn("今日仍需用盤中量價與新聞風控重新確認", signal.rationale)
         self.assertIn("prior_t_trade_signals", signal.raw_json)
 
-    def test_recommendation_section_renders_neutral_fixed_pool_when_empty(self) -> None:
-        """Final visible section still lists the fixed pool when no signal rows exist."""
+    def test_recommendation_section_stays_empty_when_no_dynamic_rows(self) -> None:
+        """Final visible section does not pad empty rows with a legacy watchlist."""
         text = build_trade_signal_recommendation_section([])
 
-        self.assertIn("固定十檔監控池", text)
-        self.assertIn("註：沒有完整短中線訊號", text)
-        self.assertIn("1. 2330 台積電｜中性觀察", text)
-        self.assertIn("10. 2351 順德｜中性觀察", text)
-        self.assertIn("利多：AI/HPC、先進製程與半導體景氣若延續", text)
-        self.assertIn("利空：今日缺少個股訊號與報價條件", text)
-        self.assertIn("買入注意：等回到進場區且大盤、費半同步轉強", text)
-        self.assertNotIn("上漲邏輯", text)
-        self.assertNotIn("低估/補漲", text)
-        self.assertNotIn("目前固定十檔沒有可用", text)
+        self.assertEqual(text, "")
 
     def test_recommendation_section_excludes_blocked_ticker(self) -> None:
         """Final visible section excludes blocked tickers such as 4749."""

@@ -66,13 +66,10 @@ from event_relay.rag import (
 )
 from event_relay.service import MarketAnalysisRecord, MySqlEventStore, TradeSignalRecord
 from event_relay.trade_signals import (
-    FIXED_MARKET_ANALYSIS_WATCH_POOL,
-    build_prior_signal_reference_trade_signals,
     build_trade_signal_recommendation_section,
     build_quote_event_trade_signals,
     build_trade_signals_from_analysis,
     is_excluded_trade_signal_ticker,
-    is_fixed_market_analysis_watch_ticker,
 )
 from event_relay.weekly_summary import _call_llm, _load_secret_from_dpapi_file, _openai_web_search_enabled
 
@@ -90,7 +87,7 @@ SLOTS = {
 }
 
 MACRO_DAILY_OWNER_SLOT = "pre_tw_open"
-FIXED_POOL_SIGNAL_SLOTS = {"pre_tw_open", "us_close"}
+DYNAMIC_TRADE_SIGNAL_SLOTS = {"pre_tw_open", "us_close"}
 VISIBLE_RECOMMENDATION_SECTION_SLOTS: set[str] = set()
 
 
@@ -391,7 +388,7 @@ def _preferred_tw_fallback_tickers_from_env() -> set[str]:
                 symbol = symbol.split(separator, 1)[0]
                 break
         code = symbol.strip().upper().split(".", 1)[0]
-        if code.isdigit():
+        if code.isdigit() and len(code) == 4:
             result.add(code)
     return result
 
@@ -403,18 +400,20 @@ def _should_emit_recommendation_section(slot: str, *, pipeline_mode: str | None 
     return slot in VISIBLE_RECOMMENDATION_SECTION_SLOTS
 
 
-def _should_build_fixed_pool_signals(slot: str, *, pipeline_mode: str | None = None) -> bool:
-    """Return whether internal fixed-pool signals should still be maintained."""
+def _should_build_trade_signals(slot: str, *, pipeline_mode: str | None = None) -> bool:
+    """Return whether internal dynamic trade signals should be maintained."""
     if slot == "us_close" and pipeline_mode == "digest":
         return False
-    return slot in FIXED_POOL_SIGNAL_SLOTS
+    return slot in DYNAMIC_TRADE_SIGNAL_SLOTS
 
 
 def _allowed_claim_tickers_for_slot(slot: str, *, pipeline_mode: str | None = None) -> set[str]:
-    """Return structured tickers allowed by the fixed market-analysis contract."""
-    if not _should_build_fixed_pool_signals(slot, pipeline_mode=pipeline_mode):
-        return set()
-    return set(FIXED_MARKET_ANALYSIS_WATCH_POOL)
+    """Return ticker whitelist for claim verification.
+
+    Dynamic stock candidates should be supported by the current evidence
+    corpus, so there is intentionally no static ticker whitelist.
+    """
+    return set()
 
 
 def _merge_reference_levels_from_fallbacks(
@@ -639,7 +638,7 @@ def _build_us_close_digest_prompts(
     )
     user_prompt = (
         f"Generate one compact {slot} digest in Traditional Chinese.\n"
-        "Purpose: summarize the U.S. close so the later Taiwan pre-open analysis can decide sector tilt and fixed-pool stock setups.\n"
+        "Purpose: summarize the U.S. close so the later Taiwan pre-open analysis can decide sector tilt and dynamic Taiwan stock setups.\n"
         "Do NOT recommend Taiwan stocks, do NOT provide entry/stop/take-profit levels, and do NOT write a full research report.\n"
         "Required sections:\n"
         "1) 美股收盤一句話\n"
@@ -1982,7 +1981,7 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
             )
             structured_signals_count = len(trade_signals)
         reference_levels_filled = 0
-        if _should_build_fixed_pool_signals(slot, pipeline_mode=effective_pipeline_mode):
+        if _should_build_trade_signals(slot, pipeline_mode=effective_pipeline_mode):
             preferred_fallback_tickers = _preferred_tw_fallback_tickers_from_env()
             fallback_signals = build_quote_event_trade_signals(
                 analysis_id=analysis_id,
@@ -2020,27 +2019,6 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 for signal in trade_signals
                 if not is_excluded_trade_signal_ticker(signal.ticker)
             ]
-            existing_tickers = {signal.ticker for signal in trade_signals}
-            missing_reference_tickers = [
-                ticker
-                for ticker in FIXED_MARKET_ANALYSIS_WATCH_POOL
-                if ticker not in existing_tickers and not is_excluded_trade_signal_ticker(ticker)
-            ]
-            if missing_reference_tickers:
-                prior_rows = store.fetch_recent_trade_signal_references(
-                    tickers=missing_reference_tickers,
-                    exclude_analysis_id=analysis_id,
-                    days=_int_env("MARKET_ANALYSIS_PRIOR_SIGNAL_LOOKBACK_DAYS", 30, minimum=1, maximum=180),
-                )
-                prior_signals = build_prior_signal_reference_trade_signals(
-                    analysis_id=analysis_id,
-                    analysis_date=record.analysis_date,
-                    analysis_slot=record.analysis_slot,
-                    prior_rows=prior_rows,
-                    missing_tickers=missing_reference_tickers,
-                )
-                trade_signals.extend(prior_signals)
-                prior_reference_added = len(prior_signals)
         if used_multi_stage or trade_signals:
             trade_signals_count = store.replace_trade_signals_for_analysis(analysis_id, trade_signals)
             source_label = "structured"
@@ -2062,12 +2040,11 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
                 prior_reference_added,
                 reference_levels_filled,
             )
-        if _should_build_fixed_pool_signals(slot, pipeline_mode=effective_pipeline_mode):
+        if _should_build_trade_signals(slot, pipeline_mode=effective_pipeline_mode):
             recommendations = [
                 row
                 for row in store.fetch_trade_signal_recommendations(analysis_id, limit=10)
                 if not is_excluded_trade_signal_ticker(row.get("ticker"))
-                and is_fixed_market_analysis_watch_ticker(row.get("ticker"))
             ]
             trade_signal_recommendations_count = min(len(recommendations), 10)
             if _should_emit_recommendation_section(slot, pipeline_mode=effective_pipeline_mode):

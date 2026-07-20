@@ -536,7 +536,7 @@ Current behavior:
 - Keeps regular-day `us_close` analysis stored and injects it into the next Taiwan pre-open prompt only when that U.S. close session was open; TW-holiday `us_close` rows are eligible for Java LINE delivery
 - Target direction: Codex should generate dynamic Taiwan intraday / short-swing trade candidates from collected `t_relay_events`, market context, quote evidence, historical/RAG context, and model judgment, then store reviewable rows in `t_trade_signals`.
 - The old fixed ten-stock pool was only an observation/debugging aid and is superseded by `spec/market-analysis-dynamic-trade-candidates.md`.
-- Current implementation gap: code still contains fixed-pool paths such as `FIXED_MARKET_ANALYSIS_WATCH_POOL`; do not assume runtime dynamic candidate generation is complete.
+- Runtime candidate generation is now dynamic: valid Taiwan candidates are normalized to four-digit stock codes, must be evidence-backed, and are not padded from the historical fixed pool.
 - `stock-monitor-service` should monitor the top five ranked `t_trade_signals` candidates that pass the deterministic risk gate.
 - Future `order-dispatcher-service` trading must cap concurrent traded symbols at three and must remain sandbox/paper until order, fill, position, PnL, reconciliation, and kill-switch state are implemented.
 - Daily visible market-analysis text follows the author-style flow for readability: `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與資料缺口`; `三個證據` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. The daily body should not expose entry/stop/target lists unless a separate trading UI asks for them.
@@ -688,7 +688,7 @@ Market analysis env keys:
 - `LLM_WEB_SEARCH_ENABLED` (default `true` for OpenAI; set `false` for local-only analysis)
 - `LLM_TIMEOUT_SECONDS` (default `120`, configured `.env` value `600`, shared OpenAI/Anthropic HTTP timeout; clamped to `15-600`)
 - `MARKET_CONTEXT_TWSE_CODES` (optional; defaults to `TWSE_MOPS_TRACKED_CODES`)
-- `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` (tracked Taiwan quote/context symbols; historically used for the fixed pool and should be generalized during dynamic-candidate migration)
+- `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` (optional Taiwan quote/context symbols used as a dynamic fallback preference list; it is not a fixed trading universe)
 - `MARKET_ANALYSIS_EXCLUDED_TICKERS` (default `4749`; comma-separated tickers excluded from visible stock analysis)
 - `MARKET_ANALYSIS_CLAIM_GATE_ENABLED` (default `true`; set `false` only for emergency debugging to bypass the `claim_verifier.ok=false` delivery/signal block)
 - `MARKET_CONTEXT_ANALYSIS_SLOT` (default `market_context_pre_tw_open`)

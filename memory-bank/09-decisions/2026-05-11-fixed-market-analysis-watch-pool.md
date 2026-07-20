@@ -4,7 +4,7 @@
 2026-05-11
 
 ## Superseded
-Superseded on 2026-05-16 by `memory-bank/09-decisions/2026-05-16-ten-stock-observation-template.md`. The current visible pool is ten stocks and each visible row exposes `利多`, `利空`, and `買入注意`.
+Superseded on 2026-05-16 by `memory-bank/09-decisions/2026-05-16-ten-stock-observation-template.md`, then superseded again on 2026-07-20 by dynamic evidence-backed daily Taiwan candidates. The old fixed pool is historical only.
 
 ## Decision
 Superseded on 2026-06-02 by `2026-06-02-dynamic-intraday-candidate-pipeline.md`.
@@ -23,10 +23,10 @@ Historical 2026-05-11 pool used five stocks:
 | `1605` | 華新 | TWSE | cable / copper-infrastructure proxy |
 | `4956` | 光鋐 | TPEX | small semiconductor packaging proxy |
 
-## Rationale
+## Historical Rationale
 The goal is stable monitoring, not ticker discovery. A fixed pool lets middle-office, frontend, and future stock monitor services compare the same names over time and avoid user-facing "AI stock pick" semantics.
 
-## Boundaries
+## Superseded Boundaries
 - The model may analyze state, risks, levels, and data gaps for the fixed pool.
 - The model must not introduce substitute Taiwan tickers.
 - If evidence is insufficient, mark data gap or neutral watch state.
@@ -36,4 +36,4 @@ The goal is stable monitoring, not ticker discovery. A fixed pool lets middle-of
 ## Historical Operational Contract
 - `TWSE_MOPS_TRACKED_CODES=2330,2603,2882,1605`
 - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS=2330.TW:台積電,2603.TW:長榮,2882.TW:國泰金,1605.TW:華新,4956.TWO:光鋐`
-- UI wording should use `今日個股觀察` / fixed watch pool language, not model recommendation language.
+- UI wording used `今日個股觀察` / fixed watch pool language historically. Current daily strategy output must use dynamic candidate language and must not imply a static universe.

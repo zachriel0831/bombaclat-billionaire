@@ -76,15 +76,16 @@ Position reporting must include realized and unrealized PnL, fees/tax, quantity,
 
 ## Current Gap
 
-As of 2026-06-02:
+As of 2026-07-20:
 
-- `data-collecting` still contains fixed-pool code such as `FIXED_MARKET_ANALYSIS_WATCH_POOL`.
+- `data-collecting` uses dynamic evidence-backed four-digit Taiwan stock candidates for daily strategy output.
+- Legacy fixed-pool names may remain only as compatibility aliases for CLI/test callers; they must not pad visible recommendations.
 - `stock-monitor-service` has quote status, selected watchlists, trigger evaluation, and entry-first trigger state, but no position or PnL state.
 - `order-dispatcher-service` is still skeleton-only and has no trigger consumer, broker wrapper, audit schema, order lifecycle, position lifecycle, or PnL reporting.
 
 ## Consequences
 
-- Existing fixed-pool docs are now superseded by `spec/market-analysis-dynamic-trade-candidates.md`.
-- Future implementation should remove hard fixed-pool restrictions from dynamic candidate generation while preserving evidence, claim verification, review gates, and order-safety boundaries.
+- Existing fixed-pool docs are superseded by `spec/market-analysis-dynamic-trade-candidates.md`.
+- Dynamic candidate generation must preserve evidence, claim verification, review gates, and order-safety boundaries.
 - Stock monitoring can remain capped at five even if `data-collecting` produces more candidates.
 - Order execution cannot go live until the state machine and PnL reporting are implemented.

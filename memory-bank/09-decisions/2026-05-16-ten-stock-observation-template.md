@@ -9,8 +9,11 @@ This document is historical. The ten-stock pool existed to make the system easy 
 ## Date
 2026-05-16
 
+## Superseded
+Superseded on 2026-07-20 by `spec/market-analysis-dynamic-trade-candidates.md`. The ten-stock pool was for observation and debugging only; daily strategy candidates are now dynamic and evidence-backed.
+
 ## Decision
-`market_analysis` keeps the individual-stock section as a fixed monitoring pool, but expands the visible pool from five to ten stocks:
+Historical decision: `market_analysis` kept the individual-stock section as a fixed monitoring pool, and expanded the visible pool from five to ten stocks:
 
 | ticker | name | market | role |
 |---|---|---|---|
@@ -27,7 +30,7 @@ This document is historical. The ten-stock pool existed to make the system easy 
 
 ## Visible Template Contract
 - Append at most ten rows under `## 今日個股觀察`.
-- The fixed pool should stay visible. If a ticker has no `swing/medium` signal row for the analysis, render it as a neutral observation row instead of replacing the whole section with an empty data-gap message.
+- Historical behavior only: the fixed pool stayed visible. Current behavior must not render neutral rows to pad an empty or thin dynamic candidate list.
 - Every row must show:
   - `利多`: concrete catalyst, sector support, or current evidence chain that could support the stock.
   - `利空`: downside risk, valuation/relative-strength gap, invalidation condition, or missing evidence.
@@ -43,4 +46,4 @@ This document is historical. The ten-stock pool existed to make the system easy 
 ## Operational Contract
 - `MARKET_CONTEXT_TWSE_CODES=2330,2317,2454,2308,2881,2882,2485,3535,3715,2351`
 - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS=2330.TW:台積電,2317.TW:鴻海,2454.TW:聯發科,2308.TW:台達電,2881.TW:富邦金,2882.TW:國泰金,2485.TW:兆赫,3535.TW:晶彩科,3715.TW:定穎投控,2351.TW:順德`
-- UI wording should use `今日個股觀察` / fixed watch pool language and expose the three reasoning lines above.
+- Historical UI wording used `今日個股觀察` / fixed watch pool language and exposed the three reasoning lines above. Current UI/report output should use dynamic candidate language when showing trade candidates.

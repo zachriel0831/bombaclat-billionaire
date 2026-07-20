@@ -290,8 +290,8 @@ ORDER BY updated_at DESC;
 ```
 
 For `pre_tw_open`, verify dynamic Taiwan intraday / short-swing candidate rows
-in `t_trade_signals`. As of 2026-06-02, runtime code may still emit historical
-fixed-pool fallback rows; treat those as a migration gap, not the target policy:
+in `t_trade_signals`. Fixed-pool fallback rows are no longer target behavior;
+treat any new rows that look padded from the old pool as a regression:
 
 ```powershell
 mysql -h 127.0.0.1 -uroot -proot news_relay -e "
@@ -375,4 +375,4 @@ Do not report restart recovery complete until there is evidence for:
 - if Truth Social is enabled, bridge log shows `Polling source=truthsocial` or
   a current Truth Social health row
 - pre-open DB check has today's `pre_tw_open` or calendar-guarded `macro_daily` row
-- if `pre_tw_open` ran, `t_trade_signals` has same-day dynamic candidate rows, historical fixed-pool fallback rows with a clear migration note, or the analysis records a clear data gap
+- if `pre_tw_open` ran, `t_trade_signals` has same-day dynamic candidate rows or the analysis records a clear data gap

@@ -56,11 +56,12 @@ This file is append-only. Add a new entry after any user correction to prevent r
 - Trigger (User correction): User asked why `今日個股觀察` emitted only a fixed-pool data-gap message instead of still talking through the fixed pool.
 - What was wrong: Empty `t_trade_signals` recommendations caused the visible template to render only a gap message, hiding the fixed-pool monitor rows.
 - Root cause: Rendering logic treated missing `swing/medium long` rows as no output, instead of falling back to neutral fixed-pool observations.
-- New rule (always/never): Always show the fixed-pool observation rows in the final template; never hide the pool just because actionable signal rows are missing.
+- New rule (superseded): At the time, fixed-pool observation rows were kept visible even without actionable signals.
+- Superseded by LESSON-20260720-01: fixed-pool padding is no longer allowed.
 - Prevention checklist (before final response):
-  - [ ] Test `build_trade_signal_recommendation_section([])` renders fixed-pool rows
-  - [ ] Keep neutral rows clearly non-actionable when evidence is missing
-  - [ ] Search requirements/spec docs for stale fixed-pool size wording
+  - [ ] Confirm this lesson is not used to reintroduce fixed-pool padding
+  - [ ] Test `build_trade_signal_recommendation_section([])` stays empty
+  - [ ] Search requirements/spec docs for stale fixed-pool wording
 - Repo updates made:
   - `src/event_relay/trade_signals.py`
   - `tests/test_trade_signals.py`
@@ -76,7 +77,7 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `$env:PYTHONPATH='src'; python -m unittest tests.test_market_analysis -v` passed, 41 tests
   - `python scripts/validate_readiness.py` passed
   - Sample `build_trade_signal_recommendation_section([])` renders fixed ten neutral rows
-- Status: active
+- Status: superseded
 
 ## LESSON-20260516-01
 - Date: 2026-05-16
@@ -86,7 +87,7 @@ This file is append-only. Add a new entry after any user correction to prevent r
 - New rule (always/never): Always render stock-watch rows with explicit `利多`, `利空`, and `買入注意`; never fabricate undervaluation when valuation or relative-discount evidence is missing.
 - Prevention checklist (before final response):
   - [ ] Check final rendered `今日個股觀察` text, not only structured JSON
-  - [ ] Confirm fixed-pool size and visible count match the current decision file
+  - [ ] Confirm no fixed-pool size rule is applied to dynamic candidates
   - [ ] Confirm valuation/laggard gaps appear under `利空` or `買入注意`, not as fabricated undervaluation
 - Repo updates made:
   - `src/event_relay/trade_signals.py`
@@ -107,6 +108,35 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `$env:PYTHONPATH='src'; python -m unittest tests.test_market_analysis -v` passed, 41 tests
   - `$env:PYTHONPATH='src'; python -m unittest tests.test_analysis_stages -v` passed, 26 tests
   - `python scripts/validate_readiness.py` passed
+- Status: active
+
+## LESSON-20260720-01
+- Date: 2026-07-20
+- Trigger (User correction): User clarified that the daily strategy should recommend buy candidates dynamically and the fixed stock pool must be removed.
+- What was wrong: The analysis pipeline still accepted old fixed-pool fallback and neutral padding behavior, which made daily candidates repeat the same names.
+- Root cause: Prompt/schema/docs and repair paths kept historical observation-pool semantics as fallback behavior.
+- New rule (always/never): Daily trade candidates must be dynamic, evidence-backed Taiwan four-digit tickers. Never pad empty or thin `stock_watch` output from the historical fixed ten-stock pool. Legacy names such as `build_fixed_pool_repair_trade_signals` may remain only as compatibility aliases.
+- Prevention checklist (before final response):
+  - [ ] Search code/docs for active fixed-pool padding or fixed ticker lists
+  - [ ] Verify `build_trade_signal_recommendation_section([])` returns empty text
+  - [ ] Verify non-legacy four-digit Taiwan tickers pass validation when evidence-backed
+  - [ ] Verify unsupported ticker claims block delivery/signals through the trust gate
+- Repo updates made:
+  - `src/event_relay/trade_signals.py`
+  - `src/event_relay/market_analysis.py`
+  - `src/event_relay/analysis_stages/stage3_tw_mapping.py`
+  - `src/event_relay/analysis_stages/stage4_synthesis.py`
+  - `src/event_relay/analysis_stages/schemas.py`
+  - `src/event_relay/service.py`
+  - `spec/market-analysis-dynamic-trade-candidates.md`
+  - `README.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `memory-bank/restart-recovery-runbook.md`
+  - `tests/test_trade_signals.py`
+  - `tests/test_market_analysis.py`
+- Verification:
+  - `python -m unittest tests.test_trade_signals tests.test_market_analysis` passed, 63 tests
 - Status: active
 
 ## LESSON-20260515-04
@@ -901,10 +931,11 @@ This file is append-only. Add a new entry after any user correction to prevent r
 - Trigger (User correction): User showed `今日個股觀察` rows where `上漲邏輯 / 低估/補漲 / 買入理由` repeated boilerplate and had little finance value.
 - What was wrong: Neutral and thin-evidence rows reused generic missing-evidence text, so the fixed-pool section looked mechanically filled rather than like a finance watch note.
 - Root cause: The renderer had no ticker-aware theme/risk fallback and the visible labels pushed every row into a bullish/valuation framing even when the real information was risk or action discipline.
-- New rule (always/never): Always render fixed-pool watch rows with `利多`, `利空`, and `買入注意`, using ticker-aware context for neutral rows and putting missing valuation evidence under risk/action gaps.
+- New rule (superseded): At the time, fixed-pool watch rows used `利多`, `利空`, and `買入注意`, with ticker-aware context for neutral rows.
+- Superseded by LESSON-20260720-01: fixed-pool padding and neutral rows are no longer allowed.
 - Prevention checklist (before final response):
   - [ ] Check sample rendered `今日個股觀察`, not only stored `t_trade_signals`
-  - [ ] Verify neutral fixed-pool rows vary by ticker theme/risk
+  - [ ] Verify empty/thin dynamic candidates are not padded by neutral fixed-pool rows
   - [ ] Ensure prompt assets and docs use the same visible labels
 - Repo updates made:
   - `src/event_relay/trade_signals.py`
@@ -930,7 +961,7 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - `python -m unittest tests.test_trade_signals tests.test_analysis_stages tests.test_market_analysis -v` passed
   - `python scripts/validate_readiness.py` passed
   - Sample rendered section shows `利多`, `利空`, and `買入注意`
-- Status: active
+- Status: superseded
 
 ## LESSON-20260525-01
 - Date: 2026-05-25

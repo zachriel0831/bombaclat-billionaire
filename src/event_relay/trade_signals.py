@@ -19,6 +19,7 @@ from event_relay.service import MySqlEventStore, TradeSignalRecord
 
 logger = logging.getLogger(__name__)
 _TICKER_RE = re.compile(r"^[A-Za-z0-9.\-_]{1,16}$")
+_DYNAMIC_TW_TICKER_RE = re.compile(r"^\d{4}$")
 _TW_MARKETS = {"TW", "TSE", "TWSE", "TPEx", "OTC"}
 _DIRECTION_MAP = {
     "bullish": "long",
@@ -36,20 +37,11 @@ _SUSPECT_STOCK_NAME_RE = re.compile(r"[?\ufffd\ue000-\uf8ff]")
 _DEFAULT_EXCLUDED_TICKERS = "4749"
 VISIBLE_RECOMMENDATION_LIMIT = 10
 MIN_CANDIDATE_RISK_REWARD = 1.5
-FIXED_POOL_SIGNAL_BACKFILL_SLOTS = {"pre_tw_open", "us_close"}
-FIXED_MARKET_ANALYSIS_WATCH_POOL: dict[str, dict[str, str]] = {
-    "2330": {"name": "台積電", "market": "TWSE", "sector": "半導體（晶圓）"},
-    "2317": {"name": "鴻海", "market": "TWSE", "sector": "AI伺服器/組裝"},
-    "2454": {"name": "聯發科", "market": "TWSE", "sector": "IC設計"},
-    "2308": {"name": "台達電", "market": "TWSE", "sector": "電源/AI伺服器"},
-    "2881": {"name": "富邦金", "market": "TWSE", "sector": "金融"},
-    "2882": {"name": "國泰金", "market": "TWSE", "sector": "金融"},
-    "2485": {"name": "兆赫", "market": "TWSE", "sector": "網通/通訊"},
-    "3535": {"name": "晶彩科", "market": "TWSE", "sector": "設備/光電"},
-    "3715": {"name": "定穎投控", "market": "TWSE", "sector": "PCB/車用電子"},
-    "2351": {"name": "順德", "market": "TWSE", "sector": "導線架/半導體材料"},
-}
-_FIXED_STOCK_WATCH_PROFILES: dict[str, dict[str, str]] = {
+DYNAMIC_SIGNAL_BACKFILL_SLOTS = {"pre_tw_open", "us_close"}
+# Legacy CLI/tests still refer to the old option name. Runtime behavior is now
+# dynamic: no default ten-stock pool is backfilled.
+FIXED_POOL_SIGNAL_BACKFILL_SLOTS = DYNAMIC_SIGNAL_BACKFILL_SLOTS
+_LEGACY_STOCK_WATCH_PROFILES: dict[str, dict[str, str]] = {
     "2330": {
         "bull": "AI/HPC、先進製程與半導體景氣若延續，權值資金通常會先看台積電。",
         "bear": "估值對美債利率、費半與外資動向敏感；若費半轉弱或外資賣超，追價風險升高。",
@@ -83,7 +75,7 @@ _FIXED_STOCK_WATCH_PROFILES: dict[str, dict[str, str]] = {
     "2485": {
         "bull": "網通與通訊設備題材若有訂單或族群輪動，低基期個股較容易被資金注意。",
         "bear": "中小型股流動性與訂單能見度較弱；沒有量能時容易只是題材反彈。",
-        "buy_note": "必須看到量能與新聞催化，且價格回到進場區；否則只當固定池追蹤。",
+        "buy_note": "必須看到量能與新聞催化，且價格回到進場區；否則只當動態候選追蹤。",
     },
     "3535": {
         "bull": "設備與光電應用題材若跟隨科技股輪動，可帶來補漲想像。",
@@ -102,11 +94,10 @@ _FIXED_STOCK_WATCH_PROFILES: dict[str, dict[str, str]] = {
     },
 }
 _DEFAULT_STOCK_WATCH_PROFILE = {
-    "bull": "固定池標的仍可追蹤族群輪動與盤中量價是否轉強。",
+    "bull": "動態候選仍可追蹤族群輪動與盤中量價是否轉強。",
     "bear": "今日缺少個股訊號、估值與相對強弱證據，追價參考價值有限。",
     "buy_note": "等價格、量能、新聞催化與停損條件都明確後再評估。",
 }
-_FIXED_MARKET_ANALYSIS_TICKERS = frozenset(FIXED_MARKET_ANALYSIS_WATCH_POOL)
 _TW_STOCK_NAME_BY_TICKER = {
     "0050": "元大台灣50",
     "1605": "華新",
@@ -153,7 +144,7 @@ def build_trade_signals_from_analysis(
             continue
         if is_excluded_trade_signal_ticker(ticker):
             continue
-        if not is_fixed_market_analysis_watch_ticker(ticker):
+        if not is_supported_taiwan_stock_ticker(ticker):
             continue
         market = _normalize_market(item.get("market"))
         if market not in _TW_MARKETS:
@@ -246,10 +237,11 @@ def build_quote_event_trade_signals(
         return []
 
     excluded = excluded_trade_signal_tickers_from_env()
-    fixed_pool = set(_FIXED_MARKET_ANALYSIS_TICKERS) - excluded
-    preferred = _normalize_ticker_set(preferred_tickers) & fixed_pool
-    if not preferred:
-        preferred = set(fixed_pool)
+    preferred = {
+        ticker
+        for ticker in _normalize_ticker_set(preferred_tickers)
+        if is_supported_taiwan_stock_ticker(ticker) and ticker not in excluded
+    }
     candidates: dict[str, dict[str, Any]] = {}
     for event in events:
         candidate = _fallback_candidate_from_event(event)
@@ -258,7 +250,7 @@ def build_quote_event_trade_signals(
         ticker = str(candidate["ticker"])
         if ticker in excluded:
             continue
-        if ticker not in fixed_pool:
+        if not is_supported_taiwan_stock_ticker(ticker):
             continue
         current = candidates.get(ticker)
         event_row_id = candidate.get("event_row_id")
@@ -273,7 +265,7 @@ def build_quote_event_trade_signals(
             int(item.get("volume") or 0),
         ),
         reverse=True,
-    )[: max(1, min(int(max_signals), len(_FIXED_MARKET_ANALYSIS_TICKERS)))]
+    )[: max(0, int(max_signals))]
 
     signals: list[TradeSignalRecord] = []
     for item in ranked:
@@ -333,7 +325,7 @@ def build_quote_event_trade_signals(
                     rationale=_clean_fallback_rationale(item.get("rationale")),
                     risk_notes_json=json.dumps(
                         [
-                            "Fixed-pool quote/context fallback; not a model-selected ticker",
+                            "Dynamic quote/context fallback; not a reviewed order candidate",
                             "Must pass independent review and risk gate",
                         ],
                         ensure_ascii=False,
@@ -361,7 +353,11 @@ def build_prior_signal_reference_trade_signals(
     distinct signal type. They preserve useful prior entry/stop/target levels,
     but the visible rationale must still require same-day confirmation.
     """
-    missing = _normalize_ticker_set(missing_tickers) & _FIXED_MARKET_ANALYSIS_TICKERS
+    missing = {
+        ticker
+        for ticker in _normalize_ticker_set(missing_tickers)
+        if is_supported_taiwan_stock_ticker(ticker)
+    }
     signals: list[TradeSignalRecord] = []
     seen: set[str] = set()
     for row in prior_rows:
@@ -437,13 +433,13 @@ def build_fixed_pool_repair_trade_signals(
     preferred_tickers: Iterable[Any] | None = None,
     max_signals: int = VISIBLE_RECOMMENDATION_LIMIT,
 ) -> tuple[list[TradeSignalRecord], dict[str, int]]:
-    """Repair internal fixed-pool signals without changing visible reports.
+    """Repair internal dynamic trade signals without changing visible reports.
 
     This is the safe backfill path for cases where a market-analysis row exists
     but the downstream stock-monitor watchlist was never populated. It first
     trusts structured ``stock_watch`` rows, then fills missing reference levels
     from recent quote/context events, and finally clones prior same-ticker
-    reference levels for still-missing fixed-pool tickers.
+    reference levels for explicitly preferred dynamic tickers only.
     """
     signals = build_trade_signals_from_analysis(
         analysis_id=analysis_id,
@@ -458,7 +454,7 @@ def build_fixed_pool_repair_trade_signals(
         "prior_signal_references": 0,
         "reference_levels_filled": 0,
     }
-    if analysis_slot not in FIXED_POOL_SIGNAL_BACKFILL_SLOTS:
+    if analysis_slot not in DYNAMIC_SIGNAL_BACKFILL_SLOTS:
         return signals, metrics
 
     fallback_signals = build_quote_event_trade_signals(
@@ -481,7 +477,12 @@ def build_fixed_pool_repair_trade_signals(
         if signal.direction == "long" and signal.strategy_type in {"swing", "medium"}
     }
     existing_tickers = {signal.ticker for signal in signals}
-    preferred = _normalize_ticker_set(preferred_tickers)
+    preferred = {
+        ticker
+        for ticker in _normalize_ticker_set(preferred_tickers)
+        if is_supported_taiwan_stock_ticker(ticker)
+        and not is_excluded_trade_signal_ticker(ticker)
+    }
     for fallback_signal in fallback_signals:
         if is_excluded_trade_signal_ticker(fallback_signal.ticker):
             continue
@@ -504,9 +505,15 @@ def build_fixed_pool_repair_trade_signals(
         if not is_excluded_trade_signal_ticker(signal.ticker)
     ]
     existing_tickers = {signal.ticker for signal in signals}
+    preferred = {
+        ticker
+        for ticker in _normalize_ticker_set(preferred_tickers)
+        if is_supported_taiwan_stock_ticker(ticker)
+        and not is_excluded_trade_signal_ticker(ticker)
+    }
     missing_tickers = [
         ticker
-        for ticker in FIXED_MARKET_ANALYSIS_WATCH_POOL
+        for ticker in preferred
         if ticker not in existing_tickers and not is_excluded_trade_signal_ticker(ticker)
     ]
     if missing_tickers:
@@ -681,9 +688,9 @@ def _prior_reference_rationale(row: dict[str, Any]) -> str:
     if not prior_bull and prior_rationale:
         prior_bull = prior_rationale
     bull = (
-        f"沿用 {ref_date} 前次固定池參考：{prior_bull}；今日仍需用盤中量價與新聞風控重新確認。"
+        f"沿用 {ref_date} 前次同股參考：{prior_bull}；今日仍需用盤中量價與新聞風控重新確認。"
         if prior_bull
-        else f"沿用 {ref_date} 前次固定池參考，今日仍需用盤中量價與新聞風控重新確認。"
+        else f"沿用 {ref_date} 前次同股參考，今日仍需用盤中量價與新聞風控重新確認。"
     )
     bear = (
         f"前次條件已過期，且仍需重驗：{prior_bear}。"
@@ -900,12 +907,13 @@ def sync_trade_signals_from_recent_analyses(
             continue
         pipeline_telemetry = raw_payload.get("pipeline_stages") if isinstance(raw_payload, dict) else None
         if include_fixed_pool_fallback:
+            preferred_tickers = _preferred_tw_fallback_tickers_from_env()
             prior_rows = []
-            if row.analysis_slot in FIXED_POOL_SIGNAL_BACKFILL_SLOTS:
+            if row.analysis_slot in DYNAMIC_SIGNAL_BACKFILL_SLOTS and preferred_tickers:
                 fetch_prior = getattr(store, "fetch_recent_trade_signal_references", None)
                 if callable(fetch_prior):
                     prior_rows = fetch_prior(
-                        tickers=FIXED_MARKET_ANALYSIS_WATCH_POOL,
+                        tickers=preferred_tickers,
                         exclude_analysis_id=row.row_id,
                         days=max(int(prior_days), 1),
                     )
@@ -917,7 +925,7 @@ def sync_trade_signals_from_recent_analyses(
                 pipeline_telemetry=pipeline_telemetry,
                 events=recent_events,
                 prior_rows=prior_rows,
-                preferred_tickers=_preferred_tw_fallback_tickers_from_env(),
+                preferred_tickers=preferred_tickers,
             )
             quote_fallback_added += metrics["quote_fallback_added"]
             prior_signal_references += metrics["prior_signal_references"]
@@ -965,24 +973,25 @@ def _preferred_tw_fallback_tickers_from_env() -> set[str]:
                 symbol = symbol.split(separator, 1)[0]
                 break
         ticker = _normalize_ticker(symbol)
-        if ticker and ticker.isdigit():
+        if ticker and is_supported_taiwan_stock_ticker(ticker):
             result.add(ticker)
     return result
 
 
 def build_trade_signal_recommendation_section(recommendations: list[dict[str, Any]]) -> str:
     """Build a deterministic report section from stored trade-signal rows."""
-    lines = ["## 今日個股觀察", "固定十檔監控池（t_trade_signals）"]
+    lines = ["## 今日個股觀察", "動態個股候選（t_trade_signals）"]
 
     visible_recommendations = [
         item
         for item in recommendations
         if not is_excluded_trade_signal_ticker(item.get("ticker"))
-        and is_fixed_market_analysis_watch_ticker(item.get("ticker"))
+        and is_supported_taiwan_stock_ticker(item.get("ticker"))
     ]
+    if not visible_recommendations:
+        return ""
     rendered_items: list[dict[str, Any]] = []
     seen_tickers: set[str] = set()
-    neutral_added = 0
     for item in visible_recommendations:
         ticker = _normalize_ticker(item.get("ticker"))
         if not ticker or ticker in seen_tickers:
@@ -991,16 +1000,6 @@ def build_trade_signal_recommendation_section(recommendations: list[dict[str, An
         seen_tickers.add(ticker)
         if len(rendered_items) >= VISIBLE_RECOMMENDATION_LIMIT:
             break
-    for ticker in FIXED_MARKET_ANALYSIS_WATCH_POOL:
-        if len(rendered_items) >= VISIBLE_RECOMMENDATION_LIMIT:
-            break
-        if ticker in seen_tickers or is_excluded_trade_signal_ticker(ticker):
-            continue
-        rendered_items.append(_neutral_fixed_pool_item(ticker))
-        seen_tickers.add(ticker)
-        neutral_added += 1
-    if neutral_added:
-        lines.append("註：沒有完整短中線訊號的固定池股票，以中性觀察列示；等待盤中量價、新聞催化與估值資料確認。")
     rendered = 0
     for idx, item in enumerate(rendered_items, start=1):
         ticker = str(item.get("ticker") or "").strip()
@@ -1036,35 +1035,14 @@ def build_trade_signal_recommendation_section(recommendations: list[dict[str, An
             f"   - 買入注意：{buy_note}"
         )
     if rendered == 0:
-        lines.append("資料缺口：固定十檔目前全數無法呈現；不可硬湊下單。")
+        lines.append("資料缺口：目前沒有足夠動態候選可呈現；不可硬湊下單。")
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
-def _neutral_fixed_pool_item(ticker: str) -> dict[str, Any]:
-    """Return a neutral visible row for a fixed-pool ticker with no signal."""
-    name = _resolve_stock_name(ticker)
-    profile = _stock_watch_profile(ticker)
-    return {
-        "ticker": ticker,
-        "name": name,
-        "strategy_type": "watch",
-        "direction": "watch",
-        "confidence": "low",
-        "entry_zone": None,
-        "take_profit_zone": None,
-        "invalidation": None,
-        "rationale": (
-            f"利多：{profile['bull']}；"
-            f"利空：今日缺少個股訊號與報價條件，{profile['bear']}；"
-            f"買入注意：{profile['buy_note']}；沒有明確進場區前只列中性觀察。"
-        ),
-    }
-
-
 def _stock_watch_profile(ticker: str) -> dict[str, str]:
-    """Return ticker-aware fixed-pool context for neutral or thin-evidence rows."""
+    """Return ticker-aware legacy ticker context for neutral or thin-evidence rows."""
     normalized = _normalize_ticker(ticker) or ""
-    return _FIXED_STOCK_WATCH_PROFILES.get(normalized, _DEFAULT_STOCK_WATCH_PROFILE)
+    return _LEGACY_STOCK_WATCH_PROFILES.get(normalized, _DEFAULT_STOCK_WATCH_PROFILE)
 
 
 def _stock_reason_lines(
@@ -1154,7 +1132,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fixed-pool-fallback",
         action="store_true",
-        help="Repair fixed-pool signals from recent quote/context events and prior signal references.",
+        help="Legacy alias: repair dynamic signals from recent quote/context events and prior signal references.",
+    )
+    parser.add_argument(
+        "--dynamic-fallback",
+        action="store_true",
+        help="Repair dynamic signals from recent quote/context events and prior signal references.",
     )
     parser.add_argument("--event-days", type=int, default=1)
     parser.add_argument("--event-limit", type=int, default=200)
@@ -1183,7 +1166,7 @@ def main() -> int:
         days=args.days,
         limit=args.limit,
         analysis_id=args.analysis_id,
-        include_fixed_pool_fallback=args.fixed_pool_fallback,
+        include_fixed_pool_fallback=args.fixed_pool_fallback or args.dynamic_fallback,
         event_days=args.event_days,
         event_limit=args.event_limit,
         prior_days=args.prior_days,
@@ -1254,9 +1237,14 @@ def is_excluded_trade_signal_ticker(value: Any) -> bool:
     return bool(ticker and ticker in excluded_trade_signal_tickers_from_env())
 
 
-def is_fixed_market_analysis_watch_ticker(value: Any) -> bool:
+def is_supported_taiwan_stock_ticker(value: Any) -> bool:
     ticker = _normalize_ticker(value)
-    return bool(ticker and ticker in _FIXED_MARKET_ANALYSIS_TICKERS)
+    return bool(ticker and _DYNAMIC_TW_TICKER_RE.fullmatch(ticker))
+
+
+def is_fixed_market_analysis_watch_ticker(value: Any) -> bool:
+    """Legacy compatibility wrapper for the old fixed-pool predicate."""
+    return is_supported_taiwan_stock_ticker(value)
 
 
 def _resolve_stock_name(ticker: Any, value: Any = None) -> str | None:
@@ -1493,7 +1481,7 @@ def _format_strategy_label(value: str) -> str:
 
 
 def _format_action_label(strategy: str, confidence: str) -> str:
-    """Render a fixed-pool watch row without recommendation wording."""
+    """Render a dynamic watch row without recommendation wording."""
     normalized = (strategy or "").strip().lower()
     if normalized == "watch":
         return "中性觀察" if (confidence or "").strip().lower() == "low" else "觀察"

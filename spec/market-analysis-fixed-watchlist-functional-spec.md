@@ -14,4 +14,4 @@ Current target:
 
 Implementation note:
 
-As of 2026-06-02, code still contains fixed-pool paths. Do not assume the runtime has already migrated.
+As of 2026-07-20, the runtime has migrated daily strategy candidates to dynamic evidence-backed Taiwan four-digit stock codes. Do not reintroduce fixed-pool padding.

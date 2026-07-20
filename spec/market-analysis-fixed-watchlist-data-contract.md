@@ -17,4 +17,4 @@ New contract summary:
 
 Implementation note:
 
-As of 2026-06-02, runtime code still has fixed-pool guardrails that must be migrated before this target contract is fully live.
+As of 2026-07-20, runtime code uses dynamic evidence-backed Taiwan four-digit stock candidates. Do not reintroduce fixed-pool guardrails or padding.

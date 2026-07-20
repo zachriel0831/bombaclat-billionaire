@@ -17,6 +17,14 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Run targeted fixed-pool monitor extraction after a delivery-ready write.
 - [x] Verify DB flags, claim/trust/style/garbled checks, structured data, signals, and provider telemetry.
 
+## 2026-07-20 Dynamic Daily Candidate Migration
+- [x] Removed the historical fixed ten-stock pool from daily strategy candidate generation.
+- [x] Stage3 / Stage4 prompts now request evidence-backed dynamic Taiwan four-digit tickers.
+- [x] Trade-signal extraction no longer pads empty or thin candidate lists with neutral fixed-pool rows.
+- [x] Legacy `fixed_pool` function and CLI names remain compatibility aliases only.
+- [x] Updated specs, memory-bank docs, and lessons to prevent reintroducing fixed-pool padding.
+- [x] Verified with compileall, targeted unit tests, stale-text scan, and readiness validation.
+
 ## 2026-07-20 Pre-Open Guard Run
 - [x] Found no `analysis_date=2026-07-20` / `analysis_slot=pre_tw_open` row.
 - [x] Calendar allows `pre_tw_open`: Taiwan is a regular trading day and the relevant U.S. session is weekend-closed.

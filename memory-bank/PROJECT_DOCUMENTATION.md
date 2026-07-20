@@ -339,7 +339,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   9. Set base delivery eligibility in `push_enabled`: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`; the trust gate may lower the final stored value to `0`
   10. Inject the latest stored `us_close` digest/analysis as upstream context only when the relevant U.S. close session was open; if U.S. was closed, the Taiwan pre-open prompt intentionally has no `us_close` block
   11. Target design: extract Codex-generated dynamic Taiwan intraday / short-swing candidates into `t_trade_signals` as `pending_review` rows for full analysis modes.
-  12. The old fixed ten-stock pool was an observation/debugging aid. Current runtime code still contains fixed-pool paths, so migration work is required before dynamic candidate generation is fully live.
+  12. The old fixed ten-stock pool was an observation/debugging aid. Runtime candidate generation is now dynamic and must not pad empty output from that historical pool.
   13. Fill missing signal reference levels from deterministic quote/context rows only when evidence exists. Daily visible reports must not append `## 今日個股觀察`; trading candidates remain machine-readable downstream context unless a separate trading UI explicitly asks for them.
   14. For `macro_daily`, write macro-only analysis into `t_market_analyses` and do not create trade signals.
 - Daily text formatting:
@@ -352,11 +352,11 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Fallback stock rationales keep only `需開盤量價確認` as the repeated warning
 - Tracked-stock context:
   - `MARKET_CONTEXT_TWSE_CODES` reads official TWSE close/margin rows for tracked listed stocks
-  - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` historically provided Yahoo Taiwan quote/context rows for the fixed pool; dynamic-candidate migration should generalize this into a broader evidence universe and ranking input.
+  - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` is an optional Yahoo Taiwan quote/context fallback preference list; it must not be treated as a fixed trading universe.
   - `MARKET_ANALYSIS_EXCLUDED_TICKERS` defaults to `4749`, so 新應材 is excluded from visible individual-stock analysis even if old quote/context rows remain in storage
   - Official TWSE context is preferred when both sources produce the same ticker; Yahoo context fills gaps such as TPEx `.TWO` symbols
 - Trade-signal boundary:
-  - Target design: `t_trade_signals` stores dynamic daily Taiwan intraday / short-swing candidates. Current implementation still has fixed-pool restrictions that must be migrated.
+  - `t_trade_signals` stores dynamic daily Taiwan intraday / short-swing candidates. Legacy fixed-pool function/CLI names may remain only as compatibility aliases.
   - `ticker` is the normalized tradable symbol; Taiwan signals use the 4-digit code without `.TW` / `.TWO`
   - Every signal keeps `analysis_id`, slot/date, ticker, strategy/direction, optional entry/stop/target JSON, and `source_event_ids`
   - Every signal gets `risk_reward_ratio`, `candidate_score`, and `avoid_reason`; downstream monitoring currently requires complete long/short levels, `risk_reward_ratio >= 1.5`, and empty `avoid_reason`

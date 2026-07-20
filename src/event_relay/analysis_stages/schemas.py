@@ -13,6 +13,7 @@ return lax JSON (e.g. during fallback paths).
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -35,18 +36,7 @@ _EVENT_CATEGORY_ENUM = [
 _SENTIMENT_ENUM = ["bullish", "bearish", "neutral"]
 _DIRECTION_ENUM = ["bullish", "bearish", "mixed"]
 _CONFIDENCE_ENUM = ["low", "medium", "high"]
-_FIXED_TW_STOCK_WATCH_TICKERS = [
-    "2330",
-    "2317",
-    "2454",
-    "2308",
-    "2881",
-    "2882",
-    "2485",
-    "3535",
-    "3715",
-    "2351",
-]
+_TW_TICKER_PATTERN = r"^\d{4}$"
 _NULLABLE_STRING = ["string", "null"]
 _NULLABLE_NUMBER_OR_STRING = ["number", "string", "null"]
 
@@ -189,7 +179,7 @@ STAGE3_TW_MAPPING_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
                 "required": ["ticker", "direction", "rationale", "evidence_ids"],
                 "properties": {
-                    "ticker": {"type": "string", "enum": _FIXED_TW_STOCK_WATCH_TICKERS},
+                    "ticker": {"type": "string", "pattern": _TW_TICKER_PATTERN},
                     "direction": {"type": "string", "enum": _DIRECTION_ENUM},
                     "rationale": {"type": "string"},
                     "evidence_ids": {
@@ -330,7 +320,7 @@ STAGE4_SYNTHESIS_SCHEMA: dict[str, Any] = {
                     "evidence_ids",
                 ],
                 "properties": {
-                    "ticker": {"type": "string", "enum": _FIXED_TW_STOCK_WATCH_TICKERS},
+                    "ticker": {"type": "string", "pattern": _TW_TICKER_PATTERN},
                     "market": {"type": _NULLABLE_STRING},
                     "name": {"type": _NULLABLE_STRING},
                     "direction": {"type": "string", "enum": _DIRECTION_ENUM},
@@ -420,6 +410,9 @@ def validate_against_schema(value: Any, schema: dict[str, Any], path: str = "$")
         enum = schema.get("enum")
         if enum is not None and value not in enum:
             raise SchemaValidationError(f"{path}: value {value!r} not in enum {enum}")
+        pattern = schema.get("pattern")
+        if isinstance(pattern, str) and re.fullmatch(pattern, value) is None:
+            raise SchemaValidationError(f"{path}: value {value!r} does not match pattern {pattern!r}")
 
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
         minimum = schema.get("minimum")
