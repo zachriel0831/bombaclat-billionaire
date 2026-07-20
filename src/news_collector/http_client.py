@@ -7,6 +7,7 @@ from __future__ import annotations
 
 # 共用 HTTP Client：提供含標頭的文字與 JSON 讀取工具。
 import json
+import re
 import ssl
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -49,7 +50,9 @@ def http_get_text_with_headers(
     req = Request(full_url, headers=request_headers)
     context = None if verify_ssl else ssl._create_unverified_context()
     with urlopen(req, timeout=timeout, context=context) as resp:
-        return resp.read().decode("utf-8", errors="replace")
+        payload = resp.read()
+        charset = _detect_charset(resp, payload)
+        return payload.decode(charset, errors="replace")
 
 
 def http_get_json(url: str, params: dict[str, str | int] | None = None, timeout: int = 15) -> dict:
@@ -69,3 +72,26 @@ def http_get_json_with_headers(
     if isinstance(data, dict):
         return data
     return {"data": data}
+
+
+_XML_DECLARATION_RE = re.compile(br'<\?xml[^>]*encoding=["\']([A-Za-z0-9._-]+)["\']', re.IGNORECASE)
+
+
+def _detect_charset(resp: object, payload: bytes) -> str:
+    headers = getattr(resp, "headers", None)
+    if headers is not None and hasattr(headers, "get_content_charset"):
+        charset = headers.get_content_charset()
+        if charset:
+            return charset
+
+    if payload.startswith(b"\xef\xbb\xbf"):
+        return "utf-8-sig"
+
+    match = _XML_DECLARATION_RE.search(payload[:200])
+    if match:
+        try:
+            return match.group(1).decode("ascii")
+        except UnicodeDecodeError:
+            pass
+
+    return "utf-8"
