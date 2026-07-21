@@ -4,10 +4,10 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-21 `tw_close` market-analysis row from local evidence only.
+- Task: Guard and repair the 2026-07-22 `us_close` market-analysis row from local evidence only.
 - Requested by: automation
-- Start date: 2026-07-21
-- Scope: Inspect today's `tw_close` row, repair it when missing or unhealthy, preserve storage-only delivery policy, run signal extraction only if eligible, and use no paid external LLM APIs.
+- Start date: 2026-07-22
+- Scope: Inspect today's `us_close` row, repair it when missing or unhealthy, preserve Java delivery policy, run signal extraction when eligible, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, Workflow 4C guard rules, automation memory, and active lessons.
@@ -15,6 +15,13 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Gather local relay and market-context evidence if repair is needed.
 - [x] Repair through `MySqlEventStore.upsert_market_analysis()` only if needed.
 - [x] Verify DB flags, claim/trust/style/garbled checks, structured data, signals, and provider telemetry.
+
+## 2026-07-22 US Close Guard Run
+- [x] Taiwan and the relevant 2026-07-21 U.S. session were regular trading days; `us_close` was eligible but remained storage/upstream-only, and the target row was missing.
+- [x] Repaired `t_market_analyses.id=273` through `MySqlEventStore.upsert_market_analysis()` using six local evidence events only.
+- [x] Final verification: required six-section order, exactly three evidence bullets, readable Traditional Chinese, no forbidden internal/trading terms, `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=0`, `pushed=0`, structured data present, and `external_provider_api_called=false`.
+- [x] Ran targeted signal extraction because the trust gate allowed it; stored 10 `pending_review` prior-signal references under the existing repo policy.
+- [x] No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ## 2026-07-21 TW Close Guard Run
 - [x] Taiwan was a regular trading day and `tw_close` was eligible; the target row was missing while fresh close context existed.
