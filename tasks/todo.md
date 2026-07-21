@@ -4,18 +4,24 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-20 `pre_tw_open` market-analysis row from local evidence only.
+- Task: Guard and repair the 2026-07-21 `tw_close` market-analysis row from local evidence only.
 - Requested by: automation
-- Start date: 2026-07-20
-- Scope: Inspect today's `pre_tw_open` row, repair it when missing or unhealthy, preserve calendar/delivery ownership, rebuild internal fixed-pool monitor signals after a delivery-ready write, and use no paid external LLM APIs.
+- Start date: 2026-07-21
+- Scope: Inspect today's `tw_close` row, repair it when missing or unhealthy, preserve storage-only delivery policy, run signal extraction only if eligible, and use no paid external LLM APIs.
 
 ## Plan
-- [x] Read repo instructions, Workflow 4C guard rules, prompt skill, and active lessons.
-- [x] Inspect the target row and calendar eligibility.
-- [x] Gather local relay and market-context evidence.
+- [x] Read repo instructions, Workflow 4C guard rules, automation memory, and active lessons.
+- [x] Inspect calendar eligibility and today's target row.
+- [x] Gather local relay and market-context evidence if repair is needed.
 - [x] Repair through `MySqlEventStore.upsert_market_analysis()` only if needed.
-- [x] Run targeted fixed-pool monitor extraction after a delivery-ready write.
 - [x] Verify DB flags, claim/trust/style/garbled checks, structured data, signals, and provider telemetry.
+
+## 2026-07-21 TW Close Guard Run
+- [x] Taiwan was a regular trading day and `tw_close` was eligible; the target row was missing while fresh close context existed.
+- [x] Repaired `t_market_analyses.id=272` through `MySqlEventStore.upsert_market_analysis()` using seven local evidence events only.
+- [x] Final verification: required six-section order, exactly three evidence bullets, readable Traditional Chinese, no forbidden internal/trading terms, `claim_verifier.ok=true`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=0`, `pushed=0`, structured data present, and `external_provider_api_called=false`.
+- [x] Signal extraction skipped because `tw_close` is storage-only, `trust_gate.signals_allowed=false`, and `structured_json.stock_watch` is empty; existing signal count is zero.
+- [x] No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ## 2026-07-20 Dynamic Daily Candidate Migration
 - [x] Removed the historical fixed ten-stock pool from daily strategy candidate generation.
