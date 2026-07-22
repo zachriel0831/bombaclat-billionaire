@@ -69,6 +69,38 @@ class CwaDisasterPublicRecordsTest(unittest.TestCase):
         self.assertEqual(record.region, "臺灣東方海面")
         self.assertIn("typhoon", record.tags)
 
+    def test_parse_tropical_depression_payload(self) -> None:
+        payload = {
+            "records": {
+                "TropicalCyclones": {
+                    "TropicalCyclone": [
+                        {
+                            "Year": "2026",
+                            "CwaTdNo": "13",
+                            "AnalysisData": {
+                                "Fix": [
+                                    {
+                                        "DateTime": "2026-07-22T14:00:00+08:00",
+                                        "CoordinateLongitude": "132.6",
+                                        "CoordinateLatitude": "14.2",
+                                    }
+                                ]
+                            },
+                            "ForecastData": {"Fix": []},
+                        }
+                    ]
+                }
+            }
+        }
+
+        records = parse_typhoon_payload(payload, dataset_id="W-C0034-005")
+
+        self.assertEqual(len(records), 1)
+        record = records[0]
+        self.assertEqual(record.title, "熱帶性低氣壓 TD13")
+        self.assertEqual(record.record_type, "cwa_typhoon_report")
+        self.assertIn("typhoon", record.tags)
+
 
 if __name__ == "__main__":
     unittest.main()

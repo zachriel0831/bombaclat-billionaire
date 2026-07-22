@@ -122,6 +122,7 @@ def parse_typhoon_payload(payload: dict[str, Any], *, dataset_id: str) -> list[P
     for event in _collect_dicts(payload.get("records", payload), _looks_like_typhoon):
         cwa_name = _text_value(event, "CwaTyphoonName", "cwaTyphoonName")
         english_name = _text_value(event, "TyphoonName", "typhoonName")
+        td_no = _text_value(event, "CwaTdNo", "cwaTdNo")
         title = _text_value(
             event,
             "ReportContent",
@@ -156,6 +157,8 @@ def parse_typhoon_payload(payload: dict[str, Any], *, dataset_id: str) -> list[P
         clean_title = _clean_text(title) or "中央氣象署颱風資訊"
         if cwa_name and english_name and cwa_name != english_name:
             clean_title = f"{cwa_name}（{english_name}）"
+        elif not title and td_no:
+            clean_title = f"熱帶性低氣壓 TD{td_no}"
 
         output.append(
             PublicRecord(
@@ -220,6 +223,8 @@ def _looks_like_typhoon(value: dict[str, Any]) -> bool:
     if {"dataid", "note"}.issubset(keys):
         return False
     if {"typhoonname", "cwatyphoonname"} & keys:
+        return True
+    if "cwatdno" in keys and {"analysisdata", "forecastdata"} & keys:
         return True
     if {"reportcontent", "content", "title", "name"} & keys:
         return any(isinstance(item, str) and "颱風" in item for item in value.values())
