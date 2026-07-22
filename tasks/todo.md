@@ -487,3 +487,13 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Scan frontend analysis pages, market-analysis prompt templates, LINE/weekly skills, and memory docs for raw internal labels that could leak to client-visible text.
 - [x] Replace prompt and skill wording with generic reader-facing rules: no source labels, table names, snake_case fields, scheduled task names, provider names, guard names, custom score labels, or missing-data implementation notes in visible prose.
 - [x] Align daily analysis wording with `風險與觀察限制` and `主要反向觀點`.
+## 2026-07-22 TW Close Guard Run
+- [x] Read repo instructions, Workflow 4C guard rules, automation memory status, and active lessons.
+- [x] Confirm today's `tw_close` row is missing and inspect local close/context evidence.
+- [x] Repair through `MySqlEventStore.upsert_market_analysis` using local evidence only.
+- [x] Verify DB state, visible-text gates, signal eligibility, and external-provider telemetry.
+
+### 2026-07-22 TW Close Result
+- Repaired the missing row as analysis `275` from four local evidence events; no external provider API was called.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, six headings, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, and `pushed=0`.
+- Signal extraction skipped: the storage-only row has `trust_gate.signals_allowed=false`; signal count remains zero.
