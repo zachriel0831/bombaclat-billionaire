@@ -4,17 +4,26 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-23 `us_close` market-analysis row from local evidence only.
+- Task: Guard and repair the 2026-07-23 `pre_tw_open` market-analysis row from local evidence only.
 - Requested by: automation
 - Start date: 2026-07-23
-- Scope: Inspect today's `us_close` row, repair it when missing or unhealthy, preserve Java delivery policy, run signal extraction when eligible, and use no paid external LLM APIs.
+- Scope: Create the missing `pre_tw_open` row, preserve Java delivery policy, run targeted signal extraction, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, Workflow 4C guard rules, automation memory, and active lessons.
 - [x] Inspect calendar eligibility and today's target row.
-- [x] Gather local relay and market-context evidence if repair is needed.
-- [x] Repair through `MySqlEventStore.upsert_market_analysis()` only if needed.
-- [x] Verify DB flags, claim/trust/style/garbled checks, structured data, signals, and provider telemetry.
+- [x] Gather local relay and market-context evidence with index-friendly queries.
+- [x] Repair through `MySqlEventStore.upsert_market_analysis()`.
+- [x] Run targeted signal extraction and verify DB/style/provider state.
+
+## 2026-07-23 Pre-Open Guard Run
+- [x] Taiwan and the relevant 2026-07-22 U.S. session are regular trading days; `pre_tw_open` is eligible and the target row is missing.
+- [x] Re-plan: the broad event query hit known MySQL `Out of sort memory`; use the indexed recent-id path and filter the bounded result locally.
+- [x] Re-plan: the first upsert was rejected because `scheduled_time_local` accepts the existing short time format; preserve the schema and retry with `07:30`.
+- [x] Created `t_market_analyses.id=277` through `MySqlEventStore.upsert_market_analysis()` using three local relay events only.
+- [x] Ran targeted extraction with `-AnalysisId 277 -FixedPoolFallback`; stored 10 prior-signal monitor references and no quote fallback rows.
+- [x] Final verification: `claim_verifier.ok=true`, support rate `1.0`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=1`, `pushed=0`, structured data present, six requested headings in order, exactly three evidence bullets, garbled/style/template checks passed, 10 trade signals, and `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ## 2026-07-23 US Close Guard Run
 - [x] Taiwan and the relevant 2026-07-22 U.S. session were regular trading days; `us_close` was eligible but the target row was missing.
