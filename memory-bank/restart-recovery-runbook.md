@@ -10,7 +10,8 @@ Do not rediscover the flow from scratch. Start here, then inspect logs/DB eviden
 
 - Repo root: `D:\work_space\stock\data-collecting`
 - Shell: Windows PowerShell
-- Python data services only; Java owns LINE delivery/webhook behavior
+- Python data services, local Node support services, and their health checks;
+  Java owns LINE delivery/webhook behavior
 - Never operate outside `D:\work_space`
 
 ## 1. Restart Live Python Services
@@ -62,6 +63,18 @@ Start-Process powershell -ArgumentList @(
 )
 ```
 
+Restart the local AI comment service if barrage/comment AI behavior is expected:
+
+```powershell
+Set-Location D:\work_space\claude-box\workspace\liuli-social-ai-service
+Start-Process cmd.exe -ArgumentList '/k', 'start-ollama-local.cmd'
+Start-Process cmd.exe -ArgumentList '/k', 'start-liuli-social-ai.cmd'
+```
+
+Keep both windows open. `start-liuli-social-ai.cmd` starts
+`liuli-social-ai-service` on `http://127.0.0.1:8787` and writes logs under
+`.codex\`.
+
 ## 2. Confirm Processes And Health
 
 Expected Python process command lines:
@@ -82,10 +95,32 @@ Get-CimInstance Win32_Process | Where-Object {
 } | Select-Object ProcessId, Name, CommandLine
 ```
 
+Expected local Node support process command lines:
+
+- `liuli-social-ai-service\server.js`
+- `tools\ollama\ollama.exe serve`
+
+Check:
+
+```powershell
+Get-CimInstance Win32_Process | Where-Object {
+  $_.CommandLine -and (
+    $_.CommandLine -match 'liuli-social-ai-service.*server\.js' -or
+    $_.CommandLine -match 'liuli-social-ai-service.*ollama\.exe'
+  )
+} | Select-Object ProcessId, Name, CommandLine
+```
+
 Event relay health must return `{"ok": true}`:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:18090/healthz
+```
+
+Local AI comment service health must return ok:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8787/health
 ```
 
 Run the combined source-health report before calling restart recovery done:
@@ -194,6 +229,20 @@ Look for:
 - `Topic pass scanned=<n>`
 - `Public records daily pass fetched=<n>`
 - `Public-record link pass ...`
+
+Local AI comment service:
+
+```powershell
+Get-Content D:\work_space\claude-box\workspace\liuli-social-ai-service\.codex\liuli-social-ai.out.log -Tail 80
+Get-Content D:\work_space\claude-box\workspace\liuli-social-ai-service\.codex\liuli-social-ai.err.log -Tail 80
+Get-Content D:\work_space\claude-box\workspace\liuli-social-ai-service\.codex\ollama-local.err.log -Tail 80
+```
+
+Look for:
+
+- `liuli-social-ai-service listening on http://127.0.0.1:8787`
+- Redis queue/worker messages if AI comments are expected
+- no repeated Ollama connection failures
 
 ## 5. Check Society/Politics Data Freshness
 
@@ -365,7 +414,9 @@ Rules:
 Do not report restart recovery complete until there is evidence for:
 
 - `event_relay.main`, `news_collector.relay_bridge`, and `news_platform.main --loop` running
+- `liuli-social-ai-service\server.js` running when AI comments/barrage are expected
 - `/healthz` returns `{"ok": true}`
+- `http://127.0.0.1:8787/health` returns ok when AI comments/barrage are expected
 - source bridge log has recent RSS polling
 - `news_platform` log has a recent cycle and topic pass or no pending work
 - society/politics DB check has same-day rows and no stale missing topics after catch-up
