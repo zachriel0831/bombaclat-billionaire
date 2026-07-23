@@ -4,17 +4,24 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-23 `pre_tw_open` market-analysis row from local evidence only.
+- Task: Guard and repair the 2026-07-23 `tw_close` market-analysis row from local evidence only.
 - Requested by: automation
 - Start date: 2026-07-23
-- Scope: Create the missing `pre_tw_open` row, preserve Java delivery policy, run targeted signal extraction, and use no paid external LLM APIs.
+- Scope: Create the missing storage-only `tw_close` row, preserve Java delivery policy, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, Workflow 4C guard rules, automation memory, and active lessons.
 - [x] Inspect calendar eligibility and today's target row.
 - [x] Gather local relay and market-context evidence with index-friendly queries.
 - [x] Repair through `MySqlEventStore.upsert_market_analysis()`.
-- [x] Run targeted signal extraction and verify DB/style/provider state.
+- [x] Run targeted signal extraction only if eligible; verify DB/style/provider state.
+
+## 2026-07-23 TW Close Guard Run
+- [x] Taiwan was a regular trading day and `tw_close` was eligible; the target row was missing while fresh close context existed.
+- [x] Created `t_market_analyses.id=278` through `MySqlEventStore.upsert_market_analysis()` using five local relay events only.
+- [x] Final verification: `claim_verifier.ok=true`, support rate `1.0`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=0`, `pushed=0`, structured data present, six requested headings in order, exactly three evidence bullets, garbled/style/template checks passed, and `external_provider_api_called=false`.
+- [x] Signal extraction skipped because `tw_close` is storage-only, `trust_gate.signals_allowed=false`, and `structured_json.stock_watch` is empty.
+- [x] No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ## 2026-07-23 Pre-Open Guard Run
 - [x] Taiwan and the relevant 2026-07-22 U.S. session are regular trading days; `pre_tw_open` is eligible and the target row is missing.
