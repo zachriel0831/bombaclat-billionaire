@@ -520,3 +520,12 @@ Move completed or stale task logs to `tasks/archive/`.
 - Repaired the missing row as analysis `275` from four local evidence events; no external provider API was called.
 - Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, six headings, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, and `pushed=0`.
 - Signal extraction skipped: the storage-only row has `trust_gate.signals_allowed=false`; signal count remains zero.
+# 2026-07-25 US Close Guard Run
+
+- [x] Read repo instructions, Workflow 4C guard rules, automation memory, Ponytail guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row.
+- [x] Gather local relay and market-index evidence without paid external APIs.
+- [x] Created missing `t_market_analyses.id=280` through `MySqlEventStore.upsert_market_analysis()` from four local relay events and two local market-index rows.
+- [x] Re-ran internal signal extraction without obsolete fixed-pool fallback; zero current dynamic signals were stored and the ten fallback rows were superseded.
+- [x] Final verification: `claim_verifier.ok=true`, support rate `1.0`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=1`, `pushed=0`, structured data present, six requested headings in order, exactly three evidence bullets, garbled/style/template checks passed, and `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
