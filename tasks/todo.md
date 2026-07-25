@@ -535,3 +535,10 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Re-ran internal signal extraction without obsolete fixed-pool fallback; zero current dynamic signals were stored and the ten fallback rows were superseded.
 - [x] Final verification: `claim_verifier.ok=true`, support rate `1.0`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=1`, `pushed=0`, structured data present, six requested headings in order, exactly three evidence bullets, garbled/style/template checks passed, and `external_provider_api_called=false`.
 - [x] No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
+
+# 2026-07-26 US Close Guard Run
+
+- [x] Read repo instructions, Workflow 4C guard rules, automation memory, Ponytail guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row.
+- [x] Verified calendar-correct no-op: Taiwan local Sunday and the relevant 2026-07-25 U.S. session are both weekend-closed, so `allowed_slots=[]`.
+- [x] Confirmed no `2026-07-26 us_close` row exists; no DB write, signal extraction, external provider API, web search, or LINE contact was performed.
