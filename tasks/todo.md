@@ -4,17 +4,24 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-26 `weekly_tw_preopen` market-analysis row from local evidence only.
+- Task: Guard the 2026-07-26 `pre_tw_open` market-analysis row from local evidence only.
 - Requested by: automation
 - Start date: 2026-07-26
-- Scope: Generate or repair the Sunday weekly row with the exact three-section contract, preserve Java delivery ownership, and use no paid external LLM APIs.
+- Scope: Apply the Sunday calendar guard before the LINE window and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, Workflow 4C guard rules, automation memory, and active lessons.
-- [x] Inspect the target Sunday row and gather bounded local relay/context/history evidence.
-- [x] Draft and deterministically validate the exact three-section Traditional-Chinese weekly prose.
-- [x] Repair through `MySqlEventStore.upsert_market_analysis()`.
-- [x] Verify DB metadata, heading order, mojibake/style checks, evidence counts, and provider state.
+- [x] Resolve the 2026-07-26 market-calendar routing state.
+- [x] Inspect the target daily row and Sunday owner row.
+- [x] Leave the ineligible daily row absent; skip signal extraction.
+- [x] Verify no `pre_tw_open` delivery row exists and the Sunday weekly owner row exists.
+
+## 2026-07-26 Pre-Open Guard Run
+- [x] Calendar guard returned no allowed daily slots because Taiwan local date is Sunday; Workflow 4L assigns the day to the weekly summary.
+- [x] Confirmed no `analysis_date=2026-07-26` / `analysis_slot=pre_tw_open` row exists.
+- [x] Confirmed the Sunday owner row exists as `analysis_date=2026-07-26` / `analysis_slot=weekly_tw_preopen`.
+- [x] Per calendar policy, performed no daily write and no trade-signal extraction; daily delivery/style/provider fields are not applicable.
+- [x] No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ## 2026-07-26 Weekly Guard Run
 - [x] Found no `analysis_date=2026-07-26` / `analysis_slot=weekly_tw_preopen` row.
