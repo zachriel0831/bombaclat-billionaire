@@ -4,17 +4,23 @@ Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
 ## Current Task
-- Task: Guard and repair the 2026-07-23 `tw_close` market-analysis row from local evidence only.
+- Task: Guard and repair the 2026-07-26 `weekly_tw_preopen` market-analysis row from local evidence only.
 - Requested by: automation
-- Start date: 2026-07-23
-- Scope: Create the missing storage-only `tw_close` row, preserve Java delivery policy, and use no paid external LLM APIs.
+- Start date: 2026-07-26
+- Scope: Generate or repair the Sunday weekly row with the exact three-section contract, preserve Java delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, Workflow 4C guard rules, automation memory, and active lessons.
-- [x] Inspect calendar eligibility and today's target row.
-- [x] Gather local relay and market-context evidence with index-friendly queries.
+- [x] Inspect the target Sunday row and gather bounded local relay/context/history evidence.
+- [x] Draft and deterministically validate the exact three-section Traditional-Chinese weekly prose.
 - [x] Repair through `MySqlEventStore.upsert_market_analysis()`.
-- [x] Run targeted signal extraction only if eligible; verify DB/style/provider state.
+- [x] Verify DB metadata, heading order, mojibake/style checks, evidence counts, and provider state.
+
+## 2026-07-26 Weekly Guard Run
+- [x] Found no `analysis_date=2026-07-26` / `analysis_slot=weekly_tw_preopen` row.
+- [x] Created `t_market_analyses.id=282` through `MySqlEventStore.upsert_market_analysis()` using 17 selected local events, 429 recent market-context rows, and local indexed history availability.
+- [x] Final verification: exact section order `週總經` -> `下週台股配置` -> `下週觀察清單`, exactly three top-level headings, garbled/mojibake and forbidden trade-language checks passed, `push_enabled=1`, `pushed=0`, `dimension=weekly`, `delivery_owner=java`, and `external_provider_api_called=false`.
+- [x] No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ## 2026-07-23 TW Close Guard Run
 - [x] Taiwan was a regular trading day and `tw_close` was eligible; the target row was missing while fresh close context existed.
