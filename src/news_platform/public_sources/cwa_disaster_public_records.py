@@ -285,6 +285,13 @@ def _parse_taipei_datetime(value: str | None) -> datetime | None:
     text = value.strip()
     if not text:
         return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=_TAIPEI)
+        return parsed.astimezone(timezone.utc)
+    except ValueError:
+        pass
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M"):
         try:
             return datetime.strptime(text, fmt).replace(tzinfo=_TAIPEI).astimezone(timezone.utc)

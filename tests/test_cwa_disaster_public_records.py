@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import timezone
 
 from news_platform.public_sources.cwa_disaster_public_records import (
     parse_earthquake_payload,
@@ -44,6 +45,33 @@ class CwaDisasterPublicRecordsTest(unittest.TestCase):
         self.assertEqual(record.metrics["magnitude"], 5.2)
         self.assertEqual(record.metrics["depth_km"], 12.5)
         self.assertIn("earthquake", record.tags)
+
+    def test_parse_earthquake_payload_accepts_iso_origin_time(self) -> None:
+        payload = {
+            "records": {
+                "Earthquake": [
+                    {
+                        "EarthquakeNo": "115051",
+                        "ReportContent": "07/26-20:36新北市雙溪區發生規模5.6有感地震。",
+                        "EarthquakeInfo": {
+                            "OriginTime": "2026-07-26T20:36:17+08:00",
+                            "FocalDepth": 95.7,
+                            "Epicenter": {
+                                "Location": "新北市政府東南東方 35.8 公里 (位於新北市雙溪區)",
+                                "EpicenterLatitude": 24.91,
+                                "EpicenterLongitude": 121.8,
+                            },
+                            "EarthquakeMagnitude": {"MagnitudeValue": 5.6},
+                        },
+                    }
+                ]
+            }
+        }
+
+        records = parse_earthquake_payload(payload, dataset_id="E-A0015-001")
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].occurred_at.astimezone(timezone.utc).isoformat(), "2026-07-26T12:36:17+00:00")
 
     def test_parse_typhoon_payload(self) -> None:
         payload = {
