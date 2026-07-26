@@ -9,6 +9,18 @@ These instructions apply to this repository.
 - `AGENTS.md` is the source of truth for agent behavior. `CLAUDE.md` may add Claude-specific shell/test notes, but it must not contradict this file.
 - Start at `PROJECT_INDEX.md` for whole-repo navigation, then load only the smallest task-specific context.
 
+## Codex Automation Observer
+
+For Codex automation runs in this repo, record minimal Observer telemetry. At run start, post an `automation_started` event; before the final response, post `automation_succeeded` or `automation_failed`.
+
+Use:
+
+```powershell
+python D:\work_space\claude-box\workspace\codex-observer-service\codex_observer_service.py event --session codex-automations --type automation_started --agent codex-automation --role <article|analysis|maintenance|service|audit> --meta source=codex_automation --meta job=<automation-or-job> --meta status=started --meta cwd=<cwd>
+```
+
+For completion, use the same metadata with `--type automation_succeeded --meta status=succeeded` or `--type automation_failed --meta status=failed`. Add `--model <model>` only when the model is known from the automation config; do not guess. Do not include prompt text, generated article bodies, secrets, tokens, `.env` values, API keys, passwords, or private keys. Observer failures must not fail the automation.
+
 ## Global CTO Standards
 Before implementation or verification work, read and follow `D:\work_space\claude-box\rules\rules\cto-technical-standards.md`. If this repo file and the global CTO standards conflict, follow the higher-priority rule and note the conflict.
 
