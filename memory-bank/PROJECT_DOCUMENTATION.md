@@ -219,6 +219,10 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   Codex-generated four-hour cross-section news digest. Codex automation writes
   the final JSON to Redis through `scripts/store_four_hour_digest_to_redis.ps1`
   with a 15,000 second TTL; public API reads are owned by `news-platform-api`.
+- Local PowerShell entry scripts emit non-blocking Codex Observer telemetry
+  through `scripts/codex_observer.ps1`, so crawler, analysis, article, RAG,
+  service, and maintenance jobs appear in the Observer dashboard with job status
+  metadata.
 - The report checks relay-side finance/public RSS, international RSS, X, Truth Social, SEC, TWSE/MOPS, US index tracker, market-context facts, BLS macro facts, Taiwan market-flow facts, and stored market analyses.
 - It also checks news-platform society/politics article freshness per category and per source, article enrichment gaps, public-record refresh freshness based on `updated_at`, article-record link freshness, and local Python process counts.
 - Status semantics: `OK` within expected cadence, `WARN` outside warn threshold, `STALE` outside stale threshold, `MISSING` no rows, and `ERROR` for query/connect failures.

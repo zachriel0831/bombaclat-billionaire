@@ -14,6 +14,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
+. (Join-Path $PSScriptRoot "codex_observer.ps1")
 
 Write-Host "Running Taiwan close context collector ..." -ForegroundColor Cyan
 
@@ -30,5 +31,11 @@ if ($TradeDate) {
   $cmdArgs += @("--trade-date", $TradeDate)
 }
 
-& python @cmdArgs
-exit $LASTEXITCODE
+$exitCode = Invoke-CodexObservedCommand `
+  -Job "tw_close_context" `
+  -Category "crawler" `
+  -Skill "news-ingestion-skill" `
+  -Metadata @{ source = "tw_close_context"; trade_date = $TradeDate; scheduled_time = $ScheduledTime; log_level = $LogLevel } `
+  -Command { & python @cmdArgs }
+
+exit $exitCode

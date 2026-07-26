@@ -13,6 +13,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
+. (Join-Path $PSScriptRoot "codex_observer.ps1")
 
 Write-Host "Running market analysis slot=$Slot ..." -ForegroundColor Cyan
 
@@ -27,5 +28,11 @@ if ($Force) {
   $cmdArgs += "--force"
 }
 
-& python @cmdArgs
-exit $LASTEXITCODE
+$exitCode = Invoke-CodexObservedCommand `
+  -Job "market_analysis" `
+  -Category "analysis" `
+  -Skill "macro-weekly-summary-skill" `
+  -Metadata @{ slot = $Slot; force = $Force.IsPresent; log_level = $LogLevel } `
+  -Command { & python @cmdArgs }
+
+exit $exitCode

@@ -9,6 +9,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONUNBUFFERED = "1"
+. (Join-Path $PSScriptRoot "codex_observer.ps1")
 
 $cmdArgs = @(
   (Join-Path $ProjectRoot "scripts\store_four_hour_digest_to_redis.py"),
@@ -23,5 +24,11 @@ if ($DryRun) {
   $cmdArgs += "--dry-run"
 }
 
-& python @cmdArgs
-exit $LASTEXITCODE
+$exitCode = Invoke-CodexObservedCommand `
+  -Job "four_hour_digest_store" `
+  -Category "article" `
+  -Skill "four-hour-digest-workflow" `
+  -Metadata @{ input_file = [System.IO.Path]::GetFileName($InputFile); ttl_seconds = $TtlSeconds; dry_run = $DryRun.IsPresent } `
+  -Command { & python @cmdArgs }
+
+exit $exitCode

@@ -12,6 +12,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
+. (Join-Path $PSScriptRoot "codex_observer.ps1")
 
 Write-Host "Running Taiwan market-flow collector families=$Families ..." -ForegroundColor Cyan
 
@@ -27,5 +28,11 @@ if ($DryRun) {
   $cmdArgs += "--dry-run"
 }
 
-& python @cmdArgs
-exit $LASTEXITCODE
+$exitCode = Invoke-CodexObservedCommand `
+  -Job "tw_market_flow" `
+  -Category "crawler" `
+  -Skill "news-ingestion-skill" `
+  -Metadata @{ source = "tw_market_flow"; families = $Families; dry_run = $DryRun.IsPresent; log_level = $LogLevel } `
+  -Command { & python @cmdArgs }
+
+exit $exitCode

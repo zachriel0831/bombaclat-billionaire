@@ -3,6 +3,14 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-07-26 Codex Observer Data-Collecting Telemetry
+- [x] Confirmed Observer previously recorded Codex turn-end skill/RAG events, not data-collecting job execution.
+- [x] Added a non-blocking PowerShell telemetry helper for local job start/success/fail events.
+- [x] Wrapped crawler, analysis, article digest, RAG, service, and maintenance entry scripts.
+- [x] Updated README and memory-bank workflow documentation.
+- [x] Verified PowerShell syntax, observer API writes, and dashboard display.
+- [x] Commit the data-collecting instrumentation.
+
 ## Current Task
 - Task: Guard the 2026-07-26 `pre_tw_open` market-analysis row from local evidence only.
 - Requested by: automation

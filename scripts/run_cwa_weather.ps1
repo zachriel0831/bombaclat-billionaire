@@ -11,14 +11,22 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
+. (Join-Path $PSScriptRoot "codex_observer.ps1")
 
 Write-Host "Collecting CWA typhoon and earthquake public records..." -ForegroundColor Cyan
 
-& python -m news_platform.main `
-  --env-file $EnvFile `
-  --collect-public-records `
-  --public-sources cwa_weather `
-  --public-record-limit $Limit `
-  --log-level $LogLevel
+$exitCode = Invoke-CodexObservedCommand `
+  -Job "cwa_weather" `
+  -Category "crawler" `
+  -Skill "news-ingestion-skill" `
+  -Metadata @{ source = "cwa_weather"; limit = $Limit; log_level = $LogLevel } `
+  -Command {
+    & python -m news_platform.main `
+      --env-file $EnvFile `
+      --collect-public-records `
+      --public-sources cwa_weather `
+      --public-record-limit $Limit `
+      --log-level $LogLevel
+  }
 
-exit $LASTEXITCODE
+exit $exitCode

@@ -15,6 +15,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 
 $env:PYTHONPATH = "src"
+. (Join-Path $PSScriptRoot "codex_observer.ps1")
 Write-Host "Extracting trade signals from market analyses..." -ForegroundColor Cyan
 
 $PythonExe = Join-Path $ProjectRoot ".venv\\Scripts\\python.exe"
@@ -41,8 +42,17 @@ if ($FixedPoolFallback.IsPresent) {
   $argsList += "--fixed-pool-fallback"
 }
 
-& $PythonExe @argsList
+$exitCode = Invoke-CodexObservedCommand `
+  -Job "trade_signal_extraction" `
+  -Category "analysis" `
+  -Skill "market-analysis-dynamic-trade-candidates" `
+  -Metadata @{
+    days = $Days
+    limit = $Limit
+    analysis_id = $AnalysisId
+    fixed_pool_fallback = $FixedPoolFallback.IsPresent
+    log_level = $LogLevel
+  } `
+  -Command { & $PythonExe @argsList }
 
-if ($LASTEXITCODE -ne 0) {
-  exit $LASTEXITCODE
-}
+exit $exitCode

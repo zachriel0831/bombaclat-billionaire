@@ -13,6 +13,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
+. (Join-Path $PSScriptRoot "codex_observer.ps1")
 
 Write-Host "Running market context collector slot=$AnalysisSlot ..." -ForegroundColor Cyan
 
@@ -25,4 +26,11 @@ $cmdArgs = @(
   "--log-level", $LogLevel
 )
 
-& python @cmdArgs
+$exitCode = Invoke-CodexObservedCommand `
+  -Job "market_context" `
+  -Category "crawler" `
+  -Skill "news-ingestion-skill" `
+  -Metadata @{ source = "market_context"; analysis_slot = $AnalysisSlot; scheduled_time = $ScheduledTime; log_level = $LogLevel } `
+  -Command { & python @cmdArgs }
+
+exit $exitCode

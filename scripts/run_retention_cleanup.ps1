@@ -12,6 +12,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
+. (Join-Path $PSScriptRoot "codex_observer.ps1")
 
 $argsList = @(
   "-m", "event_relay.retention_cleanup",
@@ -25,5 +26,10 @@ if ($DryRun) {
   $argsList += "--dry-run"
 }
 
-& python @argsList
-exit $LASTEXITCODE
+$exitCode = Invoke-CodexObservedCommand `
+  -Job "retention_cleanup" `
+  -Category "maintenance" `
+  -Metadata @{ keep_days = $KeepDays; dry_run = $DryRun.IsPresent; log_level = $LogLevel } `
+  -Command { & python @argsList }
+
+exit $exitCode

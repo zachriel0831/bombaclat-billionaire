@@ -20,6 +20,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
+. (Join-Path $PSScriptRoot "codex_observer.ps1")
 $ResolvedEnvFile = if ([System.IO.Path]::IsPathRooted($EnvFile)) { $EnvFile } else { Join-Path $ProjectRoot $EnvFile }
 
 function Resolve-PythonExe {
@@ -162,5 +163,17 @@ if ($DisableUsIndex) {
   $cmdArgs += "--disable-us-index"
 }
 
-& $ResolvedPythonExe @cmdArgs 2> $ErrLogFile | Tee-Object -FilePath $OutLogFile
-exit $LASTEXITCODE
+$exitCode = Invoke-CodexObservedCommand `
+  -Job "source_bridge" `
+  -Category "crawler" `
+  -Skill "news-ingestion-skill" `
+  -Metadata @{
+    event_sink = $EventSink
+    poll_interval_seconds = $PollIntervalSeconds
+    limit = $Limit
+    disable_us_index = $DisableUsIndex.IsPresent
+    log_level = $LogLevel
+  } `
+  -Command { & $ResolvedPythonExe @cmdArgs 2> $ErrLogFile | Tee-Object -FilePath $OutLogFile }
+
+exit $exitCode

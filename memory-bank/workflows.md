@@ -59,6 +59,22 @@ Minimum evidence before reporting recovery complete:
 - DB checks show same-day finance RSS rows in `news_relay.t_relay_events`
 - today's `pre_tw_open` or calendar-guarded `macro_daily` row exists in `t_market_analyses`
 
+## Workflow 0B: Codex Observer Telemetry
+Use this when adding or auditing local scheduler entry scripts.
+
+1. Emit job telemetry
+- PowerShell run scripts should dot-source `scripts/codex_observer.ps1`.
+- Wrap the real command with `Invoke-CodexObservedCommand`.
+- Use categories: `crawler`, `analysis`, `article`, `rag`, `service`, or `maintenance`.
+2. Preserve privacy and uptime
+- The helper posts to `http://127.0.0.1:8765/events` by default.
+- Set `CODEX_OBSERVER_URL` to change the target, `CODEX_OBSERVER_SESSION_ID` to group runs, or `CODEX_OBSERVER_DISABLED=true` to skip observer writes.
+- Observer failures must not fail the data job.
+- Do not send prompts, article bodies, secrets, tokens, API keys, `.env` values, or credentials in metadata.
+3. Verify
+- Check the Observer dashboard Recent Events table for Role and Meta values such as `job=cwa_weather`, `status=succeeded`, and `duration_seconds=<n>`.
+- Expected event names are `<category>_started`, `<category>_succeeded`, and `<category>_failed`.
+
 ## Demand Elegance (Balanced)
 1. For non-trivial changes:
 - pause and choose the simplest robust solution

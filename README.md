@@ -8,6 +8,11 @@ It also provides the context collection and Redis write helpers for the
 Codex-generated four-hour cross-section news digest. Codex automation writes the
 latest successful digest to Redis; this repo does not expose the public API.
 
+Local PowerShell entry scripts also emit lightweight Codex Observer telemetry
+when `http://127.0.0.1:8765` is available, so crawlers, analysis runs, article
+digest helpers, RAG indexing, and service wrappers show start/success/fail
+status on the local dashboard.
+
 It does not own LINE delivery, the public API runtime, frontend rendering, live quote WebSocket monitoring, or broker order placement. Those boundaries are handled by sibling services.
 
 ## Total Index
