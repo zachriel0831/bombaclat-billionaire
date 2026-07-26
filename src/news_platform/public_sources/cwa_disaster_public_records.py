@@ -20,6 +20,11 @@ _TAIPEI = timezone(timedelta(hours=8))
 _CWA_API_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/{dataset_id}"
 _CWA_PORTAL_URL = "https://opendata.cwa.gov.tw/"
 _DEFAULT_EARTHQUAKE_DATASET_ID = "E-A0015-001"
+_DEFAULT_SMALL_EARTHQUAKE_DATASET_ID = "E-A0016-001"
+_DEFAULT_EARTHQUAKE_DATASET_IDS = (
+    _DEFAULT_EARTHQUAKE_DATASET_ID,
+    _DEFAULT_SMALL_EARTHQUAKE_DATASET_ID,
+)
 _DEFAULT_TYPHOON_DATASET_ID = "W-C0034-005"
 
 
@@ -33,20 +38,24 @@ class CwaEarthquakeReportSource:
         *,
         timeout_seconds: int = 20,
         dataset_id: str | None = None,
+        dataset_ids: tuple[str, ...] | None = None,
         authorization: str | None = None,
     ) -> None:
         self.timeout_seconds = timeout_seconds
-        self.dataset_id = dataset_id or os.getenv("CWA_EARTHQUAKE_DATASET_ID", _DEFAULT_EARTHQUAKE_DATASET_ID)
+        self.dataset_ids = _earthquake_dataset_ids(dataset_id=dataset_id, dataset_ids=dataset_ids)
         self.authorization = authorization or _cwa_authorization()
         self.name = "cwa:earthquake_report"
 
     def fetch(self, *, limit: int | None = None, **_: Any) -> list[PublicRecord]:
-        payload = _fetch_cwa_json(
-            self.dataset_id,
-            authorization=self.authorization,
-            timeout=self.timeout_seconds,
-        )
-        records = parse_earthquake_payload(payload, dataset_id=self.dataset_id)
+        records: list[PublicRecord] = []
+        for dataset_id in self.dataset_ids:
+            payload = _fetch_cwa_json(
+                dataset_id,
+                authorization=self.authorization,
+                timeout=self.timeout_seconds,
+            )
+            records.extend(parse_earthquake_payload(payload, dataset_id=dataset_id))
+        records = _dedupe(records)
         records.sort(key=lambda r: r.occurred_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
         return records[: max(1, int(limit))] if limit is not None else records
 
@@ -95,7 +104,7 @@ def parse_earthquake_payload(payload: dict[str, Any], *, dataset_id: str) -> lis
 
         output.append(
             PublicRecord(
-                record_id="cwa:earthquake:" + (earthquake_no or stable_id(dataset_id, title, origin_time)),
+                record_id=_earthquake_record_id(dataset_id, earthquake_no, title, origin_time),
                 source_id="cwa",
                 record_type="cwa_earthquake_report",
                 country="TW",
@@ -194,6 +203,35 @@ def _fetch_cwa_json(dataset_id: str, *, authorization: str | None, timeout: int)
         logger.warning("CWA fetch failed dataset_id=%s error=%s", dataset_id, exc)
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def _earthquake_dataset_ids(
+    *,
+    dataset_id: str | None,
+    dataset_ids: tuple[str, ...] | None,
+) -> tuple[str, ...]:
+    if dataset_ids:
+        items = tuple(dict.fromkeys(item.strip() for item in dataset_ids if item.strip()))
+        if items:
+            return items
+    if dataset_id:
+        return (dataset_id,)
+    env_multi = os.getenv("CWA_EARTHQUAKE_DATASET_IDS")
+    if env_multi:
+        items = tuple(dict.fromkeys(item.strip() for item in env_multi.split(",") if item.strip()))
+        if items:
+            return items
+    env_single = os.getenv("CWA_EARTHQUAKE_DATASET_ID")
+    if env_single:
+        return (env_single.strip(),)
+    return _DEFAULT_EARTHQUAKE_DATASET_IDS
+
+
+def _earthquake_record_id(dataset_id: str, earthquake_no: str, title: str, origin_time: str) -> str:
+    key = earthquake_no or stable_id(dataset_id, title, origin_time)
+    if dataset_id == _DEFAULT_EARTHQUAKE_DATASET_ID:
+        return "cwa:earthquake:" + key
+    return "cwa:earthquake:" + dataset_id + ":" + key
 
 
 def _cwa_authorization() -> str:

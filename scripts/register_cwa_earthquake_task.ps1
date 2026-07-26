@@ -1,0 +1,52 @@
+# Register high-frequency CWA earthquake collection.
+param(
+  [string]$TaskName = "NewsCollector-CwaEarthquake",
+  [string]$EnvFile = ".env",
+  [int]$EveryMinutes = 5,
+  [int]$Limit = 50,
+  [switch]$Force
+)
+
+$ErrorActionPreference = "Stop"
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+$scriptPath = Join-Path $PSScriptRoot "run_cwa_earthquake.ps1"
+
+if ($EveryMinutes -lt 1) {
+  throw "EveryMinutes must be at least 1."
+}
+
+if (-not (Test-Path -LiteralPath $scriptPath)) {
+  throw "run_cwa_earthquake.ps1 not found: $scriptPath"
+}
+
+$actionArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -EnvFile `"$EnvFile`" -Limit $Limit -LogLevel INFO"
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs -WorkingDirectory $ProjectRoot
+$startAt = (Get-Date).AddMinutes(1)
+$trigger = New-ScheduledTaskTrigger `
+  -Once `
+  -At $startAt `
+  -RepetitionInterval (New-TimeSpan -Minutes $EveryMinutes) `
+  -RepetitionDuration (New-TimeSpan -Days 3650)
+$settings = New-ScheduledTaskSettingsSet `
+  -StartWhenAvailable `
+  -MultipleInstances IgnoreNew `
+  -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+
+if ($Force) {
+  $null = Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+}
+
+Register-ScheduledTask `
+  -TaskName $TaskName `
+  -Action $action `
+  -Trigger $trigger `
+  -Settings $settings `
+  -Description "Collect CWA significant and small-area felt earthquake public records into t_public_records." `
+  -Force | Out-Null
+
+$task = Get-ScheduledTask -TaskName $TaskName
+$info = Get-ScheduledTaskInfo -TaskName $TaskName
+Write-Host "Registered CWA earthquake task: $TaskName" -ForegroundColor Green
+Write-Host "State: $($task.State)" -ForegroundColor DarkGray
+Write-Host "NextRunTime: $($info.NextRunTime)" -ForegroundColor DarkGray
+Write-Host "EveryMinutes: $EveryMinutes" -ForegroundColor DarkGray

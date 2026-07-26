@@ -286,6 +286,29 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - Confirm `metrics_json` includes term/session fields and `cosignatory_count` for Legislative Yuan records, content length for NPA 165 records, casualty/party/geolocation fields for A1 traffic records, monthly/yearly aggregate count fields for NPA statistic records, nurse/staff/bed counts for healthcare capacity records, bed occupancy rates for NHI occupancy records, prosecution-disposition counts for MOJ records, and custody/capacity/over-capacity fields for corrections records
 - Query `t_news_article_public_record_links` joined with article/record tables; inspect `confidence`, `matched_by`, and `evidence_json`
 
+## Workflow 3C-1: CWA Earthquake High-Frequency Collection
+Use this when the weather page needs faster earthquake updates than the
+combined CWA weather task.
+
+1. Understand the sources
+- `cwa_earthquake_report` reads CWA significant felt earthquakes
+  (`E-A0015-001`) and small-area felt earthquakes (`E-A0016-001`) by default.
+- CWA publishes these datasets irregularly; the local schedule controls polling
+  frequency, not upstream publication frequency.
+2. Smoke fetch without DB writes
+- `$env:PYTHONPATH='src'; python -m news_platform.main --env-file .env --public-records-smoke --public-sources cwa_earthquake_report --public-record-limit 5`
+3. Store a controlled batch
+- `powershell -ExecutionPolicy Bypass -File .\scripts\run_cwa_earthquake.ps1 -EnvFile .env -Limit 50`
+4. Register high-frequency polling
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_cwa_earthquake_task.ps1 -Force`
+- Default cadence is every 5 minutes; use `-EveryMinutes 1` only if operationally needed.
+5. Verify
+- `Get-ScheduledTask -TaskName NewsCollector-CwaEarthquake`
+- `Get-ScheduledTaskInfo -TaskName NewsCollector-CwaEarthquake`
+- Query recent `t_public_records` rows where `source_id='cwa'` and
+  `record_type='cwa_earthquake_report'`; `raw_json.dataset_id` should include
+  `E-A0015-001` or `E-A0016-001`.
+
 ## Workflow 3D: News Data-Source Health Check
 Use this when news analysis quality depends on fresh source rows, after a
 machine restart, or when the user asks whether source data has caught up.

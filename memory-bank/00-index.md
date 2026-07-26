@@ -5,7 +5,7 @@ For whole-repo navigation, start at [../PROJECT_INDEX.md](../PROJECT_INDEX.md). 
 ## Active Core
 - `memory-bank/PROJECT_DOCUMENTATION.md`: project overview, architecture, source contracts
 - `memory-bank/rules.md`: development, security, and quality rules
-- `memory-bank/workflows.md`: operational workflows and runbooks
+- `memory-bank/workflows.md`: operational workflows and runbooks, including CWA earthquake high-frequency collection
 - `memory-bank/restart-recovery-runbook.md`: machine-restart recovery steps and post-restart checks
 - `memory-bank/rag-operations.md`: RAG indexing, retrieval, config, telemetry, and verification
 

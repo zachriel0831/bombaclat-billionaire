@@ -3,6 +3,15 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-07-26 CWA Earthquake High-Frequency Collection
+- [x] Confirmed existing CWA weather task is healthy but only runs every 30 minutes.
+- [x] Confirmed CWA official datasets: `E-A0015-001` significant felt earthquakes and `E-A0016-001` small-area felt earthquakes.
+- [x] Add `E-A0016-001` to earthquake public-record collection without changing existing `E-A0015-001` record IDs.
+- [x] Add a dedicated earthquake run script and 5-minute scheduled-task registration helper.
+- [x] Update README and memory-bank workflow/source docs.
+- [x] Verify parser tests, focused smoke collection, and scheduled-task registration.
+- [x] Commit the scoped change.
+
 ## 2026-07-26 Codex Observer Data-Collecting Telemetry
 - [x] Confirmed Observer previously recorded Codex turn-end skill/RAG events, not data-collecting job execution.
 - [x] Added a non-blocking PowerShell telemetry helper for local job start/success/fail events.
