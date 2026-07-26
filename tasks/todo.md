@@ -549,3 +549,15 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Confirm calendar eligibility and inspect today's `us_close` row.
 - [x] Verified calendar-correct no-op: Taiwan local Sunday and the relevant 2026-07-25 U.S. session are both weekend-closed, so `allowed_slots=[]`.
 - [x] Confirmed no `2026-07-26 us_close` row exists; no DB write, signal extraction, external provider API, web search, or LINE contact was performed.
+
+# 2026-07-26 Free Palestine Weekly Editorial Run
+
+- [x] Read and review all 140 English source rows from 2026-07-19 through 2026-07-26 exclusive.
+- [x] Draft and idempotently upsert `palestine-weekly-2026-W30` without paid LLM APIs.
+- [x] Read back and validate encoding, source IDs/count, body format, and citations.
+
+## 2026-07-26 Free Palestine Weekly Editorial Result
+
+- Published `palestine-weekly-2026-W30`, titled `停火若只留下新的邊界，和平就只是另一種佔領`.
+- Validation passed: readable Traditional Chinese, no mojibake/question blocks, 140 unique saved IDs matched `source_count`, no raw JSON in the body, and every Markdown citation matched a reviewed source URL.
+- No OpenAI, Anthropic, or other paid external LLM API was called.
