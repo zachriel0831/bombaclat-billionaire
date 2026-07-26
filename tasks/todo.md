@@ -21,17 +21,23 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Commit the data-collecting instrumentation.
 
 ## Current Task
-- Task: Guard the 2026-07-26 `pre_tw_open` market-analysis row from local evidence only.
+- Task: Guard the 2026-07-27 `us_close` market-analysis row from local evidence only.
 - Requested by: automation
-- Start date: 2026-07-26
-- Scope: Apply the Sunday calendar guard before the LINE window and use no paid external LLM APIs.
+- Start date: 2026-07-27
+- Scope: Inspect or repair today's row, preserve delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, Workflow 4C guard rules, automation memory, and active lessons.
-- [x] Resolve the 2026-07-26 market-calendar routing state.
-- [x] Inspect the target daily row and Sunday owner row.
-- [x] Leave the ineligible daily row absent; skip signal extraction.
-- [x] Verify no `pre_tw_open` delivery row exists and the Sunday weekly owner row exists.
+- [x] Resolve the 2026-07-27 market-calendar routing state and inspect the target row.
+- [x] Generate or repair only if the row is missing or not review-ready.
+- [x] Run signal extraction only when existing repo policy allows it.
+- [x] Verify final DB state and record Observer completion telemetry.
+
+## 2026-07-27 US Close Guard Run
+- [x] Calendar guard excluded `us_close`: Taiwan is open, but the relevant 2026-07-26 U.S. session was weekend-closed; allowed slots are `pre_tw_open` and `tw_close`.
+- [x] Confirmed no `analysis_date=2026-07-27` / `analysis_slot=us_close` row exists.
+- [x] Per calendar policy, performed no DB write and no trade-signal extraction; row-level review fields are not applicable.
+- [x] No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ## 2026-07-26 Pre-Open Guard Run
 - [x] Calendar guard returned no allowed daily slots because Taiwan local date is Sunday; Workflow 4L assigns the day to the weekly summary.
