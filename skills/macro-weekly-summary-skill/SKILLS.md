@@ -19,6 +19,44 @@ Guide generated weekly summaries and market-analysis drafts so they are evidence
 - Hybrid RAG historical analogues from embeddings.
 - Fixed ten-stock watchlist context for machine-readable downstream signal rows when explicitly needed; daily visible reports no longer render the fixed-watchlist section.
 
+## External Research Knowledge Base
+
+Use this hierarchy when web search is available. Local rows remain the primary
+evidence pack; these sources are verification and interpretation targets, not a
+reason to fabricate missing facts.
+
+1. Official macro / market data
+- Fed / FRED, BLS, BEA, U.S. Treasury Fiscal Data, IMF Data / WEO, World Bank
+  Data360, OECD Data Explorer, BIS Data Portal, EIA, WTO, UN Comtrade, and New
+  York Fed GSCPI.
+
+2. Uncertainty / geopolitical event data
+- Economic Policy Uncertainty, Geopolitical Risk / Trade Policy Uncertainty,
+  World Uncertainty Index, ACLED / CAST, UCDP, GDELT, ReliefWeb, CFR Global
+  Conflict Tracker, and International Crisis Group CrisisWatch.
+
+3. Research interpretation layer
+- IMF WEO / GFSR / Fiscal Monitor, BIS Quarterly Review, central-bank speeches
+  and minutes, Brookings Global Economy, CFR backgrounders, and Crisis Group
+  conflict notes. Use these for mechanisms and risk maps; cross-check hard
+  numbers against official data sources above.
+
+## Analysis Skills
+
+- Regime map: growth, inflation, policy reaction function, liquidity, credit,
+  risk appetite, and positioning.
+- Surprise lens: separate consensus / already-priced facts from new
+  information that can still reprice rates, FX, commodities, semis, financials,
+  or cyclicals.
+- Transmission chain: source fact -> macro or geopolitical mechanism -> U.S.
+  assets / USD / rates / oil / SOX -> Taiwan index, sectors, and mega-cap
+  proxies.
+- Geopolitical escalation ladder: event -> chokepoint, sanctions, shipping,
+  energy, defense, or supply-chain channel -> market risk premium.
+- Evidence discipline: one concrete claim needs local evidence, official data,
+  or externally verified support; news-volume indices are risk gauges, not
+  direct proof of economic damage.
+
 ## Output Principles
 
 - Explain evidence -> transmission mechanism -> Taiwan market implication.

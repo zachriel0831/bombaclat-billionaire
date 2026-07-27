@@ -278,7 +278,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - `t_relay_events` is the primary local event/fact context for weekly and scheduled daily analyses, but it is not treated as the complete universe of relevant market information.
 - OpenAI analysis calls request the Responses API `web_search` tool by default so the model can verify missing, stale, or fast-moving facts beyond local rows.
 - If web search is unavailable or returns insufficient evidence, prompts require the model to lower confidence and describe observation limits in reader-facing language instead of fabricating certainty or exposing internal missing-data notes.
-- Skill docs are retained as prompt assets for macro reasoning and mobile-chat readability; they do not create any Python-owned LINE delivery behavior.
+- Skill docs are retained as prompt assets for macro reasoning, web-verified source hierarchy, and mobile-chat readability; they do not create any Python-owned LINE delivery behavior.
 
 ## Weekly Summary
 - Module: `src/event_relay/weekly_summary.py`

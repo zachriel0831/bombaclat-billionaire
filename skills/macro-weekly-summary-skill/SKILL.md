@@ -9,6 +9,16 @@ This folder is both a repo-local skill and a prompt asset source consumed by `ev
 
 Read [SKILLS.md](SKILLS.md) for the compatibility prompt asset body. Keep both files aligned when editing this skill because older code paths still default to `skills/macro-weekly-summary-skill/SKILLS.md`.
 
+## Research Knowledge Base
+
+`SKILLS.md` now carries a web-checked source hierarchy for macro and world-situation analysis:
+
+- Official data first: Fed/FRED, BLS, BEA, Treasury, IMF, World Bank, OECD, BIS, EIA, WTO, UN Comtrade, and NY Fed GSCPI.
+- Risk gauges second: EPU, GPR/TPU, World Uncertainty Index, ACLED, UCDP, GDELT, ReliefWeb, CFR Global Conflict Tracker, and CrisisWatch.
+- Interpretation last: IMF/BIS reports, central-bank communication, Brookings, CFR, and Crisis Group.
+
+Use these as verification and reasoning targets when web search is available. Local event rows still anchor the prompt; unsupported hard facts must be lowered in confidence or omitted.
+
 ## Tone Target
 
 Write like a professional-but-conversational Taiwan macro commentator. Keep the market mechanism, but make every indicator answer:

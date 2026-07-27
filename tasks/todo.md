@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-07-27 Finance/Geopolitical Knowledge Sources Load
+- [x] Read repo instructions, CTO rules pointer, project index, source/skill docs, and current dirty state.
+- [x] Web-check reputable macro, market, trade, energy, uncertainty, and geopolitical data/analysis sources.
+- [x] Load the selected source hierarchy and analysis method into the existing market-analysis prompt asset.
+- [x] Verify skill/readiness checks and prompt loading.
+- [x] Commit and push the scoped change.
+
+### 2026-07-27 Result
+- Added the source hierarchy to `skills/macro-weekly-summary-skill/SKILLS.md`, which is the file loaded by market-analysis and weekly-summary prompt builders.
+- Synced the human-facing skill entry and project documentation.
+- Verification passed: `python scripts/validate_readiness.py`, `git diff --check`, and a direct `_build_prompts()` smoke check that found the new knowledge-base text in the system prompt.
+
 ## 2026-07-26 CWA Earthquake High-Frequency Collection
 - [x] Confirmed existing CWA weather task is healthy but only runs every 30 minutes.
 - [x] Confirmed CWA official datasets: `E-A0015-001` significant felt earthquakes and `E-A0016-001` small-area felt earthquakes.
