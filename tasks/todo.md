@@ -57,17 +57,24 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Commit the data-collecting instrumentation.
 
 ## Current Task
-- Task: Guard the 2026-07-27 `tw_close` market-analysis row from local evidence only.
+- Task: Guard the 2026-07-28 `us_close` market-analysis row from local evidence only.
 - Requested by: automation
-- Start date: 2026-07-27
+- Start date: 2026-07-28
 - Scope: Inspect or repair today's row, preserve delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo instructions, Workflow 4C guard rules, automation memory, and active lessons.
-- [x] Resolve the 2026-07-27 market-calendar routing state and inspect the target row.
+- [x] Resolve the 2026-07-28 market-calendar routing state and inspect the target row.
 - [x] Generate or repair only if the row is missing or not review-ready.
 - [x] Run signal extraction only when existing repo policy allows it.
 - [x] Verify final DB state and record Observer completion telemetry.
+
+## 2026-07-28 US Close Guard Run
+- [x] Taiwan and the relevant 2026-07-27 U.S. session were regular trading days; `us_close` was eligible and the target row was missing.
+- [x] Created `t_market_analyses.id=286` through `MySqlEventStore.upsert_market_analysis()` using three local relay events and two local market-index rows.
+- [x] Final verification: `claim_verifier.ok=true`, support rate `1.0`, trust reason `claim_verifier_ok`, six required headings in order, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+- [x] Ran internal dynamic signal extraction; `structured_json.stock_watch` was empty, so zero signals were stored and no fixed-pool padding was added.
+- [x] No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ## 2026-07-27 TW Close Guard Run
 - [x] Taiwan was a regular trading day and `tw_close` was eligible; the target row was missing while fresh close context existed.
