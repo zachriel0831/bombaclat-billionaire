@@ -21,6 +21,7 @@ from event_relay.weekly_summary import (
     _normalize_line_text,
     _openai_model_supports_temperature,
     _openai_web_search_enabled,
+    _retrieve_weekly_rag_examples,
     _resolve_llm_settings,
     _should_run_now,
     _store_weekly_analysis,
@@ -177,8 +178,28 @@ class WeeklySummaryTests(unittest.TestCase):
         self.assertIn("evidence -> mechanism -> Taiwan implication", reusable_prompt)
         self.assertIn("Weekly reports should not output intraday entry", reusable_prompt)
         self.assertIn("1200-2200 Chinese characters", reusable_prompt)
+        self.assertIn("Historical RAG examples JSON", reusable_prompt)
         self.assertNotIn("總經 Regime", reusable_prompt)
         self.assertNotIn("Section 2 利率與流動性", reusable_prompt)
+
+    def test_retrieve_weekly_rag_examples_returns_prompt_payload_and_telemetry(self) -> None:
+        """Weekly summaries should convert RAG examples into prompt payloads."""
+
+        class Example:
+            def to_prompt_dict(self):
+                return {"source": "market_analysis:weekly_tw_preopen", "title": "past week"}
+
+        with mock.patch.dict(os.environ, {"WEEKLY_SUMMARY_RAG_ENABLED": "true"}, clear=False), \
+             mock.patch("event_relay.weekly_summary.retrieve_similar_events", return_value=[Example()]) as retrieve:
+            payload, telemetry = _retrieve_weekly_rag_examples(
+                mock.Mock(),
+                [{"id": 1, "title": "this week", "summary": "macro stress"}],
+            )
+
+        self.assertEqual(payload, [{"source": "market_analysis:weekly_tw_preopen", "title": "past week"}])
+        self.assertTrue(telemetry["enabled"])
+        self.assertEqual(telemetry["examples_count"], 1)
+        retrieve.assert_called_once()
 
     def test_call_llm_routes_to_openai_by_default(self) -> None:
         """測試 test call llm routes to openai by default 的預期行為。"""

@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Historical-case RAG gives market analysis a small set of past event/analysis analogues. It is guidance for transmission reasoning, not current evidence. Current evidence still comes from the prompt context, source facts, market rows, and scorecard.
+Historical-case RAG gives market analysis and weekly summary a small set of past event/analysis analogues. It is guidance for transmission reasoning, not current evidence. Current evidence still comes from the prompt context, source facts, market rows, and scorecard.
 
 ## Ownership
 
 - Repo: `data-collecting`
 - Module: `src/event_relay/rag.py`
 - Indexer script: `scripts/run_rag_indexer.ps1`
-- Analysis integration: `src/event_relay/market_analysis.py`
+- Analysis integration: `src/event_relay/market_analysis.py`, `src/event_relay/weekly_summary.py`
 - Scheduled task registration: `scripts/register_market_analysis_tasks.ps1`
 
 ## Tables
@@ -31,9 +31,9 @@ RAG does not write delivery rows, LINE rows, order rows, or frontend rows.
   - stored outcome score as a prior
 - Outcome scoring is entry-first for strategy triggers: raw `target_hit` or `stop_hit` alone is neutral, because a target can occur before `entry_hit`. Only lifecycle metadata such as `entry_first_status=entry_then_target` or ordered `trigger_events` where entry comes first can raise/lower the prior.
 - Event examples and generated-analysis examples can both be retrieved.
-- Retrieved examples are sent to stage2 as historical analogues only.
+- Retrieved examples are sent to daily stage2 or weekly prompt context as historical analogues only.
 - Historical example IDs must not be treated as current `trigger_event_ids` or current evidence IDs.
-- RAG failure must degrade to zero examples and record the error in `t_market_analyses.raw_json.rag`; it must not block market-analysis storage.
+- RAG failure must degrade to zero examples and record the error in `t_market_analyses.raw_json.rag`; it must not block market-analysis or weekly-summary storage.
 
 ## Commands
 
@@ -68,6 +68,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\register_market_analysis_task
 | `MARKET_ANALYSIS_RAG_OUTCOME_WEIGHT` | `0.13` | Hybrid outcome component. |
 | `MARKET_ANALYSIS_RAG_METADATA_FILTER_THRESHOLD` | `0.10` | Metadata filter floor when query metadata exists. |
 | `MARKET_ANALYSIS_RAG_INCLUDE_ANALYSES` | `true` | Include previous generated analyses as examples. |
+| `WEEKLY_SUMMARY_RAG_ENABLED` | inherits `MARKET_ANALYSIS_RAG_ENABLED`, else `true` | Enables retrieval during weekly summary. |
+| `WEEKLY_SUMMARY_RAG_K` | `5` | Max examples passed to weekly summary. |
+| `WEEKLY_SUMMARY_RAG_MIN_SIMILARITY` | `0.22` | Weekly vector similarity floor. |
+| `WEEKLY_SUMMARY_RAG_CANDIDATE_LIMIT` | `500` | Weekly candidate pool size. |
+| `WEEKLY_SUMMARY_RAG_INCLUDE_ANALYSES` | `true` | Include previous generated weekly analyses as examples. |
 | `RAG_EMBEDDING_MODEL` | `local-hash-v1` | Keep stable unless intentionally rebuilding. |
 | `RAG_EMBEDDING_DIMENSIONS` | `128` | Keep aligned with stored vectors. |
 | `RAG_INDEX_LOOKBACK_DAYS` | `30` | Indexer lookback window. |
@@ -91,7 +96,7 @@ Use focused tests after RAG or analysis changes:
 
 ```powershell
 $env:PYTHONPATH='src'
-python -m unittest tests.test_rag tests.test_analysis_stages tests.test_market_analysis -v
+python -m unittest tests.test_rag tests.test_analysis_stages tests.test_market_analysis tests.test_weekly_summary -v
 ```
 
 If local dependencies are missing, state that verification could not run and why.

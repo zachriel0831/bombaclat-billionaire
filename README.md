@@ -477,6 +477,7 @@ Prompt pipeline:
 - Read skill docs:
   - `skills/macro-weekly-summary-skill/SKILLS.md` (prompt-loader compatibility file; `SKILL.md` is the skill entry)
   - `skills/line-brief-format-skill/line-weekly-brief.md`
+- Retrieve historical RAG examples from `t_event_embeddings` / `t_analysis_embeddings` when enabled; these are analogues only, not current evidence.
 - Weekly output uses a weekly-specific three-section contract:
   - `週總經` -> `下週台股配置` -> `下週觀察清單`
   - Each section should connect evidence -> mechanism -> Taiwan implication.
@@ -491,6 +492,7 @@ Prompt pipeline:
   - `analysis_slot=weekly_tw_preopen`
   - `scheduled_time_local=05:10` (`HH:MM`, no weekday prefix)
   - `raw_json.section_contract=["週總經","下週台股配置","下週觀察清單"]`
+  - `raw_json.rag` for weekly historical-example retrieval telemetry
   - `raw_json.token_usage` for provider/model/token telemetry
 
 Weekly summary env keys:
@@ -498,6 +500,11 @@ Weekly summary env keys:
 - `WEEKLY_SUMMARY_OPENAI_API_KEY` (optional; fallback to `OPENAI_API_KEY`)
 - `WEEKLY_SUMMARY_OPENAI_API_KEY_FILE` (default `.secrets/openai_api_key.dpapi`, Windows DPAPI encrypted key)
 - `WEEKLY_SUMMARY_MODEL` (default `gpt-5`)
+- `WEEKLY_SUMMARY_RAG_ENABLED` (default inherits `MARKET_ANALYSIS_RAG_ENABLED`, else `true`)
+- `WEEKLY_SUMMARY_RAG_K` (default `5`)
+- `WEEKLY_SUMMARY_RAG_MIN_SIMILARITY` (default `0.22`)
+- `WEEKLY_SUMMARY_RAG_CANDIDATE_LIMIT` (default `500`)
+- `WEEKLY_SUMMARY_RAG_INCLUDE_ANALYSES` (default `true`)
 - `ANTHROPIC_API_KEY` / `ANTHROPIC_API_KEY_FILE` (used when `LLM_PROVIDER=anthropic` or weekly runtime failover switches to Claude)
 - `WEEKLY_SUMMARY_RUNTIME_FAILOVER_ENABLED` (default `true`; OpenAI quota/rate/5xx failures retry once on Anthropic when configured)
 - `WEEKLY_SUMMARY_LOOKBACK_DAYS` (default `7`)

@@ -72,7 +72,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 |---|---|
 | [skills/README.md](skills/README.md) | Skill workspace structure. |
 | [skills/news-ingestion-skill/SKILL.md](skills/news-ingestion-skill/SKILL.md) | Ingestion workflow skill. |
-| [skills/rag-operations-skill/SKILL.md](skills/rag-operations-skill/SKILL.md) | Historical-case RAG operating skill. |
+| [skills/rag-operations-skill/SKILL.md](skills/rag-operations-skill/SKILL.md) | Historical-case RAG operating skill for daily market analysis and weekly summaries. |
 | [skills/political-topic-thread-skill/SKILL.md](skills/political-topic-thread-skill/SKILL.md) | Taiwan politics topic/thread workflow skill. |
 | [skills/macro-weekly-summary-skill/SKILL.md](skills/macro-weekly-summary-skill/SKILL.md) | Weekly summary and market-analysis prompt workflow guidance. |
 | [skills/line-brief-format-skill/](skills/line-brief-format-skill/) | LINE brief formatting references. |

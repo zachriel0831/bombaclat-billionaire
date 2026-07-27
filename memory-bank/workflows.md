@@ -510,6 +510,7 @@ Guard responsibilities:
 - Run `weekly_summary` every Saturday `23:00` local time (Java pushes it at Sunday `05:10`)
 2. Generate the weekly brief
 - Read the last 7 days from `t_relay_events`
+- Retrieve historical RAG examples from `t_event_embeddings` / `t_analysis_embeddings`; treat them as analogues only, not current evidence
 - Call OpenAI Responses API with weekly summary prompts and web search enabled by default for current-fact verification
 - If local events or web verification are insufficient, lower confidence and describe observation limits in reader-facing language; do not surface internal missing-data notes
 3. Store for downstream delivery
@@ -520,9 +521,11 @@ Guard responsibilities:
 - Use `analysis_slot=weekly_tw_preopen`
 - Use `scheduled_time_local=05:10`; do not include weekday text in this column
 - Put `dimension=weekly` in `raw_json`
+- Put weekly RAG retrieval telemetry in `raw_json.rag`
 5. Verify
 - Check scheduled task next run
 - Query `t_market_analyses` by the target Sunday `analysis_date`
+- Inspect `raw_json.rag.examples_count` or `raw_json.rag.error`
 6. Manual backfill
 - Call the running relay service:
   `'{"kind":"weekly","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`

@@ -285,9 +285,10 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Flow:
   1. Read last N days events from `t_relay_events`
   2. Build `system prompt` and `reusable prompt` from skill docs
-  3. Call OpenAI Responses API with web search enabled by default for current-fact verification
-  4. Store the weekly text into `t_market_analyses`
-  5. Leave user-facing delivery to the Java system
+  3. Retrieve historical RAG examples from `t_event_embeddings` / `t_analysis_embeddings` when enabled; these are analogues only, not current evidence
+  4. Call OpenAI Responses API with web search enabled by default for current-fact verification
+  5. Store the weekly text into `t_market_analyses`
+  6. Leave user-facing delivery to the Java system
 - Output format:
   - Weekly uses the section contract `週總經` -> `下週台股配置` -> `下週觀察清單`
   - Each section should connect evidence -> mechanism -> Taiwan implication
@@ -298,6 +299,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `scheduled_time_local=05:10` using the same `HH:MM` format as daily analyses
   - `raw_json.dimension=weekly`
   - `raw_json.section_contract=["週總經","下週台股配置","下週觀察清單"]`
+  - `raw_json.rag` records weekly historical-example retrieval telemetry
   - `raw_json.token_usage` records provider/model/token telemetry when an LLM call completes
 - Prompt snapshots:
   - `runtime/prompts/weekly_summary_system_prompt.txt`
@@ -381,7 +383,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Default embeddings still use deterministic local lexical embeddings (`local-hash-v1`) to avoid a new paid API dependency
   - `scripts/run_rag_indexer.ps1` incrementally indexes recent `t_relay_events` into `t_event_embeddings` and `t_market_analyses` into `t_analysis_embeddings`
   - `stage2_transmission` receives retrieved examples as analogues only; historical event IDs are not valid current evidence IDs
-  - If RAG retrieval fails or has no candidates, market analysis continues without historical examples and records the gap in `raw_json.rag`
+  - Weekly summary also receives retrieved examples as analogues only.
+  - If RAG retrieval fails or has no candidates, market analysis and weekly summary continue without historical examples and record the gap in `raw_json.rag`
 - Market context storage contract:
   - `source` starts with `market_context:`
   - `raw_json.stored_only=true`

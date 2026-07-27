@@ -24,6 +24,14 @@ from urllib.request import Request, urlopen
 
 from event_relay.config import load_env_file, load_settings
 from event_relay.prompt_assets import TokenUsage
+from event_relay.rag import (
+    DEFAULT_CANDIDATE_LIMIT as RAG_DEFAULT_CANDIDATE_LIMIT,
+    DEFAULT_EMBEDDING_DIMENSIONS as RAG_DEFAULT_EMBEDDING_DIMENSIONS,
+    DEFAULT_EMBEDDING_MODEL as RAG_DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_MIN_SIMILARITY as RAG_DEFAULT_MIN_SIMILARITY,
+    DEFAULT_RAG_K,
+    retrieve_similar_events,
+)
 from event_relay.service import MarketAnalysisRecord, MySqlEventStore
 
 
@@ -308,6 +316,7 @@ def _compile_prompts(config: WeeklySummaryConfig) -> tuple[str, str]:
     reusable_prompt = (
         "Please generate one weekly political/economic summary in Traditional Chinese for downstream mobile chat delivery.\n"
         "The Events JSON is the local event-store context, not a complete list of everything that happened.\n"
+        "Historical RAG examples are analogues only; never present them as current evidence.\n"
         "Use web search when available to verify missing or current facts, and state any remaining gaps.\n"
         "Required sections:\n"
         f"{WEEKLY_SECTION_LIST}"
@@ -324,6 +333,7 @@ def _compile_prompts(config: WeeklySummaryConfig) -> tuple[str, str]:
         "- Total length 1200-2200 Chinese characters. Keep it readable in mobile chat.\n\n"
         "Time range: {week_range}\n"
         "Events JSON:\n{events_json}\n"
+        "Historical RAG examples JSON:\n{rag_examples_json}\n"
     )
     return system_prompt, reusable_prompt
 
@@ -372,6 +382,75 @@ def _parse_bool_env(value: str | None, default: bool) -> bool:
     if normalized in {"0", "false", "no", "n", "off"}:
         return False
     return default
+
+
+def _int_env(name: str, default: int, *, minimum: int = 0) -> int:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return max(minimum, default)
+    try:
+        return max(minimum, int(raw))
+    except ValueError:
+        return max(minimum, default)
+
+
+def _float_env(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _weekly_rag_enabled() -> bool:
+    raw = os.getenv("WEEKLY_SUMMARY_RAG_ENABLED")
+    if raw is None:
+        raw = os.getenv("MARKET_ANALYSIS_RAG_ENABLED")
+    return _parse_bool_env(raw, default=True)
+
+
+def _retrieve_weekly_rag_examples(
+    store: MySqlEventStore,
+    events_payload: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if not _weekly_rag_enabled():
+        return [], {"enabled": False, "examples_count": 0}
+
+    embedding_model = (os.getenv("RAG_EMBEDDING_MODEL") or RAG_DEFAULT_EMBEDDING_MODEL).strip()
+    try:
+        examples = retrieve_similar_events(
+            store,
+            events_payload,
+            k=_int_env("WEEKLY_SUMMARY_RAG_K", DEFAULT_RAG_K, minimum=1),
+            min_similarity=_float_env("WEEKLY_SUMMARY_RAG_MIN_SIMILARITY", RAG_DEFAULT_MIN_SIMILARITY),
+            candidate_limit=_int_env(
+                "WEEKLY_SUMMARY_RAG_CANDIDATE_LIMIT",
+                RAG_DEFAULT_CANDIDATE_LIMIT,
+                minimum=1,
+            ),
+            embedding_model=embedding_model,
+            dimensions=_int_env("RAG_EMBEDDING_DIMENSIONS", RAG_DEFAULT_EMBEDDING_DIMENSIONS, minimum=8),
+            include_analysis_examples=_parse_bool_env(os.getenv("WEEKLY_SUMMARY_RAG_INCLUDE_ANALYSES"), True),
+            analysis_slot=WEEKLY_ANALYSIS_SLOT,
+        )
+    except Exception as exc:
+        logger.warning("Weekly RAG retrieval failed; continuing without historical examples: %s", exc)
+        return [], {
+            "enabled": True,
+            "examples_count": 0,
+            "embedding_model": embedding_model,
+            "error": str(exc)[:500],
+        }
+
+    prompt_examples = [example.to_prompt_dict() for example in examples]
+    return prompt_examples, {
+        "enabled": True,
+        "examples_count": len(prompt_examples),
+        "embedding_model": embedding_model,
+        "sources": [str(item.get("source") or "") for item in prompt_examples],
+    }
 
 
 def _openai_web_search_enabled() -> bool:
@@ -638,6 +717,7 @@ def _store_weekly_analysis(
     message: str,
     events_used: int,
     usage: TokenUsage | None = None,
+    rag: dict[str, Any] | None = None,
 ) -> None:
     """執行 store weekly analysis 的主要流程。"""
     analysis_date = _analysis_date_key(now_local, config)
@@ -663,6 +743,7 @@ def _store_weekly_analysis(
                     "scheduled_time": f"{config.hour:02d}:{config.minute:02d}",
                     "events_used": events_used,
                     "section_contract": list(WEEKLY_SECTION_TITLES),
+                    "rag": rag or {"enabled": False, "examples_count": 0},
                     "token_usage": usage.to_dict() if usage is not None else None,
                     "selected_provider": config.provider,
                     "selected_model": config.model,
@@ -732,10 +813,15 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
         }
         for event in events
     ]
+    rag_examples, rag_telemetry = _retrieve_weekly_rag_examples(store, events_payload)
     # weekly_summary 直接帶最近 N 天事件摘要，不再重放完整 raw_json，
     # 目的是保留主線資訊，同時控制 prompt 體積。
     week_range = f"{config.lookback_days} days ending {now_local.strftime('%Y-%m-%d %H:%M %Z')}"
-    user_prompt = reusable_prompt.format(week_range=week_range, events_json=json.dumps(events_payload, ensure_ascii=False))
+    user_prompt = reusable_prompt.format(
+        week_range=week_range,
+        events_json=json.dumps(events_payload, ensure_ascii=False),
+        rag_examples_json=json.dumps(rag_examples, ensure_ascii=False),
+    )
 
     try:
         summary_text, usage = _call_llm(
@@ -785,6 +871,7 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
         message=message,
         events_used=len(events),
         usage=usage,
+        rag=rag_telemetry,
     )
     _mark_sent_this_week(state_file, run_key)
     return {
@@ -797,6 +884,7 @@ def run_once(config: WeeklySummaryConfig) -> dict[str, Any]:
         "provider": config.provider,
         "model": config.model,
         "runtime_failover": config.runtime_failover,
+        "rag_examples_used": len(rag_examples),
     }
 
 

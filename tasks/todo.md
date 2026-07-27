@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-07-27 Weekly RAG Confirmation
+- [x] Confirm daily `market_analysis` already loads macro skill and historical RAG.
+- [x] Confirm weekly `weekly_summary` loaded macro skill but did not yet retrieve RAG.
+- [x] Wire weekly summary to reuse historical RAG examples as analogues in the weekly prompt.
+- [x] Update docs and run focused verification.
+- [x] Commit and push the scoped change.
+
+### 2026-07-27 Result
+- Daily path confirmed: `market_analysis` loads `skills/macro-weekly-summary-skill/SKILLS.md` and retrieves historical RAG when enabled.
+- Weekly path changed: `weekly_summary` now retrieves historical RAG examples, injects them into the weekly prompt, and stores telemetry in `raw_json.rag`.
+- Verification passed: `python -m unittest tests.test_weekly_summary tests.test_rag tests.test_market_analysis -v`, `python scripts/validate_readiness.py`, `git diff --check`, and direct prompt/RAG smoke.
+
 ## 2026-07-27 Finance/Geopolitical Knowledge Sources Load
 - [x] Read repo instructions, CTO rules pointer, project index, source/skill docs, and current dirty state.
 - [x] Web-check reputable macro, market, trade, energy, uncertainty, and geopolitical data/analysis sources.
