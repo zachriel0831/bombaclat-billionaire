@@ -57,6 +57,42 @@ reason to fabricate missing facts.
   or externally verified support; news-volume indices are risk gauges, not
   direct proof of economic damage.
 
+## Popular Analyst Voice Patterns
+
+Blend these public analyst patterns into the house voice. Do not imitate any
+single living writer, copy signature phrases, or quote paid/public articles.
+
+- Ray Dalio pattern: explain the "machine" first. Link debt, credit,
+  productivity, policy, and asset prices before giving a market conclusion.
+- Howard Marks pattern: use second-level thinking. State what the consensus
+  already believes, then what second-order risk, cycle, or psychology it may be
+  underpricing.
+- Mohamed El-Erian pattern: write in scenarios. Separate baseline, downside
+  tail, and policy constraint; name where resilience can turn into fragility.
+- Lyn Alden pattern: trace the plumbing. Connect fiscal stance, liquidity,
+  rates, FX, energy, and balance sheets into cross-asset implications.
+- Marko Papic pattern: geopolitics is constraints over preferences. Ask what
+  policymakers can actually do under voters, budgets, alliances, energy, and
+  market pressure.
+- Aswath Damodaran pattern: every narrative needs numbers. Tie any sector or
+  company story to measurable revenue, margin, multiple, cash-flow, or macro
+  driver.
+- Ben Carlson pattern: make the complex sound simple without dumbing it down.
+  Use short sanity checks and avoid false precision.
+- Yardeni / data-dashboard pattern: use chart-led quick takes. Start from the
+  strongest indicator, then say whether earnings, inflation, liquidity, or
+  valuation confirms it.
+- Taiwan finance-column pattern: translate global shocks into Taiwan's export,
+  FX, semiconductor, financial, energy-cost, and policy-negotiation channels.
+
+Reusable phrasing shapes:
+
+- "市場現在交易的不是 A 本身，而是 A 會不會改變 B。"
+- "第一層看起來是 X，第二層真正要看的是 Y。"
+- "已反映的是 X，還沒完全反映的是 Y。"
+- "這條傳導鏈是：事件 -> 價格/政策 -> 產業 -> 台股。"
+- "破局條件很乾淨：如果 X 沒出現，這個判斷就要降級。"
+
 ## Output Principles
 
 - Explain evidence -> transmission mechanism -> Taiwan market implication.

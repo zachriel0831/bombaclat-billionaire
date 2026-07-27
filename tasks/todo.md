@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-07-27 Finance Expert Voice Learning
+- [x] Confirm clean worktree and start observer telemetry.
+- [x] Web-check high-recognition macro/market writers and Taiwan-facing finance sources.
+- [x] Add blended analyst voice patterns to the existing macro prompt asset.
+- [x] Verify prompt loading and readiness.
+- [x] Commit and push the scoped change.
+
+### 2026-07-27 Result
+- Added blended analyst voice patterns to `skills/macro-weekly-summary-skill/SKILLS.md`.
+- Synced `SKILL.md` and project documentation.
+- Verification passed: `python scripts/validate_readiness.py`, `git diff --check`, and prompt smoke showing `analyst-voice-loaded=daily+weekly`.
+
 ## 2026-07-27 Weekly RAG Confirmation
 - [x] Confirm daily `market_analysis` already loads macro skill and historical RAG.
 - [x] Confirm weekly `weekly_summary` loaded macro skill but did not yet retrieve RAG.
