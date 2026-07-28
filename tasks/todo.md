@@ -647,3 +647,16 @@ Move completed or stale task logs to `tasks/archive/`.
 - Repaired the missing row as analysis `287` from three local evidence events; no external provider API was called.
 - Corrected PowerShell stdin encoding by rewriting the same row through a temporary UTF-8 Python helper, then removed the helper.
 - Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, six headings, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=1`, `pushed=0`, and 10 internal monitor signals.
+
+# 2026-07-29 US Close Guard Run
+
+- [x] Read repo instructions, Workflow 4C guard rules, automation memory, Ponytail guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row.
+- [x] Create the missing row from local evidence through `MySqlEventStore.upsert_market_analysis()`.
+- [x] Run eligible internal signal extraction and verify the final DB state.
+
+## 2026-07-29 US Close Guard Result
+
+- Repaired the missing row as analysis `290` from three local evidence events and two U.S. close index rows; no external provider API was called.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, six requested headings, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+- Dynamic signal extraction ran; empty `stock_watch` produced zero signals without fixed-pool padding.
