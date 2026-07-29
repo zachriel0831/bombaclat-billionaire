@@ -57,17 +57,24 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Commit the data-collecting instrumentation.
 
 ## Current Task
-- Task: Guard the 2026-07-28 `us_close` market-analysis row from local evidence only.
+- Task: Guard the 2026-07-30 `pre_tw_open` market-analysis row from local evidence only.
 - Requested by: automation
-- Start date: 2026-07-28
-- Scope: Inspect or repair today's row, preserve delivery ownership, and use no paid external LLM APIs.
+- Start date: 2026-07-30
+- Scope: Inspect or repair today's delivery row, run fixed-pool extraction after a ready write, preserve Java delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
-- [x] Read repo instructions, Workflow 4C guard rules, automation memory, and active lessons.
-- [x] Resolve the 2026-07-28 market-calendar routing state and inspect the target row.
-- [x] Generate or repair only if the row is missing or not review-ready.
-- [x] Run signal extraction only when existing repo policy allows it.
+- [x] Read repo instructions, Workflow 4C guard rules, automation memory, Ponytail guidance, and active lessons.
+- [x] Resolve the 2026-07-30 market-calendar routing state and inspect the target row plus local evidence.
+- [x] Generate or repair only if the row is missing or not delivery-ready.
+- [x] Run targeted fixed-pool signal extraction after a ready write.
 - [x] Verify final DB state and record Observer completion telemetry.
+
+## 2026-07-30 Pre-Open Guard Run
+- [x] Taiwan and the relevant 2026-07-29 U.S. session are regular trading days; `pre_tw_open` was eligible and missing.
+- [x] Created `t_market_analyses.id=295` through `MySqlEventStore.upsert_market_analysis()` using three local relay/context events only.
+- [x] Final verification: claim support rate `1.0`, trust gate allowed delivery/signals, `push_enabled=1`, `pushed=0`, structured JSON present, six headings and exactly three evidence bullets passed, readable Traditional Chinese passed, and `external_provider_api_called=false`.
+- [x] Targeted fixed-pool extraction stored 10 internal monitor signals.
+- [x] No paid external LLM API, web search, or LINE contact occurred.
 
 ## 2026-07-28 US Close Guard Run
 - [x] Taiwan and the relevant 2026-07-27 U.S. session were regular trading days; `us_close` was eligible and the target row was missing.
