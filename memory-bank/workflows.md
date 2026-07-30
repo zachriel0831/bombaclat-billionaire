@@ -448,13 +448,13 @@ machine restart, or when the user asks whether source data has caught up.
 - New signals use `status=pending_review`; stale pending signals for the same analysis are marked `superseded`
 - `ticker` is normalized symbol text; Taiwan signals use 4-digit codes without `.TW` / `.TWO`
 - Daily visible reports no longer append `## 今日個股觀察`; `t_trade_signals` may still be maintained as machine-readable downstream context, but it is not rendered into the market-analysis body.
-- If today's structured/quote context misses a ticker, the pipeline may copy only same-ticker recent `t_trade_signals` as `prior_signal_stock_watch` for downstream signal context. Treat it as stale reference only: keep `confidence=low`, show the prior date, and require same-day price, volume, and news confirmation.
+- If today's structured `stock_watch` is empty, trade-signal extraction must store zero current candidates. Do not copy same-ticker recent `t_trade_signals` or tracked/preferred ticker lists into the current day.
 - Daily formatting uses date-only `raw_json.display_title` and the author-style flow `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與觀察限制`; `三個證據` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. Do not write a dedicated `台股配置` section.
 - Individual company mentions in daily visible reports are limited to macro/sector transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write entry, stop-loss, or target-price language in the daily body.
 - In that section, `direction=long` is rendered as `可做/建議觀察` plus the strategy label; `entry_zone` means entry area, `take_profit_zone` means profit-taking/exit area, and `invalidation` is rendered as `停損`
 - Do not create orders here. Risk gate / review and outcomes stay in `t_signal_reviews` and `t_signal_outcomes`
 - For existing structured rows, run `scripts/run_trade_signal_extraction.ps1 -EnvFile .env`
-- For a specific analysis row that exists but has no monitor signals, run targeted repair: `scripts/run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback -EventDays 1 -PriorDays 30`. This may use recent quote/context events and prior same-ticker signal references, but it still honors `raw_json.trust_gate.signals_allowed=false`.
+- For a specific analysis row whose model-selected tickers have missing monitor levels, run targeted repair: `scripts/run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback -EventDays 1 -PriorDays 30`. Despite the legacy option name, this may fill quote/context levels only for tickers already present in structured `stock_watch`; it still honors `raw_json.trust_gate.signals_allowed=false`.
 - Strategy performance must use entry-first attribution: ignore `target_hit` / `stop_hit` before the first `entry_hit`; after entry, the first `target_hit` is a win and the first `stop_hit` is a loss. Rows without entry are `not_entered` and must not inflate win rate.
 4. Keep Python storage-only
 - `market_analysis` does not push directly or create delivery jobs
@@ -500,9 +500,10 @@ Guard responsibilities:
 - Write repaired rows only through `MySqlEventStore.upsert_market_analysis`.
 - Preserve Java delivery ownership: set `push_enabled` only according to
   existing slot/calendar/trust-gate policy and keep `pushed=false`.
-- For repaired delivery/signal-eligible rows, rebuild internal
-  monitor signals with `scripts/run_trade_signal_extraction.ps1 -AnalysisId
-  <id> -FixedPoolFallback`.
+- For repaired delivery/signal-eligible rows, rebuild internal monitor signals
+  with `scripts/run_trade_signal_extraction.ps1 -AnalysisId <id>
+  -FixedPoolFallback`; this must not create candidates when structured
+  `stock_watch` is empty.
 - Verify final DB state: `claim_verifier.ok`, trust-gate reason,
   `push_enabled`, `pushed`, `structured_json`, and `t_trade_signals` count.
 - Store telemetry indicating `external_provider_api_called=false` for repaired

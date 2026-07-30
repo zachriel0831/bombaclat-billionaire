@@ -176,8 +176,8 @@ class TradeSignalExtractionTests(unittest.TestCase):
         self.assertEqual(store.writes[0][1][0].ticker, "2330")
         self.assertEqual(json.loads(store.writes[0][1][0].source_event_ids_json), [123])
 
-    def test_dynamic_repair_uses_prior_references_for_preferred_tickers(self) -> None:
-        """A stored analysis can rebuild same-ticker monitor signals when explicitly preferred."""
+    def test_dynamic_repair_does_not_create_candidates_from_preferred_tickers(self) -> None:
+        """Preferred fallback tickers must not create candidates when the model selected none."""
         signals, metrics = build_fixed_pool_repair_trade_signals(
             analysis_id=78,
             analysis_date="2026-05-25",
@@ -205,10 +205,59 @@ class TradeSignalExtractionTests(unittest.TestCase):
             ],
         )
 
-        self.assertEqual([signal.ticker for signal in signals], ["2330"])
-        self.assertEqual(signals[0].signal_type, "prior_signal_stock_watch")
-        self.assertEqual(signals[0].entry_zone_json, '{"low": 1000, "high": 1010}')
-        self.assertEqual(metrics["prior_signal_references"], 1)
+        self.assertEqual(signals, [])
+        self.assertEqual(metrics["quote_fallback_added"], 0)
+        self.assertEqual(metrics["prior_signal_references"], 0)
+
+    def test_dynamic_repair_only_fills_model_selected_ticker_levels(self) -> None:
+        """Quote fallback may fill levels for a model-selected ticker, not add other tickers."""
+        events = [
+            SimpleNamespace(
+                row_id=301,
+                source="yfinance_taiwan",
+                summary=json.dumps(
+                    {"symbol": "2603.TW", "name": "長榮", "price": 180, "change_pct": 4.2, "volume": 9000},
+                    ensure_ascii=False,
+                ),
+            ),
+            SimpleNamespace(
+                row_id=302,
+                source="yfinance_taiwan",
+                summary=json.dumps(
+                    {"symbol": "2330.TW", "name": "台積電", "price": 2450, "change_pct": 9.0, "volume": 99000},
+                    ensure_ascii=False,
+                ),
+            ),
+        ]
+
+        signals, metrics = build_fixed_pool_repair_trade_signals(
+            analysis_id=79,
+            analysis_date="2026-05-25",
+            analysis_slot="pre_tw_open",
+            structured_payload={
+                "stock_watch": [
+                    {
+                        "ticker": "2603",
+                        "name": "長榮",
+                        "direction": "bullish",
+                        "strategy_type": "swing",
+                        "rationale": "Freight rate evidence",
+                    }
+                ]
+            },
+            events=events,
+            preferred_tickers={"2330"},
+        )
+
+        self.assertEqual([signal.ticker for signal in signals], ["2603"])
+        self.assertEqual(signals[0].signal_type, "analysis_stock_watch")
+        self.assertIsNotNone(signals[0].entry_zone_json)
+        self.assertIsNotNone(signals[0].invalidation_json)
+        self.assertIsNotNone(signals[0].take_profit_zone_json)
+        self.assertGreaterEqual(signals[0].risk_reward_ratio, 1.5)
+        self.assertIsNone(signals[0].avoid_reason)
+        self.assertEqual(metrics["reference_levels_filled"], 1)
+        self.assertEqual(metrics["quote_fallback_added"], 0)
 
     def test_sync_targeted_repair_honors_trust_gate(self) -> None:
         """Repair must not recreate monitor signals when stored trust gate blocks them."""

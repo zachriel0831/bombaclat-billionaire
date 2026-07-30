@@ -584,7 +584,7 @@ Trade signal storage:
   from the generated entry/stop levels so their first target is at least 1.5R;
   structured LLM rows are not silently adjusted and remain gated when R is low.
 - For Taiwan pre-open output, internal `direction=long` means buy-side / 做多, not long-term holding. `strategy_type=swing|medium` controls 波段/中線 wording. `entry_zone` is entry area, `take_profit_zone` is profit-taking exit area, and `invalidation` is shown as 停損.
-- Fallback rows may enrich or fill monitor levels only when evidence exists. They still start as `pending_review` and are not orders.
+- Fallback rows may enrich or fill monitor levels only for tickers already selected in model `stock_watch` output. They must not create extra candidates from tracked/preferred ticker lists or prior signals. They still start as `pending_review` and are not orders.
 - `idempotency_key` prevents duplicate signals for the same analysis/ticker/strategy.
 - `t_signal_reviews` and `t_signal_outcomes` are separate follow-up tables for risk gate / human review and performance feedback.
 - LLM output stops at signal creation. Order intents and broker calls must be created only after independent review/risk approval.

@@ -438,8 +438,7 @@ def build_fixed_pool_repair_trade_signals(
     This is the safe backfill path for cases where a market-analysis row exists
     but the downstream stock-monitor watchlist was never populated. It first
     trusts structured ``stock_watch`` rows, then fills missing reference levels
-    from recent quote/context events, and finally clones prior same-ticker
-    reference levels for explicitly preferred dynamic tickers only.
+    for those model-selected tickers from recent quote/context events.
     """
     signals = build_trade_signals_from_analysis(
         analysis_id=analysis_id,
@@ -457,75 +456,32 @@ def build_fixed_pool_repair_trade_signals(
     if analysis_slot not in DYNAMIC_SIGNAL_BACKFILL_SLOTS:
         return signals, metrics
 
-    fallback_signals = build_quote_event_trade_signals(
-        analysis_id=analysis_id,
-        analysis_date=analysis_date,
-        analysis_slot=analysis_slot,
-        events=events or [],
-        max_signals=max_signals,
-        preferred_tickers=preferred_tickers,
+    structured_tickers = {signal.ticker for signal in signals if signal.ticker}
+    fallback_signals = (
+        build_quote_event_trade_signals(
+            analysis_id=analysis_id,
+            analysis_date=analysis_date,
+            analysis_slot=analysis_slot,
+            events=events or [],
+            max_signals=max(max_signals, len(structured_tickers)),
+            preferred_tickers=structured_tickers,
+        )
+        if structured_tickers
+        else []
     )
+    fallback_signals = [
+        signal for signal in fallback_signals if signal.ticker in structured_tickers
+    ]
     signals, metrics["reference_levels_filled"] = _merge_reference_levels_from_fallbacks(
         signals,
         fallback_signals,
     )
-
-    recommendation_tickers = {
-        signal.ticker
-        for signal in signals
-        if not is_excluded_trade_signal_ticker(signal.ticker)
-        if signal.direction == "long" and signal.strategy_type in {"swing", "medium"}
-    }
-    existing_tickers = {signal.ticker for signal in signals}
-    preferred = {
-        ticker
-        for ticker in _normalize_ticker_set(preferred_tickers)
-        if is_supported_taiwan_stock_ticker(ticker)
-        and not is_excluded_trade_signal_ticker(ticker)
-    }
-    for fallback_signal in fallback_signals:
-        if is_excluded_trade_signal_ticker(fallback_signal.ticker):
-            continue
-        if (
-            len(recommendation_tickers) >= max_signals
-            and fallback_signal.ticker not in preferred
-        ):
-            break
-        if fallback_signal.ticker in existing_tickers:
-            continue
-        signals.append(fallback_signal)
-        existing_tickers.add(fallback_signal.ticker)
-        if fallback_signal.direction == "long" and fallback_signal.strategy_type in {"swing", "medium"}:
-            recommendation_tickers.add(fallback_signal.ticker)
-            metrics["quote_fallback_added"] += 1
 
     signals = [
         signal
         for signal in signals
         if not is_excluded_trade_signal_ticker(signal.ticker)
     ]
-    existing_tickers = {signal.ticker for signal in signals}
-    preferred = {
-        ticker
-        for ticker in _normalize_ticker_set(preferred_tickers)
-        if is_supported_taiwan_stock_ticker(ticker)
-        and not is_excluded_trade_signal_ticker(ticker)
-    }
-    missing_tickers = [
-        ticker
-        for ticker in preferred
-        if ticker not in existing_tickers and not is_excluded_trade_signal_ticker(ticker)
-    ]
-    if missing_tickers:
-        prior_signals = build_prior_signal_reference_trade_signals(
-            analysis_id=analysis_id,
-            analysis_date=analysis_date,
-            analysis_slot=analysis_slot,
-            prior_rows=prior_rows or [],
-            missing_tickers=missing_tickers,
-        )
-        signals.extend(prior_signals)
-        metrics["prior_signal_references"] = len(prior_signals)
     return signals, metrics
 
 
@@ -557,7 +513,17 @@ def _merge_reference_levels_from_fallbacks(
 
         if updates:
             filled += 1
-            merged.append(replace(signal, **updates))
+            merged.append(
+                _with_candidate_metrics(
+                    replace(
+                        signal,
+                        risk_reward_ratio=None,
+                        candidate_score=None,
+                        avoid_reason=None,
+                        **updates,
+                    )
+                )
+            )
         else:
             merged.append(signal)
     return merged, filled

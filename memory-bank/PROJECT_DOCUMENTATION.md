@@ -368,10 +368,10 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Every signal keeps `analysis_id`, slot/date, ticker, strategy/direction, optional entry/stop/target JSON, and `source_event_ids`
   - Every signal gets `risk_reward_ratio`, `candidate_score`, and `avoid_reason`; downstream monitoring currently requires complete long/short levels, `risk_reward_ratio >= 1.5`, and empty `avoid_reason`
   - Internal `direction=long` means buy-side / 做多, not long-term holding; `entry_zone` is the entry area, `take_profit_zone` is the profit-taking exit area, and `invalidation` is rendered as 停損
-  - `quote_fallback_stock_watch` / `context_fallback_stock_watch` may enrich or fill monitor levels only when evidence exists; they must not invent tickers.
+  - `quote_fallback_stock_watch` / `context_fallback_stock_watch` may enrich or fill monitor levels only for tickers already selected in model `stock_watch` output; they must not invent tickers from tracked/preferred ticker lists.
   - Deterministic quote/context fallback levels calibrate `take_profit_zone.first` from entry/stop so the first target is at least 1.5R. Structured LLM rows are not silently rewritten; low-R structured rows remain stored with `avoid_reason`.
-  - `prior_signal_stock_watch` may fill a missing same-ticker row from recent `t_trade_signals` history. It is downgraded to `confidence=low`, labelled as prior reference, and must require same-day price, volume, and news confirmation before any action.
-  - Targeted signal repair for an existing analysis row uses `scripts/run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback`; it may combine structured rows, recent quote/context fallback, and prior same-ticker references, while still respecting `raw_json.trust_gate.signals_allowed=false`.
+  - `prior_signal_stock_watch` is historical-only for old rows; targeted repair must not create current candidates from prior same-ticker history.
+  - Targeted signal repair for an existing analysis row uses `scripts/run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback`; despite the legacy option name, it only extracts structured model rows and fills those tickers' missing quote/context levels while still respecting `raw_json.trust_gate.signals_allowed=false`.
   - `idempotency_key` suppresses duplicate signals for the same analysis/ticker/strategy
   - `t_signal_reviews` is reserved for risk gate / human / model-review decisions
   - `t_signal_outcomes` is reserved for later performance feedback; any strategy report/outcome JSON must use entry-first attribution: ignore target/stop hits before the first entry, then count the first target after entry as win and first stop after entry as loss
@@ -450,7 +450,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `'{"kind":"market","slot":"pre_tw_open","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
 - Extract trade signals from existing structured analyses:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_trade_signal_extraction.ps1 -EnvFile .env -Days 14 -Limit 50`
-- Repair one existing analysis row that has no stock-monitor signals:
+- Repair one existing analysis row's model-selected signal levels:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback -EventDays 1 -PriorDays 30`
 - Run market context once:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env`

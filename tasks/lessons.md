@@ -1092,3 +1092,15 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - [ ] Pricing section says what is already reflected and what can still reprice
   - [ ] Invalidation section names what would make the thesis wrong
 - Status: active
+
+## LESSON-20260730-01
+- Date: 2026-07-30
+- Trigger (User correction): User noticed the daily strategy page still repeated the same old tickers and reminded that the five monitored names should come from model-selected dynamic candidates.
+- What was wrong: Targeted repair ran `-FixedPoolFallback` on an analysis whose structured `stock_watch` was empty, then copied ten prior same-ticker rows into today's `t_trade_signals`.
+- Root cause: The legacy repair path still treated `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` / preferred tickers and prior signals as candidate sources, even though fixed-pool padding had been superseded.
+- New rule (always/never): If model `structured_json.stock_watch` is empty, current-day trade-signal extraction must store zero candidates. Fallbacks may fill levels only for model-selected tickers; never create candidates from preferred/tracked ticker lists or prior `t_trade_signals`.
+- Prevention checklist:
+  - [ ] Check today's `t_trade_signals.signal_type` values; current recommendations should be `analysis_stock_watch` or level-filled model-selected rows, not `prior_signal_stock_watch`
+  - [ ] Verify `structured_json.stock_watch=[]` leads to zero current signals after targeted repair
+  - [ ] Keep `-FixedPoolFallback` as a compatibility alias only; do not let it imply fixed-pool candidate creation
+- Status: active

@@ -184,7 +184,9 @@ As of 2026-07-20:
   stock codes and no longer uses a fixed pool for padding.
 - Legacy CLI/API names such as `build_fixed_pool_repair_trade_signals` and
   `--fixed-pool-fallback` remain as compatibility aliases, but their behavior
-  is dynamic-candidate repair.
+  is dynamic-candidate repair: they may fill missing quote/context levels for
+  model-selected `stock_watch` tickers, but must not create candidates from
+  tracked/preferred ticker lists or prior signals.
 - `t_trade_signals` has deterministic `risk_reward_ratio`, `candidate_score`,
   and `avoid_reason` fields for downstream filtering.
 - `stock-monitor-service` can monitor five qualified symbols, write trigger

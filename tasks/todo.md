@@ -57,23 +57,23 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Commit the data-collecting instrumentation.
 
 ## Current Task
-- Task: Keep CWA typhoon/earthquake scheduled crawling in one fixed visible window.
+- Task: Stop dynamic trade-signal repair from recreating the old fixed ticker pool.
 - Requested by: user
 - Start date: 2026-07-30
-- Scope: Reuse existing CWA crawler scripts, avoid short-lived cmd popups, preserve weather 30-minute and earthquake 5-minute cadences, update workflow docs, verify locally, and commit.
+- Scope: Verify why the daily strategy page repeats old tickers, fix the targeted repair path so only model-selected `stock_watch` tickers become current candidates, repair today's DB rows, update docs/lessons, verify, and commit.
 
 ## Plan
-- [x] Read repo instructions, ingestion/service skills, scheduler docs, and current scheduled task actions.
-- [x] Add a persistent visible CWA collector window entrypoint that calls existing crawler scripts.
-- [x] Add an installer that disables the two popup scheduled tasks and registers/starts the fixed-window task.
-- [x] Update workflow documentation for the new repeatable operation.
-- [x] Verify scripts and scheduled-task state.
+- [x] Confirm current page rows are `prior_signal_stock_watch` and not model-selected signals.
+- [x] Fix repair logic so fallback/prior paths do not create candidates from preferred old tickers.
+- [x] Update tests, docs, and lessons.
+- [x] Run focused verification and repair today's `analysis_id=295` signals.
 - [x] Commit the scoped change.
 
 ### 2026-07-30 Result
-- Added a persistent visible CWA collector window that reuses `run_cwa_weather.ps1` and `run_cwa_earthquake.ps1`.
-- Added a fixed-window scheduled-task installer that disables the legacy popup tasks and registers `NewsCollector-CwaFixedWindow` for interactive logon.
-- Verification passed: PowerShell parser checks, both `-PlanOnly` checks, scheduled-task switch, and live process check for `run_cwa_collectors_window.ps1`.
+- Root cause: targeted repair stored ten `prior_signal_stock_watch` rows for old preferred tickers when model `stock_watch` was empty.
+- Changed repair so quote/context fallback only fills levels for model-selected tickers and prior/preferred rows cannot create current candidates.
+- Repaired `analysis_id=295`: old generated signals were superseded; stock-monitor sync disabled the ten stale watchlist subscriptions.
+- Verification passed: `tests.test_trade_signals`, `py_compile`, stock-monitor focused Maven tests, `/strategy-review`, `/strategy-review/daily`, `/sync/status`, and `/quote/status`.
 
 ## 2026-07-30 Pre-Open Guard Run
 - [x] Taiwan and the relevant 2026-07-29 U.S. session are regular trading days; `pre_tw_open` was eligible and missing.
