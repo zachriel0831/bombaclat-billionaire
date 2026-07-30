@@ -57,23 +57,27 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Commit the data-collecting instrumentation.
 
 ## Current Task
-- Task: Stop dynamic trade-signal repair from recreating the old fixed ticker pool.
-- Requested by: user
-- Start date: 2026-07-30
-- Scope: Verify why the daily strategy page repeats old tickers, fix the targeted repair path so only model-selected `stock_watch` tickers become current candidates, repair today's DB rows, update docs/lessons, verify, and commit.
+- Task: Guard the 2026-07-31 `pre_tw_open` market-analysis row from local evidence only.
+- Requested by: automation
+- Start date: 2026-07-31
+- Scope: Create the missing delivery row, run targeted signal extraction, preserve Java delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
-- [x] Confirm current page rows are `prior_signal_stock_watch` and not model-selected signals.
-- [x] Fix repair logic so fallback/prior paths do not create candidates from preferred old tickers.
-- [x] Update tests, docs, and lessons.
-- [x] Run focused verification and repair today's `analysis_id=295` signals.
-- [x] Commit the scoped change.
+- [x] Read repo rules, Workflow 4C, automation memory, and active lessons.
+- [x] Confirm the slot is calendar-eligible, missing, and has same-day local evidence.
+- [x] Write and verify the delivery-ready row through `MySqlEventStore.upsert_market_analysis`.
+- [x] Run targeted signal extraction and verify final DB state.
+- [x] Record Observer completion, commit, and push the run log.
 
-### 2026-07-30 Result
-- Root cause: targeted repair stored ten `prior_signal_stock_watch` rows for old preferred tickers when model `stock_watch` was empty.
-- Changed repair so quote/context fallback only fills levels for model-selected tickers and prior/preferred rows cannot create current candidates.
-- Repaired `analysis_id=295`: old generated signals were superseded; stock-monitor sync disabled the ten stale watchlist subscriptions.
-- Verification passed: `tests.test_trade_signals`, `py_compile`, stock-monitor focused Maven tests, `/strategy-review`, `/strategy-review/daily`, `/sync/status`, and `/quote/status`.
+### 2026-07-31 Replan
+- Initial write was rejected before commit because `prompt_version` exceeded the existing column length.
+- Replan: shorten only that metadata value, rerun the same validated payload, then query the stored row independently.
+
+### 2026-07-31 Pre-Open Guard Result
+- Created `t_market_analyses.id=298` from three same-day local BLS evidence events through `MySqlEventStore.upsert_market_analysis()`.
+- Final verification: claim support rate `1.0`, trust gate allowed delivery/signals, `push_enabled=1`, `pushed=0`, structured JSON present, six headings and exactly three evidence bullets passed, garbled/style/template checks passed, and `external_provider_api_called=false`.
+- Targeted extraction completed; `structured_json.stock_watch` is empty, so the correct current signal count is zero.
+- No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ## 2026-07-30 Pre-Open Guard Run
 - [x] Taiwan and the relevant 2026-07-29 U.S. session are regular trading days; `pre_tw_open` was eligible and missing.
