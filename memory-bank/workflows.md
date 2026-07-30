@@ -313,6 +313,27 @@ combined CWA weather task.
   `record_type='cwa_earthquake_report'`; `raw_json.dataset_id` should include
   `E-A0015-001` or `E-A0016-001`.
 
+## Workflow 3C-2: CWA Fixed Collector Window
+Use this when CWA typhoon/earthquake scheduled polling should stay in one
+visible PowerShell window instead of opening short-lived task windows.
+
+1. Verify the scheduler change without applying it
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_cwa_fixed_window_task.ps1 -PlanOnly`
+2. Install and start the fixed window
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_cwa_fixed_window_task.ps1 -StartNow`
+- This disables the legacy popup tasks `NewsCollector-CwaWeather` and
+  `NewsCollector-CwaEarthquake`, registers `NewsCollector-CwaFixedWindow` for
+  the interactive logon user, and opens the visible window now.
+3. Verify
+- `Get-ScheduledTask -TaskName NewsCollector-CwaFixedWindow,NewsCollector-CwaWeather,NewsCollector-CwaEarthquake | Select-Object TaskName,State`
+- The fixed window title is `NewsCollector CWA fixed window`.
+- Weather/typhoon keeps the 30-minute cadence; earthquake keeps the 5-minute
+  cadence. When both are due, the weather run wins because it already includes
+  earthquake records, then the next earthquake-only poll is delayed 5 minutes.
+4. Roll back to the old popup-style tasks only if explicitly needed
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_cwa_weather_task.ps1 -Force`
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_cwa_earthquake_task.ps1 -Force`
+
 ## Workflow 3D: News Data-Source Health Check
 Use this when news analysis quality depends on fresh source rows, after a
 machine restart, or when the user asks whether source data has caught up.

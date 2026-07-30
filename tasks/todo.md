@@ -57,17 +57,23 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Commit the data-collecting instrumentation.
 
 ## Current Task
-- Task: Guard the 2026-07-30 `pre_tw_open` market-analysis row from local evidence only.
-- Requested by: automation
+- Task: Keep CWA typhoon/earthquake scheduled crawling in one fixed visible window.
+- Requested by: user
 - Start date: 2026-07-30
-- Scope: Inspect or repair today's delivery row, run fixed-pool extraction after a ready write, preserve Java delivery ownership, and use no paid external LLM APIs.
+- Scope: Reuse existing CWA crawler scripts, avoid short-lived cmd popups, preserve weather 30-minute and earthquake 5-minute cadences, update workflow docs, verify locally, and commit.
 
 ## Plan
-- [x] Read repo instructions, Workflow 4C guard rules, automation memory, Ponytail guidance, and active lessons.
-- [x] Resolve the 2026-07-30 market-calendar routing state and inspect the target row plus local evidence.
-- [x] Generate or repair only if the row is missing or not delivery-ready.
-- [x] Run targeted fixed-pool signal extraction after a ready write.
-- [x] Verify final DB state and record Observer completion telemetry.
+- [x] Read repo instructions, ingestion/service skills, scheduler docs, and current scheduled task actions.
+- [x] Add a persistent visible CWA collector window entrypoint that calls existing crawler scripts.
+- [x] Add an installer that disables the two popup scheduled tasks and registers/starts the fixed-window task.
+- [x] Update workflow documentation for the new repeatable operation.
+- [x] Verify scripts and scheduled-task state.
+- [x] Commit the scoped change.
+
+### 2026-07-30 Result
+- Added a persistent visible CWA collector window that reuses `run_cwa_weather.ps1` and `run_cwa_earthquake.ps1`.
+- Added a fixed-window scheduled-task installer that disables the legacy popup tasks and registers `NewsCollector-CwaFixedWindow` for interactive logon.
+- Verification passed: PowerShell parser checks, both `-PlanOnly` checks, scheduled-task switch, and live process check for `run_cwa_collectors_window.ps1`.
 
 ## 2026-07-30 Pre-Open Guard Run
 - [x] Taiwan and the relevant 2026-07-29 U.S. session are regular trading days; `pre_tw_open` was eligible and missing.

@@ -214,8 +214,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 
 11. Data-source health tracking
 - `scripts/run_data_source_health.ps1` / `scripts/check_data_source_health.py` produce a read-only freshness report for news-analysis inputs.
-- `scripts/run_cwa_weather.ps1` collects CWA typhoon/earthquake public records; `scripts/register_cwa_weather_task.ps1` registers `NewsCollector-CwaWeather` on a 30-minute cadence by default.
-- `scripts/run_cwa_earthquake.ps1` collects only CWA earthquake public records from both default earthquake datasets; `scripts/register_cwa_earthquake_task.ps1` registers `NewsCollector-CwaEarthquake` on a 5-minute cadence by default, configurable down to 1 minute.
+- `scripts/run_cwa_weather.ps1` collects CWA typhoon/earthquake public records; `scripts/run_cwa_earthquake.ps1` collects only CWA earthquake public records from both default earthquake datasets.
+- `scripts/run_cwa_collectors_window.ps1` keeps those two scripts in one visible local window with the default 30-minute weather/typhoon cadence and 5-minute earthquake cadence; `scripts/register_cwa_fixed_window_task.ps1` registers `NewsCollector-CwaFixedWindow` at interactive logon and disables the legacy popup tasks `NewsCollector-CwaWeather` and `NewsCollector-CwaEarthquake`.
 - `scripts/run_four_hour_digest_context.ps1` collects compact context for the
   Codex-generated four-hour cross-section news digest. Codex automation writes
   the final JSON to Redis through `scripts/store_four_hour_digest_to_redis.ps1`

@@ -201,6 +201,7 @@ Storage:
 - Structured official datasets do not go into `t_news_articles`; they are upserted into `t_public_records` and linked back to related articles through `t_news_article_public_record_links`.
 - Official public-record sources: Legislative Yuan legal proposals (`ly_bills`), budget/public-resource-filtered Legislative Yuan proposals (`ly_budget_bills`), healthcare-filtered Legislative Yuan proposals (`ly_healthcare_bills`), NPA 165 fraud-rumor open data (`npa_fraud_rumors`), NPA A1 traffic accident open data (`npa_traffic_a1`), NPA A2 traffic accident monthly statistics (`npa_traffic_a2_stats`), NPA drunk-driving annual statistics (`npa_drunk_driving_stats`), NPA fraud blocked-domain statistics (`npa_fraud_blocked_domain_stats`), NPA fraud enforcement dashboard statistics (`npa_fraud_enforcement_stats`), NPA drug-case statistics (`npa_drug_case_stats`), NHI healthcare capacity sources (`nhi_hospital_nursing_staff`, `nhi_hospital_bed_occupancy`), MOHW annual healthcare capacity sources (`mohw_hospital_workforce`, `mohw_clinic_workforce`, `mohw_hospital_beds`, `mohw_nursing_staff_stats`), MOJ prosecution disposition statistics (`moj_prosecution_disposition_stats`), Agency of Corrections daily custody statistics (`mojac_daily_custody`), Taipei housing price index (`taipei_housing_price_index`), RIS birth monthly statistics (`ris_birth_monthly_stats`), and CWA typhoon/earthquake reports (`cwa_typhoon_report`, `cwa_earthquake_report`). Use `--public-sources public_budget`, `--public-sources healthcare`, `--public-sources justice`, `--public-sources housing`, `--public-sources low_birthrate`, `--public-sources drug_abuse`, or `--public-sources cwa_weather` for focused subsets.
 - CWA weather sources require `CWA_AUTHORIZATION` in local `.env`. Optional dataset overrides are `CWA_TYPHOON_DATASET_ID`, legacy single `CWA_EARTHQUAKE_DATASET_ID`, or comma-separated `CWA_EARTHQUAKE_DATASET_IDS`. By default earthquake collection reads both significant felt earthquakes (`E-A0015-001`) and small-area felt earthquakes (`E-A0016-001`).
+- Use `scripts/register_cwa_fixed_window_task.ps1 -StartNow` for the local visible CWA schedule; it keeps the 30-minute weather/typhoon cadence and the 5-minute earthquake cadence in one window.
 - Article-record matching uses deterministic high-precision rules for Legislative Yuan bills, healthcare-filtered Legislative Yuan bills, and NPA 165 fraud-rumor records. Links are written with source-specific `matched_by` values and evidence in `evidence_json`.
 
 Optional table-name env keys:
@@ -642,6 +643,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_macro_calendar.ps1 -EnvFi
 powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_close_context.ps1 -EnvFile .env
 powershell -ExecutionPolicy Bypass -File .\scripts\run_cwa_weather.ps1 -EnvFile .env
 powershell -ExecutionPolicy Bypass -File .\scripts\run_cwa_earthquake.ps1 -EnvFile .env
+```
+
+Run CWA typhoon/earthquake polling in one fixed visible window:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\register_cwa_fixed_window_task.ps1 -StartNow
 ```
 
 Run once manually:
