@@ -702,6 +702,19 @@ Move completed or stale task logs to `tasks/archive/`.
 - Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, six requested headings, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
 - Targeted signal extraction ran; empty `stock_watch` produced zero signals without fixed-pool padding.
 
+# 2026-07-31 TW Close Guard Run
+
+- [x] Read repo instructions, Workflow 4C guard rules, automation memory, skills, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `tw_close` row plus same-day local evidence.
+- [x] Create or repair the row from local evidence only when required.
+- [x] Apply signal policy, verify final DB state, and record the result.
+
+## 2026-07-31 TW Close Guard Result
+
+- Created missing analysis `299` through `MySqlEventStore.upsert_market_analysis()` from four local evidence rows; no external provider API or LINE contact occurred.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, required six-section flow, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+- Targeted signal extraction ran; empty `stock_watch` produced zero signals.
+
 # 2026-07-31 US Close Guard Run
 
 - [x] Read repo instructions, Workflow 4C guard rules, automation memory status, Ponytail guidance, and active lessons.
