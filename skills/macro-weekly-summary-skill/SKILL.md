@@ -48,10 +48,11 @@ Translate those into reader-facing Traditional Chinese market implications inste
 
 Visible daily reports use:
 
-`今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與觀察限制`
+`今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `觀察限制`
 
-- `三個證據` must contain exactly three bullets.
+- `三個檢查點` must contain exactly three bullets.
 - Each evidence bullet should connect source fact -> mechanism -> why it matters now.
+- `市場押注與預期差` should name what is already reflected in prices and what can still be repriced.
 - Do not include a dedicated `台股配置` section.
 - Do not append `今日個股觀察`.
 - Individual companies should appear only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.

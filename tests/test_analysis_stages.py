@@ -423,17 +423,17 @@ class StageRunnerFallbackTests(unittest.TestCase):
             structured=True,
         )
 
-        self.assertIn("今日主命題", user_prompt)
-        self.assertIn("三個證據", user_prompt)
-        self.assertIn("市場正在定價什麼", user_prompt)
-        self.assertIn("台股傳導", user_prompt)
-        self.assertIn("反證條件", user_prompt)
-        self.assertIn("風險與觀察限制", user_prompt)
+        self.assertIn("今日一句話", user_prompt)
+        self.assertIn("三個檢查點", user_prompt)
+        self.assertIn("市場押注與預期差", user_prompt)
+        self.assertIn("國際消息到台股的傳導", user_prompt)
+        self.assertIn("看錯的條件", user_prompt)
+        self.assertIn("觀察限制", user_prompt)
         self.assertNotIn("6. 台股配置", user_prompt)
         self.assertIn("Do not append or write a ## 今日個股觀察 section", user_prompt)
         self.assertIn("NVIDIA", user_prompt)
         self.assertIn("Magnificent Seven", user_prompt)
-        self.assertIn("Section 2 三個證據", user_prompt)
+        self.assertIn("Section 2 三個檢查點", user_prompt)
         self.assertIn("source fact -> mechanism -> why it matters now", user_prompt)
         self.assertIn("Stage0 core tensions JSON", user_prompt)
         self.assertIn("date-only", user_prompt)
@@ -450,7 +450,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
     def test_stage4_anthropic_uses_same_template_contract(self) -> None:
         """Anthropic structured path uses the same schema and visible template instructions."""
         structured = {
-            "summary_text": "今日主命題\n市場在交易流動性改善。",
+            "summary_text": "今日一句話\n市場在交易流動性改善。",
             "headline": "流動性支撐台股",
             "sentiment": "bullish",
             "confidence": "medium",
@@ -489,14 +489,15 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertEqual(captured["provider"], "anthropic")
         self.assertEqual(captured["schema_name"], "market_analysis_stage4_synthesis")
         self.assertIs(captured["schema"], STAGE4_SYNTHESIS_SCHEMA)
-        self.assertIn("今日主命題", captured["user_prompt"])
-        self.assertIn("三個證據", captured["user_prompt"])
-        self.assertIn("市場正在定價什麼", captured["user_prompt"])
-        self.assertIn("台股傳導", captured["user_prompt"])
-        self.assertIn("反證條件", captured["user_prompt"])
+        self.assertIn("今日一句話", captured["user_prompt"])
+        self.assertIn("三個檢查點", captured["user_prompt"])
+        self.assertIn("市場押注與預期差", captured["user_prompt"])
+        self.assertIn("國際消息到台股的傳導", captured["user_prompt"])
+        self.assertIn("看錯的條件", captured["user_prompt"])
         self.assertNotIn("6. 台股配置", captured["user_prompt"])
         self.assertIn("machine-readable only", captured["user_prompt"])
-        self.assertIn("2330 台積電, 2317 鴻海, 2454 聯發科", captured["user_prompt"])
+        self.assertIn("Allowed tickers must be evidence-backed 4-digit Taiwan ticker codes", captured["user_prompt"])
+        self.assertIn("Never pad with a legacy watchlist", captured["user_prompt"])
         self.assertIn("信心等級：medium", result.output["summary_text"])
         self.assertEqual(result.extras["usage"]["provider"], "anthropic")
 

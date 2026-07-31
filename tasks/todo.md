@@ -3,6 +3,17 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-07-31 Daily Analysis Template Refresh
+- [x] Confirm clean worktree and start observer telemetry.
+- [x] Replace the fixed daily visible section contract in legacy and Stage4 prompts.
+- [x] Sync prompt skills/docs with the new daily flow.
+- [x] Run focused verification, commit, and push the scoped change.
+
+### 2026-07-31 Result
+- Daily `market_analysis` now uses `今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `觀察限制`.
+- Synced legacy prompt, Stage4 prompt, prompt skills, README, memory-bank docs, and focused tests.
+- Verification passed: `python -m unittest tests.test_market_analysis tests.test_analysis_stages -v`, `python scripts/validate_readiness.py`, `git diff --check`, and direct prompt smoke.
+
 ## 2026-07-27 Finance Expert Voice Learning
 - [x] Confirm clean worktree and start observer telemetry.
 - [x] Web-check high-recognition macro/market writers and Taiwan-facing finance sources.

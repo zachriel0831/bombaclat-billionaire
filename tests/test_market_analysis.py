@@ -300,19 +300,19 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertIn("Do not expose internal pipeline labels", user_prompt)
         self.assertIn("snake_case fields", user_prompt)
         self.assertIn("plain Chinese market implications", user_prompt)
-        self.assertIn("今日主命題", user_prompt)
-        self.assertIn("三個證據", user_prompt)
-        self.assertIn("市場正在定價什麼", user_prompt)
-        self.assertIn("台股傳導", user_prompt)
-        self.assertIn("反證條件", user_prompt)
+        self.assertIn("今日一句話", user_prompt)
+        self.assertIn("三個檢查點", user_prompt)
+        self.assertIn("市場押注與預期差", user_prompt)
+        self.assertIn("國際消息到台股的傳導", user_prompt)
+        self.assertIn("看錯的條件", user_prompt)
         self.assertNotIn("6) 台股配置", user_prompt)
         self.assertIn("Do not include a dedicated 台股配置 section", user_prompt)
         self.assertIn("NVIDIA", user_prompt)
         self.assertIn("Magnificent Seven", user_prompt)
-        self.assertIn("Section 2 三個證據", user_prompt)
+        self.assertIn("Section 2 三個檢查點", user_prompt)
         self.assertIn("what expectations are already in prices", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
-        self.assertIn("風險與觀察限制", user_prompt)
+        self.assertIn("觀察限制", user_prompt)
 
     def test_sanitize_visible_report_text_translates_internal_labels(self) -> None:
         """Reader-visible analysis text must not leak pipeline field names."""
@@ -356,11 +356,11 @@ class MarketAnalysisTests(unittest.TestCase):
 
         self.assertIn("Taiwan close review", system_prompt)
         self.assertIn("market_context:tw_close", user_prompt)
-        self.assertIn("今日主命題", user_prompt)
-        self.assertIn("三個證據", user_prompt)
-        self.assertIn("市場正在定價什麼", user_prompt)
-        self.assertIn("台股傳導", user_prompt)
-        self.assertIn("反證條件", user_prompt)
+        self.assertIn("今日一句話", user_prompt)
+        self.assertIn("三個檢查點", user_prompt)
+        self.assertIn("市場押注與預期差", user_prompt)
+        self.assertIn("國際消息到台股的傳導", user_prompt)
+        self.assertIn("看錯的條件", user_prompt)
         self.assertNotIn("6) 台股配置", user_prompt)
 
     def test_triggered_prompt_skills_match_fixed_ten_contract(self) -> None:

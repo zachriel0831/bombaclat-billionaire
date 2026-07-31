@@ -599,12 +599,12 @@ def _build_prompts(
         "- Do not include internal event IDs, source row IDs, or citation-only numeric lists in summary_text.\n"
         "- Do not expose internal pipeline labels, table names, API/guard implementation notes, snake_case fields, scheduled task names, provider names, or custom numeric handles; translate them into plain Chinese market implications.\n"
         "- Keep evidence references in structured telemetry, not visible report text.\n"
-        "- Section 1 今日主命題 should be one sentence, not a paragraph.\n"
-        "- Section 2 三個證據 must contain exactly three bullets and each bullet must include the source fact and why it matters.\n"
-        "- Section 3 市場正在定價什麼 should state what expectations are already in prices and what is not fully priced yet.\n"
-        "- Section 4 台股傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.\n"
-        "- Section 5 反證條件 should name the cleanest conditions that would break the thesis.\n"
-        "- Section 6 風險與觀察限制 must be concise: three bullets maximum.\n"
+        "- Section 1 今日一句話 should be one sentence, not a paragraph.\n"
+        "- Section 2 三個檢查點 must contain exactly three bullets and each bullet must include the source fact and why it matters.\n"
+        "- Section 3 市場押注與預期差 should state what expectations are already in prices and what is not fully priced yet.\n"
+        "- Section 4 國際消息到台股的傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.\n"
+        "- Section 5 看錯的條件 should name the cleanest conditions that would break the thesis.\n"
+        "- Section 6 觀察限制 must be concise: three bullets maximum.\n"
         "- Do not include a dedicated 台股配置 section or any ## 今日個股觀察 section in daily reports.\n"
         "- Individual companies may appear only as mega-cap transmission examples, e.g. NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; avoid entry, stop-loss, or target-price language.\n"
         "- Use the exact section titles listed above.\n"
@@ -667,12 +667,12 @@ def _summary_length_instruction(slot: str) -> str:
 def _regime_flow_sections() -> str:
     """Return the fixed product-editor daily section order."""
     return (
-        "1) 今日主命題\n"
-        "2) 三個證據\n"
-        "3) 市場正在定價什麼\n"
-        "4) 台股傳導\n"
-        "5) 反證條件\n"
-        "6) 風險與觀察限制\n"
+        "1) 今日一句話\n"
+        "2) 三個檢查點\n"
+        "3) 市場押注與預期差\n"
+        "4) 國際消息到台股的傳導\n"
+        "5) 看錯的條件\n"
+        "6) 觀察限制\n"
     )
 
 
@@ -680,12 +680,12 @@ def _regime_flow_guide() -> str:
     """Explain how each section should reason without bloating the report."""
     return (
         "Reasoning flow:\n"
-        "- 今日主命題: one plain sentence stating the investable thesis, Taiwan bias, and main uncertainty.\n"
-        "- 三個證據: exactly three evidence bullets; each bullet must connect source fact -> mechanism -> why it matters now.\n"
-        "- 市場正在定價什麼: explain what expectations are already reflected in prices and what still has room for repricing.\n"
-        "- 台股傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
-        "- 反證條件: state the cleanest data or market moves that would make the thesis wrong.\n"
-        "- 風險與觀察限制: max three bullets; describe event risks, stale information, or observation limits in reader-facing language.\n"
+        "- 今日一句話: one plain sentence stating what the market is trading, Taiwan bias, and main uncertainty.\n"
+        "- 三個檢查點: exactly three evidence bullets; each bullet must connect source fact -> mechanism -> why it matters now.\n"
+        "- 市場押注與預期差: explain what is already reflected in prices and what still has room for repricing.\n"
+        "- 國際消息到台股的傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
+        "- 看錯的條件: state the cleanest data or market moves that would make the thesis wrong.\n"
+        "- 觀察限制: max three bullets; describe event risks, stale information, or observation limits in reader-facing language.\n"
     )
 
 

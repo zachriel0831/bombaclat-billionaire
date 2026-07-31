@@ -6,16 +6,16 @@ After several days of generated daily market analysis, the visible output was to
 
 ## Decision
 
-Daily `market_analysis` reports use the author-style visible flow:
+Daily `market_analysis` reports use the refreshed author-style visible flow:
 
-1. `今日主命題`
-2. `三個證據`
-3. `市場正在定價什麼`
-4. `台股傳導`
-5. `反證條件`
-6. `風險與觀察限制`
+1. `今日一句話`
+2. `三個檢查點`
+3. `市場押注與預期差`
+4. `國際消息到台股的傳導`
+5. `看錯的條件`
+6. `觀察限制`
 
-`三個證據` must contain exactly three bullets. Each bullet should connect `資料事實 -> 傳導機制 -> 為什麼現在重要`. `市場正在定價什麼` must explain what expectations are already in prices and what still has room for repricing. `反證條件` must state what would make the thesis wrong.
+`三個檢查點` must contain exactly three bullets. Each bullet should connect `資料事實 -> 傳導機制 -> 為什麼現在重要`. `市場押注與預期差` must explain what expectations are already in prices and what still has room for repricing. `看錯的條件` must state what would make the thesis wrong.
 
 As of 2026-05-25, daily visible reports must not include a dedicated `台股配置` section and must not append the deterministic `## 今日個股觀察` fixed-pool section. The fixed-pool / `t_trade_signals` flow may continue as machine-readable downstream context, but the daily body should focus on macro and industry/sector interpretation. Individual companies may be mentioned only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
 
@@ -25,16 +25,16 @@ As of 2026-07-17, this rule also covers table names, API/guard implementation no
 
 Pushed daily reports should usually land around 800-1400 Chinese characters. Close-window digests and thin-data windows may be shorter, but visible text must still preserve the section order and avoid internal labels.
 
-As of 2026-07-17, the clean daily visible order is:
+As of 2026-07-31, the clean daily visible order is:
 
-1. `今日主命題`
-2. `三個證據`
-3. `市場正在定價什麼`
-4. `台股傳導`
-5. `反證條件`
-6. `風險與觀察限制`
+1. `今日一句話`
+2. `三個檢查點`
+3. `市場押注與預期差`
+4. `國際消息到台股的傳導`
+5. `看錯的條件`
+6. `觀察限制`
 
-`三個證據` must contain exactly three bullets. Each bullet should connect source fact -> market mechanism -> why it matters now. The report should read like a professional market column: decisive thesis first, then evidence, repricing, Taiwan transmission, invalidation, and reader-facing observation limits.
+`三個檢查點` must contain exactly three bullets. Each bullet should connect source fact -> market mechanism -> why it matters now. The report should read like a professional market column: decisive thesis first, then evidence, repricing, Taiwan transmission, invalidation, and reader-facing observation limits.
 
 ## Consequences
 

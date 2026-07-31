@@ -449,7 +449,7 @@ machine restart, or when the user asks whether source data has caught up.
 - `ticker` is normalized symbol text; Taiwan signals use 4-digit codes without `.TW` / `.TWO`
 - Daily visible reports no longer append `## 今日個股觀察`; `t_trade_signals` may still be maintained as machine-readable downstream context, but it is not rendered into the market-analysis body.
 - If today's structured `stock_watch` is empty, trade-signal extraction must store zero current candidates. Do not copy same-ticker recent `t_trade_signals` or tracked/preferred ticker lists into the current day.
-- Daily formatting uses date-only `raw_json.display_title` and the author-style flow `今日主命題` -> `三個證據` -> `市場正在定價什麼` -> `台股傳導` -> `反證條件` -> `風險與觀察限制`; `三個證據` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. Do not write a dedicated `台股配置` section.
+- Daily formatting uses date-only `raw_json.display_title` and the refreshed author-style flow `今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `觀察限制`; `三個檢查點` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. Do not write a dedicated `台股配置` section.
 - Individual company mentions in daily visible reports are limited to macro/sector transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write entry, stop-loss, or target-price language in the daily body.
 - In that section, `direction=long` is rendered as `可做/建議觀察` plus the strategy label; `entry_zone` means entry area, `take_profit_zone` means profit-taking/exit area, and `invalidation` is rendered as `停損`
 - Do not create orders here. Risk gate / review and outcomes stay in `t_signal_reviews` and `t_signal_outcomes`

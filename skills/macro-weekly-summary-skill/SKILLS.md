@@ -113,14 +113,14 @@ Reusable phrasing shapes:
 
 Use this readable author-style macro flow unless the calling code supplies a stricter section contract:
 
-1. 今日主命題
-2. 三個證據
-3. 市場正在定價什麼
-4. 台股傳導
-5. 反證條件
-6. 風險與觀察限制
+1. 今日一句話
+2. 三個檢查點
+3. 市場押注與預期差
+4. 國際消息到台股的傳導
+5. 看錯的條件
+6. 觀察限制
 
-`三個證據` should contain exactly three bullets. Each bullet should connect source fact -> mechanism -> why it matters now. `市場正在定價什麼` should name what is already reflected in prices and what can still be repriced.
+`三個檢查點` should contain exactly three bullets. Each bullet should connect source fact -> mechanism -> why it matters now. `市場押注與預期差` should name what is already reflected in prices and what can still be repriced.
 
 For daily `market_analysis`, do not append `今日個股觀察` and do not write `台股配置` as a visible section. If the structured JSON contains `stock_watch`, treat it as machine-readable downstream signal context only. The visible report may mention companies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭 only to explain macro/sector transmission, not as a watchlist, entry plan, stop-loss, or target-price list.
 

@@ -48,12 +48,12 @@ COUNTERPOINT_LINE_RE = re.compile(r"^主要反向觀點：(.+)$", re.MULTILINE)
 _VALID_CONFIDENCE = {"low", "medium", "high"}
 
 _EDITORIAL_FLOW_SECTIONS = [
-    "今日主命題",
-    "三個證據",
-    "市場正在定價什麼",
-    "台股傳導",
-    "反證條件",
-    "風險與觀察限制",
+    "今日一句話",
+    "三個檢查點",
+    "市場押注與預期差",
+    "國際消息到台股的傳導",
+    "看錯的條件",
+    "觀察限制",
 ]
 
 _SLOT_SECTIONS = {
@@ -77,12 +77,12 @@ _SLOT_SECTIONS = {
 
 _REGIME_FLOW_GUIDE = (
     "Editorial daily flow:\n"
-    "1. 今日主命題: one plain sentence stating the investable thesis, Taiwan bias, and main uncertainty.\n"
-    "2. 三個證據: exactly three evidence bullets; each bullet must connect source fact -> mechanism -> why it matters now.\n"
-    "3. 市場正在定價什麼: explain what expectations are already reflected in prices and what still has room for repricing.\n"
-    "4. 台股傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
-    "5. 反證條件: state the cleanest data or market moves that would make the thesis wrong.\n"
-    "6. 風險與觀察限制: max three bullets; describe event risks, stale information, or observation limits in reader-facing language.\n"
+    "1. 今日一句話: one plain sentence stating what the market is trading, Taiwan bias, and main uncertainty.\n"
+    "2. 三個檢查點: exactly three evidence bullets; each bullet must connect source fact -> mechanism -> why it matters now.\n"
+    "3. 市場押注與預期差: explain what is already reflected in prices and what still has room for repricing.\n"
+    "4. 國際消息到台股的傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
+    "5. 看錯的條件: state the cleanest data or market moves that would make the thesis wrong.\n"
+    "6. 觀察限制: max three bullets; describe event risks, stale information, or observation limits in reader-facing language.\n"
 )
 
 _POPULAR_MACRO_TONE_GUIDE = (
@@ -110,7 +110,7 @@ def _structured_instructions() -> str:
         "of the same analysis.\n"
         "  - summary_text: Traditional Chinese plain text matching the length\n"
         "    budget in the user prompt. Follow the section list below and preserve\n"
-        "    the flow: 今日主命題 -> 三個證據 -> 市場正在定價什麼 -> 台股傳導 -> 反證條件 -> 風險與觀察限制.\n"
+        "    the flow: 今日一句話 -> 三個檢查點 -> 市場押注與預期差 -> 國際消息到台股的傳導 -> 看錯的條件 -> 觀察限制.\n"
         "    Do not append or write a ## 今日個股觀察 section. Do not write 台股配置 as a section title.\n"
         "    Do not expose internal source labels, snake_case fields, table names, task names, or telemetry handles; translate them into plain Chinese market implications.\n"
         "    End summary_text with two\n"
@@ -225,12 +225,12 @@ def build_prompts(
         "- Do not include internal event IDs, source row IDs, or citation-only numeric lists in summary_text.\n"
         "- Do not expose internal pipeline labels, table names, snake_case fields, task names, or custom numeric handles; translate them into plain Chinese market implications.",
         "- Keep evidence references in structured telemetry, not visible report text.",
-        "- Section 1 今日主命題 should be one sentence, not a paragraph.\n"
-        "- Section 2 三個證據 must contain exactly three bullets and each bullet must include the source fact and why it matters.\n"
-        "- Section 3 市場正在定價什麼 should state what expectations are already in prices and what is not fully priced yet.\n"
-        "- Section 4 台股傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.\n"
-        "- Section 5 反證條件 should name the cleanest conditions that would break the thesis.\n"
-        "- Section 6 風險與觀察限制 must be concise: three bullets maximum.\n"
+        "- Section 1 今日一句話 should be one sentence, not a paragraph.\n"
+        "- Section 2 三個檢查點 must contain exactly three bullets and each bullet must include the source fact and why it matters.\n"
+        "- Section 3 市場押注與預期差 should state what expectations are already in prices and what is not fully priced yet.\n"
+        "- Section 4 國際消息到台股的傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.\n"
+        "- Section 5 看錯的條件 should name the cleanest conditions that would break the thesis.\n"
+        "- Section 6 觀察限制 must be concise: three bullets maximum.\n"
         "- Use the exact section titles listed above.",
         "",
         "Use only claims supported by the stage outputs below. If a section",
