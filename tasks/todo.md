@@ -727,3 +727,16 @@ Move completed or stale task logs to `tasks/archive/`.
 - Repaired the missing row as analysis `297` from three local BLS evidence events; no external provider API was called.
 - Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, six requested headings, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
 - Targeted signal extraction ran; empty `stock_watch` produced zero signals without fixed-pool padding.
+
+# 2026-08-02 Weekly Codex Guard Run
+
+- [x] Read repo instructions, automation memory, Workflow 4C weekly storage rules, weekly contract, skills, and active lessons.
+- [x] Inspect target Sunday `weekly_tw_preopen` row and current local evidence/history availability.
+- [x] Create or repair the row through `MySqlEventStore.upsert_market_analysis()` using local evidence only when required.
+- [x] Verify final DB state, text contract, delivery flags, provenance, and record the result.
+
+## 2026-08-02 Weekly Codex Guard Result
+
+- Created missing analysis `300` from 10 selected local evidence events, 432 market-context rows, and local indexed history availability; no external provider API or LINE contact occurred.
+- Corrected PowerShell stdin mojibake by rewriting the same row through a temporary UTF-8 helper, then removed the helper.
+- Final checks passed: exact three-section order, readable Traditional Chinese, no forbidden trade/internal terms, `push_enabled=1`, `pushed=0`, and `external_provider_api_called=false`.
