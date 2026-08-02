@@ -53,9 +53,11 @@ Visible daily reports use:
 - `三個檢查點` must contain exactly three bullets.
 - Each evidence bullet should connect source fact -> mechanism -> why it matters now.
 - `市場押注與預期差` should name what is already reflected in prices and what can still be repriced.
+- Trial trigger-first style: section 1 may start with `結論先講`; section 3 may add `先看區間邊界` with evidence-backed index/rates/FX/SOX levels; section 5 may add `現在只看兩件事` with one upside trigger and one downside trigger.
 - Do not include a dedicated `台股配置` section.
 - Do not append `今日個股觀察`.
 - Individual companies should appear only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
+- Do not write `開多`, `開空`, `止盈`, `止損`, `入場區間`, or order-level commands in visible daily text; triggers are observation boundaries, not trading instructions.
 - If evidence is stale or thin, lower confidence and describe observation limits in reader-facing language. Do not expose missing-data implementation notes.
 
 Pushed daily reports should usually land around 800-1400 Chinese characters. Shorter close digests are acceptable only when the window is thin and the required section order still exists.

@@ -311,6 +311,11 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertIn("Magnificent Seven", user_prompt)
         self.assertIn("Section 2 三個檢查點", user_prompt)
         self.assertIn("what expectations are already in prices", user_prompt)
+        self.assertIn("結論先講", user_prompt)
+        self.assertIn("先看區間邊界", user_prompt)
+        self.assertIn("現在只看兩件事", user_prompt)
+        self.assertIn("observation boundaries, not trading instructions", user_prompt)
+        self.assertIn("Do not write 開多, 開空, 止盈, 止損, 入場區間", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
         self.assertIn("觀察限制", user_prompt)
 
@@ -373,6 +378,9 @@ class MarketAnalysisTests(unittest.TestCase):
         for text in (macro_skill, line_skill):
             self.assertIn("Daily Market Analysis", text)
             self.assertIn("visible", text.lower())
+            self.assertIn("結論先講", text)
+            self.assertIn("先看區間邊界", text)
+            self.assertIn("現在只看兩件事", text)
             self.assertNotIn("fixed-five", text.lower())
         self.assertIn("`2317`", macro_skill)
         self.assertIn("`2351`", macro_skill)

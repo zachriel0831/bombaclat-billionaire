@@ -124,6 +124,8 @@ Use this readable author-style macro flow unless the calling code supplies a str
 
 For daily `market_analysis`, do not append `今日個股觀察` and do not write `台股配置` as a visible section. If the structured JSON contains `stock_watch`, treat it as machine-readable downstream signal context only. The visible report may mention companies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭 only to explain macro/sector transmission, not as a watchlist, entry plan, stop-loss, or target-price list.
 
+Trial trigger-first style: section 1 may start with `結論先講`; section 3 may add `先看區間邊界` with evidence-backed index/rates/FX/SOX levels; section 5 may add `現在只看兩件事` with one upside trigger and one downside trigger. Do not write `開多`, `開空`, `止盈`, `止損`, `入場區間`, or order-level commands in visible daily text; triggers are observation boundaries, not trading instructions.
+
 ## Weekly Summary Sections
 
 Weekly reports use:

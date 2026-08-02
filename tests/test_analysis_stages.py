@@ -445,6 +445,10 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("professional-but-conversational macro-commentary voice", system_prompt)
         self.assertIn("market is trading this", user_prompt)
         self.assertIn("Avoid acronym piles", user_prompt)
+        self.assertIn("結論先講", user_prompt)
+        self.assertIn("先看區間邊界", user_prompt)
+        self.assertIn("現在只看兩件事", user_prompt)
+        self.assertIn("observation boundaries, not trading instructions", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
 
     def test_stage4_anthropic_uses_same_template_contract(self) -> None:

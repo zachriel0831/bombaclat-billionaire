@@ -83,6 +83,7 @@ _REGIME_FLOW_GUIDE = (
     "4. 國際消息到台股的傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
     "5. 看錯的條件: state the cleanest data or market moves that would make the thesis wrong.\n"
     "6. 觀察限制: max three bullets; describe event risks, stale information, or observation limits in reader-facing language.\n"
+    "Trial trigger-first template: borrow the rhythm of 結論先講 -> 先看區間邊界 -> 現在只看兩件事. Use only evidence-backed observation levels, and frame bull/bear paths as scenarios, not orders.\n"
 )
 
 _POPULAR_MACRO_TONE_GUIDE = (
@@ -231,6 +232,8 @@ def build_prompts(
         "- Section 4 國際消息到台股的傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.\n"
         "- Section 5 看錯的條件 should name the cleanest conditions that would break the thesis.\n"
         "- Section 6 觀察限制 must be concise: three bullets maximum.\n"
+        "- Trial trigger-first style: section 1 may start with 結論先講; section 3 may add 先看區間邊界 with evidence-backed index/rates/FX/SOX levels; section 5 may add 現在只看兩件事 with one upside trigger and one downside trigger.\n"
+        "- Do not write 開多, 開空, 止盈, 止損, 入場區間, or order-level commands in visible daily text; triggers are observation boundaries, not trading instructions.\n"
         "- Use the exact section titles listed above.",
         "",
         "Use only claims supported by the stage outputs below. If a section",
