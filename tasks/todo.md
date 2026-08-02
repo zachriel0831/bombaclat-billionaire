@@ -676,6 +676,17 @@ Move completed or stale task logs to `tasks/archive/`.
 - Corrected PowerShell stdin encoding by rewriting the same row through a temporary UTF-8 Python helper, then removed the helper.
 - Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, six headings, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=1`, `pushed=0`, and 10 internal monitor signals.
 
+# 2026-08-02 Free Palestine Weekly Editorial Run
+
+- [x] Reviewed all 135 English source rows from 2026-07-26 through 2026-08-02 exclusive, including raw metadata.
+- [x] Upserted `palestine-weekly-2026-W31` without a paid external LLM API.
+- [x] Read back and validated Traditional Chinese text, source IDs/count, body format, and citations.
+
+## 2026-08-02 Free Palestine Weekly Editorial Result
+
+- Published `palestine-weekly-2026-W31`, titled `和平不能只要求巴勒斯坦人先放下武器`.
+- Validation passed with 135 unique source IDs and seven citations to reviewed source URLs.
+
 # 2026-07-29 US Close Guard Run
 
 - [x] Read repo instructions, Workflow 4C guard rules, automation memory, Ponytail guidance, and active lessons.
