@@ -68,17 +68,26 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Commit the data-collecting instrumentation.
 
 ## Current Task
-- Task: Guard the 2026-07-31 `pre_tw_open` market-analysis row from local evidence only.
+- Task: Guard the 2026-08-03 `pre_tw_open` market-analysis row from local evidence only.
 - Requested by: automation
-- Start date: 2026-07-31
+- Start date: 2026-08-03
 - Scope: Create the missing delivery row, run targeted signal extraction, preserve Java delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
 - [x] Read repo rules, Workflow 4C, automation memory, and active lessons.
-- [x] Confirm the slot is calendar-eligible, missing, and has same-day local evidence.
+- [x] Confirm the slot is calendar-eligible, missing, and has local evidence.
 - [x] Write and verify the delivery-ready row through `MySqlEventStore.upsert_market_analysis`.
 - [x] Run targeted signal extraction and verify final DB state.
 - [x] Record Observer completion, commit, and push the run log.
+
+### 2026-08-03 Replan
+- The first diagnostic used the wrong settings attribute (`mysql_table`) after confirming the row was missing; switch to the existing `mysql_event_table` setting and keep the repair path unchanged.
+
+### 2026-08-03 Pre-Open Guard Result
+- Created `t_market_analyses.id=302` through `MySqlEventStore.upsert_market_analysis()` from three local market-context evidence rows.
+- Final verification: claim support rate `1.0`, trust gate allowed delivery/signals, `push_enabled=1`, `pushed=0`, structured JSON present, six headings and exactly three evidence bullets passed, garbled/style/template checks passed, and `external_provider_api_called=false`.
+- Targeted extraction completed; `structured_json.stock_watch` is empty, so zero current trade signals were stored.
+- No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ### 2026-07-31 Replan
 - Initial write was rejected before commit because `prompt_version` exceeded the existing column length.
