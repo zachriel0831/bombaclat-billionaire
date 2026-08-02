@@ -10,7 +10,7 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Run focused verification, commit, and push the scoped change.
 
 ### 2026-07-31 Result
-- Daily `market_analysis` now uses `今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `觀察限制`.
+- Daily `market_analysis` now uses `今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `備註`.
 - Synced legacy prompt, Stage4 prompt, prompt skills, README, memory-bank docs, and focused tests.
 - Verification passed: `python -m unittest tests.test_market_analysis tests.test_analysis_stages -v`, `python scripts/validate_readiness.py`, `git diff --check`, and direct prompt smoke.
 

@@ -48,12 +48,12 @@ Translate those into reader-facing Traditional Chinese market implications inste
 
 Visible daily reports use:
 
-`今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `觀察限制`
+`今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `備註`
 
 - `三個檢查點` must contain exactly three bullets.
 - Each evidence bullet should connect source fact -> mechanism -> why it matters now.
 - `市場押注與預期差` should name what is already reflected in prices and what can still be repriced.
-- Trial trigger-first style: section 1 may start with `結論先講`; section 3 may add `先看區間邊界` with evidence-backed index/rates/FX/SOX levels; section 5 may add `現在只看兩件事` with one upside trigger and one downside trigger.
+- Trial trigger-first style: section 1 may start with `結論先講`; section 3 may add `先看區間邊界` with evidence-backed index/rates/FX/SOX levels; section 5 may add `現在只看 N 件事`, where N is the needed count of evidence-backed triggers. Do not force exactly two.
 - Do not include a dedicated `台股配置` section.
 - Do not append `今日個股觀察`.
 - Individual companies should appear only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.

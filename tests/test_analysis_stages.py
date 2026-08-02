@@ -428,7 +428,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("市場押注與預期差", user_prompt)
         self.assertIn("國際消息到台股的傳導", user_prompt)
         self.assertIn("看錯的條件", user_prompt)
-        self.assertIn("觀察限制", user_prompt)
+        self.assertIn("備註", user_prompt)
         self.assertNotIn("6. 台股配置", user_prompt)
         self.assertIn("Do not append or write a ## 今日個股觀察 section", user_prompt)
         self.assertIn("NVIDIA", user_prompt)
@@ -447,7 +447,8 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("Avoid acronym piles", user_prompt)
         self.assertIn("結論先講", user_prompt)
         self.assertIn("先看區間邊界", user_prompt)
-        self.assertIn("現在只看兩件事", user_prompt)
+        self.assertIn("現在只看 N 件事", user_prompt)
+        self.assertIn("Do not force exactly two triggers", user_prompt)
         self.assertIn("observation boundaries, not trading instructions", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
 

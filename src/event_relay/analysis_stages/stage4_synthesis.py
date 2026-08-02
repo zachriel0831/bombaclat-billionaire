@@ -53,7 +53,7 @@ _EDITORIAL_FLOW_SECTIONS = [
     "市場押注與預期差",
     "國際消息到台股的傳導",
     "看錯的條件",
-    "觀察限制",
+    "備註",
 ]
 
 _SLOT_SECTIONS = {
@@ -82,8 +82,8 @@ _REGIME_FLOW_GUIDE = (
     "3. 市場押注與預期差: explain what is already reflected in prices and what still has room for repricing.\n"
     "4. 國際消息到台股的傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
     "5. 看錯的條件: state the cleanest data or market moves that would make the thesis wrong.\n"
-    "6. 觀察限制: max three bullets; describe event risks, stale information, or observation limits in reader-facing language.\n"
-    "Trial trigger-first template: borrow the rhythm of 結論先講 -> 先看區間邊界 -> 現在只看兩件事. Use only evidence-backed observation levels, and frame bull/bear paths as scenarios, not orders.\n"
+    "6. 備註: max three bullets; describe event risks, stale information, or evidence limits in reader-facing language.\n"
+    "Trial trigger-first template: borrow the rhythm of 結論先講 -> 先看區間邊界 -> 現在只看 N 件事. Let N be the needed number of evidence-backed triggers; do not force exactly two.\n"
 )
 
 _POPULAR_MACRO_TONE_GUIDE = (
@@ -111,7 +111,7 @@ def _structured_instructions() -> str:
         "of the same analysis.\n"
         "  - summary_text: Traditional Chinese plain text matching the length\n"
         "    budget in the user prompt. Follow the section list below and preserve\n"
-        "    the flow: 今日一句話 -> 三個檢查點 -> 市場押注與預期差 -> 國際消息到台股的傳導 -> 看錯的條件 -> 觀察限制.\n"
+        "    the flow: 今日一句話 -> 三個檢查點 -> 市場押注與預期差 -> 國際消息到台股的傳導 -> 看錯的條件 -> 備註.\n"
         "    Do not append or write a ## 今日個股觀察 section. Do not write 台股配置 as a section title.\n"
         "    Do not expose internal source labels, snake_case fields, table names, task names, or telemetry handles; translate them into plain Chinese market implications.\n"
         "    End summary_text with two\n"
@@ -193,7 +193,7 @@ def build_prompts(
         "Write with a professional-but-conversational macro-commentary voice: keep the framework, but make every indicator answer what the market is trading and why it matters for Taiwan.\n"
         "You are the final stage of a multi-stage pipeline. Do not introduce new\n"
         "facts: restate what earlier stages produced, keep evidence-backed claims,\n"
-        "and translate risks / data_gaps into reader-facing observation limits when they appear in visible prose.\n"
+        "and translate risks / data_gaps into reader-facing notes when they appear in visible prose.\n"
         "Treat the dual-view bull/bear and the critic's findings as constraints:\n"
         "if critic flags overconfidence, lower the confidence; if dual-view bear\n"
         "is strong, surface its top point as 主要反向觀點.\n\n"
@@ -231,8 +231,8 @@ def build_prompts(
         "- Section 3 市場押注與預期差 should state what expectations are already in prices and what is not fully priced yet.\n"
         "- Section 4 國際消息到台股的傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.\n"
         "- Section 5 看錯的條件 should name the cleanest conditions that would break the thesis.\n"
-        "- Section 6 觀察限制 must be concise: three bullets maximum.\n"
-        "- Trial trigger-first style: section 1 may start with 結論先講; section 3 may add 先看區間邊界 with evidence-backed index/rates/FX/SOX levels; section 5 may add 現在只看兩件事 with one upside trigger and one downside trigger.\n"
+        "- Section 6 備註 must be concise: three bullets maximum.\n"
+        "- Trial trigger-first style: section 1 may start with 結論先講; section 3 may add 先看區間邊界 with evidence-backed index/rates/FX/SOX levels; section 5 may add 現在只看 N 件事 with the needed number of evidence-backed triggers. Do not force exactly two triggers.\n"
         "- Do not write 開多, 開空, 止盈, 止損, 入場區間, or order-level commands in visible daily text; triggers are observation boundaries, not trading instructions.\n"
         "- Use the exact section titles listed above.",
         "",

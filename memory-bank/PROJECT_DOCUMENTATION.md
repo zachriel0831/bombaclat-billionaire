@@ -351,7 +351,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   14. For `macro_daily`, write macro-only analysis into `t_market_analyses` and do not create trade signals.
 - Daily text formatting:
   - `raw_json.display_title` is date-only (`YYYY-MM-DD`) for downstream delivery titles
-  - Daily analysis uses the refreshed author-style flow: `今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `觀察限制`
+  - Daily analysis uses the refreshed author-style flow: `今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `備註`
   - Do not write a dedicated `台股配置` section or append `## 今日個股觀察` in daily visible reports.
   - Individual companies may appear only as macro/sector transmission examples, such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; daily visible reports should not include entry, stop-loss, or target-price language.
   - `三個檢查點` must contain exactly three bullets, each connecting source fact -> market mechanism -> why it matters now; `市場押注與預期差` should name what is already reflected in prices and what can still be repriced

@@ -13,7 +13,7 @@ Daily `market_analysis` reports use the refreshed author-style visible flow:
 3. `市場押注與預期差`
 4. `國際消息到台股的傳導`
 5. `看錯的條件`
-6. `觀察限制`
+6. `備註`
 
 `三個檢查點` must contain exactly three bullets. Each bullet should connect `資料事實 -> 傳導機制 -> 為什麼現在重要`. `市場押注與預期差` must explain what expectations are already in prices and what still has room for repricing. `看錯的條件` must state what would make the thesis wrong.
 
@@ -32,11 +32,11 @@ As of 2026-07-31, the clean daily visible order is:
 3. `市場押注與預期差`
 4. `國際消息到台股的傳導`
 5. `看錯的條件`
-6. `觀察限制`
+6. `備註`
 
 `三個檢查點` must contain exactly three bullets. Each bullet should connect source fact -> market mechanism -> why it matters now. The report should read like a professional market column: decisive thesis first, then evidence, repricing, Taiwan transmission, invalidation, and reader-facing observation limits.
 
-As of 2026-08-02, daily reports may trial a trigger-first rhythm inside the same six section titles: `今日一句話` may start with `結論先講`, `市場押注與預期差` may include `先看區間邊界`, and `看錯的條件` may include `現在只看兩件事` with one upside trigger and one downside trigger. Any level must be evidence-backed and framed as an observation boundary, not an entry, stop-loss, take-profit, or order instruction.
+As of 2026-08-02, daily reports may trial a trigger-first rhythm inside the same six section titles: `今日一句話` may start with `結論先講`, `市場押注與預期差` may include `先看區間邊界`, and `看錯的條件` may include `現在只看 N 件事` where N is the needed count of evidence-backed triggers. Any level must be framed as an observation boundary, not an entry, stop-loss, take-profit, or order instruction.
 
 ## Consequences
 
@@ -44,5 +44,6 @@ As of 2026-08-02, daily reports may trial a trigger-first rhythm inside the same
 - The first section must state a clear investable thesis, not just summarize headlines.
 - Evidence, pricing, transmission, and invalidation sections must translate facts into Taiwan-market implications.
 - Daily visible output should not contain entry, stop-loss, or target-price language.
+- The sixth daily visible section is `備註`, not `觀察限制`.
 - The trigger-first trial borrows pacing from retail market dashboards but keeps the product boundary: no visible `開多`, `開空`, `止盈`, `止損`, `入場區間`, or order-level commands.
 - The delivery/signal trust gate is implemented separately in `2026-05-20-claim-verifier-trust-gate.md`.

@@ -27,6 +27,35 @@ This file is append-only. Add a new entry after any user correction to prevent r
 
 <!-- Add new lessons below this line -->
 
+## LESSON-20260802-01
+- Date: 2026-08-02
+- Trigger (User correction): User corrected the daily-analysis trial template: `現在只看兩件事` should become N evidence-backed trigger items, and the visible `觀察限制` section should be renamed `備註`.
+- What was wrong: The trigger-first template copied the sample's two-trigger rhythm too literally and kept the old sixth-section title.
+- Root cause: Prompt/docs/tests encoded the first sample as a fixed contract instead of preserving it as a flexible style.
+- New rule (always/never): Daily visible `market_analysis` may use `現在只看 N 件事` with evidence-driven trigger count; never force exactly two triggers and never use `觀察限制` as the sixth daily section title.
+- Prevention checklist (before final response):
+  - [ ] Check legacy and Stage4 prompts for `現在只看兩件事` and `觀察限制`
+  - [ ] Check triggered prompt skills and README/memory docs use `現在只看 N 件事` and `備註`
+  - [ ] Keep order language forbidden: no `開多`, `開空`, `止盈`, `止損`, or `入場區間`
+- Repo updates made:
+  - `src/event_relay/market_analysis.py`
+  - `src/event_relay/analysis_stages/stage4_synthesis.py`
+  - `skills/macro-weekly-summary-skill/SKILL.md`
+  - `skills/macro-weekly-summary-skill/SKILLS.md`
+  - `skills/line-brief-format-skill/line-weekly-brief.md`
+  - `README.md`
+  - `memory-bank/PROJECT_DOCUMENTATION.md`
+  - `memory-bank/workflows.md`
+  - `memory-bank/09-decisions/2026-05-20-daily-analysis-editorial-template.md`
+  - `tests/test_market_analysis.py`
+  - `tests/test_analysis_stages.py`
+  - `tasks/todo.md`
+  - `tasks/lessons.md`
+- Verification evidence:
+  - `python -m unittest tests.test_analysis_stages tests.test_market_analysis` passed, 75 tests
+  - `python scripts/validate_readiness.py` passed
+- Status: active
+
 ## LESSON-20260516-03
 - Date: 2026-05-16
 - Trigger (User correction): User reminded me to check the triggered skills after verifying the Anthropic template path.

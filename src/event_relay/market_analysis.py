@@ -580,7 +580,7 @@ def _build_prompts(
         "- Treat t_relay_events, market_context rows, and t_market_index_snapshots as primary local evidence.\n"
         "- Do not treat absence from local events as proof that nothing happened.\n"
         "- If web search is available, verify latest policy, price, war, macro, and earnings facts before using them.\n"
-        "- If web search is unavailable or evidence is insufficient, lower confidence and describe observation limits in reader-facing language; do not expose missing-data implementation notes.\n"
+        "- If web search is unavailable or evidence is insufficient, lower confidence and describe limits under reader-facing notes; do not expose missing-data implementation notes.\n"
         "- Distinguish local-event facts, externally verified facts, and inference.\n"
         "- Visible prose must translate internal source labels, table names, snake_case fields, task names, provider names, guard names, and numeric handles into plain Chinese implications.\n\n"
         "[Macro Skill]\n"
@@ -604,8 +604,8 @@ def _build_prompts(
         "- Section 3 市場押注與預期差 should state what expectations are already in prices and what is not fully priced yet.\n"
         "- Section 4 國際消息到台股的傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.\n"
         "- Section 5 看錯的條件 should name the cleanest conditions that would break the thesis.\n"
-        "- Section 6 觀察限制 must be concise: three bullets maximum.\n"
-        "- Trial trigger-first style: section 1 may start with 結論先講; section 3 may add 先看區間邊界 with evidence-backed index/rates/FX/SOX levels; section 5 may add 現在只看兩件事 with one upside trigger and one downside trigger.\n"
+        "- Section 6 備註 must be concise: three bullets maximum.\n"
+        "- Trial trigger-first style: section 1 may start with 結論先講; section 3 may add 先看區間邊界 with evidence-backed index/rates/FX/SOX levels; section 5 may add 現在只看 N 件事 with the needed number of evidence-backed triggers. Do not force exactly two triggers.\n"
         "- Do not include a dedicated 台股配置 section or any ## 今日個股觀察 section in daily reports.\n"
         "- Individual companies may appear only as mega-cap transmission examples, e.g. NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; avoid entry, stop-loss, or target-price language.\n"
         "- Do not write 開多, 開空, 止盈, 止損, 入場區間, or order-level commands in visible daily text; triggers are observation boundaries, not trading instructions.\n"
@@ -646,7 +646,7 @@ def _build_us_close_digest_prompts(
         "1) 美股收盤一句話\n"
         "2) 跨資產訊號\n"
         "3) 對台股開盤的傳導線\n"
-        "4) 反向風險與觀察限制\n"
+        "4) 反向風險與備註\n"
         "Length: 350-750 Chinese characters. Use bullets for market facts.\n"
         f"Now local time: {now_local.strftime('%Y-%m-%d %H:%M %Z')}\n"
         f"Recent events JSON:\n{events_json}\n\n"
@@ -674,7 +674,7 @@ def _regime_flow_sections() -> str:
         "3) 市場押注與預期差\n"
         "4) 國際消息到台股的傳導\n"
         "5) 看錯的條件\n"
-        "6) 觀察限制\n"
+        "6) 備註\n"
     )
 
 
@@ -687,8 +687,8 @@ def _regime_flow_guide() -> str:
         "- 市場押注與預期差: explain what is already reflected in prices and what still has room for repricing.\n"
         "- 國際消息到台股的傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
         "- 看錯的條件: state the cleanest data or market moves that would make the thesis wrong.\n"
-        "- 觀察限制: max three bullets; describe event risks, stale information, or observation limits in reader-facing language.\n"
-        "- Trigger-first template: borrow the rhythm of 結論先講 -> 先看區間邊界 -> 現在只看兩件事. Use only evidence-backed observation levels, and frame bull/bear paths as scenarios, not orders.\n"
+        "- 備註: max three bullets; describe event risks, stale information, or evidence limits in reader-facing language.\n"
+        "- Trigger-first template: borrow the rhythm of 結論先講 -> 先看區間邊界 -> 現在只看 N 件事. Let N be the needed number of evidence-backed triggers; do not force exactly two.\n"
     )
 
 
