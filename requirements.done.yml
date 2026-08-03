@@ -48,7 +48,7 @@ tasks:
       建立獨立 Spring Boot 3.3.x / Java 21 專案 (Maven + mvnw)。
       套件：com.zack.linerelay
       功能：
-        1. GET /health - healthcheck
+        1. GET /healthz - healthcheck
         2. POST /webhook - LINE webhook 接收，驗 X-Line-Signature (HMAC-SHA256)，
            解析 join/leave/message/follow/unfollow 事件，先只 log 不寫 DB
         3. LinePushClient service - push(targetId, text) / multicast(targetIds, text)
@@ -59,7 +59,7 @@ tasks:
     acceptance:
       - 專案位於 D:\work_space\claude-box\workspace\line-relay-service 且為獨立 git repo  # done (commit fcdfc93)
       - ./mvnw spring-boot:run 可啟動服務                                                   # pending：需先裝 JDK 21
-      - /health 回 200                                                                      # pending：需先啟動服務
+      - /healthz 回 200                                                                     # pending：需先啟動服務
       - ngrok/cloudflared 暴露後，LINE Console webhook 測試成功（log 顯示事件）              # pending：需先啟動服務
       - 手動呼叫 LinePushClient.push() 能成功推送訊息到指定 LINE 用戶/群組                   # pending：需先啟動服務
     notes: |
