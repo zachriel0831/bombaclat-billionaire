@@ -68,9 +68,9 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Commit the data-collecting instrumentation.
 
 ## Current Task
-- Task: Guard the 2026-08-03 `pre_tw_open` market-analysis row from local evidence only.
+- Task: Guard the 2026-08-04 `pre_tw_open` market-analysis row from local evidence only.
 - Requested by: automation
-- Start date: 2026-08-03
+- Start date: 2026-08-04
 - Scope: Create the missing delivery row, run targeted signal extraction, preserve Java delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
@@ -79,6 +79,16 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Write and verify the delivery-ready row through `MySqlEventStore.upsert_market_analysis`.
 - [x] Run targeted signal extraction and verify final DB state.
 - [x] Record Observer completion, commit, and push the run log.
+
+### 2026-08-04 Replan
+- The first evidence query used nonexistent `event_time`; use the actual `published_at` column and keep the indexed recent-ID path.
+- The first independent verifier embedded Chinese literals through PowerShell stdin, so its delimiter lookup was mis-encoded; rerun with Unicode escapes against the unchanged stored row.
+
+### 2026-08-04 Pre-Open Guard Result
+- Created `t_market_analyses.id=306` through `MySqlEventStore.upsert_market_analysis()` from four local market-context evidence rows.
+- Final verification: claim support rate `1.0`, trust gate allowed delivery/signals, `push_enabled=1`, `pushed=0`, structured JSON present, six headings and exactly three evidence bullets passed, garbled/style/template checks passed, and `external_provider_api_called=false`.
+- Targeted extraction completed; `structured_json.stock_watch` is empty, so zero current trade signals were stored.
+- No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ### 2026-08-03 Replan
 - The first diagnostic used the wrong settings attribute (`mysql_table`) after confirming the row was missing; switch to the existing `mysql_event_table` setting and keep the repair path unchanged.
