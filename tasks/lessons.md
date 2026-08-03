@@ -27,6 +27,17 @@ This file is append-only. Add a new entry after any user correction to prevent r
 
 <!-- Add new lessons below this line -->
 
+## LESSON-20260803-01
+- Date: 2026-08-03
+- Trigger (User correction): User asked what `看錯的條件` means and clarified that stock recommendations should not appear in daily analysis.
+- What was wrong: The trigger-first daily template could read like trading triggers, and prompt wording around `stock_watch` could still pull visible text toward stock picks.
+- Root cause: The visible daily-report contract did not explicitly define `看錯的條件` as thesis invalidation, and the no-stock-picks guard was narrower than the internal signal wording.
+- New rule (always/never): `看錯的條件` means evidence or market moves that would invalidate the thesis; never write visible daily `market_analysis` as stock recommendations, buy candidates, or watchlist candidates.
+- Prevention checklist:
+  - [ ] Check runtime prompts say invalidation conditions are not buy/sell triggers
+  - [ ] Check daily visible prompts and skills ban stock recommendations / buy candidates / watchlist candidates
+  - [ ] Keep internal `stock_watch` / `t_trade_signals` machine-readable unless a separate trading UI explicitly asks for them
+
 ## LESSON-20260802-01
 - Date: 2026-08-02
 - Trigger (User correction): User corrected the daily-analysis trial template: `現在只看兩件事` should become N evidence-backed trigger items, and the visible `觀察限制` section should be renamed `備註`.

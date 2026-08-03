@@ -554,7 +554,7 @@ def _build_prompts(
         if slot == "tw_close"
         else "The audience wants macro context only; avoid stock entry recommendations."
         if slot == "macro_daily"
-        else "The audience wants actionable Taiwan pre-open context from U.S. market moves."
+        else "The audience wants actionable Taiwan pre-open macro/sector context from U.S. market moves, not stock recommendations."
     )
     required_sections = _regime_flow_sections()
     section_guide = _regime_flow_guide()
@@ -602,12 +602,12 @@ def _build_prompts(
         "- Section 1 今日一句話 should be one sentence, not a paragraph.\n"
         "- Section 2 三個檢查點 must contain exactly three bullets and each bullet must include the source fact and why it matters.\n"
         "- Section 3 市場押注與預期差 should state what expectations are already in prices and what is not fully priced yet.\n"
-        "- Section 4 國際消息到台股的傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list.\n"
-        "- Section 5 看錯的條件 should name the cleanest conditions that would break the thesis.\n"
+        "- Section 4 國際消息到台股的傳導 should translate the thesis into Taiwan index, sector, and mega-cap transmission; it is not a stock-picking list or stock recommendation list.\n"
+        "- Section 5 看錯的條件 should name the cleanest conditions that would break the thesis; these are invalidation evidence, not buy/sell triggers.\n"
         "- Section 6 備註 must be concise: three bullets maximum.\n"
         "- Trial trigger-first style: section 1 may start with 結論先講; section 3 may add 先看區間邊界 with evidence-backed index/rates/FX/SOX levels; section 5 may add 現在只看 N 件事 with the needed number of evidence-backed triggers. Do not force exactly two triggers.\n"
-        "- Do not include a dedicated 台股配置 section or any ## 今日個股觀察 section in daily reports.\n"
-        "- Individual companies may appear only as mega-cap transmission examples, e.g. NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; avoid entry, stop-loss, or target-price language.\n"
+        "- Do not include a dedicated 台股配置 section, any ## 今日個股觀察 section, stock recommendations, buy candidates, or watchlist candidates in daily reports.\n"
+        "- Individual companies may appear only as mega-cap transmission examples, e.g. NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; never frame them as recommendations and avoid entry, stop-loss, or target-price language.\n"
         "- Do not write 開多, 開空, 止盈, 止損, 入場區間, or order-level commands in visible daily text; triggers are observation boundaries, not trading instructions.\n"
         "- Use the exact section titles listed above.\n"
         f"{_summary_length_instruction(slot)}\n"
@@ -685,8 +685,8 @@ def _regime_flow_guide() -> str:
         "- 今日一句話: one plain sentence stating what the market is trading, Taiwan bias, and main uncertainty.\n"
         "- 三個檢查點: exactly three evidence bullets; each bullet must connect source fact -> mechanism -> why it matters now.\n"
         "- 市場押注與預期差: explain what is already reflected in prices and what still has room for repricing.\n"
-        "- 國際消息到台股的傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist.\n"
-        "- 看錯的條件: state the cleanest data or market moves that would make the thesis wrong.\n"
+        "- 國際消息到台股的傳導: translate the thesis into Taiwan index, sectors, and mega-cap proxies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write a watchlist or stock recommendations.\n"
+        "- 看錯的條件: state the cleanest data or market moves that would make the thesis wrong; these are invalidation conditions, not trading triggers.\n"
         "- 備註: max three bullets; describe event risks, stale information, or evidence limits in reader-facing language.\n"
         "- Trigger-first template: borrow the rhythm of 結論先講 -> 先看區間邊界 -> 現在只看 N 件事. Let N be the needed number of evidence-backed triggers; do not force exactly two.\n"
     )

@@ -120,9 +120,9 @@ Use this readable author-style macro flow unless the calling code supplies a str
 5. 看錯的條件
 6. 備註
 
-`三個檢查點` should contain exactly three bullets. Each bullet should connect source fact -> mechanism -> why it matters now. `市場押注與預期差` should name what is already reflected in prices and what can still be repriced.
+`三個檢查點` should contain exactly three bullets. Each bullet should connect source fact -> mechanism -> why it matters now. `市場押注與預期差` should name what is already reflected in prices and what can still be repriced. `看錯的條件` means the evidence or market moves that would invalidate the thesis; it is not a buy/sell trigger list.
 
-For daily `market_analysis`, do not append `今日個股觀察` and do not write `台股配置` as a visible section. If the structured JSON contains `stock_watch`, treat it as machine-readable downstream signal context only. The visible report may mention companies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭 only to explain macro/sector transmission, not as a watchlist, entry plan, stop-loss, or target-price list.
+For daily `market_analysis`, do not append `今日個股觀察`, do not write `台股配置` as a visible section, and do not write stock recommendations, buy candidates, or watchlist candidates. If the structured JSON contains `stock_watch`, treat it as machine-readable downstream signal context only. The visible report may mention companies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭 only to explain macro/sector transmission, not as recommendations, a watchlist, entry plan, stop-loss, or target-price list.
 
 Trial trigger-first style: section 1 may start with `結論先講`; section 3 may add `先看區間邊界` with evidence-backed index/rates/FX/SOX levels; section 5 may add `現在只看 N 件事`, where N is the needed count of evidence-backed triggers. Do not force exactly two. Do not write `開多`, `開空`, `止盈`, `止損`, `入場區間`, or order-level commands in visible daily text; triggers are observation boundaries, not trading instructions.
 

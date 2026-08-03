@@ -15,9 +15,9 @@ Daily `market_analysis` reports use the refreshed author-style visible flow:
 5. `看錯的條件`
 6. `備註`
 
-`三個檢查點` must contain exactly three bullets. Each bullet should connect `資料事實 -> 傳導機制 -> 為什麼現在重要`. `市場押注與預期差` must explain what expectations are already in prices and what still has room for repricing. `看錯的條件` must state what would make the thesis wrong.
+`三個檢查點` must contain exactly three bullets. Each bullet should connect `資料事實 -> 傳導機制 -> 為什麼現在重要`. `市場押注與預期差` must explain what expectations are already in prices and what still has room for repricing. `看錯的條件` must state what evidence or market moves would invalidate the thesis; it is not a buy/sell trigger list.
 
-As of 2026-05-25, daily visible reports must not include a dedicated `台股配置` section and must not append the deterministic `## 今日個股觀察` fixed-pool section. The fixed-pool / `t_trade_signals` flow may continue as machine-readable downstream context, but the daily body should focus on macro and industry/sector interpretation. Individual companies may be mentioned only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
+As of 2026-05-25, daily visible reports must not include a dedicated `台股配置` section and must not append the deterministic `## 今日個股觀察` fixed-pool section. The fixed-pool / `t_trade_signals` flow may continue as machine-readable downstream context, but the daily body should focus on macro and industry/sector interpretation. Individual companies may be mentioned only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭, never as stock recommendations.
 
 As of 2026-06-25, daily visible reports must translate internal context labels into reader-facing Chinese. Do not expose source labels, table names, snake_case fields, scheduled task names, provider names, guard names, or custom score labels; describe the market implication instead, such as `盤前市場環境資料顯示...` or `流動性與風險指標偏向支撐風險資產...`.
 
@@ -36,14 +36,14 @@ As of 2026-07-31, the clean daily visible order is:
 
 `三個檢查點` must contain exactly three bullets. Each bullet should connect source fact -> market mechanism -> why it matters now. The report should read like a professional market column: decisive thesis first, then evidence, repricing, Taiwan transmission, invalidation, and reader-facing observation limits.
 
-As of 2026-08-02, daily reports may trial a trigger-first rhythm inside the same six section titles: `今日一句話` may start with `結論先講`, `市場押注與預期差` may include `先看區間邊界`, and `看錯的條件` may include `現在只看 N 件事` where N is the needed count of evidence-backed triggers. Any level must be framed as an observation boundary, not an entry, stop-loss, take-profit, or order instruction.
+As of 2026-08-02, daily reports may trial a trigger-first rhythm inside the same six section titles: `今日一句話` may start with `結論先講`, `市場押注與預期差` may include `先看區間邊界`, and `看錯的條件` may include `現在只看 N 件事` where N is the needed count of evidence-backed triggers. These are thesis-invalidation conditions and observation boundaries, not stock recommendations, entries, stop-losses, take-profits, or order instructions.
 
 ## Consequences
 
 - Multi-stage Stage4 and legacy fallback prompts share the same visible section order.
 - The first section must state a clear investable thesis, not just summarize headlines.
 - Evidence, pricing, transmission, and invalidation sections must translate facts into Taiwan-market implications.
-- Daily visible output should not contain entry, stop-loss, or target-price language.
+- Daily visible output should not contain stock recommendations, buy/watchlist candidates, entry, stop-loss, or target-price language.
 - The sixth daily visible section is `備註`, not `觀察限制`.
 - The trigger-first trial borrows pacing from retail market dashboards but keeps the product boundary: no visible `開多`, `開空`, `止盈`, `止損`, `入場區間`, or order-level commands.
 - The delivery/signal trust gate is implemented separately in `2026-05-20-claim-verifier-trust-gate.md`.

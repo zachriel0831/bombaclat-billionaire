@@ -450,6 +450,9 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("現在只看 N 件事", user_prompt)
         self.assertIn("Do not force exactly two triggers", user_prompt)
         self.assertIn("observation boundaries, not trading instructions", user_prompt)
+        self.assertIn("stock recommendations, buy candidates, or watchlist candidates", user_prompt)
+        self.assertIn("stock recommendation list", user_prompt)
+        self.assertIn("invalidation evidence, not buy/sell triggers", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
 
     def test_stage4_anthropic_uses_same_template_contract(self) -> None:
