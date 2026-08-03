@@ -773,3 +773,16 @@ Move completed or stale task logs to `tasks/archive/`.
 - Created analysis `303` from ten local Taiwan flow evidence rows; no external provider API or LINE contact occurred.
 - Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact six-section flow, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
 - Targeted signal extraction ran; empty `stock_watch` correctly produced zero signals without fixed-pool padding.
+
+# 2026-08-04 US Close Guard Run
+
+- [x] Read repo instructions, automation memory, Workflow 4C guard rules, skills, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row plus local U.S. close evidence.
+- [x] Create the missing row through `MySqlEventStore.upsert_market_analysis()` using local evidence only.
+- [x] Run eligible internal signal extraction and verify the final DB state.
+
+## 2026-08-04 US Close Guard Result
+
+- Created analysis `305` from five local evidence events and two U.S. close index rows; no external provider API or LINE contact occurred.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact six-section flow, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+- Targeted signal extraction ran; empty `stock_watch` correctly produced zero signals without fixed-pool padding.
