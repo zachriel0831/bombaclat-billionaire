@@ -760,3 +760,16 @@ Move completed or stale task logs to `tasks/archive/`.
 - Created missing analysis `300` from 10 selected local evidence events, 432 market-context rows, and local indexed history availability; no external provider API or LINE contact occurred.
 - Corrected PowerShell stdin mojibake by rewriting the same row through a temporary UTF-8 helper, then removed the helper.
 - Final checks passed: exact three-section order, readable Traditional Chinese, no forbidden trade/internal terms, `push_enabled=1`, `pushed=0`, and `external_provider_api_called=false`.
+
+# 2026-08-03 TW Close Guard Run
+
+- [x] Read repo instructions, Workflow 4C guard rules, automation memory, skills, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `tw_close` row plus same-day local evidence.
+- [x] Create the missing row from local evidence through `MySqlEventStore.upsert_market_analysis()`.
+- [x] Run eligible internal signal extraction and verify the final DB state.
+
+## 2026-08-03 TW Close Guard Result
+
+- Created analysis `303` from ten local Taiwan flow evidence rows; no external provider API or LINE contact occurred.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact six-section flow, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+- Targeted signal extraction ran; empty `stock_watch` correctly produced zero signals without fixed-pool padding.
