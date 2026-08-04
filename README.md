@@ -118,6 +118,7 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - `X_INCLUDE_REPLIES` / `X_INCLUDE_RETWEETS` (default `false`)
 - `X_BACKFILL_ENABLED` (default `true`; replay recent tracked-account tweets into the event store once when bridge starts)
 - `X_BACKFILL_MAX_RESULTS_PER_ACCOUNT` (default `10`; startup backfill size per tracked account)
+- `NEWSPF_DISABLED_SOURCE_IDS` (default `tvbs,ctee`; broken society/politics endpoints are skipped until a working URL is available)
 - `TRUTH_SOCIAL_ENABLED` (master switch for Truth Social public account source; default `false`)
 - `TRUTH_SOCIAL_ACCOUNTS` (comma-separated handles or profile URLs, e.g. `https://truthsocial.com/@realDonaldTrump`)
 - `TRUTH_SOCIAL_MAX_RESULTS_PER_ACCOUNT` (default `10`)
@@ -397,7 +398,7 @@ One-shot fetch (debug/poll mode, optional):
 $env:PYTHONPATH='src'; python -m news_collector.main fetch --source x --limit 10 --pretty
 ```
 
-Required `.env` keys for X:
+Required `.env` keys for X when quota is available:
 - `X_ENABLED=true`
 - `X_BEARER_TOKEN_FILE=.secrets/x_bearer_token.dpapi` (or `X_BEARER_TOKEN`)
 - `X_ACCOUNTS=https://x.com/elonmusk,https://x.com/realDonaldTrump,https://x.com/aleabitoreddit`
@@ -406,7 +407,7 @@ Required `.env` keys for X:
 - `X_BACKFILL_ENABLED=true`
 - `X_BACKFILL_MAX_RESULTS_PER_ACCOUNT=10`
 
-If you get `HTTP 402 Payment Required`, your X developer project/app does not currently have the required paid access for these read endpoints.
+If you get `HTTP 402 Payment Required` / `CreditsDepleted`, the X project has no usable read quota. Set `X_ENABLED=false` and `X_BACKFILL_ENABLED=false`, then restart `news_collector.relay_bridge`; the code also stops X polling/streaming for the current process after the first quota error.
 
 ## Truth Social public account source
 

@@ -144,8 +144,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 10. Taiwan society/politics news platform
 - Runs in `src/news_platform` and is separate from `event_relay`
 - Reads Taiwan society/politics RSS, sitemap, ETtoday category-list, and PTS category-page sources defined in `news_platform.registry`
-- Default society/politics source set is LTN, ETtoday, TVBS, CNA, PTS, EBC, Newtalk, Storm Media, and Commercial Times (`ctee`)
-- Commercial Times uses `https://www.ctee.com.tw/sitemaps/sitemap_newstoday.xml`; URL tail category code `-431401` is mapped to `society`, and `-430104` is mapped to `politics`. These are source-category filters only; issue topics are still assigned later by the normal deterministic/LLM topic workers.
+- Default active society/politics source set is LTN, ETtoday, CNA, PTS, EBC, Newtalk, and Storm Media. `NEWSPF_DISABLED_SOURCE_IDS` defaults to `tvbs,ctee` because the current TVBS sitemap returns 404 and the Commercial Times sitemap returns 403 on this workstation.
+- TVBS and Commercial Times (`ctee`) metadata remains registered for old rows and for quick re-enable. Clear or change `NEWSPF_DISABLED_SOURCE_IDS` only after a working endpoint is verified. Commercial Times' disabled sitemap URL is `https://www.ctee.com.tw/sitemaps/sitemap_newstoday.xml`; URL tail category code `-431401` maps to `society`, and `-430104` maps to `politics`.
 - Category scope defaults to `society,politics` and can be limited by `NEWSPF_CATEGORIES` or CLI `--categories`
 - Writes article rows to independent MySQL tables controlled by `NEWSPF_MYSQL_*`
 - Storage contract:
@@ -468,5 +468,6 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 
 ## Known Operational Notes
 - X stream may return 429 when connection slots are occupied; auto-heal is enabled.
+- X may return `402 Payment Required` / `CreditsDepleted` when developer quota is exhausted. Local `.env` should keep `X_ENABLED=false` and `X_BACKFILL_ENABLED=false` until quota is restored; the polling and stream clients also stop retrying after the first quota error in a process.
 - OpenAI `insufficient_quota` can occur even with valid key if project billing/entitlement is not active.
 - On this Windows workstation, `run_source_bridge.ps1` prefers `Python 3.12` for the bridge because local `Python 3.13` fails TLS verification against `openapi.twse.com.tw`.

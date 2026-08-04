@@ -15,6 +15,8 @@ param(
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $windowScript = Join-Path $PSScriptRoot "run_cwa_collectors_window.ps1"
+$logDir = Join-Path $ProjectRoot "runtime\logs"
+$statusFile = Join-Path $ProjectRoot "runtime\status\cwa-fixed-window-status.json"
 $legacyTasks = @("NewsCollector-CwaWeather", "NewsCollector-CwaEarthquake")
 
 if ($WeatherEveryMinutes -lt 1) {
@@ -45,6 +47,8 @@ if ($PlanOnly) {
   Write-Host "Would disable legacy tasks: $($legacyTasks -join ', ')" -ForegroundColor DarkGray
   Write-Host "Would register $TaskName for interactive logon user $currentUser" -ForegroundColor Cyan
   Write-Host "Action: powershell.exe $actionArgs" -ForegroundColor DarkGray
+  Write-Host "Status: $statusFile" -ForegroundColor DarkGray
+  Write-Host "Logs: $logDir\cwa-fixed-window-YYYYMMDD.log" -ForegroundColor DarkGray
   exit 0
 }
 
@@ -77,6 +81,8 @@ Write-Host "Registered CWA fixed-window task: $TaskName" -ForegroundColor Green
 Write-Host "User: $currentUser" -ForegroundColor DarkGray
 Write-Host "WeatherEveryMinutes: $WeatherEveryMinutes" -ForegroundColor DarkGray
 Write-Host "EarthquakeEveryMinutes: $EarthquakeEveryMinutes" -ForegroundColor DarkGray
+Write-Host "Status: $statusFile" -ForegroundColor DarkGray
+Write-Host "Logs: $logDir\cwa-fixed-window-YYYYMMDD.log" -ForegroundColor DarkGray
 
 if ($StartNow) {
   Start-Process `

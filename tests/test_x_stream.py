@@ -1,6 +1,9 @@
 import unittest
+from unittest.mock import patch
 
 from news_collector.x_stream import XFilteredStreamer, XStreamConfig, _normalize_account
+from news_collector.sources import x_accounts
+from news_collector.sources.x_accounts import XAccountSource
 
 
 class XStreamTests(unittest.TestCase):
@@ -72,6 +75,11 @@ class XStreamTests(unittest.TestCase):
         self.assertTrue(XFilteredStreamer._is_too_many_connections_429(body))
         self.assertFalse(XFilteredStreamer._is_too_many_connections_429('{"title":"RateLimited"}'))
 
+    def test_is_quota_exhausted(self) -> None:
+        self.assertTrue(XFilteredStreamer._is_quota_exhausted('{"title":"CreditsDepleted"}'))
+        self.assertTrue(XFilteredStreamer._is_quota_exhausted("HTTP 402 Payment Required"))
+        self.assertFalse(XFilteredStreamer._is_quota_exhausted('{"title":"RateLimited"}'))
+
     def test_parse_connection_kill_stats(self) -> None:
         """測試 test parse connection kill stats 的預期行為。"""
         success, failed = XFilteredStreamer._parse_connection_kill_stats(
@@ -79,6 +87,23 @@ class XStreamTests(unittest.TestCase):
         )
         self.assertEqual(success, 2)
         self.assertEqual(failed, 1)
+
+    def test_x_account_source_stops_after_quota_error(self) -> None:
+        x_accounts._X_STOPPED_BY_QUOTA = False
+        source = XAccountSource("token", ["elonmusk"])
+
+        with patch(
+            "news_collector.sources.x_accounts.http_get_json_with_headers",
+            side_effect=RuntimeError("HTTP 402 Payment Required CreditsDepleted"),
+        ) as mocked:
+            self.assertEqual(source.fetch(limit=1), [])
+            self.assertEqual(mocked.call_count, 1)
+
+        with patch("news_collector.sources.x_accounts.http_get_json_with_headers") as mocked:
+            self.assertEqual(source.fetch(limit=1), [])
+            mocked.assert_not_called()
+
+        x_accounts._X_STOPPED_BY_QUOTA = False
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ logs/
 runtime/logs/
 runtime/four-hour-digest/
 runtime/prompts/
+runtime/status/
 runtime/state/
 runtime/*.log
 runtime/codex_guard_*_summary.txt

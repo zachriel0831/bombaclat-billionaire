@@ -73,7 +73,10 @@ class XFilteredStreamer:
         logger.info("X stream tracking query=%s", query)
 
         try:
-            self._sync_rules(query)
+            try:
+                self._sync_rules(query)
+            except _StopStream:
+                return
 
             backoff_seconds = 1.0
             # stream 長連線一定會遇到網路斷線 / timeout / 429；
@@ -138,6 +141,9 @@ class XFilteredStreamer:
                     on_item(item)
         except HTTPError as exc:
             body_text = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            if int(exc.code) == 402 or self._is_quota_exhausted(body_text):
+                logger.warning("X stream stopped because quota is exhausted; set X_ENABLED=false or restore X credits before restart")
+                raise _StopStream("x stream stopped on quota exhaustion") from exc
             if int(exc.code) == 429:
                 # X 最麻煩的是 TooManyConnections；若可自癒就先清掉舊連線再重試，
                 # 不行才依設定停流或交給外層 backoff。
@@ -180,6 +186,11 @@ class XFilteredStreamer:
         """判斷 is too many connections 429 對應的資料或結果。"""
         text = (body_text or "").lower()
         return "toomanyconnections" in text or "maximum allowed connection limit" in text
+
+    @staticmethod
+    def _is_quota_exhausted(body_text: str) -> bool:
+        text = (body_text or "").lower()
+        return "402" in text or "payment required" in text or "creditsdepleted" in text
 
     @staticmethod
     def _parse_connection_kill_stats(result: dict[str, Any]) -> tuple[int, int]:
@@ -253,8 +264,15 @@ class XFilteredStreamer:
         req.add_header("Authorization", f"Bearer {self.config.bearer_token}")
         req.add_header("Content-Type", "application/json")
 
-        with urlopen(req, timeout=max(self.config.timeout_seconds, 15)) as resp:
-            text = resp.read().decode("utf-8", errors="replace")
+        try:
+            with urlopen(req, timeout=max(self.config.timeout_seconds, 15)) as resp:
+                text = resp.read().decode("utf-8", errors="replace")
+        except HTTPError as exc:
+            body_text = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            if int(exc.code) == 402 or self._is_quota_exhausted(body_text):
+                logger.warning("X stream rule request stopped because quota is exhausted; set X_ENABLED=false or restore X credits before restart")
+                raise _StopStream("x stream rule request stopped on quota exhaustion") from exc
+            raise
 
         if not text.strip():
             return {}

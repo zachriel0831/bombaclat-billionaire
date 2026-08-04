@@ -10,7 +10,7 @@ import json
 import os
 import re
 import subprocess
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Sequence
 
@@ -19,6 +19,7 @@ from news_collector.config import Settings as CollectorSettings
 from news_collector.config import load_settings as load_collector_settings
 from news_platform.config import NewsPlatformSettings
 from news_platform.config import load_settings as load_news_platform_settings
+from news_platform.registry import active_source_ids
 
 
 STATUS_ORDER = {
@@ -73,17 +74,7 @@ INTERNATIONAL_URL_PATTERNS = (
     "%npr.org%",
 )
 
-NEWS_PLATFORM_SOURCE_IDS = (
-    "ltn",
-    "ettoday",
-    "tvbs",
-    "cna",
-    "pts",
-    "ebc",
-    "newtalk",
-    "storm",
-    "ctee",
-)
+NEWS_PLATFORM_SOURCE_IDS = active_source_ids()
 
 PUBLIC_RECORD_GROUPS = (
     ("ly", "legislative_bill"),
@@ -102,6 +93,8 @@ PUBLIC_RECORD_GROUPS = (
     ("mohw", "mohw_nursing_staff_stat"),
     ("moj", "moj_prosecution_disposition_stat"),
     ("mojac", "mojac_daily_custody_stat"),
+    ("cwa", "cwa_typhoon_report"),
+    ("cwa", "cwa_earthquake_report"),
 )
 
 IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_]+$")
@@ -236,7 +229,7 @@ def build_report(env_file: str = ".env", *, include_processes: bool = True) -> H
         "x_enabled": collector_settings.x_enabled,
         "sec_enabled": collector_settings.sec_enabled,
         "twse_mops_enabled": collector_settings.twse_mops_enabled,
-        "news_platform_sources": list(NEWS_PLATFORM_SOURCE_IDS),
+        "news_platform_sources": list(active_source_ids()),
     }
     return HealthReport(
         generated_at_utc=generated_at,
@@ -364,7 +357,7 @@ def _collect_relay_probes(
                 enabled=collector_settings.sec_enabled,
                 disabled_name="relay_sec_filings",
                 disabled_detail="SEC_ENABLED=false",
-                factory=lambda: _latest_probe(
+                factory=lambda: _event_driven_probe(_latest_probe(
                     conn,
                     name="relay_sec_filings",
                     table=event_table,
@@ -375,7 +368,7 @@ def _collect_relay_probes(
                     stale_minutes=10080,
                     recent_minutes=10080,
                     detail="Official SEC tracked filings; event-driven.",
-                ),
+                )),
             )
         )
         probes.append(
@@ -383,7 +376,7 @@ def _collect_relay_probes(
                 enabled=collector_settings.twse_mops_enabled,
                 disabled_name="relay_twse_mops",
                 disabled_detail="TWSE_MOPS_ENABLED=false",
-                factory=lambda: _latest_probe(
+                factory=lambda: _event_driven_probe(_latest_probe(
                     conn,
                     name="relay_twse_mops",
                     table=event_table,
@@ -394,7 +387,7 @@ def _collect_relay_probes(
                     stale_minutes=4320,
                     recent_minutes=4320,
                     detail="Official TWSE/MOPS major announcements; event-driven.",
-                ),
+                )),
             )
         )
         probes.append(
@@ -581,7 +574,7 @@ def _collect_news_platform_probes(settings: NewsPlatformSettings) -> list[ProbeR
                     detail="Category-level article ingestion freshness.",
                 )
             )
-            for source_id in NEWS_PLATFORM_SOURCE_IDS:
+            for source_id in active_source_ids():
                 probes.append(
                     _latest_probe(
                         conn,
@@ -858,6 +851,16 @@ def _maybe_enabled_probe(
     if not enabled:
         return ProbeResult(name=disabled_name, status="skipped", detail=disabled_detail)
     return factory()
+
+
+def _event_driven_probe(probe: ProbeResult) -> ProbeResult:
+    if probe.status != "missing" or (probe.row_count or 0) > 0:
+        return probe
+    return replace(
+        probe,
+        status="skipped",
+        detail=f"{probe.detail} No stored rows yet; source is event-driven.",
+    )
 
 
 def _connect_mysql(mysql_connector: Any, config: DbConfig) -> Any:

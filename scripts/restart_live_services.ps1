@@ -1,4 +1,4 @@
-# Restart relay and source bridge in two visible PowerShell windows.
+# Restart relay, source bridge, and news-platform loop in visible PowerShell windows.
 param(
   [string]$EnvFile = ".env",
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]
@@ -9,11 +9,12 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 
-# Stop existing relay/bridge python processes first.
+# Stop existing relay/bridge/news-platform python processes first.
 $targets = Get-CimInstance Win32_Process | Where-Object {
   $_.Name -match '^python(3\.12)?(\.exe)?$' -and (
     $_.CommandLine -match 'event_relay\.main' -or
-    $_.CommandLine -match 'news_collector\.relay_bridge'
+    $_.CommandLine -match 'news_collector\.relay_bridge' -or
+    ($_.CommandLine -match 'news_platform\.main' -and $_.CommandLine -match '--loop')
   )
 }
 if ($targets) {
@@ -23,8 +24,10 @@ if ($targets) {
 # Run scripts directly in each opened window so logs stream live there.
 $relayCmd = "Set-Location '$ProjectRoot'; & '.\scripts\run_event_relay.ps1' -EnvFile '$EnvFile' -LogLevel '$LogLevel'"
 $bridgeCmd = "Set-Location '$ProjectRoot'; & '.\scripts\run_source_bridge.ps1' -EnvFile '$EnvFile' -LogLevel '$LogLevel'"
+$platformCmd = "Set-Location '$ProjectRoot'; `$env:PYTHONPATH='src'; python -m news_platform.main --loop"
 
 Start-Process powershell -ArgumentList @('-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', $relayCmd) -WindowStyle Normal
 Start-Process powershell -ArgumentList @('-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', $bridgeCmd) -WindowStyle Normal
+Start-Process powershell -ArgumentList @('-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', $platformCmd) -WindowStyle Normal
 
-Write-Host "Live service windows started (relay + source bridge)." -ForegroundColor Green
+Write-Host "Live service windows started (relay + source bridge + news-platform loop)." -ForegroundColor Green

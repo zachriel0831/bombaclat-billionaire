@@ -3,6 +3,19 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-05 Service Stack Cleanup
+- [x] Update the workspace service skill so `liuli-social-ai-service`, Ollama, and llama-server are explicit-only village/AI targets, not part of the news/finance "all services" stack.
+- [x] Stop noisy or misleading source health: X quota exhaustion, TVBS/CTEE broken endpoints, and CWA freshness semantics.
+- [x] Align stock-monitor local port defaults and handoff docs to `8089`.
+- [x] Remove raw inbound LINE message text/full IDs from webhook logs.
+- [x] Run focused tests, smoke health checks, and commit only scoped repo changes.
+
+### 2026-08-05 Result
+- Liuli/Ollama/llama-server are explicit-only in the local service skill; the news/finance all-services stack excludes them.
+- X quota exhaustion now stops in-process retries, local `.env` has X disabled, TVBS/CTEE are disabled by default, and CWA public-record freshness checks use refreshed timestamps.
+- The CWA fixed-window task writes a status file plus daily log, and the live-service restart script now restarts `event_relay`, `source_bridge`, and `news_platform.main --loop` together.
+- Verification passed: focused Python tests, `validate_readiness.py`, stock-monitor Maven tests, line-relay Maven tests with Java 21, CWA fixed-window smoke, data-source health, and service health checks.
+
 ## 2026-07-31 Daily Analysis Template Refresh
 - [x] Confirm clean worktree and start observer telemetry.
 - [x] Replace the fixed daily visible section contract in legacy and Stage4 prompts.

@@ -41,6 +41,7 @@ class FeedSpec:
 
 
 SUPPORTED_TW_CATEGORIES = ("society", "politics")
+DEFAULT_DISABLED_SOURCE_IDS = ("tvbs", "ctee")
 
 
 TW_SOURCES: list[SourceMeta] = [
@@ -260,6 +261,7 @@ def tw_politics_feeds() -> list[FeedSpec]:
 def tw_news_feeds(categories: Iterable[str] | None = None) -> list[FeedSpec]:
     """回傳指定分類的 TW 新聞 feed 清單，依 category 順序展開。"""
     wanted = tuple(categories or SUPPORTED_TW_CATEGORIES)
+    disabled = set(disabled_source_ids())
     overridden: list[FeedSpec] = []
     for category in wanted:
         normalized = category.strip().lower()
@@ -267,8 +269,19 @@ def tw_news_feeds(categories: Iterable[str] | None = None) -> list[FeedSpec]:
             supported = ", ".join(SUPPORTED_TW_CATEGORIES)
             raise ValueError(f"Unsupported TW news category: {category}. Supported: {supported}")
         for spec in _DEFAULT_TW_FEEDS_BY_CATEGORY[normalized]:
+            if spec.source_id in disabled:
+                continue
             overridden.append(_with_env_override(spec))
     return overridden
+
+
+def disabled_source_ids() -> tuple[str, ...]:
+    raw = os.getenv("NEWSPF_DISABLED_SOURCE_IDS", ",".join(DEFAULT_DISABLED_SOURCE_IDS))
+    return tuple(dict.fromkeys(item.strip().lower() for item in raw.split(",") if item.strip()))
+
+
+def active_source_ids(categories: Iterable[str] | None = None) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(spec.source_id for spec in tw_news_feeds(categories=categories)))
 
 
 def _with_env_override(spec: FeedSpec) -> FeedSpec:

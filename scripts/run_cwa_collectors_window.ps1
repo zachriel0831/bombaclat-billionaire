@@ -16,6 +16,10 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $weatherScript = Join-Path $PSScriptRoot "run_cwa_weather.ps1"
 $earthquakeScript = Join-Path $PSScriptRoot "run_cwa_earthquake.ps1"
+$logDir = Join-Path $ProjectRoot "runtime\logs"
+$statusDir = Join-Path $ProjectRoot "runtime\status"
+$logFile = Join-Path $logDir ("cwa-fixed-window-{0}.log" -f (Get-Date).ToString("yyyyMMdd"))
+$statusFile = Join-Path $statusDir "cwa-fixed-window-status.json"
 
 if ($WeatherEveryMinutes -lt 1) {
   throw "WeatherEveryMinutes must be at least 1."
@@ -30,13 +34,36 @@ if (-not (Test-Path -LiteralPath $earthquakeScript)) {
   throw "run_cwa_earthquake.ps1 not found: $earthquakeScript"
 }
 
+New-Item -ItemType Directory -Force -Path $logDir, $statusDir | Out-Null
+
 function Write-CwaStatus {
   param(
     [string]$Message,
     [ConsoleColor]$Color = "Gray"
   )
 
-  Write-Host ("[{0}] {1}" -f (Get-Date).ToString("yyyy-MM-dd HH:mm:ss"), $Message) -ForegroundColor $Color
+  $line = "[{0}] {1}" -f (Get-Date).ToString("yyyy-MM-dd HH:mm:ss"), $Message
+  Write-Host $line -ForegroundColor $Color
+  Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8
+}
+
+function Write-CwaState {
+  param(
+    [string]$LastJob,
+    [int]$LastExitCode,
+    [datetime]$NextWeather,
+    [datetime]$NextEarthquake
+  )
+
+  [ordered]@{
+    updated_at = (Get-Date).ToString("o")
+    pid = $PID
+    last_job = $LastJob
+    last_exit_code = $LastExitCode
+    next_weather = $NextWeather.ToString("o")
+    next_earthquake = $NextEarthquake.ToString("o")
+    log_file = $logFile
+  } | ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8
 }
 
 function Invoke-CwaScript {
@@ -47,7 +74,8 @@ function Invoke-CwaScript {
   )
 
   Write-CwaStatus "Starting $Name (limit=$Limit, log=$LogLevel)..." Cyan
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ScriptPath -EnvFile $EnvFile -Limit $Limit -LogLevel $LogLevel
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ScriptPath -EnvFile $EnvFile -Limit $Limit -LogLevel $LogLevel 2>&1 |
+    ForEach-Object { Write-CwaStatus $_ }
   $exitCode = $LASTEXITCODE
   if ($null -eq $exitCode) {
     $exitCode = 0
@@ -84,25 +112,30 @@ try {
   Set-Location -LiteralPath $ProjectRoot
   Write-CwaStatus "CWA fixed window started. Close this window to stop the local schedule." Green
   Write-CwaStatus "Weather cadence: $WeatherEveryMinutes minutes; earthquake cadence: $EarthquakeEveryMinutes minutes."
+  Write-CwaStatus "Log file: $logFile"
+  Write-CwaStatus "Status file: $statusFile"
 
   $weatherInterval = New-TimeSpan -Minutes $WeatherEveryMinutes
   $earthquakeInterval = New-TimeSpan -Minutes $EarthquakeEveryMinutes
   $now = Get-Date
   $nextWeather = if ($NoInitialRun) { $now.Add($weatherInterval) } else { $now }
   $nextEarthquake = if ($NoInitialRun) { $now.Add($earthquakeInterval) } else { $now }
+  Write-CwaState -LastJob "startup" -LastExitCode 0 -NextWeather $nextWeather -NextEarthquake $nextEarthquake
 
   do {
     $now = Get-Date
     if ($now -ge $nextWeather) {
-      [void](Invoke-CwaScript -Name "CWA weather/typhoon" -ScriptPath $weatherScript -Limit $WeatherLimit)
+      $exitCode = Invoke-CwaScript -Name "CWA weather/typhoon" -ScriptPath $weatherScript -Limit $WeatherLimit
       $afterRun = Get-Date
       $nextWeather = $afterRun.Add($weatherInterval)
       if ($nextEarthquake -le $afterRun) {
         $nextEarthquake = $afterRun.Add($earthquakeInterval)
       }
+      Write-CwaState -LastJob "weather" -LastExitCode $exitCode -NextWeather $nextWeather -NextEarthquake $nextEarthquake
     } elseif ($now -ge $nextEarthquake) {
-      [void](Invoke-CwaScript -Name "CWA earthquake" -ScriptPath $earthquakeScript -Limit $EarthquakeLimit)
+      $exitCode = Invoke-CwaScript -Name "CWA earthquake" -ScriptPath $earthquakeScript -Limit $EarthquakeLimit
       $nextEarthquake = (Get-Date).Add($earthquakeInterval)
+      Write-CwaState -LastJob "earthquake" -LastExitCode $exitCode -NextWeather $nextWeather -NextEarthquake $nextEarthquake
     }
 
     if ($Once) {

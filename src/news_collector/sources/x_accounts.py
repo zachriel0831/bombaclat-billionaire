@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 _X_MIN_REQUEST_INTERVAL_SECONDS = 1.2
 _LAST_X_REQUEST_TS = 0.0
 _X_STOPPED_BY_429 = False
+_X_STOPPED_BY_QUOTA = False
 _X_USER_ID_CACHE: dict[str, str] = {}
 _X_SINCE_ID_CACHE: dict[str, str] = {}
 
@@ -95,6 +96,9 @@ class XAccountSource(NewsSource):
 
         if self._stop_on_429 and _X_STOPPED_BY_429:
             logger.warning("X source stopped by X_STOP_ON_429 after previous 429; skip this cycle")
+            return []
+        if _X_STOPPED_BY_QUOTA:
+            logger.warning("X source stopped after quota exhaustion; skip until service restart")
             return []
 
         accounts = [name for name in (_normalize_account(x) for x in self._accounts) if name]
@@ -211,7 +215,7 @@ class XAccountSource(NewsSource):
 
     def _request_json(self, url: str, params: dict[str, str | int]) -> dict | None:
         """送出請求並處理回應 request json 對應的資料或結果。"""
-        global _X_STOPPED_BY_429
+        global _X_STOPPED_BY_429, _X_STOPPED_BY_QUOTA
         try:
             _throttle_x_requests()
             return http_get_json_with_headers(
@@ -222,6 +226,10 @@ class XAccountSource(NewsSource):
             )
         except Exception as exc:
             text = str(exc)
+            if _is_quota_exhausted(text):
+                _X_STOPPED_BY_QUOTA = True
+                logger.warning("X source stopped because quota is exhausted; set X_ENABLED=false or restore X credits before restart")
+                return None
             is_429 = "429" in text
             if is_429 and self._stop_on_429:
                 _X_STOPPED_BY_429 = True
@@ -241,3 +249,8 @@ class XAccountSource(NewsSource):
         if len(compact) <= 140:
             return compact
         return compact[:137] + "..."
+
+
+def _is_quota_exhausted(text: str) -> bool:
+    normalized = (text or "").lower()
+    return "402" in normalized or "payment required" in normalized or "creditsdepleted" in normalized

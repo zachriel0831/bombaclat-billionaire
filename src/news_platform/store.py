@@ -256,7 +256,9 @@ class NewsPlatformStore:
             "country=VALUES(country), category=VALUES(category), title=VALUES(title), "
             "url=VALUES(url), occurred_at=VALUES(occurred_at), region=VALUES(region), "
             "metrics_json=VALUES(metrics_json), tags_json=VALUES(tags_json), "
-            "raw_json=VALUES(raw_json), updated_at=CURRENT_TIMESTAMP"
+            "raw_json=VALUES(raw_json), "
+            "fetched_at=CASE WHEN VALUES(source_id)='cwa' THEN CURRENT_TIMESTAMP ELSE fetched_at END, "
+            "updated_at=CURRENT_TIMESTAMP"
         )
         occurred = (
             record.occurred_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")

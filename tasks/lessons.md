@@ -27,6 +27,18 @@ This file is append-only. Add a new entry after any user correction to prevent r
 
 <!-- Add new lessons below this line -->
 
+## LESSON-20260805-01
+- Date: 2026-08-05
+- Trigger (User correction): User clarified that Liuli is the village service and is not covered by the news/finance "all services" stack.
+- What was wrong: The workspace service skill treated Liuli, Ollama, and llama-server as normal full-stack targets, so service restart/audit language mixed village AI runtime with the news/finance platform.
+- Root cause: The service runbook grouped every local helper under one "all services" bucket instead of separating news/finance runtime from explicit-only village/AI services.
+- New rule (always/never): Always treat `liuli-social-ai-service`, Ollama, and llama-server as explicit-only village/AI targets; never include them in the default news/finance all-services restart/audit set.
+- Prevention checklist (before final response):
+  - [ ] Check service target map separates news/finance services from explicit-only village/AI services
+  - [ ] Check restart/shutdown examples do not start or stop Liuli/Ollama unless the user names them
+  - [ ] Report Liuli/Ollama status only when explicitly requested or relevant to a village-service task
+- Status: active
+
 ## LESSON-20260803-01
 - Date: 2026-08-03
 - Trigger (User correction): User asked what `看錯的條件` means and clarified that stock recommendations should not appear in daily analysis.

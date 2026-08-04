@@ -327,6 +327,8 @@ visible PowerShell window instead of opening short-lived task windows.
 3. Verify
 - `Get-ScheduledTask -TaskName NewsCollector-CwaFixedWindow,NewsCollector-CwaWeather,NewsCollector-CwaEarthquake | Select-Object TaskName,State`
 - The fixed window title is `NewsCollector CWA fixed window`.
+- Read `runtime/status/cwa-fixed-window-status.json` for the latest fixed-window PID, last job, exit code, next weather run, next earthquake run, and current log file.
+- Daily fixed-window logs are written to `runtime/logs/cwa-fixed-window-YYYYMMDD.log`.
 - Weather/typhoon keeps the 30-minute cadence; earthquake keeps the 5-minute
   cadence. When both are due, the weather run wins because it already includes
   earthquake records, then the next earthquake-only poll is delayed 5 minutes.
@@ -347,7 +349,7 @@ machine restart, or when the user asks whether source data has caught up.
 - relay international RSS: BBC/Reuters/Fox/NPR public RSS rows
 - relay X/Truth Social/SEC/TWSE-MOPS/US-index probes when enabled in `.env`
 - relay market-context, BLS macro, Taiwan market-flow, and stored analysis probes
-- news platform society/politics category and per-source article probes
+- news platform society/politics category and active per-source article probes; disabled sources such as current `tvbs,ctee` are not health failures
 - news platform public records and article-public-record link probes
 - process counts: exactly one root Python service instance for `event_relay.main`, `news_collector.relay_bridge`, and `news_platform.main --loop`
 3. Interpret WARNs

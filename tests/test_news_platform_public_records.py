@@ -73,6 +73,7 @@ class NewsPlatformPublicRecordTests(unittest.TestCase):
         self.assertTrue(inserted)
         self.assertIn("INSERT INTO `t_public_records`", sql)
         self.assertIn("ON DUPLICATE KEY UPDATE", sql)
+        self.assertIn("fetched_at=CASE WHEN VALUES(source_id)='cwa'", sql)
         self.assertEqual(params[0], "ly:bill:123")
         self.assertEqual(params[7], "2026-05-11 03:00:00")
         self.assertEqual(json.loads(params[9]), {"proposal_count": 1})

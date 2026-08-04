@@ -4,6 +4,7 @@ from data_source_health import (
     NEWS_PLATFORM_SOURCE_IDS,
     PUBLIC_RECORD_GROUPS,
     ProbeResult,
+    _event_driven_probe,
     classify_freshness,
     overall_status,
     render_text,
@@ -43,6 +44,14 @@ class DataSourceHealthTests(unittest.TestCase):
 
         self.assertEqual(overall_status(probes), "missing")
 
+    def test_event_driven_probe_skips_empty_missing(self) -> None:
+        probe = ProbeResult(name="relay_sec_filings", status="missing", row_count=0, detail="Official SEC.")
+
+        result = _event_driven_probe(probe)
+
+        self.assertEqual(result.status, "skipped")
+        self.assertIn("event-driven", result.detail)
+
     def test_render_text_includes_summary_and_probe(self) -> None:
         report = HealthReport(
             generated_at_utc="2026-05-14T00:00:00+00:00",
@@ -72,8 +81,9 @@ class DataSourceHealthTests(unittest.TestCase):
         self.assertIn("rss_feeds=28", text)
         self.assertIn("public_records_npa_traffic_accident_a1", text)
 
-    def test_news_platform_source_ids_include_commercial_times(self) -> None:
-        self.assertIn("ctee", NEWS_PLATFORM_SOURCE_IDS)
+    def test_news_platform_source_ids_exclude_disabled_sources(self) -> None:
+        self.assertNotIn("tvbs", NEWS_PLATFORM_SOURCE_IDS)
+        self.assertNotIn("ctee", NEWS_PLATFORM_SOURCE_IDS)
 
     def test_public_record_groups_include_npa_stat_sources(self) -> None:
         self.assertIn(("npa", "traffic_accident_a2_stat"), PUBLIC_RECORD_GROUPS)
@@ -82,6 +92,8 @@ class DataSourceHealthTests(unittest.TestCase):
         self.assertIn(("mohw", "mohw_hospital_bed_stat"), PUBLIC_RECORD_GROUPS)
         self.assertIn(("moj", "moj_prosecution_disposition_stat"), PUBLIC_RECORD_GROUPS)
         self.assertIn(("mojac", "mojac_daily_custody_stat"), PUBLIC_RECORD_GROUPS)
+        self.assertIn(("cwa", "cwa_typhoon_report"), PUBLIC_RECORD_GROUPS)
+        self.assertIn(("cwa", "cwa_earthquake_report"), PUBLIC_RECORD_GROUPS)
 
     def test_process_probe_counts_root_python_service_instances(self) -> None:
         records = _parse_process_records(
