@@ -81,17 +81,23 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Commit the data-collecting instrumentation.
 
 ## Current Task
-- Task: Guard the 2026-08-04 `pre_tw_open` market-analysis row from local evidence only.
+- Task: Guard the 2026-08-05 `us_close` market-analysis row from local evidence only.
 - Requested by: automation
-- Start date: 2026-08-04
-- Scope: Create the missing delivery row, run targeted signal extraction, preserve Java delivery ownership, and use no paid external LLM APIs.
+- Start date: 2026-08-05
+- Scope: Create the missing stored analysis row, preserve Java delivery ownership, and use no paid external LLM APIs.
 
 ## Plan
-- [x] Read repo rules, Workflow 4C, automation memory, and active lessons.
+- [x] Read repo rules, Workflow 4C, automation memory, skills, and active lessons.
 - [x] Confirm the slot is calendar-eligible, missing, and has local evidence.
-- [x] Write and verify the delivery-ready row through `MySqlEventStore.upsert_market_analysis`.
-- [x] Run targeted signal extraction and verify final DB state.
+- [x] Write the review-ready row through `MySqlEventStore.upsert_market_analysis`.
+- [x] Run eligible signal extraction and verify final DB state.
 - [x] Record Observer completion, commit, and push the run log.
+
+### 2026-08-05 US Close Guard Result
+- Created `t_market_analyses.id=310` through `MySqlEventStore.upsert_market_analysis()` from five local evidence rows and two local market-index rows.
+- Final verification: `claim_verifier.ok=true`, support rate `1.0`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=0`, `pushed=0`, structured data present, exact requested six-section flow, exactly three evidence bullets, garbled/style/template checks passed, and `external_provider_api_called=false`.
+- Targeted extraction completed; `structured_json.stock_watch` is empty, so zero current trade signals were stored.
+- No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
 
 ### 2026-08-04 Replan
 - The first evidence query used nonexistent `event_time`; use the actual `published_at` column and keep the indexed recent-ID path.
