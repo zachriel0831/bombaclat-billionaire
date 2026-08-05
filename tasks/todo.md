@@ -3,6 +3,19 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-05 TW Close Guard
+- [x] Read repo rules, Workflow 4C, automation memory, skills, and active lessons.
+- [x] Confirm the slot is calendar-eligible, missing, and has same-day local close context.
+- [x] Write the review-ready row through `MySqlEventStore.upsert_market_analysis`.
+- [x] Run policy-eligible signal extraction and independently verify final DB state.
+- [x] Record Observer completion, commit, and push the scoped run log.
+
+### 2026-08-05 TW Close Guard Result
+- Created `t_market_analyses.id=312` through `MySqlEventStore.upsert_market_analysis()` from four local evidence rows.
+- Final verification: `claim_verifier.ok=true`, support rate `1.0`, `trust_gate.reason=claim_verifier_ok`, `push_enabled=0`, `pushed=0`, structured data present, exact six-section flow, exactly three evidence bullets, garbled/style/template checks passed, and `external_provider_api_called=false`.
+- Targeted extraction completed; `structured_json.stock_watch` is empty, so zero current trade signals were stored.
+- No OpenAI, Anthropic, paid external LLM API, web search, or LINE contact occurred.
+
 ## 2026-08-05 Service Stack Cleanup
 - [x] Update the workspace service skill so `liuli-social-ai-service`, Ollama, and llama-server are explicit-only village/AI targets, not part of the news/finance "all services" stack.
 - [x] Stop noisy or misleading source health: X quota exhaustion, TVBS/CTEE broken endpoints, and CWA freshness semantics.
