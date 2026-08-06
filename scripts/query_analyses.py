@@ -3,7 +3,6 @@
 Examples:
     python scripts/query_analyses.py --sentiment bearish --since 2026-04-01
     python scripts/query_analyses.py --confidence high --sector 半導體
-    python scripts/query_analyses.py --ticker 2330 --limit 10
 """
 
 from __future__ import annotations
@@ -27,7 +26,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sentiment", choices=["bullish", "bearish", "neutral"])
     parser.add_argument("--confidence", choices=["low", "medium", "high"])
     parser.add_argument("--sector", help="Match against tw_sector_watch[].sector (substring).")
-    parser.add_argument("--ticker", help="Match against stock_watch[].ticker (exact).")
     parser.add_argument("--slot", help="Filter by analysis_slot (e.g. pre_tw_open).")
     parser.add_argument("--since", help="Filter analysis_date >= YYYY-MM-DD.")
     parser.add_argument("--limit", type=int, default=20)
@@ -43,10 +41,6 @@ def _matches(structured: dict, args: argparse.Namespace) -> bool:
     if args.sector:
         sectors = structured.get("tw_sector_watch") or []
         if not any(args.sector in (item.get("sector") or "") for item in sectors):
-            return False
-    if args.ticker:
-        stocks = structured.get("stock_watch") or []
-        if not any((item.get("ticker") or "") == args.ticker for item in stocks):
             return False
     return True
 
@@ -110,11 +104,6 @@ def main() -> int:
             print("  sectors:")
             for item in sectors[:5]:
                 print(f"    - {item.get('sector')} ({item.get('direction')}): {item.get('rationale')}")
-        stocks = structured.get("stock_watch") or []
-        if stocks:
-            print("  stocks:")
-            for item in stocks[:5]:
-                print(f"    - {item.get('ticker')} ({item.get('direction')}): {item.get('rationale')}")
         risks = structured.get("risks") or []
         if risks:
             print(f"  risks: {', '.join(risks[:3])}")

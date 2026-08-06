@@ -68,7 +68,6 @@ _VALID_STAGE3 = {
             "evidence_ids": [101],
         }
     ],
-    "stock_watch": [],
     "risks": ["若通膨再加速則反轉"],
     "data_gaps": ["需確認費半盤後走勢"],
 }
@@ -182,8 +181,8 @@ class SchemaValidationTests(unittest.TestCase):
 
         walk(STAGE4_SYNTHESIS_SCHEMA)
 
-    def test_stage4_accepts_nullable_stock_execution_fields(self) -> None:
-        """Stage4 stock_watch keeps all keys while allowing unknown prices as null."""
+    def test_stage4_accepts_sector_only_payload(self) -> None:
+        """Stage4 structured payload no longer carries stock candidate rows."""
         payload = {
             "summary_text": "test",
             "headline": "test",
@@ -191,28 +190,6 @@ class SchemaValidationTests(unittest.TestCase):
             "confidence": "medium",
             "key_drivers": ["AI demand"],
             "tw_sector_watch": [],
-            "stock_watch": [
-                {
-                    "ticker": "2330",
-                    "market": "TW",
-                    "name": None,
-                    "direction": "bullish",
-                    "rationale": "SOX supports Taiwan semis.",
-                    "strategy_type": "swing",
-                    "entry_zone": {
-                        "low": 600,
-                        "high": 610,
-                        "timing": None,
-                        "basis": "latest close",
-                    },
-                    "invalidation": None,
-                    "take_profit_zone": None,
-                    "holding_horizon": "short_to_medium",
-                    "confidence": "medium",
-                    "risk_notes": [],
-                    "evidence_ids": [101],
-                }
-            ],
             "risks": [],
             "data_gaps": [],
         }
@@ -231,9 +208,9 @@ class EvidenceTraceabilityTests(unittest.TestCase):
         """測試 test detects unknown evidence id 的預期行為。"""
         stage3_with_phantom = {
             **_VALID_STAGE3,
-            "stock_watch": [
+            "sector_watch": [
                 {
-                    "ticker": "2330",
+                    "sector": "AI",
                     "direction": "bullish",
                     "rationale": "test",
                     "evidence_ids": [999],
@@ -241,7 +218,7 @@ class EvidenceTraceabilityTests(unittest.TestCase):
             ],
         }
         missing = assert_evidence_ids_covered(stage3_with_phantom, _VALID_STAGE1)
-        self.assertEqual(missing, ["stock_watch:999"])
+        self.assertEqual(missing, ["sector_watch:999"])
 
 
 class StageRunnerFallbackTests(unittest.TestCase):
@@ -374,7 +351,6 @@ class StageRunnerFallbackTests(unittest.TestCase):
             )
         self.assertTrue(result.ok())
         self.assertEqual(result.extras["sectors_count"], 1)
-        self.assertEqual(result.extras["stocks_count"], 0)
 
     def test_stage4_returns_structured_when_schema_valid(self) -> None:
         """測試 test stage4 returns structured when schema valid 的預期行為。"""
@@ -451,6 +427,7 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("Do not force exactly two triggers", user_prompt)
         self.assertIn("observation boundaries, not trading instructions", user_prompt)
         self.assertIn("stock recommendations, buy candidates, or watchlist candidates", user_prompt)
+        self.assertIn("Do not output stock_watch", user_prompt)
         self.assertIn("stock recommendation list", user_prompt)
         self.assertIn("invalidation evidence, not buy/sell triggers", user_prompt)
         self.assertNotIn("對台股的可能影響", user_prompt)
@@ -503,9 +480,9 @@ class StageRunnerFallbackTests(unittest.TestCase):
         self.assertIn("國際消息到台股的傳導", captured["user_prompt"])
         self.assertIn("看錯的條件", captured["user_prompt"])
         self.assertNotIn("6. 台股配置", captured["user_prompt"])
-        self.assertIn("machine-readable only", captured["user_prompt"])
-        self.assertIn("Allowed tickers must be evidence-backed 4-digit Taiwan ticker codes", captured["user_prompt"])
-        self.assertIn("Never pad with a legacy watchlist", captured["user_prompt"])
+        self.assertIn("Do not output stock_watch", captured["user_prompt"])
+        self.assertNotIn("Allowed tickers must be evidence-backed 4-digit Taiwan ticker codes", captured["user_prompt"])
+        self.assertNotIn("Never pad with a legacy watchlist", captured["user_prompt"])
         self.assertIn("信心等級：medium", result.output["summary_text"])
         self.assertEqual(result.extras["usage"]["provider"], "anthropic")
 

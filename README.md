@@ -2,7 +2,7 @@
 
 ## Platform Role
 
-`data-collecting` is the ingestion, enrichment, analysis, and decision-memory center of the financial news platform. It collects market/news/public-record data, stores normalized events, runs scheduled market-analysis and weekly-summary jobs, extracts trade-signal candidates, and maintains the platform's richest documentation set.
+`data-collecting` is the ingestion, enrichment, analysis, and decision-memory center of the financial news platform. It collects market/news/public-record data, stores normalized events, runs scheduled market-analysis and weekly-summary jobs, and maintains the platform's richest documentation set.
 
 It also provides the context collection and Redis write helpers for the
 Codex-generated four-hour cross-section news digest. Codex automation writes the
@@ -39,10 +39,10 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 
 | Service | Relationship |
 |---|---|
-| `news-platform-api` | Reads event, article, analysis, trade-signal, public-record, and candle tables for public API access. |
+| `news-platform-api` | Reads event, article, analysis, public-record, and candle tables for public API access. |
 | `news-display-frontend` | Displays public news, analyses, issue timelines, and market candles through the API. |
 | `line-relay-service` | Delivers selected analyses and stock-query responses to LINE users. |
-| `stock-monitor-service` | Consumes trade signals and produces live quote/candle/trigger data. |
+| `stock-monitor-service` | Produces live quote/candle/trigger data. |
 | `order-dispatcher-service` | Future consumer of reviewed trigger/order intents; broker calls do not live here. |
 
 ## Current data sources
@@ -541,7 +541,7 @@ Current behavior:
 - Optionally retrieves hybrid historical examples from `t_event_embeddings` and `t_analysis_embeddings` using metadata overlap, vector similarity, and stored outcome score; examples are analogues in the stage2 transmission prompt
 - Calls OpenAI Responses API with web search enabled by default for missing/current fact verification
 - Runs `claim_verifier` after generation and stores evidence coverage for numbers, dates, and tickers in `raw_json.claim_verifier`
-- Applies `raw_json.trust_gate`: when `claim_verifier.ok=false`, the analysis is still stored for audit/debug but `push_enabled=false` and trade-signal extraction is skipped
+- Applies `raw_json.trust_gate`: when `claim_verifier.ok=false`, the analysis is still stored for audit/debug but `push_enabled=false`
 - Stores the generated analysis in `t_market_analyses`
 - Uses `push_enabled` as Java delivery eligibility: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`
 - Runs a built-in 2026 TWSE / NYSE calendar guard before any LLM call:
@@ -550,10 +550,8 @@ Current behavior:
   - both closed: `pre_tw_open` task writes `macro_daily` with `push_enabled=1`
   - Sunday: market analysis skips; weekly summary owns the day
 - Keeps regular-day `us_close` analysis stored and injects it into the next Taiwan pre-open prompt only when that U.S. close session was open; TW-holiday `us_close` rows are eligible for Java LINE delivery
-- Target direction: Codex should generate dynamic Taiwan intraday / short-swing trade candidates from collected `t_relay_events`, market context, quote evidence, historical/RAG context, and model judgment, then store reviewable rows in `t_trade_signals`.
-- The old fixed ten-stock pool was only an observation/debugging aid and is superseded by `spec/market-analysis-dynamic-trade-candidates.md`.
-- Runtime candidate generation is now dynamic: valid Taiwan candidates are normalized to four-digit stock codes, must be evidence-backed, and are not padded from the historical fixed pool.
-- `stock-monitor-service` should monitor the top five ranked `t_trade_signals` candidates that pass the deterministic risk gate.
+- Stock recommendation generation is retired: daily analysis prompts must not output `stock_watch`, buy/watchlist candidates, or entry/stop/target lists, and Python no longer writes `t_trade_signals`.
+- The old fixed ten-stock pool and later dynamic five-stock candidate flow are both removed from active runtime.
 - Future `order-dispatcher-service` trading must cap concurrent traded symbols at three and must remain sandbox/paper until order, fill, position, PnL, reconciliation, and kill-switch state are implemented.
 - Daily visible market-analysis text follows the refreshed author-style flow for readability: `今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `備註`; `三個檢查點` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. `看錯的條件` is thesis-invalidation evidence, not a buy/sell trigger list. The daily body may trial a trigger-first rhythm (`結論先講`, `先看區間邊界`, `現在只看 N 件事`) where N is evidence-driven, but must not expose stock recommendations, buy/watchlist candidates, or entry/stop/target lists.
 - Daily visible text must translate internal labels such as `market scorecard`, `scorecard +4`, `market_context`, `07:20 market_context`, `analysis_slot`, `scheduled_time_local`, and `raw_json` into plain Chinese market implications.
@@ -569,26 +567,11 @@ Manual backfill through the running relay service:
 '{"kind":"market","slot":"macro_daily","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"
 ```
 
-Trade signal storage:
-- `t_trade_signals` is the reviewable daily candidate table for Taiwan intraday / short-swing monitoring. The target design allows dynamic candidates, subject to evidence, ranking, validation, and review gates.
-- `ticker` is the normalized tradable symbol. For Taiwan signals this is the 4-digit stock code such as `2330`; `.TW` / `.TWO` suffixes are stripped and market type is stored in `market`.
-- Signals start as `status=pending_review`; they are not orders.
-- Each signal carries `analysis_id`, `analysis_date`, `analysis_slot`, `ticker`, `strategy_type`, `direction`, optional entry/stop/target JSON, and `source_event_ids`.
-- Each signal also stores deterministic `risk_reward_ratio`, `candidate_score`, and `avoid_reason`.
-  `risk_reward_ratio` uses `entry_zone.high` for long signals and
-  `entry_zone.low` for short signals, then compares against
-  `invalidation.price` and `take_profit_zone.first`.
-- `stock-monitor-service` enables monitoring only for complete long/short rows
-  with `risk_reward_ratio >= 1.5` and no `avoid_reason`; lower-quality rows are
-  still kept for audit and review.
-- Deterministic quote/context fallback rows calibrate `take_profit_zone.first`
-  from the generated entry/stop levels so their first target is at least 1.5R;
-  structured LLM rows are not silently adjusted and remain gated when R is low.
-- For Taiwan pre-open output, internal `direction=long` means buy-side / 做多, not long-term holding. `strategy_type=swing|medium` controls 波段/中線 wording. `entry_zone` is entry area, `take_profit_zone` is profit-taking exit area, and `invalidation` is shown as 停損.
-- Fallback rows may enrich or fill monitor levels only for tickers already selected in model `stock_watch` output. They must not create extra candidates from tracked/preferred ticker lists or prior signals. They still start as `pending_review` and are not orders.
-- `idempotency_key` prevents duplicate signals for the same analysis/ticker/strategy.
-- `t_signal_reviews` and `t_signal_outcomes` are separate follow-up tables for risk gate / human review and performance feedback.
-- LLM output stops at signal creation. Order intents and broker calls must be created only after independent review/risk approval.
+Retired trade-signal flow:
+- `market_analysis` no longer builds, repairs, or stores stock recommendation rows.
+- `scripts/run_trade_signal_extraction.ps1` is a compatibility no-op and stores zero rows.
+- Existing historical `t_trade_signals` rows may remain in old databases for audit/history, but this repo no longer creates or migrates that table.
+- Order intents and broker calls are still outside this repo.
 
 Pre-open market context collector:
 - Module: `event_relay.market_context`
@@ -660,7 +643,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot
 powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot tw_close -Force
 ```
 
-Backfill trade signals from existing structured analyses:
+Compatibility no-op for retired trade-signal extraction:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_trade_signal_extraction.ps1 -EnvFile .env -Days 14 -Limit 50

@@ -1,4 +1,4 @@
-# Engineering Workflows
+﻿# Engineering Workflows
 
 ## Workflow Orchestration (Default)
 1. Plan first for non-trivial work
@@ -162,7 +162,7 @@ Use this when adding or auditing local scheduler entry scripts.
 4. Verify
 - Check summary counters for `present`, `updated`, `no_author_metadata`, and `parse_failed`.
 - Query recent `t_relay_events.raw_json` rows for `$.authors`.
-- Refresh the public finance page; cards should show `記者 <name>` when author data exists.
+- Refresh the public finance page; cards should show `閮?<name>` when author data exists.
 5. Boundaries
 - The script fetches article detail pages only to extract byline metadata.
 - Do not use this workflow to store article body content.
@@ -430,7 +430,7 @@ machine restart, or when the user asks whether source data has caught up.
 - Treat `t_relay_events` as primary local evidence, not exhaustive truth
 - `MARKET_ANALYSIS_<SLOT>_PIPELINE` overrides the global `MARKET_ANALYSIS_PIPELINE`; current cost-aware default is `MARKET_ANALYSIS_US_CLOSE_PIPELINE=digest` and `MARKET_ANALYSIS_PRE_TW_OPEN_PIPELINE=multi_stage`
 - `us_close` digest mode is upstream context only: one compact call, smaller prompt context, no trading-candidate append in visible text
-- `pre_tw_open` is the main trade-decision brief. Target design: Codex generates dynamic Taiwan intraday / short-swing candidates from relay events, market context, quote evidence, historical/RAG context, and model judgment.
+- `pre_tw_open` is the main market-decision brief. It must discuss macro/sector transmission, not stock recommendations.
 - If `MARKET_ANALYSIS_MODEL_ROUTER_ENABLED=true`, OpenAI is the default primary and Claude is fallback; configure budgets/Admin API keys before relying on provider fallback, and inspect `raw_json.model_router` to confirm the selected route
 - When the selected provider is Anthropic, compact context mode is applied by default to reduce rate-limit risk; inspect `raw_json.provider_context_policy` for event/RAG/market-row reductions
 - Market analysis builds a quota-managed context pack before RAG/prompting; `market_context:scorecard`, market-context rows, and important official data must remain selected even when general news volume is high
@@ -441,22 +441,13 @@ machine restart, or when the user asks whether source data has caught up.
 - Generated text is upserted into `t_market_analyses` by `(analysis_date, analysis_slot)`
 - `push_enabled` means Java delivery eligibility, not Python push execution
 - Daily delivery policy starts from `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`; `raw_json.trust_gate` may force final `push_enabled=0`
-- If `claim_verifier.ok=false`, `market-analysis-trust-gate-v1` stores the row for audit/debug but blocks Java delivery eligibility and skips trade-signal extraction
-- `claim-verifier-v2` ignores internal parenthesized evidence/source ID lists such as `（128610,128539）`; Stage4 must keep internal IDs out of visible `summary_text` and leave evidence links in telemetry/structured fields
-- For dynamic candidate slots, `claim_verifier` must verify ticker references against local evidence or explicit candidate telemetry. Unsupported numbers, dates, and unrelated tickers must still block delivery.
+- If `claim_verifier.ok=false`, `market-analysis-trust-gate-v1` stores the row for audit/debug but blocks Java delivery eligibility
+- `claim-verifier-v2` ignores internal parenthesized evidence/source ID lists such as `嚗?28610,128539嚗; Stage4 must keep internal IDs out of visible `summary_text` and leave evidence links in telemetry/structured fields
+- `claim_verifier` still verifies ticker references when the visible analysis mentions companies as macro/sector examples. Unsupported numbers, dates, and unrelated tickers must still block delivery.
 - `us_close` remains stored as a digest/analysis and is injected into the next Taiwan pre-open analysis context only when the relevant U.S. session was open; if U.S. was closed, the pre-open prompt has no `us_close` context
-- Dynamic `structured_json.stock_watch` rows are extracted into `t_trade_signals`.
-- Do not pad empty or thin analyses from the historical fixed ten-stock pool.
-- New signals use `status=pending_review`; stale pending signals for the same analysis are marked `superseded`
-- `ticker` is normalized symbol text; Taiwan signals use 4-digit codes without `.TW` / `.TWO`
-- Daily visible reports no longer append `## 今日個股觀察`; `t_trade_signals` may still be maintained as machine-readable downstream context, but it is not rendered into the market-analysis body.
-- If today's structured `stock_watch` is empty, trade-signal extraction must store zero current candidates. Do not copy same-ticker recent `t_trade_signals` or tracked/preferred ticker lists into the current day.
-- Daily formatting uses date-only `raw_json.display_title` and the refreshed author-style flow `今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `備註`; `三個檢查點` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. `看錯的條件` means thesis-invalidation evidence, not buy/sell triggers. Do not write a dedicated `台股配置` section.
-- Individual company mentions in daily visible reports are limited to macro/sector transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; do not write stock recommendations, buy/watchlist candidates, entry, stop-loss, or target-price language in the daily body.
-- In that section, `direction=long` is rendered as `可做/建議觀察` plus the strategy label; `entry_zone` means entry area, `take_profit_zone` means profit-taking/exit area, and `invalidation` is rendered as `停損`
-- Do not create orders here. Risk gate / review and outcomes stay in `t_signal_reviews` and `t_signal_outcomes`
-- For existing structured rows, run `scripts/run_trade_signal_extraction.ps1 -EnvFile .env`
-- For a specific analysis row whose model-selected tickers have missing monitor levels, run targeted repair: `scripts/run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback -EventDays 1 -PriorDays 30`. Despite the legacy option name, this may fill quote/context levels only for tickers already present in structured `stock_watch`; it still honors `raw_json.trust_gate.signals_allowed=false`.
+- Stock recommendation generation is retired. Stage prompts must not output `stock_watch`, and Python must not write `t_trade_signals`.
+- Daily formatting uses date-only `raw_json.display_title` and the refreshed author-style flow `隞銝?亥店` -> `銝炎?仿?` -> `撣?潭釣???榆` -> `??瘨?啣?∠??喳?` -> `???隞跆 -> `?酉`; `銝炎?仿?` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. `???隞跆 means thesis-invalidation evidence, not buy/sell triggers. Do not write a dedicated `?啗?蔭` section.
+- Individual company mentions in daily visible reports are limited to macro/sector transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 蝢銝楊?? do not write stock recommendations, buy/watchlist candidates, entry, stop-loss, or target-price language in the daily body.
 - Strategy performance must use entry-first attribution: ignore `target_hit` / `stop_hit` before the first `entry_hit`; after entry, the first `target_hit` is a win and the first `stop_hit` is a loss. Rows without entry are `not_entered` and must not inflate win rate.
 4. Keep Python storage-only
 - `market_analysis` does not push directly or create delivery jobs
@@ -464,7 +455,6 @@ machine restart, or when the user asks whether source data has caught up.
 5. Verify
 - Check prompt snapshots under `runtime/prompts/`
 - Query `t_market_analyses` for the current `analysis_date`
-- Query `t_trade_signals` by `analysis_id` or `(analysis_date, analysis_slot)`
 - Query `t_relay_events` for recent `source LIKE 'market_context:%'`
 - Inspect `t_market_analyses.raw_json.context_pack` for selected counts and guaranteed bucket status
 - Inspect `t_market_analyses.raw_json.model_router`, `raw_json.provider_context_policy`, `raw_json.pipeline_stages.core_tensions`, `raw_json.rag`, and `raw_json.claim_verifier`
@@ -502,12 +492,8 @@ Guard responsibilities:
 - Write repaired rows only through `MySqlEventStore.upsert_market_analysis`.
 - Preserve Java delivery ownership: set `push_enabled` only according to
   existing slot/calendar/trust-gate policy and keep `pushed=false`.
-- For repaired delivery/signal-eligible rows, rebuild internal monitor signals
-  with `scripts/run_trade_signal_extraction.ps1 -AnalysisId <id>
-  -FixedPoolFallback`; this must not create candidates when structured
-  `stock_watch` is empty.
 - Verify final DB state: `claim_verifier.ok`, trust-gate reason,
-  `push_enabled`, `pushed`, `structured_json`, and `t_trade_signals` count.
+  `push_enabled`, `pushed`, and `structured_json`.
 - Store telemetry indicating `external_provider_api_called=false` for repaired
   rows.
 
@@ -566,7 +552,7 @@ Guard responsibilities:
 4. Verify storage
 - Query `t_market_analyses` by `analysis_slot`
 - Weekly uses `analysis_slot=weekly_tw_preopen`
-- Daily market analysis extracts dynamic trade candidates to `t_trade_signals`; old fixed-pool behavior is superseded.
+- Daily market analysis does not extract stock recommendation candidates; the old fixed-pool and dynamic `t_trade_signals` flows are retired.
 
 ## Workflow 4E: SEC Tracked Filings Flow
 1. Define tracked universe
@@ -590,7 +576,7 @@ Guard responsibilities:
 1. Define tracked universe
 - Set `TWSE_MOPS_TRACKED_CODES` to the listed companies you care about
 2. Pull official announcement feed
-- Query TWSE openapi dataset `t187ap04_L` (`上市公司每日重大訊息`)
+- Query TWSE openapi dataset `t187ap04_L` (`銝??砍瘥?之閮`)
 3. Filter and normalize
 - Keep only tracked company codes
 - Convert ROC date/time into timezone-aware timestamps
@@ -627,8 +613,7 @@ Guard responsibilities:
 - Deterministic scorecard: `breadth_health`, `ai_capex_quality`, `energy_shock_risk`, `credit_stress`, and `liquidity_impulse` on a -2..+2 scale
 - TWSE official OpenAPI: index groups, tracked stocks, and margin balances
 - Taiwan Yahoo context from `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` is an optional tracked evidence input and fallback preference list. It must not be treated as a fixed trading universe.
-- Visible stock-analysis exclusions are controlled by `MARKET_ANALYSIS_EXCLUDED_TICKERS`; default excludes `4749` / 新應材
-3. Persist as event-only facts
+- Visible stock-analysis exclusions are controlled by `MARKET_ANALYSIS_EXCLUDED_TICKERS`; default excludes `4749` / ?唳???3. Persist as event-only facts
 - Insert one stored-only event per context point into `t_relay_events`
 - Insert one `market_context:scorecard` event when `MARKET_CONTEXT_SCORECARD_ENABLED=true`
 - Add one `market_context:collector` summary event for point/failure counts

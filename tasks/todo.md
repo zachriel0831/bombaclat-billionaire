@@ -3,6 +3,13 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-06 Retire Stock Recommendations And Monitor Live Workers
+- [x] Trace stock recommendation flow: `market_analysis` structured `stock_watch` -> `t_trade_signals` -> stock-monitor daily review; LINE stock query had dormant `StockQueryService`/platform client.
+- [x] Retire market-analysis stock recommendation generation and make trade-signal extraction a no-op.
+- [x] Add data-collecting live-worker monitor scripts for relay, source bridge, and news-platform loop.
+- [x] Update workspace service-control skill so "all services" includes data live workers and the live-service monitor task, while Liuli/Ollama remain explicit-only.
+- [x] Run focused tests, register monitor task, and commit scoped changes.
+
 ## 2026-08-06 Pre-Open Guard
 - [x] Read repo rules, Workflow 4C, automation memory, skills, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's `pre_tw_open` row.

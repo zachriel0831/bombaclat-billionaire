@@ -64,13 +64,7 @@ from event_relay.rag import (
     rag_enabled_from_env,
     retrieve_similar_events,
 )
-from event_relay.service import MarketAnalysisRecord, MySqlEventStore, TradeSignalRecord
-from event_relay.trade_signals import (
-    build_trade_signal_recommendation_section,
-    build_quote_event_trade_signals,
-    build_trade_signals_from_analysis,
-    is_excluded_trade_signal_ticker,
-)
+from event_relay.service import MarketAnalysisRecord, MySqlEventStore
 from event_relay.weekly_summary import _call_llm, _load_secret_from_dpapi_file, _openai_web_search_enabled
 
 
@@ -87,8 +81,6 @@ SLOTS = {
 }
 
 MACRO_DAILY_OWNER_SLOT = "pre_tw_open"
-DYNAMIC_TRADE_SIGNAL_SLOTS = {"pre_tw_open", "us_close"}
-VISIBLE_RECOMMENDATION_SECTION_SLOTS: set[str] = set()
 
 
 @dataclass(frozen=True)
@@ -375,85 +367,9 @@ def _load_config(args: argparse.Namespace) -> MarketAnalysisConfig:
     )
 
 
-def _preferred_tw_fallback_tickers_from_env() -> set[str]:
-    """Return tickers explicitly configured as Taiwan tracked-stock fallback."""
-    result: set[str] = set()
-    for raw in str(os.getenv("MARKET_CONTEXT_TW_YAHOO_SYMBOLS") or "").split(","):
-        entry = raw.strip()
-        if not entry:
-            continue
-        symbol = entry
-        for separator in (":", "|", "="):
-            if separator in symbol:
-                symbol = symbol.split(separator, 1)[0]
-                break
-        code = symbol.strip().upper().split(".", 1)[0]
-        if code.isdigit() and len(code) == 4:
-            result.add(code)
-    return result
-
-
-def _should_emit_recommendation_section(slot: str, *, pipeline_mode: str | None = None) -> bool:
-    """Return whether stored signals should be appended to the report text."""
-    if slot == "us_close" and pipeline_mode == "digest":
-        return False
-    return slot in VISIBLE_RECOMMENDATION_SECTION_SLOTS
-
-
-def _should_build_trade_signals(slot: str, *, pipeline_mode: str | None = None) -> bool:
-    """Return whether internal dynamic trade signals should be maintained."""
-    if slot == "us_close" and pipeline_mode == "digest":
-        return False
-    return slot in DYNAMIC_TRADE_SIGNAL_SLOTS
-
-
 def _allowed_claim_tickers_for_slot(slot: str, *, pipeline_mode: str | None = None) -> set[str]:
-    """Return ticker whitelist for claim verification.
-
-    Dynamic stock candidates should be supported by the current evidence
-    corpus, so there is intentionally no static ticker whitelist.
-    """
+    """Return ticker whitelist for claim verification."""
     return set()
-
-
-def _merge_reference_levels_from_fallbacks(
-    signals: list[TradeSignalRecord],
-    fallback_signals: list[TradeSignalRecord],
-) -> tuple[list[TradeSignalRecord], int]:
-    """Fill missing price-reference levels on structured signals.
-
-    LLM stock_watch rows often name the right ticker but leave entry/exit
-    fields null. Quote/context fallback rows are deterministic reference
-    levels from recent Taiwan prices, so copy only missing fields from the
-    matching ticker while preserving the model's thesis and signal type.
-    """
-    fallback_by_ticker = {signal.ticker: signal for signal in fallback_signals}
-    merged: list[TradeSignalRecord] = []
-    filled = 0
-    for signal in signals:
-        fallback = fallback_by_ticker.get(signal.ticker)
-        if fallback is None:
-            merged.append(signal)
-            continue
-
-        updates: dict[str, Any] = {}
-        if not signal.entry_zone_json and fallback.entry_zone_json:
-            updates["entry_zone_json"] = fallback.entry_zone_json
-        if not signal.invalidation_json and fallback.invalidation_json:
-            updates["invalidation_json"] = fallback.invalidation_json
-        if not signal.take_profit_zone_json and fallback.take_profit_zone_json:
-            updates["take_profit_zone_json"] = fallback.take_profit_zone_json
-        if not signal.holding_horizon and fallback.holding_horizon:
-            updates["holding_horizon"] = fallback.holding_horizon
-        if not signal.confidence and fallback.confidence:
-            updates["confidence"] = fallback.confidence
-
-        if updates:
-            filled += 1
-            merged.append(replace(signal, **updates))
-        else:
-            merged.append(signal)
-    return merged, filled
 
 
 def _resolve_time_slot_legacy_unused(config: MarketAnalysisConfig, now_local: datetime) -> str | None:
@@ -724,7 +640,6 @@ _VISIBLE_INTERNAL_LABEL_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = 
     (re.compile(r"\bt_relay_events\b", re.IGNORECASE), "本地新聞與事件資料"),
     (re.compile(r"\bt_market_analyses\b", re.IGNORECASE), "分析資料"),
     (re.compile(r"\bt_market_index_snapshots\b", re.IGNORECASE), "行情快照"),
-    (re.compile(r"\bt_trade_signals\b", re.IGNORECASE), "交易訊號資料"),
     (re.compile(r"\banalysis_slot\b", re.IGNORECASE), "分析時段"),
     (re.compile(r"\bscheduled_time_local\b", re.IGNORECASE), "預定產出時間"),
     (re.compile(r"\braw_json\b", re.IGNORECASE), "內部稽核資料"),
@@ -1970,102 +1885,11 @@ def run_once(config: MarketAnalysisConfig) -> dict[str, Any]:
     trade_signals_count = 0
     trade_signal_recommendations_count = 0
     prior_reference_added = 0
-    if analysis_id and trust_gate["signals_allowed"]:
-        trade_signals = []
-        structured_signals_count = 0
-        quote_fallback_added = 0
-        if used_multi_stage:
-            trade_signals = build_trade_signals_from_analysis(
-                analysis_id=analysis_id,
-                analysis_date=record.analysis_date,
-                analysis_slot=record.analysis_slot,
-                structured_payload=structured_payload,
-                pipeline_telemetry=pipeline_telemetry,
-            )
-            structured_signals_count = len(trade_signals)
-        reference_levels_filled = 0
-        if _should_build_trade_signals(slot, pipeline_mode=effective_pipeline_mode):
-            preferred_fallback_tickers = _preferred_tw_fallback_tickers_from_env()
-            fallback_signals = build_quote_event_trade_signals(
-                analysis_id=analysis_id,
-                analysis_date=record.analysis_date,
-                analysis_slot=record.analysis_slot,
-                events=recent_events,
-                max_signals=10,
-                preferred_tickers=preferred_fallback_tickers,
-            )
-            trade_signals, reference_levels_filled = _merge_reference_levels_from_fallbacks(
-                trade_signals,
-                fallback_signals,
-            )
-            recommendation_tickers = {
-                signal.ticker
-                for signal in trade_signals
-                if not is_excluded_trade_signal_ticker(signal.ticker)
-                if signal.direction == "long" and signal.strategy_type in {"swing", "medium"}
-            }
-            existing_tickers = {signal.ticker for signal in trade_signals}
-            for fallback_signal in fallback_signals:
-                if is_excluded_trade_signal_ticker(fallback_signal.ticker):
-                    continue
-                if len(recommendation_tickers) >= 10 and fallback_signal.ticker not in preferred_fallback_tickers:
-                    break
-                if fallback_signal.ticker in existing_tickers:
-                    continue
-                trade_signals.append(fallback_signal)
-                existing_tickers.add(fallback_signal.ticker)
-                if fallback_signal.direction == "long" and fallback_signal.strategy_type in {"swing", "medium"}:
-                    recommendation_tickers.add(fallback_signal.ticker)
-                    quote_fallback_added += 1
-            trade_signals = [
-                signal
-                for signal in trade_signals
-                if not is_excluded_trade_signal_ticker(signal.ticker)
-            ]
-        if used_multi_stage or trade_signals:
-            trade_signals_count = store.replace_trade_signals_for_analysis(analysis_id, trade_signals)
-            source_label = "structured"
-            if prior_reference_added and (quote_fallback_added or structured_signals_count):
-                source_label = "structured_plus_fallback_plus_prior"
-            elif prior_reference_added:
-                source_label = "prior_signal_reference"
-            elif quote_fallback_added and structured_signals_count:
-                source_label = "structured_plus_quote_fallback"
-            elif quote_fallback_added:
-                source_label = "quote_fallback"
-            logger.info(
-                "[TRADE_SIGNALS_STORED] analysis_id=%s slot=%s count=%d status=pending_review source=%s fallback_added=%d prior_reference_added=%d reference_levels_filled=%d",
-                analysis_id,
-                slot,
-                trade_signals_count,
-                source_label,
-                quote_fallback_added,
-                prior_reference_added,
-                reference_levels_filled,
-            )
-        if _should_build_trade_signals(slot, pipeline_mode=effective_pipeline_mode):
-            recommendations = [
-                row
-                for row in store.fetch_trade_signal_recommendations(analysis_id, limit=10)
-                if not is_excluded_trade_signal_ticker(row.get("ticker"))
-            ]
-            trade_signal_recommendations_count = min(len(recommendations), 10)
-            if _should_emit_recommendation_section(slot, pipeline_mode=effective_pipeline_mode):
-                recommendation_section = build_trade_signal_recommendation_section(recommendations)
-                if recommendation_section:
-                    summary_text = f"{summary_text.rstrip()}\n\n{recommendation_section}"
-                    store.update_market_analysis_summary_text(analysis_id, summary_text)
-                    logger.info(
-                        "[TRADE_SIGNAL_RECOMMENDATIONS_APPENDED] analysis_id=%s count=%d",
-                        analysis_id,
-                        trade_signal_recommendations_count,
-                    )
-    elif analysis_id:
-        logger.warning(
-            "[TRADE_SIGNALS_SKIPPED_BY_TRUST_GATE] analysis_id=%s slot=%s reason=%s",
+    if analysis_id:
+        logger.info(
+            "[TRADE_SIGNALS_DISABLED] analysis_id=%s slot=%s reason=stock_recommendations_removed",
             analysis_id,
             slot,
-            trust_gate.get("reason"),
         )
     return {
         "ok": True,

@@ -1,8 +1,8 @@
-"""Stage 3: Taiwan-stock mapping.
+"""Stage 3: Taiwan sector mapping.
 
-Translates transmission chains into concrete Taiwan sector / ticker watch
-lists. Every item must carry ``evidence_ids`` that reference stage 1 event
-IDs, keeping the final report auditable.
+Translates transmission chains into concrete Taiwan sector implications. Every
+item must carry ``evidence_ids`` that reference stage 1 event IDs, keeping the
+final report auditable.
 """
 
 from __future__ import annotations
@@ -32,16 +32,13 @@ def build_prompts(
 ) -> tuple[str, str]:
     """建立 build prompts 對應的資料或結果。"""
     system_prompt = (
-        "You are a Taiwan equity analyst. Given normalised events and "
-        "transmission chains, produce: sector_watch, stock_watch, risks, "
-        "and data_gaps. stock_watch is a dynamic, evidence-backed Taiwan "
-        "ticker candidate list for downstream monitoring, not an order list. "
-        "Every sector_watch and stock_watch entry MUST "
+        "You are a Taiwan macro/sector analyst. Given normalised events and "
+        "transmission chains, produce: sector_watch, risks, and data_gaps. "
+        "Every sector_watch entry MUST "
         "carry evidence_ids that reference event IDs from the stage1 digest. "
-        "Only introduce a Taiwan ticker when the stage evidence names the "
-        "company, ticker, ADR, sector catalyst, or issuer clearly enough to "
-        "support it. Output is a single JSON object matching the schema; no "
-        "prose, no markdown."
+        "Do not output stock tickers, stock recommendations, buy candidates, "
+        "or watchlist candidates. Output is a single JSON object matching the "
+        "schema; no prose, no markdown."
     )
     user_prompt = (
         f"Slot: {slot}\n"
@@ -50,16 +47,13 @@ def build_prompts(
         "- evidence_ids must be a subset of stage1 event IDs.\n"
         "- sector labels should use Taiwan-market vocabulary "
         "(e.g. 半導體上游, AI 供應鏈, 金控, 網通, PCB/車用電子, 中小型股).\n"
-        "- stock_watch is dynamic. Use only 4-digit Taiwan ticker codes. Do not output .TW/.TWO suffixes.\n"
-        "- For pre_tw_open and delivery-eligible us_close, pick evidence-backed Taiwan names only. "
-        "Do not pad the list, do not backfill a legacy watchlist, and do not add substitute tickers just to reach a count.\n"
+        "- Do not output individual-stock lists or Taiwan ticker candidates.\n"
         "- When Fed path / liquidity / credit stress / sentiment-positioning events are present, "
-        "map them into Taiwan sector tilt before picking tickers: semis/AI beta, financials, "
+        "map them into Taiwan sector tilt: semis/AI beta, financials, "
         "high-dividend defensives, cyclicals, and small-cap risk appetite.\n"
-        "- For macro_daily, keep stock_watch empty and focus on macro risks / data gaps.\n"
         "- risks: concrete things that could invalidate the setup.\n"
         "- data_gaps: what you would want to confirm next (e.g. overnight ADR, OTC 融資餘額).\n"
-        "- Keep sector_watch 0-6 items; stock_watch 0-10 dynamic items only.\n\n"
+        "- Keep sector_watch 0-6 items.\n\n"
         f"Stage1 digest JSON:\n{stage1_json}\n\n"
         f"Stage2 chains JSON:\n{stage2_json}\n"
     )
@@ -114,15 +108,13 @@ def run(
         )
 
     sectors_count = len(parsed.get("sector_watch") or [])
-    stocks_count = len(parsed.get("stock_watch") or [])
     risks_count = len(parsed.get("risks") or [])
     gaps_count = len(parsed.get("data_gaps") or [])
     elapsed = time.perf_counter() - started
     logger.info(
-        "[stage3_tw_mapping] ok elapsed=%.2fs sectors=%d stocks=%d risks=%d data_gaps=%d",
+        "[stage3_tw_mapping] ok elapsed=%.2fs sectors=%d risks=%d data_gaps=%d",
         elapsed,
         sectors_count,
-        stocks_count,
         risks_count,
         gaps_count,
     )
@@ -133,7 +125,6 @@ def run(
         raw_text=raw_text,
         extras={
             "sectors_count": sectors_count,
-            "stocks_count": stocks_count,
             "risks_count": risks_count,
             "data_gaps_count": gaps_count,
             "elapsed_sec": round(elapsed, 3),

@@ -27,6 +27,29 @@ This file is append-only. Add a new entry after any user correction to prevent r
 
 <!-- Add new lessons below this line -->
 
+## LESSON-20260806-01
+- Date: 2026-08-06
+- Trigger (User correction): User clarified that data live workers need monitoring and must be included when restarting all services, and that stock-recommendation logic should be deleted rather than left dormant.
+- What was wrong: Source bridge / event relay / news-platform loop were treated as adjacent scripts instead of first-class news/finance services, while stock recommendation code paths remained available through internal trade-signal extraction and LINE stock-query classes.
+- Root cause: Service-control docs focused on HTTP endpoints, and the stock flow had been hidden from visible reports instead of retired at the source.
+- New rule (always/never): Always include data-collecting live workers and their monitor task in news/finance all-services restart/shutdown; never keep dormant LINE or market-analysis stock recommendation entry points after stock recommendations are retired.
+- Prevention checklist (before final response):
+  - [ ] Check `event_relay.main`, `news_collector.relay_bridge`, and `news_platform.main --loop` process probes
+  - [ ] Check all-services skill includes data live workers and `NewsCollector-LiveServiceMonitor`
+  - [ ] Check daily analysis and LINE relay cannot generate `stock_watch`, `t_trade_signals`, or stock-query replies
+- Repo updates made:
+  - `scripts/monitor_live_services.ps1`
+  - `scripts/register_live_service_monitor_task.ps1`
+  - `src/event_relay/market_analysis.py`
+  - `src/event_relay/service.py`
+  - `src/event_relay/analysis_stages/stage3_tw_mapping.py`
+  - `src/event_relay/analysis_stages/stage4_synthesis.py`
+  - `src/event_relay/analysis_stages/schemas.py`
+  - `src/event_relay/claim_verifier.py`
+  - `line-relay-service/src/main/java/com/zack/linerelay/stock/*`
+  - `C:/Users/Zack Ou/.codex/skills/workspace-service-shutdown/SKILL.md`
+- Status: active
+
 ## LESSON-20260805-01
 - Date: 2026-08-05
 - Trigger (User correction): User clarified that Liuli is the village service and is not covered by the news/finance "all services" stack.
@@ -48,7 +71,7 @@ This file is append-only. Add a new entry after any user correction to prevent r
 - Prevention checklist:
   - [ ] Check runtime prompts say invalidation conditions are not buy/sell triggers
   - [ ] Check daily visible prompts and skills ban stock recommendations / buy candidates / watchlist candidates
-  - [ ] Keep internal `stock_watch` / `t_trade_signals` machine-readable unless a separate trading UI explicitly asks for them
+  - [ ] Confirm no internal `stock_watch` / `t_trade_signals` generation remains unless a separate trading system is explicitly reintroduced
 
 ## LESSON-20260802-01
 - Date: 2026-08-02

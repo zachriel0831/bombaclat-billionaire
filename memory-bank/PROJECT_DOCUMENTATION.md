@@ -1,4 +1,4 @@
-# Project Documentation
+﻿# Project Documentation
 
 ## Project Goal
 Collect and normalize international breaking news, market data, and official disclosures, then generate stored market analyses for downstream systems.
@@ -55,9 +55,9 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 - Writes normalized filing events directly into `t_relay_events` through the crawler bridge
 
 4. TWSE / MOPS listed-company announcements
-- Uses official TWSE openapi dataset `t187ap04_L` (`上市公司每日重大訊息`)
+- Uses official TWSE openapi dataset `t187ap04_L` (`銝??砍瘥?之閮`)
 - Tracks allowlisted listed-company codes from `TWSE_MOPS_TRACKED_CODES`
-- Market analysis target direction is Codex-generated dynamic Taiwan intraday / short-swing candidates stored in `t_trade_signals`; the old fixed ten-stock pool was an observation/debugging aid and remains only as a runtime migration gap.
+- Market analysis stock-recommendation generation is retired; daily analysis must not output `stock_watch`, buy/watchlist candidates, or entry/stop/target lists.
 - Writes normalized announcement events directly into `t_relay_events` through the crawler bridge
 
 5. US index tracker
@@ -177,10 +177,10 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
      - `scripts/backfill_news_author_status.py`, `scripts/backfill_news_author_detail_pages.py`, `scripts/backfill_news_author_relations.py`, and `scripts/build_news_author_coverage_daily.py` remain available for manual repair, broader backfills, author relations, and daily coverage aggregates
   2. `KeywordWorker` fills `keywords_json`
   3. `TopicWorker` reads rows where `topics_json IS NULL AND keywords_json IS NOT NULL`
-  4. deterministic classifier writes up to three specific topic hits into `topics_json`; `TopicSpec.categories` scopes category-specific rules such as politics L2 topics to `category=politics`; no-hit rows become category-specific general topics (`general_social_news` / 一般社會新聞 or `general_politics_news` / 一般政治新聞) with `source=rule_fallback`, `topic_classified_by=rule`
-      - `low_birthrate` includes common policy variants such as `少子女化`, `0到6歲國家一起養`, and `兒少TISA`
+  4. deterministic classifier writes up to three specific topic hits into `topics_json`; `TopicSpec.categories` scopes category-specific rules such as politics L2 topics to `category=politics`; no-hit rows become category-specific general topics (`general_social_news` / 銝?祉冗???or `general_politics_news` / 銝?祆瘝餅?? with `source=rule_fallback`, `topic_classified_by=rule`
+      - `low_birthrate` includes common policy variants such as `撠?憟喳?`, `0??甇脣?摰嗡?韏琿?`, and `??TISA`
       - `weather` classifies society news about typhoons, earthquakes, heavy rain, flooding, landslides, and CWA warnings so the frontend weather page can place related news below CWA public-record panels.
-      - Related-link sections in summaries (`延伸閱讀`, `相關新聞`, `更多新聞`) are removed during RSS summary cleaning and ignored before deterministic matching to avoid persisting/searching/classifying unrelated articles
+      - Related-link sections in summaries (`撱嗡撓?梯?`, `?賊??啗?`, `?游??啗?`) are removed during RSS summary cleaning and ignored before deterministic matching to avoid persisting/searching/classifying unrelated articles
       - Politics second-layer topics are `elections`, `cross_strait_relations`, `foreign_affairs`, `legislative_policy`, `party_politics`, `political_accountability`, `defense_security`, and `public_budget`; persistent thread tables remain deferred
   5. Optional `TopicLlmFallbackWorker` can refine rule fallback rows where the first topic is a general fallback topic and `topic_classified_by` is NULL or `rule`
   6. LLM fallback calls OpenAI first (`gpt-5-nano` by default), then Anthropic Claude Haiku if OpenAI is unavailable; it writes either one `source=llm` topic or keeps the category-specific general topic with `source=llm_fallback`, `topic_classified_by=llm`
@@ -190,7 +190,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   10. `PublicRecordLinkWorker` matches recent articles to recent public records and writes one row per relation to `t_news_article_public_record_links`, preserving match evidence and confidence for downstream ranking/explanations
 - Current public-record sources:
   - Legislative Yuan legal proposals (`ly_bills`): `https://www.ly.gov.tw/WebAPI/LegislativeBill.aspx`, stored as `source_id=ly`, `record_type=legislative_bill`, `category=politics`; upstream ROC dates are normalized to Asia/Taipei timestamps
-  - Legislative Yuan healthcare proposals (`ly_healthcare_bills`, included in CLI alias `healthcare`): same official LY legal proposal API, filtered by healthcare terms such as `醫療法`, `護理人員法`, `全民健康保險法`, `長期照顧服務法`, `護病比`, `護理待遇`, and `護理津貼`; stored as `source_id=ly`, `record_type=healthcare_legislative_bill`, `category=society`, tagged `healthcare_burden`
+  - Legislative Yuan healthcare proposals (`ly_healthcare_bills`, included in CLI alias `healthcare`): same official LY legal proposal API, filtered by healthcare terms such as `?怎?瘜, `霅瑞?鈭箏瘜, `?冽??亙熒靽瘜, `?瑟??折“??瘜, `霅瑞?瘥, `霅瑞?敺?`, and `霅瑞?瘣亥票`; stored as `source_id=ly`, `record_type=healthcare_legislative_bill`, `category=society`, tagged `healthcare_burden`
   - NPA 165 fraud-rumor open data (`npa_fraud_rumors`): `https://data.gov.tw/dataset/38262`, stored as `source_id=npa`, `record_type=fraud_rumor`, `category=society`
   - NPA A1 traffic accident open data (`npa_traffic_a1`): `https://data.gov.tw/dataset/57023`, stored as `source_id=npa`, `record_type=traffic_accident_a1`, `category=society`; party rows are grouped into one accident record by date/time/location/type
   - NPA A2 traffic accident monthly statistics (`npa_traffic_a2_stats`): `https://data.gov.tw/dataset/57024`, stored as `source_id=npa`, `record_type=traffic_accident_a2_stat`, `category=society`; rows are grouped by accident/month/region, then aggregated into monthly casualty/count metrics
@@ -241,18 +241,13 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `t_market_analyses`
   - `t_event_embeddings`
   - `t_analysis_embeddings`
-  - `t_trade_signals`
-  - `t_signal_reviews`
-  - `t_signal_outcomes`
   - `t_macro_release_calendar`
 - Current behavior:
   - Crawler bridge owns normal source ingestion and writes event rows directly
   - `t_relay_events` is treated as event-only storage
   - `t_relay_events` does not keep LINE delivery columns (`is_pushed`, `line_pushed_at`, `line_push_status`, `line_push_error`); Java owns delivery state outside this Python event table
   - Source/context facts must land in `t_relay_events` first; `t_market_analyses` is only for model-generated analysis after reading event windows
-  - `t_trade_signals` is derived from `t_market_analyses.structured_json`; it is not a direct source-ingestion table
-  - `t_trade_signals` includes deterministic `risk_reward_ratio`, `candidate_score`, and `avoid_reason` fields for downstream watchlist gating and review
-  - Signal review/risk gate and signal outcomes are independent from analysis generation
+  - Python no longer creates or migrates trade-signal/recommendation tables
   - Python should not be considered the LINE delivery service; Java is responsible for user-facing LINE push/webhook behavior
   - Python contains no LINE push/webhook/direct-push contact path
   - Daily retention cleanup for old event rows
@@ -290,7 +285,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   5. Store the weekly text into `t_market_analyses`
   6. Leave user-facing delivery to the Java system
 - Output format:
-  - Weekly uses the section contract `週總經` -> `下週台股配置` -> `下週觀察清單`
+  - Weekly uses the section contract `?梁蜇蝬 -> `銝勗?⊿?蝵害 -> `銝梯?撖??害
   - Each section should connect evidence -> mechanism -> Taiwan implication
   - Weekly reports are allocation/watchlist briefs and should not output intraday entry / take-profit / stop-loss prices
 - Storage contract:
@@ -298,7 +293,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `analysis_slot=weekly_tw_preopen`
   - `scheduled_time_local=05:10` using the same `HH:MM` format as daily analyses
   - `raw_json.dimension=weekly`
-  - `raw_json.section_contract=["週總經","下週台股配置","下週觀察清單"]`
+  - `raw_json.section_contract=["?梁蜇蝬?,"銝勗?⊿?蝵?,"銝梯?撖???]`
   - `raw_json.rag` records weekly historical-example retrieval telemetry
   - `raw_json.token_usage` records provider/model/token telemetry when an LLM call completes
 - Prompt snapshots:
@@ -341,42 +336,29 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   8b. Run `claim_verifier` on the final output to check whether numbers, dates, and tickers have supporting evidence in the prompt context
       - For dynamic trade-candidate slots, candidate tickers must be supported by evidence or explicitly marked as model-selected candidates with traceable local context.
       - This allowance must not hide unsupported numeric/date claims or unrelated ticker claims.
-  8c. Apply `market-analysis-trust-gate-v1`: when `claim_verifier.ok=false`, store the analysis for audit/debug but set final `push_enabled=0` and skip trade-signal extraction; `MARKET_ANALYSIS_CLAIM_GATE_ENABLED=false` is an emergency debug override only
   8d. Store generated text in `t_market_analyses`; `raw_json.model_router`, `raw_json.provider_context_policy`, `raw_json.rag`, `raw_json.pipeline_stages`, `raw_json.requested_pipeline_mode`, `raw_json.pipeline_mode`, `raw_json.analysis_intent`, `raw_json.claim_verifier`, and `raw_json.trust_gate` hold routing/retrieval/stage/evidence/trust telemetry
   9. Set base delivery eligibility in `push_enabled`: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`; the trust gate may lower the final stored value to `0`
   10. Inject the latest stored `us_close` digest/analysis as upstream context only when the relevant U.S. close session was open; if U.S. was closed, the Taiwan pre-open prompt intentionally has no `us_close` block
-  11. Target design: extract Codex-generated dynamic Taiwan intraday / short-swing candidates into `t_trade_signals` as `pending_review` rows for full analysis modes.
-  12. The old fixed ten-stock pool was an observation/debugging aid. Runtime candidate generation is now dynamic and must not pad empty output from that historical pool.
-  13. Fill missing signal reference levels from deterministic quote/context rows only when evidence exists. Daily visible reports must not append `## 今日個股觀察`; trading candidates remain machine-readable downstream context unless a separate trading UI explicitly asks for them.
-  14. For `macro_daily`, write macro-only analysis into `t_market_analyses` and do not create trade signals.
+  11. Stock recommendation generation is retired; do not output `stock_watch`, buy/watchlist candidates, or entry/stop/target lists.
+  12. For `macro_daily`, write macro-only analysis into `t_market_analyses`.
 - Daily text formatting:
   - `raw_json.display_title` is date-only (`YYYY-MM-DD`) for downstream delivery titles
-  - Daily analysis uses the refreshed author-style flow: `今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `備註`
-  - Do not write a dedicated `台股配置` section or append `## 今日個股觀察` in daily visible reports.
-  - `看錯的條件` means thesis-invalidation evidence, not a buy/sell trigger list.
-  - Individual companies may appear only as macro/sector transmission examples, such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; daily visible reports should not include stock recommendations, buy/watchlist candidates, entry, stop-loss, or target-price language.
-  - `三個檢查點` must contain exactly three bullets, each connecting source fact -> market mechanism -> why it matters now; `市場押注與預期差` should name what is already reflected in prices and what can still be repriced
-  - `國際消息到台股的傳導` should show `事件 -> 影響變數 -> 台股族群 -> 確認/失效` when evidence supports a chain
-  - Fallback stock rationales keep only `需開盤量價確認` as the repeated warning
+  - Daily analysis uses the refreshed author-style flow: `隞銝?亥店` -> `銝炎?仿?` -> `撣?潭釣???榆` -> `??瘨?啣?∠??喳?` -> `???隞跆 -> `?酉`
+  - Do not write a dedicated `?啗?蔭` section or append `## 隞?閫撖 in daily visible reports.
+  - `???隞跆 means thesis-invalidation evidence, not a buy/sell trigger list.
+  - Individual companies may appear only as macro/sector transmission examples, such as NVIDIA, TSMC, or Magnificent Seven / 蝢銝楊?? daily visible reports should not include stock recommendations, buy/watchlist candidates, entry, stop-loss, or target-price language.
+  - `銝炎?仿?` must contain exactly three bullets, each connecting source fact -> market mechanism -> why it matters now; `撣?潭釣???榆` should name what is already reflected in prices and what can still be repriced
+  - `??瘨?啣?∠??喳?` should show `鈭辣 -> 敶梢霈 -> ?啗?黎 -> 蝣箄?/憭望?` when evidence supports a chain
+  - Fallback stock rationales keep only `???蝣箄?` as the repeated warning
 - Tracked-stock context:
   - `MARKET_CONTEXT_TWSE_CODES` reads official TWSE close/margin rows for tracked listed stocks
   - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` is an optional Yahoo Taiwan quote/context fallback preference list; it must not be treated as a fixed trading universe.
-  - `MARKET_ANALYSIS_EXCLUDED_TICKERS` defaults to `4749`, so 新應材 is excluded from visible individual-stock analysis even if old quote/context rows remain in storage
+  - `MARKET_ANALYSIS_EXCLUDED_TICKERS` defaults to `4749`, so ?唳???is excluded from visible individual-stock analysis even if old quote/context rows remain in storage
   - Official TWSE context is preferred when both sources produce the same ticker; Yahoo context fills gaps such as TPEx `.TWO` symbols
-- Trade-signal boundary:
-  - `t_trade_signals` stores dynamic daily Taiwan intraday / short-swing candidates. Legacy fixed-pool function/CLI names may remain only as compatibility aliases.
-  - `ticker` is the normalized tradable symbol; Taiwan signals use the 4-digit code without `.TW` / `.TWO`
-  - Every signal keeps `analysis_id`, slot/date, ticker, strategy/direction, optional entry/stop/target JSON, and `source_event_ids`
-  - Every signal gets `risk_reward_ratio`, `candidate_score`, and `avoid_reason`; downstream monitoring currently requires complete long/short levels, `risk_reward_ratio >= 1.5`, and empty `avoid_reason`
-  - Internal `direction=long` means buy-side / 做多, not long-term holding; `entry_zone` is the entry area, `take_profit_zone` is the profit-taking exit area, and `invalidation` is rendered as 停損
-  - `quote_fallback_stock_watch` / `context_fallback_stock_watch` may enrich or fill monitor levels only for tickers already selected in model `stock_watch` output; they must not invent tickers from tracked/preferred ticker lists.
-  - Deterministic quote/context fallback levels calibrate `take_profit_zone.first` from entry/stop so the first target is at least 1.5R. Structured LLM rows are not silently rewritten; low-R structured rows remain stored with `avoid_reason`.
-  - `prior_signal_stock_watch` is historical-only for old rows; targeted repair must not create current candidates from prior same-ticker history.
-  - Targeted signal repair for an existing analysis row uses `scripts/run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback`; despite the legacy option name, it only extracts structured model rows and fills those tickers' missing quote/context levels while still respecting `raw_json.trust_gate.signals_allowed=false`.
-  - `idempotency_key` suppresses duplicate signals for the same analysis/ticker/strategy
-  - `t_signal_reviews` is reserved for risk gate / human / model-review decisions
-  - `t_signal_outcomes` is reserved for later performance feedback; any strategy report/outcome JSON must use entry-first attribution: ignore target/stop hits before the first entry, then count the first target after entry as win and first stop after entry as loss
-  - Order, fill, position state, realized PnL, and unrealized PnL are not implemented here; they belong to future `order-dispatcher-service` state tables.
+- Retired trade-signal boundary:
+  - `market_analysis` must not create stock recommendation rows, `stock_watch`, buy/watchlist candidates, entry levels, stop-loss levels, or target-price lists.
+  - `scripts/run_trade_signal_extraction.ps1` is a compatibility no-op.
+  - Existing historical database rows may remain for audit/history, but this repo no longer creates or migrates trade-signal tables.
   - LLM analysis never creates order intents or broker calls directly
 - Historical-case RAG:
   - Module: `src/event_relay/rag.py`
@@ -449,10 +431,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot macro_daily -Force`
 - Run market analysis through HTTP:
   - `'{"kind":"market","slot":"pre_tw_open","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
-- Extract trade signals from existing structured analyses:
+- Retired trade-signal extraction compatibility no-op:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_trade_signal_extraction.ps1 -EnvFile .env -Days 14 -Limit 50`
-- Repair one existing analysis row's model-selected signal levels:
-  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_trade_signal_extraction.ps1 -EnvFile .env -AnalysisId <id> -FixedPoolFallback -EventDays 1 -PriorDays 30`
 - Run market context once:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env`
 - Run Taiwan official market-flow context once:

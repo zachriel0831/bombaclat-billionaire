@@ -156,10 +156,6 @@ def _extract_tickers(text: str, structured_payload: dict[str, Any] | None, evide
         # also appears in the evidence corpus.
         if token in evidence_upper:
             result.add(token)
-    if isinstance(structured_payload, dict):
-        for row in structured_payload.get("stock_watch") or []:
-            if isinstance(row, dict) and row.get("ticker"):
-                result.add(str(row["ticker"]).upper())
     return result
 
 

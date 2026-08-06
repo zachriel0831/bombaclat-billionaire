@@ -153,7 +153,7 @@ STAGE2_TRANSMISSION_SCHEMA: dict[str, Any] = {
 STAGE3_TW_MAPPING_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["sector_watch", "stock_watch", "risks", "data_gaps"],
+    "required": ["sector_watch", "risks", "data_gaps"],
     "properties": {
         "sector_watch": {
             "type": "array",
@@ -163,23 +163,6 @@ STAGE3_TW_MAPPING_SCHEMA: dict[str, Any] = {
                 "required": ["sector", "direction", "rationale", "evidence_ids"],
                 "properties": {
                     "sector": {"type": "string"},
-                    "direction": {"type": "string", "enum": _DIRECTION_ENUM},
-                    "rationale": {"type": "string"},
-                    "evidence_ids": {
-                        "type": "array",
-                        "items": {"type": ["integer", "string"]},
-                    },
-                },
-            },
-        },
-        "stock_watch": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["ticker", "direction", "rationale", "evidence_ids"],
-                "properties": {
-                    "ticker": {"type": "string", "pattern": _TW_TICKER_PATTERN},
                     "direction": {"type": "string", "enum": _DIRECTION_ENUM},
                     "rationale": {"type": "string"},
                     "evidence_ids": {
@@ -276,7 +259,6 @@ STAGE4_SYNTHESIS_SCHEMA: dict[str, Any] = {
         "confidence",
         "key_drivers",
         "tw_sector_watch",
-        "stock_watch",
         "risks",
         "data_gaps",
     ],
@@ -296,73 +278,6 @@ STAGE4_SYNTHESIS_SCHEMA: dict[str, Any] = {
                     "sector": {"type": "string"},
                     "direction": {"type": "string", "enum": _DIRECTION_ENUM},
                     "rationale": {"type": "string"},
-                },
-            },
-        },
-        "stock_watch": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": [
-                    "ticker",
-                    "market",
-                    "name",
-                    "direction",
-                    "rationale",
-                    "strategy_type",
-                    "entry_zone",
-                    "invalidation",
-                    "take_profit_zone",
-                    "holding_horizon",
-                    "confidence",
-                    "risk_notes",
-                    "evidence_ids",
-                ],
-                "properties": {
-                    "ticker": {"type": "string", "pattern": _TW_TICKER_PATTERN},
-                    "market": {"type": _NULLABLE_STRING},
-                    "name": {"type": _NULLABLE_STRING},
-                    "direction": {"type": "string", "enum": _DIRECTION_ENUM},
-                    "rationale": {"type": "string"},
-                    "strategy_type": {"type": _NULLABLE_STRING},
-                    "entry_zone": {
-                        "type": ["object", "null"],
-                        "additionalProperties": False,
-                        "required": ["low", "high", "timing", "basis"],
-                        "properties": {
-                            "low": {"type": _NULLABLE_NUMBER_OR_STRING},
-                            "high": {"type": _NULLABLE_NUMBER_OR_STRING},
-                            "timing": {"type": _NULLABLE_STRING},
-                            "basis": {"type": _NULLABLE_STRING},
-                        },
-                    },
-                    "invalidation": {
-                        "type": ["object", "null"],
-                        "additionalProperties": False,
-                        "required": ["price", "basis"],
-                        "properties": {
-                            "price": {"type": _NULLABLE_NUMBER_OR_STRING},
-                            "basis": {"type": _NULLABLE_STRING},
-                        },
-                    },
-                    "take_profit_zone": {
-                        "type": ["object", "null"],
-                        "additionalProperties": False,
-                        "required": ["first", "second", "basis"],
-                        "properties": {
-                            "first": {"type": _NULLABLE_NUMBER_OR_STRING},
-                            "second": {"type": _NULLABLE_NUMBER_OR_STRING},
-                            "basis": {"type": _NULLABLE_STRING},
-                        },
-                    },
-                    "holding_horizon": {"type": _NULLABLE_STRING},
-                    "confidence": {"type": _NULLABLE_STRING},
-                    "risk_notes": {"type": "array", "items": {"type": "string"}},
-                    "evidence_ids": {
-                        "type": "array",
-                        "items": {"type": ["integer", "string"]},
-                    },
                 },
             },
         },
@@ -452,7 +367,7 @@ def assert_evidence_ids_covered(stage3_output: dict[str, Any], stage1_output: di
         if event.get("id") is not None
     }
     missing: list[str] = []
-    for bucket_name in ("sector_watch", "stock_watch"):
+    for bucket_name in ("sector_watch",):
         for item in stage3_output.get(bucket_name) or []:
             for evidence_id in item.get("evidence_ids") or []:
                 if str(evidence_id) not in known_ids:

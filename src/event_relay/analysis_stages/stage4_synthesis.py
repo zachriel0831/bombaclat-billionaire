@@ -126,43 +126,14 @@ def _structured_instructions() -> str:
         "    multiple high-severity issues, or risks dominate; use high only\n"
         "    when multiple independent chains agree and critic is clean.\n"
         "  - key_drivers: short bullets naming the top 2-4 events / forces.\n"
-        "  - tw_sector_watch / stock_watch: copy the sector / dynamic ticker\n"
-        "    buckets from stage3 for machine-readable downstream use only.\n"
-        "    Use stage3.direction values. Do not render stock_watch as a visible\n"
-        "    report section. stock_watch is not a visible model recommendation list. "
-        "Allowed tickers must be evidence-backed 4-digit Taiwan ticker codes.\n"
-        "    Never pad with a legacy watchlist, never add substitutes to reach a count, "
-        "and never output .TW/.TWO suffixes.\n"
-        "    For each stock_watch item, add execution-neutral fields when\n"
-        "    evidence supports them: market='TW', strategy_type\n"
-        "    (intraday/swing/medium/watch), entry_zone, invalidation,\n"
-        "    take_profit_zone, holding_horizon, confidence, risk_notes, and\n"
-        "    evidence_ids copied from stage3. The rationale must include three\n"
-        "    labeled parts: 利多, 利空, 買入注意. Use 利多 for concrete\n"
-        "    catalysts or sector support, 利空 for downside/risk/invalidation\n"
-        "    conditions, and 買入注意 for observable entry discipline. If valuation\n"
-        "    or relative discount evidence is missing, put that gap under 利空 or\n"
-        "    買入注意 instead of inventing an undervaluation claim.\n"
-        "    All stock_watch keys are required\n"
-        "    by the structured schema; if price levels are not evidenced, set\n"
-        "    entry_zone / invalidation / take_profit_zone to null instead of\n"
-        "    guessing or omitting keys. Use [] for empty risk_notes.\n"
-        "    For pre_tw_open and delivery-eligible us_close, use upstream U.S.\n"
-        "    close / Stage1 Taiwan quote context when present, and fill only\n"
-        "    evidence-backed watch rows with direction bullish or mixed and\n"
-        "    strategy_type swing, medium, or watch. If Stage1 includes Taiwan close\n"
-        "    prices for a stock, provide evidence-backed reference levels in\n"
-        "    entry_zone, invalidation, and take_profit_zone with a basis string;\n"
-        "    otherwise leave those fields null. If a ticker has no direct evidence,\n"
-        "    leave it out and state the data gap; do not substitute.\n"
-        "    Use entry_zone as the\n"
-        "    planned entry area, take_profit_zone as profit-taking/exit area,\n"
-        "    and invalidation as stop/exit area. These are machine signals, not\n"
-        "    visible daily-analysis content and not orders.\n"
+        "  - tw_sector_watch: copy the sector bucket from stage3 using\n"
+        "    stage3.direction values.\n"
+        "    Do not output stock_watch, stock recommendations, buy candidates,\n"
+        "    watchlist candidates, entry levels, stop-loss levels, target-price\n"
+        "    levels, or any machine-readable ticker candidate list.\n"
         "    If Fed path / liquidity / credit stress / sentiment-positioning\n"
         "    context exists, include it in key_drivers and use it to justify\n"
         "    whether Taiwan risk appetite should be chased, faded, or hedged.\n"
-        "    For macro_daily, keep stock_watch empty because markets are closed.\n"
         "  - risks / data_gaps: copy from stage3, dedupe.\n"
         "Do not introduce new facts beyond what stages 1-3 produced. Use the\n"
         "bull_case / bear_case / critic input to balance tone — if critic\n"
@@ -220,7 +191,7 @@ def build_prompts(
         "Retail usefulness requirement: make the first two sections answer 'today what should I watch?' before moving into macro detail.",
         "Do not append or write a ## 今日個股觀察 section. Do not write 台股配置 as a section title.",
         "Do not write stock recommendations, buy candidates, or watchlist candidates in summary_text.",
-        "If stock_watch is non-empty in structured JSON, keep it machine-readable only; summary_text may mention individual companies only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭, never as recommendations.",
+        "Do not output stock_watch in structured JSON; summary_text may mention individual companies only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭, never as recommendations.",
         "If evidence exists, explicitly cover Fed path, liquidity, credit stress, cycle data, and sentiment/positioning.",
         "Answer the selected stage0 core tensions directly before moving into sector implications.",
         "",
@@ -299,11 +270,10 @@ def run(
 ) -> StageResult:
     """執行 run 的主要流程。"""
     logger.info(
-        "[stage4_synthesis] start slot=%s model=%s sectors=%d stocks=%d dual=%s critic=%s",
+        "[stage4_synthesis] start slot=%s model=%s sectors=%d dual=%s critic=%s",
         context.slot,
         context.model,
         len(stage3_output.get("sector_watch") or []),
-        len(stage3_output.get("stock_watch") or []),
         dual_view_output is not None,
         critic_output is not None,
     )
