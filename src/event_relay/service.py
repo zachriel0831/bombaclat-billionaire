@@ -122,17 +122,6 @@ class StoredMarketAnalysisRecord:
 
 
 @dataclass
-class MarketAnalysisSignalSource:
-    """Analysis row fields needed to rebuild trade signals."""
-    row_id: int
-    analysis_date: str
-    analysis_slot: str
-    structured_json: str | None
-    raw_json: str | None
-    updated_at: str
-
-
-@dataclass
 class StoredEventEmbedding:
     """封裝 Stored Event Embedding 相關資料與行為。"""
     event_row_id: int
@@ -1017,72 +1006,6 @@ class MySqlEventStore:
             summary_text=str(row[6] or ""),
             raw_json=str(row[7]) if row[7] is not None else None,
             updated_at=str(row[8]) if row[8] is not None else "",
-        )
-
-    def fetch_recent_market_analyses_for_signals(
-        self, *, days: int, limit: int
-    ) -> list[MarketAnalysisSignalSource]:
-        """Fetch recent structured analyses that can produce trade signals."""
-        if self._conn is None:
-            return []
-
-        safe_days = max(int(days), 1)
-        safe_limit = max(int(limit), 1)
-        sql = (
-            f"SELECT id, analysis_date, analysis_slot, structured_json, raw_json, updated_at "
-            f"FROM {self._analysis_table} "
-            "WHERE structured_json IS NOT NULL "
-            "AND updated_at >= (NOW() - INTERVAL %s DAY) "
-            "ORDER BY updated_at DESC, id DESC "
-            "LIMIT %s"
-        )
-        with self._lock:
-            cur = self._cursor()
-            try:
-                cur.execute(sql, (safe_days, safe_limit))
-                rows = cur.fetchall()
-            finally:
-                cur.close()
-
-        return [
-            MarketAnalysisSignalSource(
-                row_id=int(row[0]),
-                analysis_date=str(row[1] or ""),
-                analysis_slot=str(row[2] or ""),
-                structured_json=str(row[3]) if row[3] is not None else None,
-                raw_json=str(row[4]) if row[4] is not None else None,
-                updated_at=str(row[5]) if row[5] is not None else "",
-            )
-            for row in rows
-        ]
-
-    def fetch_market_analysis_for_signals(self, analysis_id: int) -> MarketAnalysisSignalSource | None:
-        """Fetch one market-analysis row for targeted signal repair."""
-        if self._conn is None:
-            return None
-
-        sql = (
-            f"SELECT id, analysis_date, analysis_slot, structured_json, raw_json, updated_at "
-            f"FROM {self._analysis_table} "
-            "WHERE id=%s "
-            "LIMIT 1"
-        )
-        with self._lock:
-            cur = self._cursor()
-            try:
-                cur.execute(sql, (int(analysis_id),))
-                row = cur.fetchone()
-            finally:
-                cur.close()
-        if not row:
-            return None
-        return MarketAnalysisSignalSource(
-            row_id=int(row[0]),
-            analysis_date=str(row[1] or ""),
-            analysis_slot=str(row[2] or ""),
-            structured_json=str(row[3]) if row[3] is not None else None,
-            raw_json=str(row[4]) if row[4] is not None else None,
-            updated_at=str(row[5]) if row[5] is not None else "",
         )
 
     def delete_events_older_than_days(self, keep_days: int) -> int:
