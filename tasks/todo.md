@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-09 TW Close Guard
+- [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `tw_close` row plus local close context.
+- [x] Apply the existing calendar policy and independently verify final DB state.
+- [x] Record Observer completion, commit, and push the scoped run log.
+
+### 2026-08-09 TW Close Guard Result
+- Calendar guard returned no allowed daily analysis slots because both Taiwan and the relevant U.S. session are weekend-closed on local Sunday.
+- Confirmed the 2026-08-09 `tw_close` row is absent as required. A scheduled `market_context:tw_close` event exists, but it does not override the weekend guard; no database write was made.
+- Row-level claim/trust/style/structured/provider checks are not applicable. Trade-signal count is zero, and extraction was skipped because no eligible analysis exists and stock-recommendation extraction is retired.
+- No external provider API, web search, LINE contact, or delivery action occurred.
+
 ## 2026-08-09 US Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's `us_close` row.
