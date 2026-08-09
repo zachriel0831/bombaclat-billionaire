@@ -1,4 +1,4 @@
-# Register the live collector worker monitor as a repeating Windows task.
+# Register the live collector worker monitor as one visible fixed window.
 param(
   [string]$TaskName = "NewsCollector-LiveServiceMonitor",
   [string]$EnvFile = ".env",
@@ -11,44 +11,61 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
-$monitorScript = Join-Path $PSScriptRoot "monitor_live_services.ps1"
+$windowScript = Join-Path $PSScriptRoot "run_live_service_monitor_window.ps1"
+$logDir = Join-Path $ProjectRoot "runtime\logs"
+$statusFile = Join-Path $ProjectRoot "runtime\status\live-service-monitor-window-status.json"
 
-if (-not (Test-Path -LiteralPath $monitorScript)) {
-  throw "Monitor script not found: $monitorScript"
+if (-not (Test-Path -LiteralPath $windowScript)) {
+  throw "run_live_service_monitor_window.ps1 not found: $windowScript"
 }
 if ($EveryMinutes -lt 1) {
-  throw "EveryMinutes must be >= 1"
+  throw "EveryMinutes must be at least 1."
 }
 
+$currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $actionArgs = @(
   "-NoProfile",
   "-ExecutionPolicy", "Bypass",
-  "-File", "`"$monitorScript`"",
+  "-NoExit",
+  "-File", "`"$windowScript`"",
   "-EnvFile", "`"$EnvFile`"",
+  "-EveryMinutes", $EveryMinutes,
   "-LogLevel", $LogLevel
 ) -join " "
 
 Write-Host "Task: $TaskName"
 Write-Host "Every: $EveryMinutes minutes"
+Write-Host "User: $currentUser"
 Write-Host "Action: powershell.exe $actionArgs"
+Write-Host "Status: $statusFile"
+Write-Host "Logs: $logDir\live-service-monitor-window-YYYYMMDD.log"
 
 if ($PlanOnly) {
   exit 0
 }
 
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs -WorkingDirectory $ProjectRoot
-$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
-  -RepetitionInterval (New-TimeSpan -Minutes $EveryMinutes) `
-  -RepetitionDuration (New-TimeSpan -Days 3650)
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-  -MultipleInstances IgnoreNew -StartWhenAvailable
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User $currentUser
+$settings = New-ScheduledTaskSettingsSet `
+  -AllowStartIfOnBatteries `
+  -DontStopIfGoingOnBatteries `
+  -MultipleInstances IgnoreNew `
+  -StartWhenAvailable `
+  -ExecutionTimeLimit (New-TimeSpan -Days 3650)
+$principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
-  -Settings $settings -Description "Monitors data-collecting live workers and restarts the stack when a worker exits." `
+  -Settings $settings -Principal $principal `
+  -Description "Keep data-collecting live worker monitoring in one visible fixed PowerShell window." `
   -Force | Out-Null
 
 if ($StartNow) {
-  Start-ScheduledTask -TaskName $TaskName
+  Start-Process `
+    -FilePath "powershell.exe" `
+    -ArgumentList $actionArgs `
+    -WorkingDirectory $ProjectRoot `
+    -WindowStyle Normal
+  Write-Host "Started visible live service monitor window." -ForegroundColor Green
 }
 
 Get-ScheduledTask -TaskName $TaskName | Select-Object TaskName,State

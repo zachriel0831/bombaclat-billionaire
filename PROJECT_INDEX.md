@@ -86,6 +86,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | Run source bridge | `powershell -ExecutionPolicy Bypass -File .\scripts\run_source_bridge.ps1 -PollIntervalSeconds 300 -Limit 5` |
 | Run local console | `powershell -ExecutionPolicy Bypass -File .\scripts\run_local_console.ps1` |
 | Data-source health report | `powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -EnvFile .env` |
+| Live worker monitor fixed window | `powershell -ExecutionPolicy Bypass -File .\scripts\register_live_service_monitor_task.ps1 -StartNow` |
 | Market analysis | `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force` |
 | Weekly summary | `powershell -ExecutionPolicy Bypass -File .\scripts\run_weekly_summary.ps1 -Force -DryRun` |
 | Market context | `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env` |

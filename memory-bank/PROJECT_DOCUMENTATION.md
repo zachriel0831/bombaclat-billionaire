@@ -214,6 +214,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 
 11. Data-source health tracking
 - `scripts/run_data_source_health.ps1` / `scripts/check_data_source_health.py` produce a read-only freshness report for news-analysis inputs.
+- `scripts/run_live_service_monitor_window.ps1` keeps `scripts/monitor_live_services.ps1` in one visible local window; `scripts/register_live_service_monitor_task.ps1` registers `NewsCollector-LiveServiceMonitor` at interactive logon instead of a repeating short-lived popup task.
 - `scripts/run_cwa_weather.ps1` collects CWA typhoon/earthquake public records; `scripts/run_cwa_earthquake.ps1` collects only CWA earthquake public records from both default earthquake datasets.
 - `scripts/run_cwa_collectors_window.ps1` keeps those two scripts in one visible local window with the default 30-minute weather/typhoon cadence and 5-minute earthquake cadence; `scripts/register_cwa_fixed_window_task.ps1` registers `NewsCollector-CwaFixedWindow` at interactive logon and disables the legacy popup tasks `NewsCollector-CwaWeather` and `NewsCollector-CwaEarthquake`.
 - `scripts/run_four_hour_digest_context.ps1` collects compact context for the

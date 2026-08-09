@@ -362,6 +362,24 @@ machine restart, or when the user asks whether source data has caught up.
 - For stale public records, run Workflow 3C collection/link commands.
 - For duplicate loops, stop only the extra `news_platform.main --loop` PID, then rerun the health report.
 
+## Workflow 3D-1: Live Service Monitor Fixed Window
+Use this when the live worker monitor should stay in one visible PowerShell
+window instead of opening a short-lived task window every few minutes.
+
+1. Verify the scheduler change without applying it
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_live_service_monitor_task.ps1 -PlanOnly`
+2. Install and start the fixed window
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_live_service_monitor_task.ps1 -StartNow`
+- This replaces the old repeating popup-style `NewsCollector-LiveServiceMonitor`
+  action with an interactive-logon fixed window.
+3. Verify
+- `Get-ScheduledTask -TaskName NewsCollector-LiveServiceMonitor | Select-Object TaskName,State`
+- The fixed window title is `NewsCollector live service monitor`.
+- Read `runtime/status/live-service-monitor-window-status.json` for the latest
+  fixed-window PID, last job, exit code, next run, and current log file.
+- Daily fixed-window logs are written to
+  `runtime/logs/live-service-monitor-window-YYYYMMDD.log`.
+
 ## Workflow 4: Incident Handling (Source Outage / Rate Limit)
 1. Confirm outage scope (single source vs all)
 2. Keep collector running for healthy sources

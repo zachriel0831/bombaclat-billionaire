@@ -332,6 +332,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -E
 
 This read-only report checks MySQL freshness for finance/public RSS, international RSS, X, SEC, TWSE/MOPS, market-context facts, market analyses, society/politics article feeds, public records, article-record links, and local Python process counts. Use `-FailOnWarn` or `-FailOnStale` for scheduled monitoring.
 
+Live worker monitor fixed window:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\register_live_service_monitor_task.ps1 -StartNow
+```
+
+This opens one persistent visible PowerShell window that checks the relay API, source bridge, and news-platform loop every 5 minutes and reuses the existing restart workflow when a worker exits.
+
 Machine restart recovery:
 - Use `memory-bank/restart-recovery-runbook.md` before rediscovering restart steps.
 - It covers restarting relay/bridge/news-platform loops, scheduled-task checks, society/politics freshness, finance RSS freshness, and Taiwan pre-open analysis verification.

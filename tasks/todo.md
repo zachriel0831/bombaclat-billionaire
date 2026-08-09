@@ -894,3 +894,11 @@ Move completed or stale task logs to `tasks/archive/`.
 - Published `palestine-weekly-2026-W32`, titled `停火若不能讓人活下來，就只是暴力換了名字`.
 - Validation passed with 99 unique source IDs and seven citations to reviewed source URLs.
 - A first stdin-encoded write was rejected by mojibake validation and replaced with a verified UTF-8 rewrite.
+
+# 2026-08-09 Live Service Monitor Fixed Window
+
+- [x] Read repo instructions, CTO standards, service-control skill, and operational workflow docs.
+- [x] Confirm `NewsCollector-LiveServiceMonitor` is the remaining repeating popup task.
+- [x] Add a persistent visible monitor window that reuses `monitor_live_services.ps1`.
+- [x] Register and start the monitor as a fixed window, then verify task action, process, logs, and status file.
+- [x] Commit and push only task-related files.
