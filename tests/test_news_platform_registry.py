@@ -23,6 +23,8 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(len([f for f in feeds if f.category == "politics"]), 7)
         self.assertNotIn("tvbs", active_source_ids())
         self.assertNotIn("ctee", active_source_ids())
+        self.assertNotIn("udn", active_source_ids())
+        self.assertNotIn("setn", active_source_ids())
 
     def test_politics_feeds_include_ettoday_list_source(self):
         feeds = tw_politics_feeds()
@@ -59,10 +61,23 @@ class RegistryTests(unittest.TestCase):
             else:
                 os.environ[key] = old_value
 
+        self.assertEqual(politics["tvbs"].kind, "html_list")
+        self.assertEqual(politics["tvbs"].url, "https://news.tvbs.com.tw/politics")
         self.assertEqual(politics["tvbs"].path_filter, "/politics/")
         self.assertEqual(politics["ctee"].path_filter, "-430104")
+        self.assertEqual(society["tvbs"].kind, "html_list")
+        self.assertEqual(society["tvbs"].url, "https://news.tvbs.com.tw/local")
         self.assertEqual(society["tvbs"].path_filter, "/local/")
         self.assertEqual(society["ctee"].path_filter, "-431401")
+        self.assertEqual(society["udn"].url, "https://udn.com/news/cate/2/6639")
+        self.assertEqual(society["setn"].url, "https://www.setn.com/ViewAll.aspx?PageGroupID=41")
+
+    def test_source_ids_include_default_disabled_low_frequency_sources(self):
+        feeds = tw_news_feeds(categories=("society",), source_ids=("tvbs", "udn", "setn"))
+        by_source = {feed.source_id: feed for feed in feeds}
+
+        self.assertEqual(tuple(by_source), ("tvbs", "udn", "setn"))
+        self.assertTrue(all(feed.kind == "html_list" for feed in feeds))
 
     def test_ctee_source_metadata_is_registered(self):
         meta = source_meta("ctee")

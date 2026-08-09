@@ -32,10 +32,18 @@ NEWSPF_CATEGORIES=politics
 |---|---|---|
 | `ltn` | RSS | `https://news.ltn.com.tw/rss/politics.xml` |
 | `ettoday` | HTML list | `https://www.ettoday.net/news/news-list-{date}-1.htm`，只收標籤為「政治」的列 |
-| `tvbs` | Google News sitemap | `https://news.tvbs.com.tw/crontab/sitemap/latest` + path contains `/politics/` |
+| `tvbs` | Low-frequency HTML list | `https://news.tvbs.com.tw/politics` + JSON-LD/article path contains `/politics/` |
 | `cna` | RSS | `https://feeds.feedburner.com/rsscna/politics` |
 | `pts` | HTML category page | `https://news.pts.org.tw/category/1` |
 | `ebc` | sitemap | `https://news.ebc.net.tw/sitemap/realtime.xml` + path contains `/news/politics/` |
+| `udn` | Low-frequency HTML list | `https://udn.com/news/cate/2/6638` (`要聞`; politics-adjacent, topic classifier keeps issue separation) |
+| `setn` | Low-frequency HTML list | `https://www.setn.com/ViewAll.aspx?PageGroupID=6` + visible category label `政治` |
+
+## 3a. Low-frequency supplement rules
+- TVBS, UDN, and SETN are registered but default-disabled with `NEWSPF_DISABLED_SOURCE_IDS=tvbs,ctee,udn,setn`.
+- Run them explicitly with `--source-ids tvbs,udn,setn` or `scripts/run_news_platform_low_frequency_sources.ps1`.
+- The low-frequency run stores title, URL, source, category, optional list timestamp/summary, then uses the existing article-detail author backfill for reporter names.
+- CTEE remains disabled: local checks return 403, so do not use user-agent rotation, cookies, or proxies to bypass access controls.
 
 ETtoday politics list 在部分 Windows/OpenSSL build 會因站方憑證缺 SKI 導致 Python 驗證失敗；程式只針對這個公開讀取來源使用 source-scoped SSL verification workaround。
 

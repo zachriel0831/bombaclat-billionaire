@@ -221,9 +221,11 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 1. Smoke check feeds without DB writes
 - `$env:PYTHONPATH='src'; python -m news_platform.main --smoke`
 - Politics only: `$env:PYTHONPATH='src'; python -m news_platform.main --smoke --categories politics`
+- Low-frequency supplements only: `$env:PYTHONPATH='src'; python -m news_platform.main --smoke --categories society,politics --source-ids tvbs,udn,setn`
 2. Collect one batch into `t_news_articles`
 - `$env:PYTHONPATH='src'; python -m news_platform.main --once`
 - Politics only: `$env:PYTHONPATH='src'; python -m news_platform.main --once --categories politics`
+- TVBS/UDN/SETN low-frequency run: `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_platform_low_frequency_sources.ps1 -EnvFile .env -SourceIds "tvbs,udn,setn"`
 3. Backfill keywords and topics
 - `$env:PYTHONPATH='src'; python -m news_platform.main --extract-keywords --classify-topics`
 4. Optional LLM fallback for category-specific general fallback rows
@@ -233,9 +235,14 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - `$env:PYTHONPATH='src'; python -m news_platform.main --loop`
 6. Reporter/byline enrichment in loop mode
 - The loop runs `ArticleDetailAuthorWorker` after keyword/topic work when `NEWSPF_AUTHOR_DETAIL_BACKFILL_ENABLED=true` (default)
-- Defaults: `NEWSPF_AUTHOR_DETAIL_BACKFILL_BATCH_SIZE=30`, `NEWSPF_AUTHOR_DETAIL_BACKFILL_SLEEP_SECONDS=0.05`, and sources `cna,storm,newtalk,ltn,ettoday,tvbs,ebc,ctee,pts`
+- Defaults: `NEWSPF_AUTHOR_DETAIL_BACKFILL_BATCH_SIZE=30`, `NEWSPF_AUTHOR_DETAIL_BACKFILL_SLEEP_SECONDS=0.05`, and sources `cna,storm,newtalk,ltn,ettoday,tvbs,udn,setn,ebc,ctee,pts`
 - The loop only retries rows still in early missing states (`NULL`, `no_detail_fetched`, `parser_not_supported`); use `scripts/backfill_news_author_detail_pages.py --retry-failed` manually for parse failures or broad repair
-7. Verify DB evidence
+7. Register low-frequency supplements when needed
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force`
+- The main scheduler registration script also registers `NewsCollector-NewsPlatformLowFrequencySources` hourly.
+- `scripts/register_market_analysis_tasks.ps1` keeps scheduled LLM prose tasks disabled by default; pass `-EnableLlmAnalysisTasks` only for an explicit cost-control override.
+- CTEE stays disabled until a public allowed endpoint returns usable data; do not bypass 403 protections.
+8. Verify DB evidence
 - Confirm recent rows have `keywords_json IS NOT NULL`
 - Confirm classified rows have `topics_json IS NOT NULL`
 - Confirm recent rows have `author_extraction_status IS NOT NULL`
@@ -243,8 +250,8 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - Treat `topics_json[0].topic_id IN ('general_social_news','general_politics_news') AND topic_classified_by='rule'` as eligible for optional LLM refinement
 - Treat category-specific general topics with `topic_classified_by='llm'` as processed by both layers but still general news
 - Review `general_social_news` and `general_politics_news` rows when tuning `news_platform.topics`
-8. After adding or tuning deterministic `TopicSpec` rules, reclassify existing rule-fallback rows for the affected category; `TopicWorker` only processes `topics_json IS NULL`, so old `general_social_news` / `general_politics_news` rows will not update unless explicitly re-run through `topic_classifier.classify` and written back only when a specific topic matches.
-9. After changing worker/topic/author-detail code, restart any existing `news_platform.main --loop` process
+9. After adding or tuning deterministic `TopicSpec` rules, reclassify existing rule-fallback rows for the affected category; `TopicWorker` only processes `topics_json IS NULL`, so old `general_social_news` / `general_politics_news` rows will not update unless explicitly re-run through `topic_classifier.classify` and written back only when a specific topic matches.
+10. After changing worker/topic/author-detail code, restart any existing `news_platform.main --loop` process
 - Verify the new loop log shows current source scope and, when new rows exist, `Topic pass scanned=<n>`
 - Check live DB has `SUM(topics_json IS NULL)=0` for active categories after backfill
 

@@ -41,7 +41,7 @@ class FeedSpec:
 
 
 SUPPORTED_TW_CATEGORIES = ("society", "politics")
-DEFAULT_DISABLED_SOURCE_IDS = ("tvbs", "ctee")
+DEFAULT_DISABLED_SOURCE_IDS = ("tvbs", "ctee", "udn", "setn")
 
 
 TW_SOURCES: list[SourceMeta] = [
@@ -111,6 +111,20 @@ TW_SOURCES: list[SourceMeta] = [
         political_camp="pan_blue",
         china_alignment="beijing_friendly",
     ),
+    SourceMeta(
+        source_id="udn",
+        name="聯合新聞網",
+        country="TW",
+        political_camp="pan_blue",
+        china_alignment="neutral",
+    ),
+    SourceMeta(
+        source_id="setn",
+        name="三立新聞網",
+        country="TW",
+        political_camp="pan_green",
+        china_alignment="critical",
+    ),
 ]
 
 
@@ -132,8 +146,8 @@ _DEFAULT_TW_SOCIETY_FEEDS: list[FeedSpec] = [
         # 並用 path_filter="/local/" 抓他們的社會分類（站內叫「在地」）。
         source_id="tvbs",
         category="society",
-        kind="sitemap",
-        url="https://news.tvbs.com.tw/crontab/sitemap/latest",
+        kind="html_list",
+        url="https://news.tvbs.com.tw/local",
         path_filter="/local/",
     ),
     FeedSpec(
@@ -176,6 +190,18 @@ _DEFAULT_TW_SOCIETY_FEEDS: list[FeedSpec] = [
         url="https://www.ctee.com.tw/sitemaps/sitemap_newstoday.xml",
         path_filter="-431401",
     ),
+    FeedSpec(
+        source_id="udn",
+        category="society",
+        kind="html_list",
+        url="https://udn.com/news/cate/2/6639",
+    ),
+    FeedSpec(
+        source_id="setn",
+        category="society",
+        kind="html_list",
+        url="https://www.setn.com/ViewAll.aspx?PageGroupID=41",
+    ),
 ]
 
 
@@ -196,8 +222,8 @@ _DEFAULT_TW_POLITICS_FEEDS: list[FeedSpec] = [
     FeedSpec(
         source_id="tvbs",
         category="politics",
-        kind="sitemap",
-        url="https://news.tvbs.com.tw/crontab/sitemap/latest",
+        kind="html_list",
+        url="https://news.tvbs.com.tw/politics",
         path_filter="/politics/",
     ),
     FeedSpec(
@@ -239,6 +265,19 @@ _DEFAULT_TW_POLITICS_FEEDS: list[FeedSpec] = [
         url="https://www.ctee.com.tw/sitemaps/sitemap_newstoday.xml",
         path_filter="-430104",
     ),
+    FeedSpec(
+        # UDN has no pure politics category; 要聞 is a low-frequency politics-adjacent supplement.
+        source_id="udn",
+        category="politics",
+        kind="html_list",
+        url="https://udn.com/news/cate/2/6638",
+    ),
+    FeedSpec(
+        source_id="setn",
+        category="politics",
+        kind="html_list",
+        url="https://www.setn.com/ViewAll.aspx?PageGroupID=6",
+    ),
 ]
 
 
@@ -258,20 +297,35 @@ def tw_politics_feeds() -> list[FeedSpec]:
     return tw_news_feeds(categories=("politics",))
 
 
-def tw_news_feeds(categories: Iterable[str] | None = None) -> list[FeedSpec]:
+def tw_news_feeds(
+    categories: Iterable[str] | None = None,
+    source_ids: Iterable[str] | None = None,
+) -> list[FeedSpec]:
     """回傳指定分類的 TW 新聞 feed 清單，依 category 順序展開。"""
     wanted = tuple(categories or SUPPORTED_TW_CATEGORIES)
-    disabled = set(disabled_source_ids())
+    wanted_sources = tuple(
+        dict.fromkeys(source.strip().lower() for source in (source_ids or ()) if source.strip())
+    )
+    disabled = set() if wanted_sources else set(disabled_source_ids())
     overridden: list[FeedSpec] = []
+    known_sources: set[str] = set()
     for category in wanted:
         normalized = category.strip().lower()
         if normalized not in _DEFAULT_TW_FEEDS_BY_CATEGORY:
             supported = ", ".join(SUPPORTED_TW_CATEGORIES)
             raise ValueError(f"Unsupported TW news category: {category}. Supported: {supported}")
         for spec in _DEFAULT_TW_FEEDS_BY_CATEGORY[normalized]:
+            known_sources.add(spec.source_id)
+            if wanted_sources and spec.source_id not in wanted_sources:
+                continue
             if spec.source_id in disabled:
                 continue
             overridden.append(_with_env_override(spec))
+    if wanted_sources:
+        unknown = sorted(set(wanted_sources) - known_sources)
+        if unknown:
+            supported = ", ".join(sorted(known_sources))
+            raise ValueError(f"Unsupported TW news source: {', '.join(unknown)}. Supported: {supported}")
     return overridden
 
 
@@ -280,8 +334,11 @@ def disabled_source_ids() -> tuple[str, ...]:
     return tuple(dict.fromkeys(item.strip().lower() for item in raw.split(",") if item.strip()))
 
 
-def active_source_ids(categories: Iterable[str] | None = None) -> tuple[str, ...]:
-    return tuple(dict.fromkeys(spec.source_id for spec in tw_news_feeds(categories=categories)))
+def active_source_ids(
+    categories: Iterable[str] | None = None,
+    source_ids: Iterable[str] | None = None,
+) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(spec.source_id for spec in tw_news_feeds(categories=categories, source_ids=source_ids)))
 
 
 def _with_env_override(spec: FeedSpec) -> FeedSpec:

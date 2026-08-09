@@ -3,6 +3,13 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-10 Low-Frequency News Source Expansion
+- [x] Trace existing `news_platform` source adapters and author enrichment path.
+- [x] Add low-frequency HTML list ingestion for verified public category pages.
+- [x] Keep CTEE disabled unless an allowed public endpoint returns usable data.
+- [x] Update source/docs/decision notes for the new low-frequency source behavior.
+- [x] Run focused tests, diff checks, and commit scoped changes.
+
 ## 2026-08-09 TW Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's `tw_close` row plus local close context.

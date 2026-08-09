@@ -143,10 +143,11 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 
 10. Taiwan society/politics news platform
 - Runs in `src/news_platform` and is separate from `event_relay`
-- Reads Taiwan society/politics RSS, sitemap, ETtoday category-list, and PTS category-page sources defined in `news_platform.registry`
-- Default active society/politics source set is LTN, ETtoday, CNA, PTS, EBC, Newtalk, and Storm Media. `NEWSPF_DISABLED_SOURCE_IDS` defaults to `tvbs,ctee` because the current TVBS sitemap returns 404 and the Commercial Times sitemap returns 403 on this workstation.
-- TVBS and Commercial Times (`ctee`) metadata remains registered for old rows and for quick re-enable. Clear or change `NEWSPF_DISABLED_SOURCE_IDS` only after a working endpoint is verified. Commercial Times' disabled sitemap URL is `https://www.ctee.com.tw/sitemaps/sitemap_newstoday.xml`; URL tail category code `-431401` maps to `society`, and `-430104` maps to `politics`.
-- Category scope defaults to `society,politics` and can be limited by `NEWSPF_CATEGORIES` or CLI `--categories`
+- Reads Taiwan society/politics RSS, sitemap, ETtoday category-list, PTS category-page, and low-frequency public HTML list sources defined in `news_platform.registry`
+- Default active society/politics loop source set is LTN, ETtoday, CNA, PTS, EBC, Newtalk, and Storm Media. `NEWSPF_DISABLED_SOURCE_IDS` defaults to `tvbs,ctee,udn,setn` so the live 15-minute loop does not poll broken or low-frequency endpoints.
+- TVBS, UDN, and SETN are registered as `html_list` sources and should be run through the low-frequency path: `scripts/run_news_platform_low_frequency_sources.ps1` or CLI `--source-ids tvbs,udn,setn`. TVBS uses public category JSON-LD; UDN uses society `6639` and politics-adjacent `6638`; SETN uses public `ViewAll.aspx` category pages and filters by the visible category label.
+- Commercial Times (`ctee`) metadata remains registered for old rows and for quick re-enable, but local checks still return 403. Do not force CTEE crawling with user-agent rotation, cookies, or proxies; only enable it after a working allowed public endpoint is verified. The disabled sitemap URL is `https://www.ctee.com.tw/sitemaps/sitemap_newstoday.xml`; URL tail category code `-431401` maps to `society`, and `-430104` maps to `politics`.
+- Category scope defaults to `society,politics` and can be limited by `NEWSPF_CATEGORIES` or CLI `--categories`; source scope can be limited with `NEWSPF_SOURCE_IDS` or CLI `--source-ids`
 - Writes article rows to independent MySQL tables controlled by `NEWSPF_MYSQL_*`
 - Storage contract:
   - `t_news_sources`: source metadata

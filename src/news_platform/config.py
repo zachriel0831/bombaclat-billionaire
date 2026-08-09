@@ -121,7 +121,7 @@ def load_settings(env_file: str = ".env") -> NewsPlatformSettings:
         ),
         author_detail_backfill_sources=_parse_csv(
             os.getenv("NEWSPF_AUTHOR_DETAIL_BACKFILL_SOURCES"),
-            "cna,storm,newtalk,ltn,ettoday,tvbs,ebc,ctee,pts",
+            "cna,storm,newtalk,ltn,ettoday,tvbs,udn,setn,ebc,ctee,pts",
         ),
         author_detail_backfill_sleep_seconds=max(
             0.0,

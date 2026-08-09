@@ -56,6 +56,7 @@ from news_platform.public_sources.society_public_records import (
 from news_platform.registry import FeedSpec, SUPPORTED_TW_CATEGORIES, tw_news_feeds
 from news_platform.sources.base import NewsSource
 from news_platform.sources.ettoday_list import EttodayNewsListSource
+from news_platform.sources.html_list import HtmlListSource
 from news_platform.sources.pts_category import PtsCategorySource
 from news_platform.sources.rss_feed import RssFeedSource
 from news_platform.sources.sitemap_news import GoogleNewsSitemapSource
@@ -168,14 +169,25 @@ def build_source(spec: FeedSpec, settings: NewsPlatformSettings) -> NewsSource:
             timeout_seconds=settings.http_timeout_seconds,
             max_age_days=settings.max_age_days,
         )
+    if spec.kind == "html_list":
+        return HtmlListSource(
+            source_id=spec.source_id,
+            country="TW",
+            category=spec.category,
+            url=spec.url,
+            path_filter=spec.path_filter,
+            timeout_seconds=settings.http_timeout_seconds,
+            max_age_days=settings.max_age_days,
+        )
     raise ValueError(f"Unknown feed kind: {spec.kind}")
 
 
 def build_tw_news_sources(
     settings: NewsPlatformSettings,
     categories: tuple[str, ...] | None = None,
+    source_ids: tuple[str, ...] | None = None,
 ) -> list[NewsSource]:
-    return [build_source(spec, settings) for spec in tw_news_feeds(categories=categories)]
+    return [build_source(spec, settings) for spec in tw_news_feeds(categories=categories, source_ids=source_ids)]
 
 
 def build_public_record_sources(
@@ -289,6 +301,14 @@ def _build_parser() -> argparse.ArgumentParser:
             "Comma-separated categories to crawl. "
             f"Supported: {', '.join(SUPPORTED_TW_CATEGORIES)}. "
             "Default from NEWSPF_CATEGORIES or society,politics."
+        ),
+    )
+    parser.add_argument(
+        "--source-ids",
+        default=None,
+        help=(
+            "Comma-separated source ids to crawl. "
+            "When set, explicitly requested registered sources can run even if default-disabled."
         ),
     )
     parser.add_argument(
@@ -432,6 +452,14 @@ def parse_categories(value: str | None) -> tuple[str, ...]:
     return tuple(categories)
 
 
+def parse_source_ids(value: str | None) -> tuple[str, ...] | None:
+    raw = value or os.getenv("NEWSPF_SOURCE_IDS", "")
+    parts = [item.strip().lower() for item in raw.split(",") if item.strip()]
+    if not parts or any(item == "all" for item in parts):
+        return None
+    return tuple(dict.fromkeys(parts))
+
+
 def parse_public_sources(value: str | None) -> tuple[str, ...]:
     raw = value or ",".join(DEFAULT_PUBLIC_RECORD_SOURCES)
     sources: list[str] = []
@@ -562,7 +590,8 @@ def main() -> int:
     settings = load_settings(args.env_file)
     try:
         categories = parse_categories(args.categories)
-        sources = build_tw_news_sources(settings, categories)
+        source_ids = parse_source_ids(args.source_ids)
+        sources = build_tw_news_sources(settings, categories, source_ids)
         public_sources = build_public_record_sources(
             settings,
             source_names=parse_public_sources(args.public_sources),

@@ -3,7 +3,7 @@
 import os
 import unittest
 
-from news_platform.main import DEFAULT_PUBLIC_RECORD_SOURCES, parse_categories, parse_public_sources
+from news_platform.main import DEFAULT_PUBLIC_RECORD_SOURCES, parse_categories, parse_public_sources, parse_source_ids
 
 
 class MainConfigTests(unittest.TestCase):
@@ -20,6 +20,21 @@ class MainConfigTests(unittest.TestCase):
                 os.environ.pop("NEWSPF_CATEGORIES", None)
             else:
                 os.environ["NEWSPF_CATEGORIES"] = old_value
+
+    def test_parse_source_ids_accepts_cli_or_env(self):
+        self.assertEqual(parse_source_ids("tvbs, UDN, tvbs"), ("tvbs", "udn"))
+        self.assertIsNone(parse_source_ids("all"))
+
+        key = "NEWSPF_SOURCE_IDS"
+        old_value = os.environ.get(key)
+        os.environ[key] = "setn"
+        try:
+            self.assertEqual(parse_source_ids(None), ("setn",))
+        finally:
+            if old_value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old_value
 
     def test_parse_public_sources_normalizes_aliases(self):
         self.assertEqual(parse_public_sources("ly, legislative-bills,ly_bills"), ("ly_bills",))

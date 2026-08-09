@@ -32,6 +32,8 @@ DEFAULT_DETAIL_AUTHOR_SOURCES = (
     "ltn",
     "ettoday",
     "tvbs",
+    "udn",
+    "setn",
     "ebc",
     "ctee",
     "pts",

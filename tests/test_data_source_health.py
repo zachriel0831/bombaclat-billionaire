@@ -84,6 +84,8 @@ class DataSourceHealthTests(unittest.TestCase):
     def test_news_platform_source_ids_exclude_disabled_sources(self) -> None:
         self.assertNotIn("tvbs", NEWS_PLATFORM_SOURCE_IDS)
         self.assertNotIn("ctee", NEWS_PLATFORM_SOURCE_IDS)
+        self.assertNotIn("udn", NEWS_PLATFORM_SOURCE_IDS)
+        self.assertNotIn("setn", NEWS_PLATFORM_SOURCE_IDS)
 
     def test_public_record_groups_include_npa_stat_sources(self) -> None:
         self.assertIn(("npa", "traffic_accident_a2_stat"), PUBLIC_RECORD_GROUPS)

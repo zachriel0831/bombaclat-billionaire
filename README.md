@@ -78,10 +78,12 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 
 6. Taiwan society/politics news platform (separate MySQL database)
 - Module: `src/news_platform`
-- Collects Taiwan society and politics RSS/sitemap/list feeds into `t_news_articles`
+- Collects Taiwan society and politics RSS/sitemap/list feeds plus explicitly scheduled low-frequency public HTML lists into `t_news_articles`
 - RSS/Atom and sitemap ingestion stores reporter/author names in `authors_json` when the feed exposes explicit author metadata or a high-confidence byline. Reporter identities are also normalized into `t_news_authors` and linked through `t_news_article_authors`; missing byline states are tracked on `t_news_articles.author_extraction_status` and summarized in `t_news_author_coverage_daily`.
-- Default source set: LTN, ETtoday, TVBS, CNA, PTS, EBC, Newtalk, and Storm Media for both society and politics
+- Default loop source set: LTN, ETtoday, CNA, PTS, EBC, Newtalk, and Storm Media for both society and politics
+- Low-frequency public HTML list supplements are registered for TVBS, UDN, and SETN. Run them with `--source-ids tvbs,udn,setn` or `scripts/run_news_platform_low_frequency_sources.ps1`; CTEE remains disabled because the verified public endpoints return 403 locally.
 - `NEWSPF_CATEGORIES` or `--categories` controls collection scope; default is `society,politics`
+- `NEWSPF_SOURCE_IDS` or `--source-ids` limits collection to explicit source ids; explicit source ids can run registered low-frequency sources that are default-disabled.
 - `KeywordWorker` writes `keywords_json`; `TopicWorker` writes deterministic issue classifications into `topics_json`; optional LLM fallback refines rule-fallback general rows
 - Topic MVP uses deterministic `TopicSpec` rules. Existing social/policy topics stay unscoped; politics second-layer topics are scoped to `category=politics` so political terms do not classify unrelated society rows. Rule no-hit rows temporarily fall back by article category: `general_social_news` / 一般社會新聞 or `general_politics_news` / 一般政治新聞.
 - Politics second-layer topic IDs are `elections`, `cross_strait_relations`, `foreign_affairs`, `legislative_policy`, `party_politics`, `political_accountability`, `defense_security`, and `public_budget`. Event-thread templates are specified in [spec/political-topic-thread-technical-plan.md](spec/political-topic-thread-technical-plan.md); persistent thread tables are deferred.
@@ -118,7 +120,8 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - `X_INCLUDE_REPLIES` / `X_INCLUDE_RETWEETS` (default `false`)
 - `X_BACKFILL_ENABLED` (default `true`; replay recent tracked-account tweets into the event store once when bridge starts)
 - `X_BACKFILL_MAX_RESULTS_PER_ACCOUNT` (default `10`; startup backfill size per tracked account)
-- `NEWSPF_DISABLED_SOURCE_IDS` (default `tvbs,ctee`; broken society/politics endpoints are skipped until a working URL is available)
+- `NEWSPF_DISABLED_SOURCE_IDS` (default `tvbs,ctee,udn,setn`; default loop skips broken or low-frequency society/politics endpoints)
+- `NEWSPF_SOURCE_IDS` (optional explicit source filter, e.g. `tvbs,udn,setn` for low-frequency public HTML list runs)
 - `TRUTH_SOCIAL_ENABLED` (master switch for Truth Social public account source; default `false`)
 - `TRUTH_SOCIAL_ACCOUNTS` (comma-separated handles or profile URLs, e.g. `https://truthsocial.com/@realDonaldTrump`)
 - `TRUTH_SOCIAL_MAX_RESULTS_PER_ACCOUNT` (default `10`)
@@ -159,8 +162,11 @@ This path is separate from `event_relay`; it writes to `NEWSPF_MYSQL_DATABASE` a
 ```powershell
 $env:PYTHONPATH='src'; python -m news_platform.main --smoke
 $env:PYTHONPATH='src'; python -m news_platform.main --smoke --categories politics
+$env:PYTHONPATH='src'; python -m news_platform.main --smoke --categories society,politics --source-ids tvbs,udn,setn
 $env:PYTHONPATH='src'; python -m news_platform.main --once
 $env:PYTHONPATH='src'; python -m news_platform.main --once --categories politics
+powershell -ExecutionPolicy Bypass -File .\scripts\run_news_platform_low_frequency_sources.ps1 -EnvFile .env -SourceIds "tvbs,udn,setn"
+powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force
 $env:PYTHONPATH='src'; python -m news_platform.main --extract-keywords --classify-topics
 $env:PYTHONPATH='src'; python -m news_platform.main --llm-topic-fallback
 $env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources all
@@ -212,7 +218,7 @@ Optional table-name env keys:
 Optional reporter/detail-page enrichment env keys:
 - `NEWSPF_AUTHOR_DETAIL_BACKFILL_ENABLED=true`
 - `NEWSPF_AUTHOR_DETAIL_BACKFILL_BATCH_SIZE=30`
-- `NEWSPF_AUTHOR_DETAIL_BACKFILL_SOURCES=cna,storm,newtalk,ltn,ettoday,tvbs,ebc,ctee,pts`
+- `NEWSPF_AUTHOR_DETAIL_BACKFILL_SOURCES=cna,storm,newtalk,ltn,ettoday,tvbs,udn,setn,ebc,ctee,pts`
 - `NEWSPF_AUTHOR_DETAIL_BACKFILL_SLEEP_SECONDS=0.05`
 
 Optional LLM fallback env keys:
