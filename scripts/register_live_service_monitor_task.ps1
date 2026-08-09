@@ -5,6 +5,9 @@ param(
   [int]$EveryMinutes = 5,
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]
   [string]$LogLevel = "INFO",
+  [int]$AutoRepairCooldownMinutes = 60,
+  [int]$SourceAccuracyMaxAgeMinutes = 180,
+  [switch]$DisableAutoRepair,
   [switch]$StartNow,
   [switch]$PlanOnly
 )
@@ -30,11 +33,18 @@ $actionArgs = @(
   "-File", "`"$windowScript`"",
   "-EnvFile", "`"$EnvFile`"",
   "-EveryMinutes", $EveryMinutes,
-  "-LogLevel", $LogLevel
-) -join " "
+  "-LogLevel", $LogLevel,
+  "-AutoRepairCooldownMinutes", $AutoRepairCooldownMinutes,
+  "-SourceAccuracyMaxAgeMinutes", $SourceAccuracyMaxAgeMinutes
+)
+if ($DisableAutoRepair) {
+  $actionArgs += "-DisableAutoRepair"
+}
+$actionArgs = $actionArgs -join " "
 
 Write-Host "Task: $TaskName"
 Write-Host "Every: $EveryMinutes minutes"
+Write-Host "AutoRepair: $(-not [bool]$DisableAutoRepair), cooldown=${AutoRepairCooldownMinutes}m, sourceAccuracyMaxAge=${SourceAccuracyMaxAgeMinutes}m"
 Write-Host "User: $currentUser"
 Write-Host "Action: powershell.exe $actionArgs"
 Write-Host "Status: $statusFile"
@@ -56,7 +66,7 @@ $principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interact
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
   -Settings $settings -Principal $principal `
-  -Description "Keep data-collecting live worker monitoring in one visible fixed PowerShell window." `
+  -Description "Keep data-collecting live worker monitoring and service auto-repair watch in one visible fixed PowerShell window." `
   -Force | Out-Null
 
 if ($StartNow) {

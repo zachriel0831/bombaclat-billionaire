@@ -361,7 +361,7 @@ Live worker monitor fixed window:
 powershell -ExecutionPolicy Bypass -File .\scripts\register_live_service_monitor_task.ps1 -StartNow
 ```
 
-This opens one persistent visible PowerShell window that checks the relay API, source bridge, and news-platform loop every 5 minutes and reuses the existing restart workflow when a worker exits.
+This opens one persistent visible PowerShell window that checks the relay API, source bridge, and news-platform loop every 5 minutes and reuses the existing restart workflow when a worker exits. Each cycle also runs `scripts/run_service_auto_repair_watch.ps1 -LaunchAgent`; warn/stale/missing/error probes across the local frontend, API, LINE relay, stock monitor, Redis, event relay, frontend ngrok, Observer, `NewsCollector-*` tasks, data-source health, and latest source-accuracy report create a runtime incident under `runtime/service-auto-repair/` and launch a background `codex exec` repair agent. The watcher deduplicates identical incidents for 60 minutes by default.
 
 Machine restart recovery:
 - Use `memory-bank/restart-recovery-runbook.md` before rediscovering restart steps.

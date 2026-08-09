@@ -379,7 +379,8 @@ machine restart, or when the user asks whether source data has caught up.
 
 ## Workflow 3D-1: Live Service Monitor Fixed Window
 Use this when the live worker monitor should stay in one visible PowerShell
-window instead of opening a short-lived task window every few minutes.
+window instead of opening a short-lived task window every few minutes. The same
+fixed window now also runs the service auto-repair watcher every cycle.
 
 1. Verify the scheduler change without applying it
 - `powershell -ExecutionPolicy Bypass -File .\scripts\register_live_service_monitor_task.ps1 -PlanOnly`
@@ -391,9 +392,26 @@ window instead of opening a short-lived task window every few minutes.
 - `Get-ScheduledTask -TaskName NewsCollector-LiveServiceMonitor | Select-Object TaskName,State`
 - The fixed window title is `NewsCollector live service monitor`.
 - Read `runtime/status/live-service-monitor-window-status.json` for the latest
-  fixed-window PID, last job, exit code, next run, and current log file.
+  fixed-window PID, last job, live-monitor exit code, auto-repair exit code,
+  next run, and current log file.
 - Daily fixed-window logs are written to
   `runtime/logs/live-service-monitor-window-YYYYMMDD.log`.
+
+4. Service auto-repair behavior
+- Manual dry-run:
+  `powershell -ExecutionPolicy Bypass -File .\scripts\run_service_auto_repair_watch.ps1 -EnvFile .env -DryRun`
+- Active run:
+  `powershell -ExecutionPolicy Bypass -File .\scripts\run_service_auto_repair_watch.ps1 -EnvFile .env -LaunchAgent`
+- Warn/stale/missing/error probes across frontend, API, LINE relay, stock
+  monitor, Redis, event relay, frontend ngrok, Observer, enabled
+  `NewsCollector-*` tasks, data-source health, and the latest source-accuracy
+  report write an incident to `runtime/service-auto-repair/incidents/`.
+- When `-LaunchAgent` is set, the watcher starts a background `codex exec`
+  repair agent from the incident prompt. Identical incident fingerprints are
+  suppressed for 60 minutes by default.
+- Repair agents must not push, touch order-dispatcher/broker flows, send LINE or
+  external messages, deploy production changes, run destructive data repair, or
+  touch Liuli/Ollama/llama-server unless the user explicitly names those targets.
 
 ## Workflow 4: Incident Handling (Source Outage / Rate Limit)
 1. Confirm outage scope (single source vs all)

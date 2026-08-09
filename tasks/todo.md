@@ -916,3 +916,11 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Add a persistent visible monitor window that reuses `monitor_live_services.ps1`.
 - [x] Register and start the monitor as a fixed window, then verify task action, process, logs, and status file.
 - [x] Commit and push only task-related files.
+
+# 2026-08-10 Service Auto-Repair Watcher
+
+- [x] Add a full local service watcher for frontend, API, LINE relay, stock monitor, Redis, event relay, frontend ngrok, Observer, enabled `NewsCollector-*` tasks, data-source health, and source-accuracy reports.
+- [x] Generate deduped warn+ incidents under `runtime/service-auto-repair/`.
+- [x] Launch a constrained background `codex exec` repair agent when `-LaunchAgent` is set.
+- [x] Wire the watcher into the existing fixed live-service monitor window.
+- [x] Register the updated `NewsCollector-LiveServiceMonitor` scheduled task action and verify dry-run behavior.

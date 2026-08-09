@@ -16,6 +16,7 @@ runtime/logs/
 runtime/four-hour-digest/
 runtime/news-source-accuracy/
 runtime/prompts/
+runtime/service-auto-repair/
 runtime/status/
 runtime/state/
 runtime/*.log
