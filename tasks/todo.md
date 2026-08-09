@@ -3,6 +3,17 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-09 US Close Guard
+- [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row.
+- [x] Apply the existing calendar policy and independently verify final DB state.
+- [x] Record Observer completion, commit, and push the scoped run log.
+
+### 2026-08-09 US Close Guard Result
+- Calendar guard excluded all daily analysis slots: local Sunday maps `us_close` to the 2026-08-08 U.S. weekend session, so no `us_close` row should be created.
+- Confirmed the 2026-08-09 `us_close` row is absent. Claim/trust/style/structured/provider flags are therefore not applicable; no database write, external provider API, web search, LINE contact, or delivery action occurred.
+- Signal extraction was skipped because no eligible analysis exists and stock-recommendation extraction is retired.
+
 ## 2026-08-06 Retire Stock Recommendations And Monitor Live Workers
 - [x] Trace stock recommendation flow: `market_analysis` structured `stock_watch` -> `t_trade_signals` -> stock-monitor daily review; LINE stock query had dormant `StockQueryService`/platform client.
 - [x] Retire market-analysis stock recommendation generation and make trade-signal extraction a no-op.
