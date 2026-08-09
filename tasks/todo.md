@@ -871,3 +871,14 @@ Move completed or stale task logs to `tasks/archive/`.
 - Created missing analysis `311` from four local market-context evidence events; no external provider API or LINE contact occurred.
 - Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact requested six-section flow, exactly three checkpoint bullets, readable Traditional Chinese, structured data present, `push_enabled=1`, `pushed=0`, and `external_provider_api_called=false`.
 - Targeted extraction ran; empty `stock_watch` correctly produced zero current trade signals.
+# 2026-08-09 Free Palestine Weekly Editorial Run
+
+- [x] Review every English source row from 2026-08-02 through 2026-08-09 exclusive, including raw metadata.
+- [x] Draft and idempotently upsert `palestine-weekly-2026-W32` without paid external LLM APIs.
+- [x] Read back and validate Traditional Chinese text, source IDs/count, body format, and citations.
+
+## 2026-08-09 Free Palestine Weekly Editorial Result
+
+- Published `palestine-weekly-2026-W32`, titled `停火若不能讓人活下來，就只是暴力換了名字`.
+- Validation passed with 99 unique source IDs and seven citations to reviewed source URLs.
+- A first stdin-encoded write was rejected by mojibake validation and replaced with a verified UTF-8 rewrite.
