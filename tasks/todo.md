@@ -924,3 +924,14 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Launch a constrained background `codex exec` repair agent when `-LaunchAgent` is set.
 - [x] Wire the watcher into the existing fixed live-service monitor window.
 - [x] Register the updated `NewsCollector-LiveServiceMonitor` scheduled task action and verify dry-run behavior.
+# 2026-08-10 US Close Guard Run
+
+- [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row.
+- [x] Verify the policy-valid no-row outcome and skip ineligible signal extraction.
+
+## 2026-08-10 US Close Guard Result
+
+- Calendar mapped the local run to the 2026-08-09 U.S. weekend session, so allowed slots are `pre_tw_open` and `tw_close` only.
+- Confirmed no `2026-08-10 us_close` row exists; no DB write, external provider API, web search, LINE contact, or delivery action occurred.
+- Claim/trust/push/structured/style checks are not applicable without an eligible analysis; signal extraction was skipped because no eligible row exists and stock recommendation extraction is retired.
