@@ -189,6 +189,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   8. In loop mode, default public-record sources are collected once per local day
   9. In loop mode, article-detail author enrichment defaults to enabled with a small batch (`NEWSPF_AUTHOR_DETAIL_BACKFILL_BATCH_SIZE`, default `30`) and source allowlist (`NEWSPF_AUTHOR_DETAIL_BACKFILL_SOURCES`)
   10. `PublicRecordLinkWorker` matches recent articles to recent public records and writes one row per relation to `t_news_article_public_record_links`, preserving match evidence and confidence for downstream ranking/explanations
+  11. `scripts/run_news_source_accuracy_audit.ps1` reads the current official source lists, compares their article IDs/canonical URLs with `t_news_articles`, and can run one bounded existing crawler pass for sources below the coverage threshold. It does not push LINE messages or generate prose.
 - Current public-record sources:
   - Legislative Yuan legal proposals (`ly_bills`): `https://www.ly.gov.tw/WebAPI/LegislativeBill.aspx`, stored as `source_id=ly`, `record_type=legislative_bill`, `category=politics`; upstream ROC dates are normalized to Asia/Taipei timestamps
   - Legislative Yuan healthcare proposals (`ly_healthcare_bills`, included in CLI alias `healthcare`): same official LY legal proposal API, filtered by healthcare terms such as `?怎?瘜, `霅瑞?鈭箏瘜, `?冽??亙熒靽瘜, `?瑟??折“??瘜, `霅瑞?瘥, `霅瑞?敺?`, and `霅瑞?瘣亥票`; stored as `source_id=ly`, `record_type=healthcare_legislative_bill`, `category=society`, tagged `healthcare_burden`
@@ -215,6 +216,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 
 11. Data-source health tracking
 - `scripts/run_data_source_health.ps1` / `scripts/check_data_source_health.py` produce a read-only freshness report for news-analysis inputs.
+- `scripts/run_news_source_accuracy_audit.ps1` / `scripts/check_news_source_accuracy.py` produce the official-list coverage audit for society/politics article sources. The default scope is active sources plus TVBS/UDN/SETN and skips CTEE; `-Compensate` backfills missing article rows and runs keyword/topic enrichment, and reports are written to `runtime/news-source-accuracy/latest.json` and `latest.txt`.
+- `scripts/register_news_source_accuracy_audit_task.ps1` registers `NewsCollector-NewsSourceAccuracyAudit` every 2 hours by default. `scripts/register_market_analysis_tasks.ps1` also registers it so a full local schedule rebuild keeps the audit.
 - `scripts/run_live_service_monitor_window.ps1` keeps `scripts/monitor_live_services.ps1` in one visible local window; `scripts/register_live_service_monitor_task.ps1` registers `NewsCollector-LiveServiceMonitor` at interactive logon instead of a repeating short-lived popup task.
 - `scripts/run_cwa_weather.ps1` collects CWA typhoon/earthquake public records; `scripts/run_cwa_earthquake.ps1` collects only CWA earthquake public records from both default earthquake datasets.
 - `scripts/run_cwa_collectors_window.ps1` keeps those two scripts in one visible local window with the default 30-minute weather/typhoon cadence and 5-minute earthquake cadence; `scripts/register_cwa_fixed_window_task.ps1` registers `NewsCollector-CwaFixedWindow` at interactive logon and disables the legacy popup tasks `NewsCollector-CwaWeather` and `NewsCollector-CwaEarthquake`.

@@ -167,6 +167,8 @@ $env:PYTHONPATH='src'; python -m news_platform.main --once
 $env:PYTHONPATH='src'; python -m news_platform.main --once --categories politics
 powershell -ExecutionPolicy Bypass -File .\scripts\run_news_platform_low_frequency_sources.ps1 -EnvFile .env -SourceIds "tvbs,udn,setn"
 powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force
+powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audit.ps1 -EnvFile .env -Compensate -FailOnWarn
+powershell -ExecutionPolicy Bypass -File .\scripts\register_news_source_accuracy_audit_task.ps1 -Force
 $env:PYTHONPATH='src'; python -m news_platform.main --extract-keywords --classify-topics
 $env:PYTHONPATH='src'; python -m news_platform.main --llm-topic-fallback
 $env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources all
@@ -192,6 +194,12 @@ $env:PYTHONPATH='src'; python -m news_platform.main --loop
 ```
 
 Loop mode collects the default public-record source set once per local day, then runs article-record linking each crawl cycle.
+
+Source accuracy audit:
+- `scripts/run_news_source_accuracy_audit.ps1` compares current official source lists with matching rows in `t_news_articles` by `article_id` or canonical URL.
+- Default audit scope is the active society/politics sources plus low-frequency TVBS, UDN, and SETN; CTEE is skipped by default because local public endpoints still return 403.
+- `-Compensate` runs one bounded existing crawler pass for sources below the coverage threshold, then runs keyword/topic enrichment; `-FailOnWarn` makes scheduled runs visible as failures when coverage remains too low.
+- Reports are written to `runtime/news-source-accuracy/latest.json` and `latest.txt`.
 
 Storage:
 - `t_news_sources`: source metadata
@@ -337,6 +345,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -E
 ```
 
 This read-only report checks MySQL freshness for finance/public RSS, international RSS, X, SEC, TWSE/MOPS, market-context facts, market analyses, society/politics article feeds, public records, article-record links, and local Python process counts. Use `-FailOnWarn` or `-FailOnStale` for scheduled monitoring.
+
+News source official-list accuracy:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audit.ps1 -EnvFile .env -Compensate -FailOnWarn
+powershell -ExecutionPolicy Bypass -File .\scripts\register_news_source_accuracy_audit_task.ps1 -Force
+```
+
+This checks whether currently advertised official-list items are already present in `t_news_articles`. The scheduled task is `NewsCollector-NewsSourceAccuracyAudit`; default cadence is every 2 hours.
 
 Live worker monitor fixed window:
 

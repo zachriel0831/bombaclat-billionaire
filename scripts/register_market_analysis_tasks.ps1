@@ -4,6 +4,7 @@ param(
   [string]$RagIndexerTaskName = "NewsCollector-RagIndexer",
   [string]$PalestineNewsTaskName = "NewsCollector-PalestineNews",
   [string]$NewsPlatformLowFrequencyTaskName = "NewsCollector-NewsPlatformLowFrequencySources",
+  [string]$NewsSourceAccuracyTaskName = "NewsCollector-NewsSourceAccuracyAudit",
   [string]$BlsMacroTaskName = "NewsCollector-BlsMacro",
   [string]$MacroCalendarTaskName = "NewsCollector-MacroCalendar",
   [string]$MarketContextTaskName = "NewsCollector-MarketContext-PreTwOpen",
@@ -17,6 +18,8 @@ param(
   [int]$PalestineNewsEveryHours = 3,
   [string]$NewsPlatformLowFrequencyAt = "00:20",
   [int]$NewsPlatformLowFrequencyEveryHours = 1,
+  [string]$NewsSourceAccuracyAt = "00:40",
+  [int]$NewsSourceAccuracyEveryHours = 2,
   [string]$BlsMacroAt = "04:50",
   [string]$MacroCalendarAt = "06:00",
   [string]$MarketContextAt = "07:20",
@@ -34,6 +37,7 @@ $RunScript = Join-Path $ProjectRoot "scripts\\run_market_analysis.ps1"
 $RagIndexerScript = Join-Path $ProjectRoot "scripts\\run_rag_indexer.ps1"
 $PalestineNewsScript = Join-Path $ProjectRoot "scripts\\run_palestine_news.ps1"
 $NewsPlatformLowFrequencyScript = Join-Path $ProjectRoot "scripts\\run_news_platform_low_frequency_sources.ps1"
+$NewsSourceAccuracyScript = Join-Path $ProjectRoot "scripts\\run_news_source_accuracy_audit.ps1"
 $ContextScript = Join-Path $ProjectRoot "scripts\\run_market_context.ps1"
 $BlsMacroScript = Join-Path $ProjectRoot "scripts\\run_bls_macro.ps1"
 $MacroCalendarScript = Join-Path $ProjectRoot "scripts\\run_macro_calendar.ps1"
@@ -51,6 +55,9 @@ if (-not (Test-Path -LiteralPath $PalestineNewsScript)) {
 }
 if (-not (Test-Path -LiteralPath $NewsPlatformLowFrequencyScript)) {
   throw "run_news_platform_low_frequency_sources.ps1 not found: $NewsPlatformLowFrequencyScript"
+}
+if (-not (Test-Path -LiteralPath $NewsSourceAccuracyScript)) {
+  throw "run_news_source_accuracy_audit.ps1 not found: $NewsSourceAccuracyScript"
 }
 if (-not (Test-Path -LiteralPath $ContextScript)) {
   throw "run_market_context.ps1 not found: $ContextScript"
@@ -196,6 +203,7 @@ function Register-TwCloseContextTask {
 Register-CollectorTask -TaskName $RagIndexerTaskName -ScriptPath $RagIndexerScript -At $RagIndexerAt -Description "Index recent relay events and market analyses for historical-case RAG."
 Register-CollectorTask -TaskName $PalestineNewsTaskName -ScriptPath $PalestineNewsScript -At $PalestineNewsAt -Description "Collect English Palestine/Gaza/West Bank issue news into long-term t_palestine_news_items." -ExtraArgs "-Limit 20" -RepeatEveryHours $PalestineNewsEveryHours
 Register-CollectorTask -TaskName $NewsPlatformLowFrequencyTaskName -ScriptPath $NewsPlatformLowFrequencyScript -At $NewsPlatformLowFrequencyAt -Description "Collect low-frequency TVBS/UDN/SETN public society-politics list pages and enrich reporter metadata." -ExtraArgs "-SourceIds `"tvbs,udn,setn`" -Categories `"society,politics`" -Limit 20 -AuthorLimit 30" -RepeatEveryHours $NewsPlatformLowFrequencyEveryHours
+Register-CollectorTask -TaskName $NewsSourceAccuracyTaskName -ScriptPath $NewsSourceAccuracyScript -At $NewsSourceAccuracyAt -Description "Audit news-platform official-list coverage and compensate missing source rows." -ExtraArgs "-Categories `"society,politics`" -Limit 20 -MinCoverage 0.85 -Compensate -FailOnWarn" -RepeatEveryHours $NewsSourceAccuracyEveryHours
 Register-CollectorTask -TaskName $BlsMacroTaskName -ScriptPath $BlsMacroScript -At $BlsMacroAt -Description "Collect BLS official macro facts into t_relay_events before U.S. close analysis."
 Register-CollectorTask -TaskName $MacroCalendarTaskName -ScriptPath $MacroCalendarScript -At $MacroCalendarAt -Description "Collect official U.S. macro release dates into t_macro_release_calendar before LINE reminder delivery."
 Register-MarketAnalysisTask -TaskName $UsCloseTaskName -Slot "us_close" -At $UsCloseAt -Description "Generate U.S. close analysis at 05:00 local time; TW holidays with U.S. trading make it Java-delivery eligible."

@@ -6,6 +6,7 @@ import unittest
 from news_platform.registry import (
     SUPPORTED_TW_CATEGORIES,
     active_source_ids,
+    registered_source_ids,
     source_meta,
     tw_news_feeds,
     tw_politics_feeds,
@@ -78,6 +79,14 @@ class RegistryTests(unittest.TestCase):
 
         self.assertEqual(tuple(by_source), ("tvbs", "udn", "setn"))
         self.assertTrue(all(feed.kind == "html_list" for feed in feeds))
+
+    def test_registered_source_ids_include_disabled_sources(self):
+        registered = registered_source_ids()
+
+        self.assertIn("ctee", registered)
+        self.assertIn("tvbs", registered)
+        self.assertIn("udn", registered)
+        self.assertIn("setn", registered)
 
     def test_ctee_source_metadata_is_registered(self):
         meta = source_meta("ctee")

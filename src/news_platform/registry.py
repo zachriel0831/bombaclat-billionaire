@@ -341,6 +341,19 @@ def active_source_ids(
     return tuple(dict.fromkeys(spec.source_id for spec in tw_news_feeds(categories=categories, source_ids=source_ids)))
 
 
+def registered_source_ids(categories: Iterable[str] | None = None) -> tuple[str, ...]:
+    """Return all registered source ids, including default-disabled sources."""
+    wanted = tuple(categories or SUPPORTED_TW_CATEGORIES)
+    ids: list[str] = []
+    for category in wanted:
+        normalized = category.strip().lower()
+        if normalized not in _DEFAULT_TW_FEEDS_BY_CATEGORY:
+            supported = ", ".join(SUPPORTED_TW_CATEGORIES)
+            raise ValueError(f"Unsupported TW news category: {category}. Supported: {supported}")
+        ids.extend(spec.source_id for spec in _DEFAULT_TW_FEEDS_BY_CATEGORY[normalized])
+    return tuple(dict.fromkeys(ids))
+
+
 def _with_env_override(spec: FeedSpec) -> FeedSpec:
     env_key = f"NEWSPF_FEED_{spec.source_id.upper()}_{spec.category.upper()}"
     url = os.getenv(env_key, spec.url).strip() or spec.url

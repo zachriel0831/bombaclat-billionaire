@@ -3,6 +3,13 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-10 News Source Accuracy Audit Schedule
+- [x] Trace existing source health and news-platform collection paths.
+- [x] Add official-list coverage audit for active plus low-frequency sources.
+- [x] Add bounded compensation for sources below coverage threshold.
+- [x] Register the scheduled task and verify local run output.
+- [x] Update docs, run tests, and commit scoped changes.
+
 ## 2026-08-10 Low-Frequency News Source Expansion
 - [x] Trace existing `news_platform` source adapters and author enrichment path.
 - [x] Add low-frequency HTML list ingestion for verified public category pages.

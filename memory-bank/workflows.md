@@ -242,7 +242,15 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - The main scheduler registration script also registers `NewsCollector-NewsPlatformLowFrequencySources` hourly.
 - `scripts/register_market_analysis_tasks.ps1` keeps scheduled LLM prose tasks disabled by default; pass `-EnableLlmAnalysisTasks` only for an explicit cost-control override.
 - CTEE stays disabled until a public allowed endpoint returns usable data; do not bypass 403 protections.
-8. Verify DB evidence
+8. Audit official-list coverage and compensate gaps
+- Manual run: `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audit.ps1 -EnvFile .env -Compensate -FailOnWarn`
+- Register schedule: `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_source_accuracy_audit_task.ps1 -Force`
+- The scheduled task is `NewsCollector-NewsSourceAccuracyAudit`, every 2 hours by default.
+- Default audit scope is active sources plus TVBS/UDN/SETN; CTEE is skipped by default because local public endpoints return 403.
+- Reports: `runtime/news-source-accuracy/latest.json` and `runtime/news-source-accuracy/latest.txt`
+- Compensation runs a bounded crawl for low-coverage sources, then deterministic keyword/topic enrichment.
+- If official-list coverage stays below `MinCoverage` after compensation, the task exits non-zero and Observer marks `news_source_accuracy_audit` failed.
+9. Verify DB evidence
 - Confirm recent rows have `keywords_json IS NOT NULL`
 - Confirm classified rows have `topics_json IS NOT NULL`
 - Confirm recent rows have `author_extraction_status IS NOT NULL`
@@ -250,8 +258,8 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - Treat `topics_json[0].topic_id IN ('general_social_news','general_politics_news') AND topic_classified_by='rule'` as eligible for optional LLM refinement
 - Treat category-specific general topics with `topic_classified_by='llm'` as processed by both layers but still general news
 - Review `general_social_news` and `general_politics_news` rows when tuning `news_platform.topics`
-9. After adding or tuning deterministic `TopicSpec` rules, reclassify existing rule-fallback rows for the affected category; `TopicWorker` only processes `topics_json IS NULL`, so old `general_social_news` / `general_politics_news` rows will not update unless explicitly re-run through `topic_classifier.classify` and written back only when a specific topic matches.
-10. After changing worker/topic/author-detail code, restart any existing `news_platform.main --loop` process
+10. After adding or tuning deterministic `TopicSpec` rules, reclassify existing rule-fallback rows for the affected category; `TopicWorker` only processes `topics_json IS NULL`, so old `general_social_news` / `general_politics_news` rows will not update unless explicitly re-run through `topic_classifier.classify` and written back only when a specific topic matches.
+11. After changing worker/topic/author-detail code, restart any existing `news_platform.main --loop` process
 - Verify the new loop log shows current source scope and, when new rows exist, `Topic pass scanned=<n>`
 - Check live DB has `SUM(topics_json IS NULL)=0` for active categories after backfill
 
