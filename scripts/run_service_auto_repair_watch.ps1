@@ -487,11 +487,24 @@ foreach ($probe in $probes) {
     $maxRank = [int]$probe.severity
   }
 }
-$overallStatus = switch ($maxRank) {
-  0 { "ok" }
-  1 { "warn" }
-  2 { "missing" }
-  default { "error" }
+$hasMissing = @($failing | Where-Object { [string]$_.status -eq "missing" }).Count -gt 0
+$hasStale = @($failing | Where-Object { [string]$_.status -eq "stale" }).Count -gt 0
+$hasWarn = @($failing | Where-Object { [string]$_.status -eq "warn" }).Count -gt 0
+
+$overallStatus = if ($maxRank -ge 3) {
+  "error"
+}
+elseif ($hasMissing) {
+  "missing"
+}
+elseif ($hasStale) {
+  "stale"
+}
+elseif ($hasWarn) {
+  "warn"
+}
+else {
+  "ok"
 }
 
 $action = "none"
