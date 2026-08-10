@@ -15,7 +15,7 @@ if (-not (Test-Path -LiteralPath $RunScript)) {
   throw "run_weekly_summary.ps1 not found: $RunScript"
 }
 
-$actionArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$RunScript`" -EnvFile `"$EnvFile`" -LogLevel INFO"
+$actionArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$RunScript`" -EnvFile `"$EnvFile`" -LogLevel INFO"
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs -WorkingDirectory $ProjectRoot
 $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $DayOfWeek -At $At
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 2)

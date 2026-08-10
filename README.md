@@ -353,7 +353,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audi
 powershell -ExecutionPolicy Bypass -File .\scripts\register_news_source_accuracy_audit_task.ps1 -Force
 ```
 
-This checks whether currently advertised official-list items are already present in `t_news_articles`. The scheduled task is `NewsCollector-NewsSourceAccuracyAudit`; default cadence is every 2 hours.
+This checks whether currently advertised official-list items are already present in `t_news_articles`. The scheduled task is `NewsCollector-NewsSourceAccuracyAudit`; default cadence is every 2 hours and the task runs with a hidden PowerShell window so it does not flash a short-lived console.
 
 Live worker monitor fixed window:
 

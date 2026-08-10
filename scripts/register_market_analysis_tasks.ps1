@@ -83,7 +83,7 @@ function Register-MarketAnalysisTask {
     [string]$Description
   )
 
-  $actionArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$RunScript`" -EnvFile `"$EnvFile`" -Slot `"$Slot`" -LogLevel INFO"
+  $actionArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$RunScript`" -EnvFile `"$EnvFile`" -Slot `"$Slot`" -LogLevel INFO"
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs -WorkingDirectory $ProjectRoot
   $trigger = New-ScheduledTaskTrigger -Daily -At $At
   $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 2)
@@ -110,7 +110,7 @@ function Register-MarketContextTask {
     [string]$Description
   )
 
-  $actionArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$ContextScript`" -EnvFile `"$EnvFile`" -AnalysisSlot `"market_context_pre_tw_open`" -ScheduledTime `"$At`" -LogLevel INFO"
+  $actionArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$ContextScript`" -EnvFile `"$EnvFile`" -AnalysisSlot `"market_context_pre_tw_open`" -ScheduledTime `"$At`" -LogLevel INFO"
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs -WorkingDirectory $ProjectRoot
   $trigger = New-ScheduledTaskTrigger -Daily -At $At
   $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 1)
@@ -140,15 +140,15 @@ function Register-CollectorTask {
     [int]$RepeatEveryHours = 0
   )
 
-  $actionArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -EnvFile `"$EnvFile`" -LogLevel INFO"
+  $actionArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -EnvFile `"$EnvFile`" -LogLevel INFO"
   if ($ExtraArgs) {
     $actionArgs = "$actionArgs $ExtraArgs"
   }
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs -WorkingDirectory $ProjectRoot
   if ($RepeatEveryHours -gt 0) {
     $startAt = [DateTime]::Today.Add([TimeSpan]::Parse($At))
-    if ($startAt -le (Get-Date)) {
-      $startAt = $startAt.AddDays(1)
+    while ($startAt -le (Get-Date)) {
+      $startAt = $startAt.AddHours($RepeatEveryHours)
     }
     $trigger = New-ScheduledTaskTrigger -Once -At $startAt -RepetitionInterval (New-TimeSpan -Hours $RepeatEveryHours) -RepetitionDuration (New-TimeSpan -Days 3650)
   } else {
@@ -180,7 +180,7 @@ function Register-TwCloseContextTask {
     [string]$Description
   )
 
-  $actionArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$TwCloseContextScript`" -EnvFile `"$EnvFile`" -ScheduledTime `"$At`" -LogLevel INFO"
+  $actionArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$TwCloseContextScript`" -EnvFile `"$EnvFile`" -ScheduledTime `"$At`" -LogLevel INFO"
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs -WorkingDirectory $ProjectRoot
   $trigger = New-ScheduledTaskTrigger -Daily -At $At
   $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 1)

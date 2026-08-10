@@ -27,6 +27,7 @@ if ($EveryMinutes -lt 15) {
 }
 
 $actionArgs = @(
+  "-WindowStyle", "Hidden",
   "-NoProfile",
   "-ExecutionPolicy", "Bypass",
   "-File", "`"$runScript`"",
@@ -39,7 +40,7 @@ $actionArgs = @(
 ) -join " "
 
 $startAt = [DateTime]::Today.Add([TimeSpan]::Parse($FirstRunAt))
-if ($startAt -le (Get-Date)) {
+while ($startAt -le (Get-Date)) {
   $startAt = $startAt.AddMinutes($EveryMinutes)
 }
 

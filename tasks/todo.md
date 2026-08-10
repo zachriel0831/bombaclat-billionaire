@@ -947,3 +947,11 @@ Move completed or stale task logs to `tasks/archive/`.
 - Calendar mapped the local run to the 2026-08-09 U.S. weekend session, so allowed slots are `pre_tw_open` and `tw_close` only.
 - Confirmed no `2026-08-10 us_close` row exists; no DB write, external provider API, web search, LINE contact, or delivery action occurred.
 - Claim/trust/push/structured/style checks are not applicable without an eligible analysis; signal extraction was skipped because no eligible row exists and stock recommendation extraction is retired.
+
+# 2026-08-10 Short Scheduled Task Popup Fix
+
+- [x] Identify the popup source from recent Task Scheduler runs.
+- [x] Add hidden-window PowerShell actions for short-lived scheduled jobs.
+- [x] Fix repeating task registration so re-registering during the day schedules the next future run.
+- [x] Re-register affected tasks and verify action arguments.
+- [x] Commit only task-related files.

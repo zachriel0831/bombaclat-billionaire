@@ -12,6 +12,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $scriptPath = Join-Path $PSScriptRoot "run_retention_cleanup.ps1"
 
 $arguments = @(
+  "-WindowStyle", "Hidden",
   "-NoProfile",
   "-ExecutionPolicy", "Bypass",
   "-File", "`"$scriptPath`"",

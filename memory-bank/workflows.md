@@ -245,7 +245,7 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 8. Audit official-list coverage and compensate gaps
 - Manual run: `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audit.ps1 -EnvFile .env -Compensate -FailOnWarn`
 - Register schedule: `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_source_accuracy_audit_task.ps1 -Force`
-- The scheduled task is `NewsCollector-NewsSourceAccuracyAudit`, every 2 hours by default.
+- The scheduled task is `NewsCollector-NewsSourceAccuracyAudit`, every 2 hours by default. It should run with `-WindowStyle Hidden`; if a short PowerShell window flashes, inspect recent Task Scheduler `LastRunTime` and `Actions` first.
 - Default audit scope is active sources plus TVBS/UDN/SETN; CTEE is skipped by default because local public endpoints return 403.
 - Reports: `runtime/news-source-accuracy/latest.json` and `runtime/news-source-accuracy/latest.txt`
 - Compensation runs a bounded crawl for low-coverage sources, then deterministic keyword/topic enrichment.
