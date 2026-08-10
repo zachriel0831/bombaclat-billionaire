@@ -69,6 +69,38 @@ function New-Probe {
   [pscustomobject]$probe
 }
 
+function Resolve-PythonExe {
+  $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+  if ($pythonCmd) {
+    return $pythonCmd.Source
+  }
+
+  $venvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+  if (Test-Path -LiteralPath $venvPython) {
+    return $venvPython
+  }
+
+  throw "Unable to locate python.exe for JSON normalization fallback."
+}
+
+function Read-JsonReport {
+  param([string]$Path)
+
+  $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+  try {
+    return $raw | ConvertFrom-Json
+  }
+  catch {
+    # PowerShell's JSON parser can choke on valid UTF-8 title content from source audits.
+    $pythonExe = Resolve-PythonExe
+    $normalized = & $pythonExe -c "import json, pathlib, sys; obj=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')); print(json.dumps(obj, ensure_ascii=True))" $Path
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($normalized)) {
+      throw
+    }
+    return $normalized | ConvertFrom-Json
+  }
+}
+
 function Test-ListenPortProbe {
   param(
     [string]$Name,
@@ -192,7 +224,7 @@ function Read-NewsSourceAccuracyProbes {
   try {
     $reportFile = Get-Item -LiteralPath $reportPath
     $ageMinutes = [int][Math]::Round(((Get-Date) - $reportFile.LastWriteTime).TotalMinutes)
-    $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+    $report = Read-JsonReport -Path $reportPath
     $status = [string]$report.overall_status
     $items = @()
     if ($ageMinutes -gt $SourceAccuracyMaxAgeMinutes) {
@@ -275,7 +307,7 @@ function Read-State {
     return [pscustomobject]@{}
   }
   try {
-    return Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
+    return Get-Content -LiteralPath $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json
   }
   catch {
     return [pscustomobject]@{}
