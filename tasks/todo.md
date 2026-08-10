@@ -967,3 +967,15 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Fix repeating task registration so re-registering during the day schedules the next future run.
 - [x] Re-register affected tasks and verify action arguments.
 - [x] Commit only task-related files.
+
+# 2026-08-11 US Close Guard Run
+
+- [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row plus local evidence.
+- [x] Create the missing row through `MySqlEventStore.upsert_market_analysis()` and verify final DB state.
+
+## 2026-08-11 US Close Guard Result
+
+- Created analysis `323` from four local evidence events and two U.S. index-close rows; no external provider API, web search, LINE contact, or delivery action occurred.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact six-section flow, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+- Signal extraction was skipped because stock recommendation extraction is retired.
