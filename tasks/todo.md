@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-11 Pre-Open Guard
+- [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `pre_tw_open` row plus local context.
+- [x] Create the missing row from local evidence through `MySqlEventStore.upsert_market_analysis()`.
+- [x] Run policy-eligible signal extraction and independently verify final DB state.
+- [x] Record Observer completion, commit, and push the scoped run log.
+
+### 2026-08-11 Pre-Open Guard Result
+- Created missing analysis `324` from five local market-context evidence events; no external provider API, web search, or LINE contact occurred.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact six-section flow, exactly three checkpoint bullets, readable Traditional Chinese, structured data present, `push_enabled=1`, `pushed=0`, and `external_provider_api_called=false`.
+- Targeted extraction ran through the retired compatibility entry point; empty `stock_watch` correctly produced zero current trade signals.
+
 ## 2026-08-10 TW Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's `tw_close` row plus local close context.
