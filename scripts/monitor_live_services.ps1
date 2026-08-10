@@ -17,7 +17,7 @@ $logFile = Join-Path $logDir "live-service-monitor.log"
 function Write-MonitorLog {
   param([string]$Message)
   $line = "$(Get-Date -Format o) $Message"
-  Add-Content -LiteralPath $logFile -Value $line
+  Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8
   Write-Host $line
 }
 

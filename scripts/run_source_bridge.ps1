@@ -174,6 +174,6 @@ $exitCode = Invoke-CodexObservedCommand `
     disable_us_index = $DisableUsIndex.IsPresent
     log_level = $LogLevel
   } `
-  -Command { & $ResolvedPythonExe @cmdArgs 2> $ErrLogFile | Tee-Object -FilePath $OutLogFile }
+  -Command { & $ResolvedPythonExe @cmdArgs 2> $ErrLogFile | Tee-Object -FilePath $OutLogFile -Encoding UTF8 }
 
 exit $exitCode
