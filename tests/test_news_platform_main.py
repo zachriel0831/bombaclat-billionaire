@@ -3,7 +3,13 @@
 import os
 import unittest
 
-from news_platform.main import DEFAULT_PUBLIC_RECORD_SOURCES, parse_categories, parse_public_sources, parse_source_ids
+from news_platform.main import (
+    DEFAULT_PUBLIC_RECORD_SOURCES,
+    SUPPORTED_PUBLIC_RECORD_SOURCES,
+    parse_categories,
+    parse_public_sources,
+    parse_source_ids,
+)
 
 
 class MainConfigTests(unittest.TestCase):
@@ -72,7 +78,7 @@ class MainConfigTests(unittest.TestCase):
 
     def test_parse_public_sources_defaults_to_all_stable_sources(self):
         self.assertEqual(parse_public_sources(None), DEFAULT_PUBLIC_RECORD_SOURCES)
-        self.assertEqual(parse_public_sources("all"), DEFAULT_PUBLIC_RECORD_SOURCES)
+        self.assertEqual(parse_public_sources("all"), SUPPORTED_PUBLIC_RECORD_SOURCES)
 
 
 if __name__ == "__main__":

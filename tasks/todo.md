@@ -1011,3 +1011,11 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Register `NewsCollector-NewsPlatformLowFrequencySources` as an interactive-logon fixed window.
 - [x] Update runbooks and ingestion skill so future business schedulers avoid popup-and-exit consoles.
 - [x] Verify task action, parser checks, fixed-window startup, and local commit.
+
+# 2026-08-12 CI Unit Test Failure
+
+- [x] Confirm screenshot failures against local tests and config.
+- [x] Add the missing package dependency used by `relay_client.py`.
+- [x] Update the public-source `all` test to include CWA supported sources.
+- [x] Run targeted tests and full unittest discovery.
+- [x] Commit only CI/test related files.
