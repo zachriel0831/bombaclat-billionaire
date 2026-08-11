@@ -14,5 +14,5 @@ Add TVBS, UDN, and SETN as explicit low-frequency `news_platform` HTML list sour
 - `NEWSPF_DISABLED_SOURCE_IDS` keeps `tvbs,ctee,udn,setn` out of the normal 15-minute loop by default.
 - `--source-ids tvbs,udn,setn` explicitly runs the low-frequency sources.
 - `scripts/run_news_platform_low_frequency_sources.ps1` performs one controlled crawl, bounded author-detail backfill, and keyword/topic enrichment.
-- `scripts/register_news_platform_low_frequency_sources_task.ps1` can register the hourly local schedule.
+- `scripts/register_news_platform_low_frequency_sources_task.ps1` registers the hourly local cadence as one interactive-logon fixed window; do not use a repeating popup-and-exit command window for this business crawler.
 - CTEE remains disabled until a working allowed public endpoint is verified; do not bypass 403 with rotating user agents, cookies, or proxies.

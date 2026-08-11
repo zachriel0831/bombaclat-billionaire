@@ -238,8 +238,8 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - Defaults: `NEWSPF_AUTHOR_DETAIL_BACKFILL_BATCH_SIZE=30`, `NEWSPF_AUTHOR_DETAIL_BACKFILL_SLEEP_SECONDS=0.05`, and sources `cna,storm,newtalk,ltn,ettoday,tvbs,udn,setn,ebc,ctee,pts`
 - The loop only retries rows still in early missing states (`NULL`, `no_detail_fetched`, `parser_not_supported`); use `scripts/backfill_news_author_detail_pages.py --retry-failed` manually for parse failures or broad repair
 7. Register low-frequency supplements when needed
-- `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force`
-- The main scheduler registration script also registers `NewsCollector-NewsPlatformLowFrequencySources` hourly.
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow`
+- The main scheduler registration script also registers `NewsCollector-NewsPlatformLowFrequencySources` as an interactive-logon fixed window. It must not be a repeating popup-and-exit task.
 - `scripts/register_market_analysis_tasks.ps1` keeps scheduled LLM prose tasks disabled by default; pass `-EnableLlmAnalysisTasks` only for an explicit cost-control override.
 - CTEE stays disabled until a public allowed endpoint returns usable data; do not bypass 403 protections.
 8. Audit official-list coverage and compensate gaps
@@ -262,6 +262,25 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 11. After changing worker/topic/author-detail code, restart any existing `news_platform.main --loop` process
 - Verify the new loop log shows current source scope and, when new rows exist, `Topic pass scanned=<n>`
 - Check live DB has `SUM(topics_json IS NULL)=0` for active categories after backfill
+
+## Workflow 3B-1: Low-Frequency News Source Fixed Window
+Use this when TVBS/UDN/SETN low-frequency society/politics collection should
+stay in one visible PowerShell window instead of opening short-lived task
+windows.
+
+1. Verify the scheduler change without applying it
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -PlanOnly`
+2. Install and start the fixed window
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow`
+- This replaces `NewsCollector-NewsPlatformLowFrequencySources` with an
+  interactive-logon fixed window.
+3. Verify
+- `Get-ScheduledTask -TaskName NewsCollector-NewsPlatformLowFrequencySources | Select-Object TaskName,State`
+- The fixed window title is `NewsCollector low-frequency news sources`.
+- Read `runtime/status/news-platform-low-frequency-window-status.json` for the
+  fixed-window PID, last exit code, next run, source ids, categories, and log.
+- Daily fixed-window logs are written to
+  `runtime/logs/news-platform-low-frequency-window-YYYYMMDD.log`.
 
 ## Workflow 3C: Taiwan Official Public Records
 1. Smoke check official public-record sources without DB writes

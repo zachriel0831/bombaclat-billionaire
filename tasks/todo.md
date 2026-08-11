@@ -1003,3 +1003,11 @@ Move completed or stale task logs to `tasks/archive/`.
 - Created analysis `323` from four local evidence events and two U.S. index-close rows; no external provider API, web search, LINE contact, or delivery action occurred.
 - Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact six-section flow, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
 - Signal extraction was skipped because stock recommendation extraction is retired.
+
+# 2026-08-11 Low-Frequency Source Fixed Window
+
+- [x] Stop the existing short-lived popup task before it can run again.
+- [x] Add a persistent visible window runner for TVBS/UDN/SETN low-frequency collection.
+- [x] Register `NewsCollector-NewsPlatformLowFrequencySources` as an interactive-logon fixed window.
+- [x] Update runbooks and ingestion skill so future business schedulers avoid popup-and-exit consoles.
+- [x] Verify task action, parser checks, fixed-window startup, and local commit.

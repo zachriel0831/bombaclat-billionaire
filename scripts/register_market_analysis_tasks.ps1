@@ -36,7 +36,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $RunScript = Join-Path $ProjectRoot "scripts\\run_market_analysis.ps1"
 $RagIndexerScript = Join-Path $ProjectRoot "scripts\\run_rag_indexer.ps1"
 $PalestineNewsScript = Join-Path $ProjectRoot "scripts\\run_palestine_news.ps1"
-$NewsPlatformLowFrequencyScript = Join-Path $ProjectRoot "scripts\\run_news_platform_low_frequency_sources.ps1"
+$NewsPlatformLowFrequencyRegisterScript = Join-Path $ProjectRoot "scripts\\register_news_platform_low_frequency_sources_task.ps1"
 $NewsSourceAccuracyScript = Join-Path $ProjectRoot "scripts\\run_news_source_accuracy_audit.ps1"
 $ContextScript = Join-Path $ProjectRoot "scripts\\run_market_context.ps1"
 $BlsMacroScript = Join-Path $ProjectRoot "scripts\\run_bls_macro.ps1"
@@ -53,8 +53,8 @@ if (-not (Test-Path -LiteralPath $RagIndexerScript)) {
 if (-not (Test-Path -LiteralPath $PalestineNewsScript)) {
   throw "run_palestine_news.ps1 not found: $PalestineNewsScript"
 }
-if (-not (Test-Path -LiteralPath $NewsPlatformLowFrequencyScript)) {
-  throw "run_news_platform_low_frequency_sources.ps1 not found: $NewsPlatformLowFrequencyScript"
+if (-not (Test-Path -LiteralPath $NewsPlatformLowFrequencyRegisterScript)) {
+  throw "register_news_platform_low_frequency_sources_task.ps1 not found: $NewsPlatformLowFrequencyRegisterScript"
 }
 if (-not (Test-Path -LiteralPath $NewsSourceAccuracyScript)) {
   throw "run_news_source_accuracy_audit.ps1 not found: $NewsSourceAccuracyScript"
@@ -173,6 +173,30 @@ function Register-CollectorTask {
   }
 }
 
+function Register-LowFrequencyFixedWindowTask {
+  $registerArgs = @(
+    "-NoProfile",
+    "-ExecutionPolicy", "Bypass",
+    "-File", $NewsPlatformLowFrequencyRegisterScript,
+    "-TaskName", $NewsPlatformLowFrequencyTaskName,
+    "-EnvFile", $EnvFile,
+    "-SourceIds", "tvbs,udn,setn",
+    "-Categories", "society,politics",
+    "-Limit", 20,
+    "-AuthorLimit", 30,
+    "-EveryMinutes", ($NewsPlatformLowFrequencyEveryHours * 60),
+    "-LogLevel", "INFO"
+  )
+  if ($Force) {
+    $registerArgs += "-Force"
+  }
+
+  & powershell.exe @registerArgs
+  if ($LASTEXITCODE -ne 0) {
+    throw "low-frequency fixed-window task registration failed with exit code $LASTEXITCODE"
+  }
+}
+
 function Register-TwCloseContextTask {
   param(
     [string]$TaskName,
@@ -202,7 +226,7 @@ function Register-TwCloseContextTask {
 
 Register-CollectorTask -TaskName $RagIndexerTaskName -ScriptPath $RagIndexerScript -At $RagIndexerAt -Description "Index recent relay events and market analyses for historical-case RAG."
 Register-CollectorTask -TaskName $PalestineNewsTaskName -ScriptPath $PalestineNewsScript -At $PalestineNewsAt -Description "Collect English Palestine/Gaza/West Bank issue news into long-term t_palestine_news_items." -ExtraArgs "-Limit 20" -RepeatEveryHours $PalestineNewsEveryHours
-Register-CollectorTask -TaskName $NewsPlatformLowFrequencyTaskName -ScriptPath $NewsPlatformLowFrequencyScript -At $NewsPlatformLowFrequencyAt -Description "Collect low-frequency TVBS/UDN/SETN public society-politics list pages and enrich reporter metadata." -ExtraArgs "-SourceIds `"tvbs,udn,setn`" -Categories `"society,politics`" -Limit 20 -AuthorLimit 30" -RepeatEveryHours $NewsPlatformLowFrequencyEveryHours
+Register-LowFrequencyFixedWindowTask
 Register-CollectorTask -TaskName $NewsSourceAccuracyTaskName -ScriptPath $NewsSourceAccuracyScript -At $NewsSourceAccuracyAt -Description "Audit news-platform official-list coverage and compensate missing source rows." -ExtraArgs "-Categories `"society,politics`" -Limit 20 -MinCoverage 0.85 -Compensate -FailOnWarn" -RepeatEveryHours $NewsSourceAccuracyEveryHours
 Register-CollectorTask -TaskName $BlsMacroTaskName -ScriptPath $BlsMacroScript -At $BlsMacroAt -Description "Collect BLS official macro facts into t_relay_events before U.S. close analysis."
 Register-CollectorTask -TaskName $MacroCalendarTaskName -ScriptPath $MacroCalendarScript -At $MacroCalendarAt -Description "Collect official U.S. macro release dates into t_macro_release_calendar before LINE reminder delivery."

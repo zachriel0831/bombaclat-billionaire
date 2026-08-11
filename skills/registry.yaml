@@ -3,7 +3,7 @@ skills:
   - name: news-ingestion-skill
     owner: data-platform
     status: draft
-    version: 0.2.0
+    version: 0.2.1
     path: skills/news-ingestion-skill/SKILL.md
     evals: skills/news-ingestion-skill/EVALS.md
     changelog: skills/news-ingestion-skill/CHANGELOG.md

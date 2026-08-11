@@ -81,7 +81,7 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - Collects Taiwan society and politics RSS/sitemap/list feeds plus explicitly scheduled low-frequency public HTML lists into `t_news_articles`
 - RSS/Atom and sitemap ingestion stores reporter/author names in `authors_json` when the feed exposes explicit author metadata or a high-confidence byline. Reporter identities are also normalized into `t_news_authors` and linked through `t_news_article_authors`; missing byline states are tracked on `t_news_articles.author_extraction_status` and summarized in `t_news_author_coverage_daily`.
 - Default loop source set: LTN, ETtoday, CNA, PTS, EBC, Newtalk, and Storm Media for both society and politics
-- Low-frequency public HTML list supplements are registered for TVBS, UDN, and SETN. Run them with `--source-ids tvbs,udn,setn` or `scripts/run_news_platform_low_frequency_sources.ps1`; CTEE remains disabled because the verified public endpoints return 403 locally.
+- Low-frequency public HTML list supplements are registered for TVBS, UDN, and SETN. Run a manual one-shot with `--source-ids tvbs,udn,setn` or `scripts/run_news_platform_low_frequency_sources.ps1`; register the local schedule with `scripts/register_news_platform_low_frequency_sources_task.ps1 -StartNow` so it stays in one visible fixed window. CTEE remains disabled because the verified public endpoints return 403 locally.
 - `NEWSPF_CATEGORIES` or `--categories` controls collection scope; default is `society,politics`
 - `NEWSPF_SOURCE_IDS` or `--source-ids` limits collection to explicit source ids; explicit source ids can run registered low-frequency sources that are default-disabled.
 - `KeywordWorker` writes `keywords_json`; `TopicWorker` writes deterministic issue classifications into `topics_json`; optional LLM fallback refines rule-fallback general rows
@@ -166,7 +166,7 @@ $env:PYTHONPATH='src'; python -m news_platform.main --smoke --categories society
 $env:PYTHONPATH='src'; python -m news_platform.main --once
 $env:PYTHONPATH='src'; python -m news_platform.main --once --categories politics
 powershell -ExecutionPolicy Bypass -File .\scripts\run_news_platform_low_frequency_sources.ps1 -EnvFile .env -SourceIds "tvbs,udn,setn"
-powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force
+powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow
 powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audit.ps1 -EnvFile .env -Compensate -FailOnWarn
 powershell -ExecutionPolicy Bypass -File .\scripts\register_news_source_accuracy_audit_task.ps1 -Force
 $env:PYTHONPATH='src'; python -m news_platform.main --extract-keywords --classify-topics

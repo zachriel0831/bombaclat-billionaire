@@ -63,6 +63,16 @@ Start-Process powershell -ArgumentList @(
 )
 ```
 
+Start the low-frequency TVBS/UDN/SETN fixed window so those business crawlers do
+not reopen a short-lived command window each hour:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow
+```
+
+Keep the `NewsCollector low-frequency news sources` window open. It writes
+status to `runtime/status/news-platform-low-frequency-window-status.json`.
+
 Restart the local AI comment service if barrage/comment AI behavior is expected:
 
 ```powershell

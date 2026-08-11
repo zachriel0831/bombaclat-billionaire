@@ -88,7 +88,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | Data-source health report | `powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -EnvFile .env` |
 | Live worker monitor + service auto-repair fixed window | `powershell -ExecutionPolicy Bypass -File .\scripts\register_live_service_monitor_task.ps1 -StartNow` |
 | Manual service auto-repair watcher dry-run | `powershell -ExecutionPolicy Bypass -File .\scripts\run_service_auto_repair_watch.ps1 -EnvFile .env -DryRun` |
-| Low-frequency society/politics source supplements | `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_platform_low_frequency_sources.ps1 -EnvFile .env -SourceIds "tvbs,udn,setn"` |
+| Low-frequency society/politics source supplements | One-shot: `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_platform_low_frequency_sources.ps1 -EnvFile .env -SourceIds "tvbs,udn,setn"`; fixed window: `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow` |
 | News source official-list accuracy audit | `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audit.ps1 -EnvFile .env -Compensate -FailOnWarn` |
 | Market analysis | `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force` |
 | Weekly summary | `powershell -ExecutionPolicy Bypass -File .\scripts\run_weekly_summary.ps1 -Force -DryRun` |

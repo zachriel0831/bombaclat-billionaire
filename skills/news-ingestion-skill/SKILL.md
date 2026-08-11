@@ -31,7 +31,8 @@ Out of scope:
 4. For repeatable source workflows or incidents, read [../../memory-bank/workflows.md](../../memory-bank/workflows.md).
 5. Check relevant specs under [../../spec](../../spec) before changing topic/public-record contracts.
 6. Keep ingestion failures source-scoped; one failed source must not stop unrelated sources.
-7. Update README, specs, memory-bank decisions, or workflows when behavior changes.
+7. Repeating business crawlers must run as fixed windows or background services; do not introduce visible popup-and-exit scheduled command windows.
+8. Update README, specs, memory-bank decisions, or workflows when behavior changes.
 
 ## Key Commands
 
@@ -41,6 +42,7 @@ $env:PYTHONPATH='src'; python -m news_collector.main fetch --source sec --limit 
 $env:PYTHONPATH='src'; python -m news_collector.main fetch --source twse --limit 10 --pretty
 $env:PYTHONPATH='src'; python -m news_platform.main --smoke
 powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -EnvFile .env
+powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow
 ```
 
 ## Verification

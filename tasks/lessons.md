@@ -1179,3 +1179,15 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - [ ] Verify `structured_json.stock_watch=[]` leads to zero current signals after targeted repair
   - [ ] Keep `-FixedPoolFallback` as a compatibility alias only; do not let it imply fixed-pool candidate creation
 - Status: active
+
+## LESSON-20260811-01
+- Date: 2026-08-11
+- Trigger (User correction): User saw `Collecting low-frequency news-platform sources...` open in a command window and disappear, then clarified that platform business logic must not use popup-and-exit command windows.
+- What was wrong: The low-frequency TVBS/UDN/SETN crawler was still registered as a repeating Task Scheduler action that opened a short-lived PowerShell process.
+- Root cause: Scheduler fixes hid some short tasks, but the business crawler itself should have followed the existing fixed-window pattern used by CWA and live-service monitoring.
+- New rule (always/never): Repeating business crawlers must run as fixed windows or background services. Never add a visible popup-and-exit scheduled command window for news/finance platform business logic.
+- Prevention checklist:
+  - [ ] For any new repeating collector, choose a fixed-window runner or service process before writing the Task Scheduler action
+  - [ ] Verify scheduled task `Actions` do not point directly at a one-shot business crawler
+  - [ ] Update README, workflows, and skill guidance when scheduler behavior changes
+- Status: active
