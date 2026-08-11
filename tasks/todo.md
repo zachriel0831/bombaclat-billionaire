@@ -1031,3 +1031,15 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Update the public-source `all` test to include CWA supported sources.
 - [x] Run targeted tests and full unittest discovery.
 - [x] Commit only CI/test related files.
+
+# 2026-08-12 Pre-Open Codex Guard Run
+
+- [x] Read repo instructions, automation memory, Workflow 4C guard rules, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's missing `pre_tw_open` row plus local evidence.
+- [x] Create the missing row through `MySqlEventStore.upsert_market_analysis()`.
+- [x] Run targeted trade-signal extraction and verify the final delivery-ready DB state.
+
+## 2026-08-12 Pre-Open Codex Guard Result
+
+- Created analysis `327` from eight fresh local market-context events; no external provider API, web search, LINE contact, or delivery action occurred.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact six-section flow, exactly three checkpoint bullets, readable Traditional Chinese, structured data present, `push_enabled=1`, `pushed=0`, zero trade signals, and `external_provider_api_called=false`.
