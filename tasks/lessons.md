@@ -1191,3 +1191,15 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - [ ] Verify scheduled task `Actions` do not point directly at a one-shot business crawler
   - [ ] Update README, workflows, and skill guidance when scheduler behavior changes
 - Status: active
+
+## LESSON-20260812-01
+- Date: 2026-08-12
+- Trigger (User correction): User found many empty PowerShell windows and asked to pause the live monitor, clean stale wrappers, and fix why `source_bridge` stayed missing.
+- What was wrong: `source_bridge` exited immediately because Windows PowerShell 5.1 does not support `Tee-Object -Encoding`; repeated restarts also opened new `-NoExit` wrappers without closing stale wrapper shells.
+- Root cause: The restart script only stopped Python children, and its `-Command` startup path was fragile enough to leave empty shells behind.
+- New rule (always/never): Live worker restarts must stop both Python workers and their PowerShell wrapper shells before starting replacements; use `-File` entry scripts for long-running workers instead of composed `-Command` strings.
+- Prevention checklist:
+  - [ ] Run `restart_live_services.ps1` twice and confirm exactly three wrappers plus one process each for `event_relay.main`, `news_collector.relay_bridge`, and `news_platform.main --loop`
+  - [ ] Run `run_data_source_health.ps1 -Json` and confirm `process_source_bridge=ok`
+  - [ ] Keep `NewsCollector-LiveServiceMonitor` disabled when the user explicitly pauses live monitor
+- Status: active

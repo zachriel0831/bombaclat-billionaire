@@ -163,6 +163,8 @@ if ($DisableUsIndex) {
   $cmdArgs += "--disable-us-index"
 }
 
+# Windows PowerShell 5.1 has no Tee-Object -Encoding, and these scripts run
+# through the Windows Task Scheduler / powershell.exe path on this machine.
 $exitCode = Invoke-CodexObservedCommand `
   -Job "source_bridge" `
   -Category "crawler" `
@@ -174,6 +176,6 @@ $exitCode = Invoke-CodexObservedCommand `
     disable_us_index = $DisableUsIndex.IsPresent
     log_level = $LogLevel
   } `
-  -Command { & $ResolvedPythonExe @cmdArgs 2> $ErrLogFile | Tee-Object -FilePath $OutLogFile -Encoding UTF8 }
+  -Command { & $ResolvedPythonExe @cmdArgs 2> $ErrLogFile | Tee-Object -FilePath $OutLogFile }
 
 exit $exitCode

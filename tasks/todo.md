@@ -1043,3 +1043,12 @@ Move completed or stale task logs to `tasks/archive/`.
 
 - Created analysis `327` from eight fresh local market-context events; no external provider API, web search, LINE contact, or delivery action occurred.
 - Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact six-section flow, exactly three checkpoint bullets, readable Traditional Chinese, structured data present, `push_enabled=1`, `pushed=0`, zero trade signals, and `external_provider_api_called=false`.
+
+# 2026-08-12 Live Service Wrapper Cleanup
+
+- [x] Disable `NewsCollector-LiveServiceMonitor` and close stale empty worker wrappers.
+- [x] Reproduce why `source_bridge` is marked missing.
+- [x] Fix `run_source_bridge.ps1` startup compatibility.
+- [x] Fix `restart_live_services.ps1` so old worker wrappers are closed before restart.
+- [x] Update runbooks/lessons and verify live-service restart health.
+- [x] Commit and push only task-related files.

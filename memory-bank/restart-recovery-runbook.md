@@ -22,46 +22,21 @@ Start from repo root:
 Set-Location D:\work_space\stock\data-collecting
 ```
 
-Restart the event relay and source bridge:
+Restart the event relay, source bridge, and Taiwan society/politics loop:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\restart_live_services.ps1 -EnvFile .env -LogLevel INFO
 ```
 
-This script stops existing `event_relay.main` and `news_collector.relay_bridge`
-Python processes, then opens two PowerShell windows:
+This script stops existing `event_relay.main`, `news_collector.relay_bridge`,
+and `news_platform.main --loop` Python processes. It also closes stale
+`-NoExit` PowerShell wrapper windows before opening three fresh windows:
 
 - `scripts/run_event_relay.ps1`
 - `scripts/run_source_bridge.ps1`
+- `scripts/run_news_platform_loop.ps1`
 
-Keep both windows open. If one exits, inspect its visible error or latest log.
-
-Restart the Taiwan society/politics `news_platform` loop separately. First check
-for an existing loop:
-
-```powershell
-Get-CimInstance Win32_Process | Where-Object {
-  $_.CommandLine -and $_.CommandLine -match 'news_platform\.main' -and $_.CommandLine -match '--loop'
-} | Select-Object ProcessId, CommandLine
-```
-
-If an old/stale loop exists, stop only that PID:
-
-```powershell
-Stop-Process -Id <PID>
-```
-
-Then start a fresh loop in a visible PowerShell window:
-
-```powershell
-Start-Process powershell -ArgumentList @(
-  '-NoExit',
-  '-ExecutionPolicy',
-  'Bypass',
-  '-Command',
-  "Set-Location 'D:\work_space\stock\data-collecting'; `$env:PYTHONPATH='src'; python -m news_platform.main --loop 1> logs\news_platform_loop_current.log 2> logs\news_platform_loop_current.err.log"
-)
-```
+Keep all three windows open. If one exits, inspect its visible error or latest log.
 
 Start the low-frequency TVBS/UDN/SETN fixed window so those business crawlers do
 not reopen a short-lived command window each hour:

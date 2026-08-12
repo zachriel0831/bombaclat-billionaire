@@ -395,6 +395,7 @@ machine restart, or when the user asks whether source data has caught up.
 - For stale society/politics articles, inspect `news_platform` logs and rerun Workflow 3B.
 - For stale public records, run Workflow 3C collection/link commands.
 - For duplicate loops, stop only the extra `news_platform.main --loop` PID, then rerun the health report.
+- For empty worker wrapper windows, rerun `scripts/restart_live_services.ps1`; it closes stale `run_event_relay.ps1`, `run_source_bridge.ps1`, and `run_news_platform_loop.ps1` wrappers before starting the three fresh windows.
 
 ## Workflow 3D-1: Live Service Monitor Fixed Window
 Use this when the live worker monitor should stay in one visible PowerShell

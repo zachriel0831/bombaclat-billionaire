@@ -84,6 +84,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 |---|---|
 | Run relay service | `powershell -ExecutionPolicy Bypass -File .\scripts\run_event_relay.ps1` |
 | Run source bridge | `powershell -ExecutionPolicy Bypass -File .\scripts\run_source_bridge.ps1 -PollIntervalSeconds 300 -Limit 5` |
+| Run news-platform loop | `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_platform_loop.ps1` |
 | Run local console | `powershell -ExecutionPolicy Bypass -File .\scripts\run_local_console.ps1` |
 | Data-source health report | `powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -EnvFile .env` |
 | Live worker monitor + service auto-repair fixed window | `powershell -ExecutionPolicy Bypass -File .\scripts\register_live_service_monitor_task.ps1 -StartNow` |
