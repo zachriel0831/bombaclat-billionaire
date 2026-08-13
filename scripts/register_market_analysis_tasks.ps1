@@ -1,6 +1,7 @@
+# Registers data/context collection tasks used by the news and market platform.
+# Python LLM daily/weekly analysis tasks are retired and intentionally absent.
 param(
   [string]$EnvFile = ".env",
-  [string]$UsCloseTaskName = "NewsCollector-MarketAnalysis-UsClose",
   [string]$RagIndexerTaskName = "NewsCollector-RagIndexer",
   [string]$PalestineNewsTaskName = "NewsCollector-PalestineNews",
   [string]$NewsPlatformLowFrequencyTaskName = "NewsCollector-NewsPlatformLowFrequencySources",
@@ -8,11 +9,8 @@ param(
   [string]$BlsMacroTaskName = "NewsCollector-BlsMacro",
   [string]$MacroCalendarTaskName = "NewsCollector-MacroCalendar",
   [string]$MarketContextTaskName = "NewsCollector-MarketContext-PreTwOpen",
-  [string]$PreOpenTaskName = "NewsCollector-MarketAnalysis-PreTwOpen",
   [string]$TwMarketFlowTaskName = "NewsCollector-TwMarketFlow",
   [string]$TwCloseContextTaskName = "NewsCollector-TwCloseContext",
-  [string]$TwCloseTaskName = "NewsCollector-MarketAnalysis-TwClose",
-  [string]$UsCloseAt = "05:00",
   [string]$RagIndexerAt = "04:40",
   [string]$PalestineNewsAt = "06:10",
   [int]$PalestineNewsEveryHours = 3,
@@ -23,17 +21,13 @@ param(
   [string]$BlsMacroAt = "04:50",
   [string]$MacroCalendarAt = "06:00",
   [string]$MarketContextAt = "07:20",
-  [string]$PreOpenAt = "07:30",
   [string]$TwMarketFlowAt = "15:10",
   [string]$TwCloseContextAt = "15:20",
-  [string]$TwCloseAt = "15:30",
-  [switch]$EnableLlmAnalysisTasks,
   [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
-$RunScript = Join-Path $ProjectRoot "scripts\\run_market_analysis.ps1"
 $RagIndexerScript = Join-Path $ProjectRoot "scripts\\run_rag_indexer.ps1"
 $PalestineNewsScript = Join-Path $ProjectRoot "scripts\\run_palestine_news.ps1"
 $NewsPlatformLowFrequencyRegisterScript = Join-Path $ProjectRoot "scripts\\register_news_platform_low_frequency_sources_task.ps1"
@@ -44,9 +38,6 @@ $MacroCalendarScript = Join-Path $ProjectRoot "scripts\\run_macro_calendar.ps1"
 $TwMarketFlowScript = Join-Path $ProjectRoot "scripts\\run_tw_market_flow.ps1"
 $TwCloseContextScript = Join-Path $ProjectRoot "scripts\\run_tw_close_context.ps1"
 
-if (-not (Test-Path -LiteralPath $RunScript)) {
-  throw "run_market_analysis.ps1 not found: $RunScript"
-}
 if (-not (Test-Path -LiteralPath $RagIndexerScript)) {
   throw "run_rag_indexer.ps1 not found: $RagIndexerScript"
 }
@@ -73,34 +64,6 @@ if (-not (Test-Path -LiteralPath $TwMarketFlowScript)) {
 }
 if (-not (Test-Path -LiteralPath $TwCloseContextScript)) {
   throw "run_tw_close_context.ps1 not found: $TwCloseContextScript"
-}
-
-function Register-MarketAnalysisTask {
-  param(
-    [string]$TaskName,
-    [string]$Slot,
-    [string]$At,
-    [string]$Description
-  )
-
-  $actionArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$RunScript`" -EnvFile `"$EnvFile`" -Slot `"$Slot`" -LogLevel INFO"
-  $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs -WorkingDirectory $ProjectRoot
-  $trigger = New-ScheduledTaskTrigger -Daily -At $At
-  $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 2)
-
-  if ($Force) {
-    $null = Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-  }
-
-  Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Description $Description -Force | Out-Null
-
-  $task = Get-ScheduledTask -TaskName $TaskName
-  $info = Get-ScheduledTaskInfo -TaskName $TaskName
-  Write-Host "Scheduled task registered: $TaskName" -ForegroundColor Green
-  Write-Host "  Slot: $Slot"
-  Write-Host "  NextRunTime: $($info.NextRunTime)"
-  Write-Host "  LastRunTime: $($info.LastRunTime)"
-  Write-Host "  State: $($task.State)"
 }
 
 function Register-MarketContextTask {
@@ -228,27 +191,22 @@ Register-CollectorTask -TaskName $RagIndexerTaskName -ScriptPath $RagIndexerScri
 Register-CollectorTask -TaskName $PalestineNewsTaskName -ScriptPath $PalestineNewsScript -At $PalestineNewsAt -Description "Collect English Palestine/Gaza/West Bank issue news into long-term t_palestine_news_items." -ExtraArgs "-Limit 20" -RepeatEveryHours $PalestineNewsEveryHours
 Register-LowFrequencyFixedWindowTask
 Register-CollectorTask -TaskName $NewsSourceAccuracyTaskName -ScriptPath $NewsSourceAccuracyScript -At $NewsSourceAccuracyAt -Description "Audit news-platform official-list coverage and compensate missing source rows." -ExtraArgs "-Categories `"society,politics`" -Limit 20 -MinCoverage 0.85 -Compensate -FailOnWarn" -RepeatEveryHours $NewsSourceAccuracyEveryHours
-Register-CollectorTask -TaskName $BlsMacroTaskName -ScriptPath $BlsMacroScript -At $BlsMacroAt -Description "Collect BLS official macro facts into t_relay_events before U.S. close analysis."
+Register-CollectorTask -TaskName $BlsMacroTaskName -ScriptPath $BlsMacroScript -At $BlsMacroAt -Description "Collect BLS official macro facts into t_relay_events for downstream Codex analysis."
 Register-CollectorTask -TaskName $MacroCalendarTaskName -ScriptPath $MacroCalendarScript -At $MacroCalendarAt -Description "Collect official U.S. macro release dates into t_macro_release_calendar before LINE reminder delivery."
-Register-MarketAnalysisTask -TaskName $UsCloseTaskName -Slot "us_close" -At $UsCloseAt -Description "Generate U.S. close analysis at 05:00 local time; TW holidays with U.S. trading make it Java-delivery eligible."
 Register-MarketContextTask -TaskName $MarketContextTaskName -At $MarketContextAt -Description "Collect pre-open market context and store it as event-only facts before Taiwan open."
-Register-MarketAnalysisTask -TaskName $PreOpenTaskName -Slot "pre_tw_open" -At $PreOpenAt -Description "Generate Taiwan pre-open analysis, or macro_daily when both TW and U.S. close session are closed."
 Register-CollectorTask -TaskName $TwMarketFlowTaskName -ScriptPath $TwMarketFlowScript -At $TwMarketFlowAt -Description "Collect Taiwan official market-flow facts into t_relay_events before Taiwan close context."
 Register-TwCloseContextTask -TaskName $TwCloseContextTaskName -At $TwCloseContextAt -Description "Collect Taiwan close context from relay events at 15:20 local time."
-Register-MarketAnalysisTask -TaskName $TwCloseTaskName -Slot "tw_close" -At $TwCloseAt -Description "Generate stored-only Taiwan close analysis at 15:30 local time; market calendar guard may skip it."
 
-if (-not $EnableLlmAnalysisTasks) {
-  foreach ($taskNameToDisable in @($UsCloseTaskName, $PreOpenTaskName, $TwCloseTaskName, "NewsCollector-WeeklySummary")) {
-    if (Get-ScheduledTask -TaskName $taskNameToDisable -ErrorAction SilentlyContinue) {
-      Disable-ScheduledTask -TaskName $taskNameToDisable | Out-Null
-      Write-Host "Disabled scheduled LLM prose task per cost-control policy: $taskNameToDisable" -ForegroundColor Yellow
-    }
-  }
-}
-
-foreach ($obsoleteTaskName in @("NewsCollector-AnalysisPush-UsClose", "NewsCollector-AnalysisPush-PreTwOpen")) {
+foreach ($obsoleteTaskName in @(
+  "NewsCollector-AnalysisPush-UsClose",
+  "NewsCollector-AnalysisPush-PreTwOpen",
+  "NewsCollector-MarketAnalysis-UsClose",
+  "NewsCollector-MarketAnalysis-PreTwOpen",
+  "NewsCollector-MarketAnalysis-TwClose",
+  "NewsCollector-WeeklySummary"
+)) {
   if (Get-ScheduledTask -TaskName $obsoleteTaskName -ErrorAction SilentlyContinue) {
     Unregister-ScheduledTask -TaskName $obsoleteTaskName -Confirm:$false
-    Write-Host "Removed obsolete analysis push task: $obsoleteTaskName" -ForegroundColor Yellow
+    Write-Host "Removed obsolete analysis task: $obsoleteTaskName" -ForegroundColor Yellow
   }
 }

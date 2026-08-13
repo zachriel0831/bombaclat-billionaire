@@ -244,7 +244,7 @@ Optional LLM fallback env keys:
 This repo now includes a Python data relay service:
 - Receive compatibility/manual events via HTTP `POST /events`
 - Persist events in MySQL event table
-- Store X / Truth Social public-figure posts, market snapshots, and generated analyses
+- Store X / Truth Social public-figure posts, market snapshots, and Codex-generated analysis rows
 - Python does not own LINE webhook or LINE push delivery; those belong to the Java system
 - `t_relay_events` is pure event storage; it has no LINE push queue/status columns
 - Auto-create social post table:
@@ -275,7 +275,7 @@ Run the Free Palestine English issue-news collector once:
 powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 20
 ```
 
-Register the recurring local crawler:
+Register the recurring local crawler and data/context tasks:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\register_market_analysis_tasks.ps1 -Force
@@ -492,111 +492,53 @@ Notes:
 - Current MVP covers TWSE listed-company daily material announcements.
 - Events flow directly into `t_relay_events` through the crawler bridge.
 
-## Weekly macro summary (AI, stored only)
+## Retired Python LLM market-analysis generators
 
-Generate one weekly summary from `t_relay_events` and store it in `t_market_analyses`:
+The old Python LLM daily market-analysis and weekly-summary generators are removed.
+They are not a fallback path. Codex local automations own prose generation and write
+analysis rows into `t_market_analyses`; Python keeps data collection, context
+collection, RAG indexing, claim verification helpers, and storage methods.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_weekly_summary.ps1 -Force -DryRun
-```
+Retired HTTP triggers `POST /market-analysis/run` and `POST /analysis/backfill`
+now return `410 analysis_generation_retired`.
 
-Or trigger it through the running relay service:
+Weekly Windows Task Scheduler registration was removed; do not recreate a
+weekly Python LLM generation task.
 
-```powershell
-'{"kind":"weekly","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"
-```
+## Codex-owned market analysis storage
 
-Prompt pipeline:
-- Read skill docs:
-  - `skills/macro-weekly-summary-skill/SKILLS.md` (prompt-loader compatibility file; `SKILL.md` is the skill entry)
-  - `skills/line-brief-format-skill/line-weekly-brief.md`
-- Retrieve historical RAG examples from `t_event_embeddings` / `t_analysis_embeddings` when enabled; these are analogues only, not current evidence.
-- Weekly output uses a weekly-specific three-section contract:
-  - `週總經` -> `下週台股配置` -> `下週觀察清單`
-  - Each section should connect evidence -> mechanism -> Taiwan implication.
-  - Weekly reports are allocation/watchlist briefs and should not output intraday entry / take-profit / stop-loss prices.
-- Compile as:
-  - `runtime/prompts/weekly_summary_system_prompt.txt`
-  - `runtime/prompts/weekly_summary_reusable_prompt.txt`
-- Send to OpenAI Responses API.
-- OpenAI calls request the Responses API `web_search` tool by default so the model can verify fresh gaps beyond `t_relay_events`; set `LLM_WEB_SEARCH_ENABLED=false` to disable. If the API/project does not support the tool, the caller retries once without web search.
-- Store the weekly summary in `t_market_analyses` with:
-  - `analysis_date=YYYY-MM-DD` for the target Sunday delivery date
-  - `analysis_slot=weekly_tw_preopen`
-  - `scheduled_time_local=05:10` (`HH:MM`, no weekday prefix)
-  - `raw_json.section_contract=["週總經","下週台股配置","下週觀察清單"]`
-  - `raw_json.rag` for weekly historical-example retrieval telemetry
-  - `raw_json.token_usage` for provider/model/token telemetry
-
-Weekly summary env keys:
-- `LLM_PROVIDER` (`openai` or `anthropic`; weekly loads `.env` before resolving the provider)
-- `WEEKLY_SUMMARY_OPENAI_API_KEY` (optional; fallback to `OPENAI_API_KEY`)
-- `WEEKLY_SUMMARY_OPENAI_API_KEY_FILE` (default `.secrets/openai_api_key.dpapi`, Windows DPAPI encrypted key)
-- `WEEKLY_SUMMARY_MODEL` (default `gpt-5`)
-- `WEEKLY_SUMMARY_RAG_ENABLED` (default inherits `MARKET_ANALYSIS_RAG_ENABLED`, else `true`)
-- `WEEKLY_SUMMARY_RAG_K` (default `5`)
-- `WEEKLY_SUMMARY_RAG_MIN_SIMILARITY` (default `0.22`)
-- `WEEKLY_SUMMARY_RAG_CANDIDATE_LIMIT` (default `500`)
-- `WEEKLY_SUMMARY_RAG_INCLUDE_ANALYSES` (default `true`)
-- `ANTHROPIC_API_KEY` / `ANTHROPIC_API_KEY_FILE` (used when `LLM_PROVIDER=anthropic` or weekly runtime failover switches to Claude)
-- `WEEKLY_SUMMARY_RUNTIME_FAILOVER_ENABLED` (default `true`; OpenAI quota/rate/5xx failures retry once on Anthropic when configured)
-- `WEEKLY_SUMMARY_LOOKBACK_DAYS` (default `7`)
-- `WEEKLY_SUMMARY_MAX_EVENTS` (default `120`)
-- `WEEKLY_SUMMARY_WEEKDAY` (0=Mon ... 6=Sun, default `5` - Saturday)
-- `WEEKLY_SUMMARY_HOUR` (default `23`)
-- `WEEKLY_SUMMARY_MINUTE` (default `0`)
-- `WEEKLY_SUMMARY_WINDOW_MINUTES` (default `20`)
-- `LLM_WEB_SEARCH_ENABLED` (default `true` for OpenAI; set `false` for local-only analysis)
-
-Weekly schedule helper (Windows Task Scheduler):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\register_weekly_summary_task.ps1 -TaskName "NewsCollector-WeeklySummary" -DayOfWeek "Saturday" -At "23:00" -Force
-```
-
-## Scheduled market analysis (AI, stored only)
-
-Generate market analysis at Taiwan-local checkpoints:
+Codex automations generate market-analysis prose at Taiwan-local checkpoints:
 - `05:00` for U.S. close context; if TW is closed and that U.S. session was open, this row is Java-delivery eligible
 - `07:30` for Taiwan pre-open context
 - `15:30` for Taiwan close review context
 
-Current behavior:
+Current Python-side support behavior:
 - Reads recent events from `t_relay_events`
 - Reads recent DJIA / S&P 500 rows from `t_market_index_snapshots`
 - Reads stored-only `market_context:*` source facts from the recent `t_relay_events` window
-- Builds a quota-managed context pack before RAG/prompting so `market_context:scorecard`, market context, and important official rows are kept ahead of general news overflow
-- Selects the analysis provider/model through `llm_quota_router`: OpenAI is primary by default, Claude is fallback, provider cost checks run when Admin API keys and monthly budgets are configured, then the router records its choice in `raw_json.model_router`
-- Applies compact context automatically when Anthropic is selected, reducing event rows, market rows, RAG examples, and raw JSON detail while preserving scorecard / market_context / official / high-importance items
-- Runs deterministic `stage0_thesis_selector` before LLM stages so the prompt answers 1-2 current core tensions first
-- Optionally retrieves hybrid historical examples from `t_event_embeddings` and `t_analysis_embeddings` using metadata overlap, vector similarity, and stored outcome score; examples are analogues in the stage2 transmission prompt
-- Calls OpenAI Responses API with web search enabled by default for missing/current fact verification
-- Runs `claim_verifier` after generation and stores evidence coverage for numbers, dates, and tickers in `raw_json.claim_verifier`
-- Applies `raw_json.trust_gate`: when `claim_verifier.ok=false`, the analysis is still stored for audit/debug but `push_enabled=false`
-- Stores the generated analysis in `t_market_analyses`
+- Keeps scorecard, market context, and important official rows available for Codex context selection
+- Does not select an LLM provider/model and does not call OpenAI or Anthropic for analysis prose
+- Does not run Python LLM stages; Codex automations own writing and repair
+- Keeps hybrid historical examples in `t_event_embeddings` and `t_analysis_embeddings`; examples are analogues for Codex, not current evidence
+- Keeps `claim_verifier` available for Codex-produced rows to verify numbers, dates, and tickers before delivery eligibility
+- Stores analysis rows in `t_market_analyses` through shared storage methods
 - Uses `push_enabled` as Java delivery eligibility: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`
-- Runs a built-in 2026 TWSE / NYSE calendar guard before any LLM call:
+- Keeps a built-in 2026 TWSE / NYSE calendar helper for Codex slot/date validation:
   - TW closed + relevant U.S. close session open: only `us_close`
-  - U.S. close session closed + TW open: only Taiwan analysis (`pre_tw_open` / `tw_close`); the pre-open prompt intentionally does not include stale `us_close`
-  - both closed: `pre_tw_open` task writes `macro_daily` with `push_enabled=1`
-  - Sunday: market analysis skips; weekly summary owns the day
-- Keeps regular-day `us_close` analysis stored and injects it into the next Taiwan pre-open prompt only when that U.S. close session was open; TW-holiday `us_close` rows are eligible for Java LINE delivery
-- Stock recommendation generation is retired: daily analysis prompts must not output `stock_watch`, buy/watchlist candidates, or entry/stop/target lists, and Python no longer writes `t_trade_signals`.
+  - U.S. close session closed + TW open: only Taiwan analysis (`pre_tw_open` / `tw_close`); Codex should not use stale `us_close` context
+  - both closed: Codex may write `macro_daily` with `push_enabled=1`
+  - Sunday: no Python LLM analysis runs
+- Keeps regular-day `us_close` analysis rows available only when that U.S. close session was open; TW-holiday `us_close` rows remain Java-delivery eligible
+- Stock recommendation generation is retired: daily analysis text must not output `stock_watch`, buy/watchlist candidates, or entry/stop/target lists, and Python no longer writes `t_trade_signals`.
 - The old fixed ten-stock pool and later dynamic five-stock candidate flow are both removed from active runtime.
 - Future `order-dispatcher-service` trading must cap concurrent traded symbols at three and must remain sandbox/paper until order, fill, position, PnL, reconciliation, and kill-switch state are implemented.
 - Daily visible market-analysis text follows the refreshed author-style flow for readability: `今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `備註`; `三個檢查點` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. `看錯的條件` is thesis-invalidation evidence, not a buy/sell trigger list. The daily body may trial a trigger-first rhythm (`結論先講`, `先看區間邊界`, `現在只看 N 件事`) where N is evidence-driven, but must not expose stock recommendations, buy/watchlist candidates, or entry/stop/target lists.
 - Daily visible text must translate internal labels such as `market scorecard`, `scorecard +4`, `market_context`, `07:20 market_context`, `analysis_slot`, `scheduled_time_local`, and `raw_json` into plain Chinese market implications.
 - Does not push or create LINE delivery jobs; Java owns user-facing delivery
-- Treats `t_relay_events` as primary local evidence, not as the only possible source of truth; prompts require explicit data-gap labeling when context is insufficient
+- Treats `t_relay_events` as primary local evidence, not as the only possible source of truth; Codex reports require explicit data-gap labeling when context is insufficient
 
-Manual backfill through the running relay service:
-
-```powershell
-'{"kind":"market","slot":"pre_tw_open","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"
-'{"kind":"market","slot":"us_close","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"
-'{"kind":"market","slot":"tw_close","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"
-'{"kind":"market","slot":"macro_daily","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"
-```
+Manual Python LLM backfill is retired. Do not use Python as a fallback for
+daily or weekly stock/market-analysis prose.
 
 Retired trade-signal flow:
 - `market_analysis` no longer builds, repairs, or stores stock recommendation rows.
@@ -666,13 +608,7 @@ Run CWA typhoon/earthquake polling in one fixed visible window:
 powershell -ExecutionPolicy Bypass -File .\scripts\register_cwa_fixed_window_task.ps1 -StartNow
 ```
 
-Run once manually:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot us_close -Force
-powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force
-powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot tw_close -Force
-```
+Python no longer has a manual market-analysis generation command.
 
 Compatibility no-op for retired trade-signal extraction:
 
@@ -680,54 +616,16 @@ Compatibility no-op for retired trade-signal extraction:
 powershell -ExecutionPolicy Bypass -File .\scripts\run_trade_signal_extraction.ps1 -EnvFile .env -Days 14 -Limit 50
 ```
 
-Prompt snapshots:
-- `runtime/prompts/market_analysis_us_close_system_prompt.txt`
-- `runtime/prompts/market_analysis_us_close_user_prompt.txt`
-- `runtime/prompts/market_analysis_pre_tw_open_system_prompt.txt`
-- `runtime/prompts/market_analysis_pre_tw_open_user_prompt.txt`
-- `runtime/prompts/market_analysis_tw_close_system_prompt.txt`
-- `runtime/prompts/market_analysis_tw_close_user_prompt.txt`
+Prompt snapshots from the old Python LLM pipeline are retired.
 
-Market analysis env keys:
-- `MARKET_ANALYSIS_MODEL` (default `gpt-5`)
-- `MARKET_ANALYSIS_MODEL_ROUTER_ENABLED` (default `true`)
-- `MARKET_ANALYSIS_PRIMARY_PROVIDER` (default `openai`; set `anthropic` only for manual Claude-first routing)
-- `MARKET_ANALYSIS_PROVIDER_ORDER` (optional comma-separated order, e.g. `openai,anthropic`)
-- `MARKET_ANALYSIS_OPENAI_MODELS` / `MARKET_ANALYSIS_ANTHROPIC_MODELS` (optional comma-separated fallback model order per provider)
-- `MARKET_ANALYSIS_OPENAI_MONTHLY_BUDGET_USD` / `MARKET_ANALYSIS_ANTHROPIC_MONTHLY_BUDGET_USD` (optional; enables cost-based routing when paired with Admin API keys)
-- `MARKET_ANALYSIS_OPENAI_ADMIN_KEY` / `MARKET_ANALYSIS_ANTHROPIC_ADMIN_KEY` (optional; used only for provider cost checks)
-- `MARKET_ANALYSIS_LLM_MIN_REMAINING_USD` or provider-specific `MARKET_ANALYSIS_OPENAI_MIN_REMAINING_USD` / `MARKET_ANALYSIS_ANTHROPIC_MIN_REMAINING_USD` (default `0`)
-- `MARKET_ANALYSIS_REQUIRE_QUOTA_CHECK` (default `false`; when `true`, configured budgets require a successful Admin API check)
-- `MARKET_ANALYSIS_MODEL_ROUTER_TIMEOUT_SECONDS` (default `8`, clamped to `2-30`)
-- `MARKET_ANALYSIS_ANTHROPIC_CONTEXT_MODE` (default `compact`; set `full` to send the normal OpenAI-sized context to Claude)
-- `MARKET_ANALYSIS_ANTHROPIC_MAX_EVENTS` (default `55`; compact-mode prompt event limit)
-- `MARKET_ANALYSIS_ANTHROPIC_MAX_MARKET_ROWS` (default `12`)
-- `MARKET_ANALYSIS_ANTHROPIC_RAG_K` (default `2`)
-- `MARKET_ANALYSIS_ANTHROPIC_EVENT_SUMMARY_CHARS` (default `500`)
-- `MARKET_ANALYSIS_LOOKBACK_HOURS` (default `24`)
-- `MARKET_ANALYSIS_MAX_EVENTS` (default `120`)
-- `MARKET_ANALYSIS_CONTEXT_PACK_ENABLED` (default `true`)
-- `MARKET_ANALYSIS_CONTEXT_PACK_CANDIDATE_LIMIT` (default `MARKET_ANALYSIS_MAX_EVENTS * 3`)
-- `MARKET_ANALYSIS_MAX_MARKET_ROWS` (default `24`)
-- `MARKET_ANALYSIS_WINDOW_MINUTES` (default `25`)
-- `MARKET_ANALYSIS_RAG_ENABLED` (default `true`)
-- `MARKET_ANALYSIS_RAG_K` (default `5`)
-- `MARKET_ANALYSIS_RAG_MIN_SIMILARITY` (default `0.22`)
-- `MARKET_ANALYSIS_RAG_CANDIDATE_LIMIT` (default `500`)
-- `MARKET_ANALYSIS_RAG_VECTOR_WEIGHT` / `MARKET_ANALYSIS_RAG_METADATA_WEIGHT` / `MARKET_ANALYSIS_RAG_OUTCOME_WEIGHT` (defaults `0.62` / `0.25` / `0.13`)
-- `MARKET_ANALYSIS_RAG_METADATA_FILTER_THRESHOLD` (default `0.10`)
-- `MARKET_ANALYSIS_RAG_INCLUDE_ANALYSES` (default `true`)
+Market/context env keys:
 - `RAG_EMBEDDING_MODEL` (default `local-hash-v1`)
 - `RAG_EMBEDDING_DIMENSIONS` (default `128`)
 - `RAG_INDEX_LOOKBACK_DAYS` (default `30`)
 - `RAG_INDEX_EVENT_LIMIT` (default `500`)
 - `RAG_INDEX_ANALYSIS_LIMIT` (default `100`)
-- `LLM_WEB_SEARCH_ENABLED` (default `true` for OpenAI; set `false` for local-only analysis)
-- `LLM_TIMEOUT_SECONDS` (default `120`, configured `.env` value `600`, shared OpenAI/Anthropic HTTP timeout; clamped to `15-600`)
 - `MARKET_CONTEXT_TWSE_CODES` (optional; defaults to `TWSE_MOPS_TRACKED_CODES`)
 - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` (optional Taiwan quote/context symbols used as a dynamic fallback preference list; it is not a fixed trading universe)
-- `MARKET_ANALYSIS_EXCLUDED_TICKERS` (default `4749`; comma-separated tickers excluded from visible stock analysis)
-- `MARKET_ANALYSIS_CLAIM_GATE_ENABLED` (default `true`; set `false` only for emergency debugging to bypass the `claim_verifier.ok=false` delivery/signal block)
 - `MARKET_CONTEXT_ANALYSIS_SLOT` (default `market_context_pre_tw_open`)
 - `MARKET_CONTEXT_SCHEDULED_TIME` (default `07:20`)
 - `MARKET_CONTEXT_TIMEOUT_SECONDS` (default `15`)
@@ -750,7 +648,6 @@ Market analysis env keys:
 - `TW_CLOSE_CONTEXT_SOURCE_PREFIXES` (optional comma-separated source prefixes)
 - `TW_CLOSE_CONTEXT_LOOKBACK_DAYS` (default `2`)
 - `TW_CLOSE_CONTEXT_MAX_EVENTS` (default `200`)
-- `WEEKLY_SUMMARY_OPENAI_API_KEY_FILE` / `MARKET_ANALYSIS_OPENAI_API_KEY_FILE` for DPAPI secret fallback
 
 Register daily tasks:
 

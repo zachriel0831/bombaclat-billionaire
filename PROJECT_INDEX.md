@@ -9,7 +9,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 - Official U.S. macro release-calendar collection for CPI, PPI, nonfarm payrolls, and retail sales reminders.
 - Heavyweight-stock earnings release-calendar collection for day-before LINE reminders.
 - Event relay storage into MySQL tables such as `t_relay_events`, `t_x_posts`, `t_market_index_snapshots`, and `t_market_analyses`.
-- Scheduled and manual AI market analysis, weekly summary generation, RAG indexing, claim verification, and fixed-watchlist trade-signal extraction.
+- Market/context data collection, RAG indexing, claim verification, and storage helpers for Codex-owned analysis rows. The old Python LLM daily/weekly market-analysis generators are retired and are not a fallback.
 - Four-hour Codex-generated cross-section news digest context and Redis publish helpers.
 - Taiwan society/politics article collection, keyword extraction, topic classification, public-record ingestion, and article-record linking.
 - Engineering memory: architecture, workflows, decisions, lessons, and skill definitions.
@@ -72,9 +72,9 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 |---|---|
 | [skills/README.md](skills/README.md) | Skill workspace structure. |
 | [skills/news-ingestion-skill/SKILL.md](skills/news-ingestion-skill/SKILL.md) | Ingestion workflow skill. |
-| [skills/rag-operations-skill/SKILL.md](skills/rag-operations-skill/SKILL.md) | Historical-case RAG operating skill for daily market analysis and weekly summaries. |
+| [skills/rag-operations-skill/SKILL.md](skills/rag-operations-skill/SKILL.md) | Historical-case RAG operating skill for Codex-owned market-analysis rows. |
 | [skills/political-topic-thread-skill/SKILL.md](skills/political-topic-thread-skill/SKILL.md) | Taiwan politics topic/thread workflow skill. |
-| [skills/macro-weekly-summary-skill/SKILL.md](skills/macro-weekly-summary-skill/SKILL.md) | Weekly summary and market-analysis prompt workflow guidance. |
+| [skills/macro-weekly-summary-skill/SKILL.md](skills/macro-weekly-summary-skill/SKILL.md) | Codex market-analysis writing and review guidance. |
 | [skills/line-brief-format-skill/](skills/line-brief-format-skill/) | LINE brief formatting references. |
 | [skills/templates/](skills/templates/) | Templates for new skills, evals, and changelogs. |
 
@@ -91,8 +91,6 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | Manual service auto-repair watcher dry-run | `powershell -ExecutionPolicy Bypass -File .\scripts\run_service_auto_repair_watch.ps1 -EnvFile .env -DryRun` |
 | Low-frequency society/politics source supplements | One-shot: `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_platform_low_frequency_sources.ps1 -EnvFile .env -SourceIds "tvbs,udn,setn"`; fixed window: `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow` |
 | News source official-list accuracy audit | `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audit.ps1 -EnvFile .env -Compensate -FailOnWarn` |
-| Market analysis | `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force` |
-| Weekly summary | `powershell -ExecutionPolicy Bypass -File .\scripts\run_weekly_summary.ps1 -Force -DryRun` |
 | Market context | `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env` |
 | Free Palestine English issue news | `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 20` |
 | Four-hour digest context | `powershell -ExecutionPolicy Bypass -File .\scripts\run_four_hour_digest_context.ps1 -EnvFile .env -Hours 4 -OutFile runtime\four-hour-digest\context.json` |
@@ -109,7 +107,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | Path | Purpose |
 |---|---|
 | `src/news_collector/` | RSS, SEC, TWSE/MOPS, X, and relay bridge ingestion. |
-| `src/event_relay/` | HTTP relay, MySQL event storage, market analysis, weekly summary, RAG, market context, trade signals. |
+| `src/event_relay/` | HTTP relay, MySQL event storage, stored analysis rows, RAG, market context, and public data collectors. |
 | `src/news_platform/` | Taiwan society/politics article collection, topic classification, public records, matching. |
 | `src/data_source_health.py` | Freshness and local process health checks. |
 | `tests/` | Unit and integration-style tests for ingestion, relay, analysis, public records, topic classification, and health checks. |

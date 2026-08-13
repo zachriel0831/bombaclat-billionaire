@@ -1,13 +1,13 @@
 ---
 name: weekly-macro-line-brief
-description: Build market-analysis and weekly-summary prompts for Taiwan investors from recent event facts, market context, RAG analogues, and fixed-watchlist rules. Use when changing macro weekly summary, daily market analysis prompt assets, LINE brief shape, section contracts, or prompt safety rules in data-collecting.
+description: Guide Codex-owned market-analysis writing for Taiwan investors from recent event facts, market context, and RAG analogues. Use when changing daily market-analysis style, LINE brief shape, section contracts, or prompt safety rules in data-collecting.
 ---
 
 # Weekly Macro Summary Skill
 
-This folder is both a repo-local skill and a prompt asset source consumed by `event_relay.weekly_summary` and `event_relay.market_analysis`.
+This folder is a repo-local guidance skill for Codex-owned analysis writing. The old Python LLM daily/weekly generators were retired and no longer consume these files.
 
-Read [SKILLS.md](SKILLS.md) for the compatibility prompt asset body. Keep both files aligned when editing this skill because older code paths still default to `skills/macro-weekly-summary-skill/SKILLS.md`.
+Read [SKILLS.md](SKILLS.md) for the compatibility guidance body. Keep both files aligned when editing this skill.
 
 ## Research Knowledge Base
 

@@ -164,12 +164,17 @@ def _stop(server: RelayHttpServer, thread: threading.Thread) -> None:
 
 def _post(server: RelayHttpServer, body) -> tuple[int, dict]:
     """執行 post 的主要流程。"""
+    return _post_path(server, "/quote-snapshots", body)
+
+
+def _post_path(server: RelayHttpServer, path: str, body) -> tuple[int, dict]:
+    """Post JSON to an arbitrary relay endpoint."""
     conn = HTTPConnection(*server.server_address)
     try:
         raw = json.dumps(body).encode("utf-8")
         conn.request(
             "POST",
-            "/quote-snapshots",
+            path,
             body=raw,
             headers={"Content-Type": "application/json", "Content-Length": str(len(raw))},
         )
@@ -196,6 +201,19 @@ class QuoteSnapshotsEndpointTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["stored"], 1)
         self.assertEqual(len(proc.calls), 1)
+
+
+class RetiredAnalysisEndpointTests(unittest.TestCase):
+    def test_old_analysis_http_entrypoints_return_gone(self) -> None:
+        proc = _FakeProcessor()
+        server, thread = _start(proc)
+        try:
+            for path in ("/market-analysis/run", "/analysis/backfill"):
+                status, body = _post_path(server, path, {"force": True})
+                self.assertEqual(status, 410)
+                self.assertEqual(body["error"], "analysis_generation_retired")
+        finally:
+            _stop(server, thread)
 
 
 if __name__ == "__main__":

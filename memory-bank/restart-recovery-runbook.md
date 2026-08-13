@@ -130,7 +130,6 @@ If tasks are missing, register them again:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\register_market_analysis_tasks.ps1 -Force
 powershell -ExecutionPolicy Bypass -File .\scripts\register_retention_cleanup_task.ps1 -Force
-powershell -ExecutionPolicy Bypass -File .\scripts\register_weekly_summary_task.ps1 -Force
 ```
 
 Check current task state:
@@ -154,11 +153,8 @@ Important daily tasks:
 - `NewsCollector-RagIndexer`
 - `NewsCollector-BlsMacro`
 - `NewsCollector-MarketContext-PreTwOpen`
-- `NewsCollector-MarketAnalysis-PreTwOpen`
 - `NewsCollector-TwMarketFlow`
 - `NewsCollector-TwCloseContext`
-- `NewsCollector-MarketAnalysis-TwClose`
-- `NewsCollector-MarketAnalysis-UsClose`
 
 Do not assume a task ran after reboot. Compare `LastRunTime` to today's expected
 window.
@@ -341,10 +337,10 @@ If the machine was down during the pre-open window, run catch-up manually:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env
-powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -EnvFile .env -Slot pre_tw_open -Force
 ```
 
-Then re-run the `t_market_analyses` and `t_trade_signals` checks.
+Then verify Codex automation creates or repairs the `pre_tw_open` row in
+`t_market_analyses`. Do not run Python LLM analysis fallback.
 
 ## 8. Check Market Context Inputs
 
@@ -374,8 +370,10 @@ For Taiwan close:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_market_flow.ps1 -EnvFile .env
 powershell -ExecutionPolicy Bypass -File .\scripts\run_tw_close_context.ps1 -EnvFile .env
-powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -EnvFile .env -Slot tw_close -Force
 ```
+
+Codex automation owns the `tw_close` prose row. Python only refreshes source and
+context facts.
 
 ## 9. Optional UI / Market Candle Check
 

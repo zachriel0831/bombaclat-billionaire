@@ -1,12 +1,8 @@
-"""Built-in market calendar rules for scheduled analysis routing.
+"""Built-in market calendar rules for analysis-date routing.
 
-The calendar is intentionally small and explicit.  It covers the 2026
-Taiwan / U.S. market holidays needed by the local scheduler, and falls back
-to weekday-only behavior when a future year has not been refreshed yet.
-
-Source pages checked 2026-04-30:
-- TWSE holiday schedule: https://www.twse.com.tw/en/trading/holiday.html
-- NYSE holidays and trading hours: https://www.nyse.com/trade/hours-calendars
+The calendar is intentionally small and explicit. It covers the 2026 Taiwan and
+U.S. market holidays needed by local data/context schedulers, and falls back to
+weekday-only behavior when a future year has not been refreshed yet.
 """
 
 from __future__ import annotations
@@ -132,10 +128,9 @@ def is_us_trading_day(day: date) -> TradingDayStatus:
 
 
 def resolve_market_calendar_state(now_local: datetime) -> MarketCalendarState:
-    """Build routing state for the Taiwan-local scheduler timestamp."""
+    """Build routing state for the Taiwan-local timestamp."""
 
     local_day = now_local.date()
-    # 中文：台北早上產生的 us_close 對應前一個美股交易日，不是台北當天。
     us_session_day = local_day - timedelta(days=1)
     return MarketCalendarState(
         local_date=local_day,
@@ -147,21 +142,20 @@ def resolve_market_calendar_state(now_local: datetime) -> MarketCalendarState:
 
 
 def allowed_analysis_slots(state: MarketCalendarState) -> set[str]:
-    """Return the only analysis slots allowed for the local calendar state."""
+    """Return the analysis slots allowed for the local calendar state.
 
-    # 中文：週日只做 weekly_summary；daily market-analysis 全部跳過。
+    The old Python LLM generators are retired, but Codex automations still use
+    this pure calendar helper to decide which row/slot is valid for a date.
+    """
+
     if state.is_sunday_local:
         return set()
-    # 中文：兩邊都開時照常產生美股收盤、台股早盤、台股收盤分析。
     if state.tw.is_trading_day and state.us.is_trading_day:
         return {"us_close", "pre_tw_open", "tw_close"}
-    # 中文：TW 休、US 開時只產生 us_close，且該列會讓 Java 可推送。
     if not state.tw.is_trading_day and state.us.is_trading_day:
         return {"us_close"}
-    # 中文：US 休、TW 開時只做台股分析；此時 prompt 不應帶舊的 us_close。
     if state.tw.is_trading_day and not state.us.is_trading_day:
         return {"pre_tw_open", "tw_close"}
-    # 中文：TW/US 都休市時只做 macro_daily，避免送出舊市場摘要。
     return {"macro_daily"}
 
 

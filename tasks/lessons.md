@@ -1215,3 +1215,15 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - [ ] Compare Codex guard run time with line-relay scheduled push time before changing Windows tasks
   - [ ] If manual delivery is needed, repair the `t_market_analyses` row first, then let `line-relay-service` perform the push
 - Status: active
+
+## LESSON-20260813-02
+- Date: 2026-08-13
+- Trigger (User correction): User clarified that LLM stock daily and weekly analysis tasks are abolished and must not be used as fallback.
+- What was wrong: Repo code and runbooks still kept runnable Python LLM daily/weekly analysis modules, HTTP backfill triggers, and disabled Windows task registration paths.
+- Root cause: The previous migration treated the old LLM pipeline as disabled cost-control infrastructure instead of retired product behavior.
+- New rule (always/never): Never restore or fallback to Python LLM stock daily/weekly analysis tasks. Codex local automations own analysis prose; Python only collects context, verifies claims, and stores rows.
+- Prevention checklist:
+  - [ ] Keep `NewsCollector-MarketAnalysis-*` and `NewsCollector-WeeklySummary` unregistered
+  - [ ] Keep `/market-analysis/run` and `/analysis/backfill` returning retired status
+  - [ ] Do not add OpenAI/Anthropic market-analysis provider routing back into `data-collecting`
+- Status: active

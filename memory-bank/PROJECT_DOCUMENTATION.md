@@ -1,21 +1,20 @@
 ﻿# Project Documentation
 
 ## Project Goal
-Collect and normalize international breaking news, market data, and official disclosures, then generate stored market analyses for downstream systems.
+Collect and normalize international breaking news, market data, and official disclosures, then store Codex-generated market analyses for downstream systems.
 
-LINE delivery and LINE webhook handling have migrated to the Java system. This Python repository is the data collection, event storage, and analysis service. It does not contact LINE in any form.
+LINE delivery and LINE webhook handling have migrated to the Java system. This Python repository is the data collection, event storage, context, and persistence service. It does not contact LINE in any form.
 
 ## Current Architecture
 - Runtime: Python 3.10+
 - Main packages:
   - `src/news_collector`: source ingestion + bridge
-  - `src/event_relay`: event storage API (`/events`), MySQL persistence, retention cleanup, weekly summary, market analysis, and market context modules
+  - `src/event_relay`: event storage API (`/events`), quote snapshots, MySQL persistence, retention cleanup, stored analysis rows, RAG, and market context modules
   - `src/news_platform`: separate Taiwan society/politics news collection pipeline with keyword extraction and deterministic issue classification
 - Main services:
   1. `news_collector.relay_bridge`
   2. `event_relay.main` (event relay API for `/events`)
-  3. `event_relay.weekly_summary` (single-shot, usually triggered by scheduler)
-  4. `event_relay.market_analysis` (single-shot, usually triggered by scheduler)
+  3. Codex local automations for analysis prose; Python LLM daily/weekly generators are retired and are not fallback paths
 
 ## Ingestion Sources
 1. X filtered stream
@@ -239,7 +238,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 ## Event Storage & Analysis Boundary
 - HTTP endpoints:
   - `POST /events`: compatibility/manual normalized event ingestion
-  - `POST /analysis/backfill`: operator-triggered stored analysis backfill
+  - `POST /quote-snapshots`: market quote snapshot ingestion
+  - `POST /market-analysis/run` and `POST /analysis/backfill`: retired, return `410 analysis_generation_retired`
   - `GET /healthz`
 - Storage: MySQL
   - `t_relay_events`
@@ -277,40 +277,16 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `scripts/register_retention_cleanup_task.ps1` can register the same cleanup as a fixed daily Windows task
 
 ## Analysis Context Policy
-- `t_relay_events` is the primary local event/fact context for weekly and scheduled daily analyses, but it is not treated as the complete universe of relevant market information.
-- OpenAI analysis calls request the Responses API `web_search` tool by default so the model can verify missing, stale, or fast-moving facts beyond local rows.
-- If web search is unavailable or returns insufficient evidence, prompts require the model to lower confidence and describe observation limits in reader-facing language instead of fabricating certainty or exposing internal missing-data notes.
-- Skill docs are retained as prompt assets for macro reasoning, web-verified source hierarchy, blended analyst voice patterns, and mobile-chat readability; they do not create any Python-owned LINE delivery behavior.
+- `t_relay_events` is the primary local event/fact context for Codex market analyses, but it is not treated as the complete universe of relevant market information.
+- If evidence is insufficient, Codex reports must lower confidence and describe observation limits in reader-facing language instead of fabricating certainty or exposing internal missing-data notes.
+- Skill docs are retained for macro reasoning, source hierarchy, blended analyst voice patterns, and mobile-chat readability; they do not create any Python-owned LLM generation or LINE delivery behavior.
 
-## Weekly Summary
-- Module: `src/event_relay/weekly_summary.py`
-- Flow:
-  1. Read last N days events from `t_relay_events`
-  2. Build `system prompt` and `reusable prompt` from skill docs
-  3. Retrieve historical RAG examples from `t_event_embeddings` / `t_analysis_embeddings` when enabled; these are analogues only, not current evidence
-  4. Call OpenAI Responses API with web search enabled by default for current-fact verification
-  5. Store the weekly text into `t_market_analyses`
-  6. Leave user-facing delivery to the Java system
-- Output format:
-  - Weekly uses the section contract `?梁蜇蝬 -> `銝勗?⊿?蝵害 -> `銝梯?撖??害
-  - Each section should connect evidence -> mechanism -> Taiwan implication
-  - Weekly reports are allocation/watchlist briefs and should not output intraday entry / take-profit / stop-loss prices
-- Storage contract:
-  - `analysis_date` uses the target Sunday delivery date like `2026-04-26`
-  - `analysis_slot=weekly_tw_preopen`
-  - `scheduled_time_local=05:10` using the same `HH:MM` format as daily analyses
-  - `raw_json.dimension=weekly`
-  - `raw_json.section_contract=["?梁蜇蝬?,"銝勗?⊿?蝵?,"銝梯?撖???]`
-  - `raw_json.rag` records weekly historical-example retrieval telemetry
-  - `raw_json.token_usage` records provider/model/token telemetry when an LLM call completes
-- Prompt snapshots:
-  - `runtime/prompts/weekly_summary_system_prompt.txt`
-  - `runtime/prompts/weekly_summary_reusable_prompt.txt`
-- Key management:
-  - Prefer env var `WEEKLY_SUMMARY_OPENAI_API_KEY` / `OPENAI_API_KEY`
-  - Fallback to DPAPI file `WEEKLY_SUMMARY_OPENAI_API_KEY_FILE`
+## Retired Python LLM Market Analysis
+- The old daily market-analysis and weekly-summary Python generators are removed.
+- They must not be used as fallback when Codex analysis automations miss or fail.
+- Analysis prose belongs to Codex local automations; Python keeps context collection, RAG indexing, claim verification helpers, and `t_market_analyses` storage methods.
 
-## Scheduled Market Analysis
+## Scheduled Market Context
 - Module: `src/event_relay/market_analysis.py`
 - Pre-open context module: `src/event_relay/market_context.py`
 - Schedule intent:
@@ -321,33 +297,24 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `15:10` Asia/Taipei: collect Taiwan official market-flow facts as stored-only events into `t_relay_events`
   - `15:20` Asia/Taipei: collect Taiwan close context from same-day relay events into `t_relay_events`
   - `15:30` Asia/Taipei: Taiwan close review analysis
-- Calendar guard:
+- Calendar helper:
   - Module: `src/event_relay/market_calendar.py`
-  - Built-in 2026 TWSE / NYSE closed dates are checked before any market-analysis LLM call.
-  - TW closed + relevant U.S. close session open: only `us_close` may run.
-  - Relevant U.S. close session closed + TW open: only `pre_tw_open` / `tw_close` may run; `pre_tw_open` must not receive stale `us_close` context.
-  - TW and relevant U.S. close session both closed: the `pre_tw_open` task is converted into `macro_daily` and remains Java-delivery eligible.
-  - Sunday: daily market analysis skips; weekly summary owns the day.
+  - Built-in 2026 TWSE / NYSE closed dates are available for Codex slot/date validation.
+  - TW closed + relevant U.S. close session open: only `us_close` is valid.
+  - Relevant U.S. close session closed + TW open: only `pre_tw_open` / `tw_close` are valid; Codex must not use stale `us_close` context.
+  - TW and relevant U.S. close session both closed: Codex may write `macro_daily`, which remains Java-delivery eligible.
+  - Sunday: no Python LLM analysis runs.
 - Flow:
   1. Read latest event context from `t_relay_events`
   2. Read latest DJIA / S&P 500 rows from `t_market_index_snapshots`
-  3. Include stored-only `market_context:*` raw event payloads in the prompt event window
-  3a. Select provider/model with `src/event_relay/llm_quota_router.py`; scheduled market analysis is OpenAI-primary by default and Anthropic/Claude fallback second, with Admin API month-to-date cost checks used when keys and monthly budgets are configured
-  4. Build a quota-managed context pack in `src/event_relay/context_pack_builder.py`; scorecard, market context, and important official data are selected before general news/social rows
-  4a. Resolve the slot-aware pipeline mode. `MARKET_ANALYSIS_<SLOT>_PIPELINE` overrides `MARKET_ANALYSIS_PIPELINE`; current default keeps `pre_tw_open=multi_stage` and uses `us_close=digest` so the U.S. close job becomes compact upstream context instead of a full trade brief.
-  5. Retrieve hybrid historical examples from `t_event_embeddings` and `t_analysis_embeddings` for stage2 transmission analogues when available; metadata filter, vector similarity, and outcome score are all part of ranking
-  6. Run deterministic `stage0_thesis_selector` to choose 1-2 core tensions that all LLM stages must answer when the effective pipeline is `multi_stage`
-  7. Build Traditional Chinese prompts from existing macro + mobile-chat formatting skills for full analysis; `digest` mode uses a compact U.S. close prompt and does not load the full stage chain
-  8. Call OpenAI Responses API or Anthropic Messages API according to the selected route; OpenAI web search is enabled by default for current-fact verification
-  8a. If the selected provider is Anthropic, apply `provider-context-policy-v1` compact context before prompting to reduce event rows, market rows, RAG examples, and raw JSON detail while preserving scorecard, market context, official sources, and high-importance events
-  8b. Run `claim_verifier` on the final output to check whether numbers, dates, and tickers have supporting evidence in the prompt context
-      - For dynamic trade-candidate slots, candidate tickers must be supported by evidence or explicitly marked as model-selected candidates with traceable local context.
-      - This allowance must not hide unsupported numeric/date claims or unrelated ticker claims.
-  8d. Store generated text in `t_market_analyses`; `raw_json.model_router`, `raw_json.provider_context_policy`, `raw_json.rag`, `raw_json.pipeline_stages`, `raw_json.requested_pipeline_mode`, `raw_json.pipeline_mode`, `raw_json.analysis_intent`, `raw_json.claim_verifier`, and `raw_json.trust_gate` hold routing/retrieval/stage/evidence/trust telemetry
-  9. Set base delivery eligibility in `push_enabled`: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`; the trust gate may lower the final stored value to `0`
-  10. Inject the latest stored `us_close` digest/analysis as upstream context only when the relevant U.S. close session was open; if U.S. was closed, the Taiwan pre-open prompt intentionally has no `us_close` block
-  11. Stock recommendation generation is retired; do not output `stock_watch`, buy/watchlist candidates, or entry/stop/target lists.
-  12. For `macro_daily`, write macro-only analysis into `t_market_analyses`.
+  3. Include stored-only `market_context:*` raw event payloads in the Codex evidence window
+  4. Keep hybrid historical examples in `t_event_embeddings` and `t_analysis_embeddings` for Codex analogue lookup; metadata filter, vector similarity, and outcome score are all part of ranking
+  5. Codex local automations generate prose; Python does not select LLM providers, call OpenAI/Anthropic, or run fallback analysis code
+  6. Run `claim_verifier` on Codex output when preparing delivery eligibility, checking whether numbers, dates, and tickers have supporting evidence
+  7. Store generated text in `t_market_analyses`; `raw_json.rag`, `raw_json.claim_verifier`, and `raw_json.trust_gate` hold retrieval/evidence/trust telemetry
+  8. Set base delivery eligibility in `push_enabled`: `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`; the trust gate may lower the final stored value to `0`
+  9. Stock recommendation generation is retired; do not output `stock_watch`, buy/watchlist candidates, or entry/stop/target lists.
+  10. For `macro_daily`, write macro-only analysis into `t_market_analyses`.
 - Daily text formatting:
   - `raw_json.display_title` is date-only (`YYYY-MM-DD`) for downstream delivery titles
   - Daily analysis uses the refreshed author-style flow: `隞銝?亥店` -> `銝炎?仿?` -> `撣?潭釣???榆` -> `??瘨?啣?∠??喳?` -> `???隞跆 -> `?酉`
@@ -356,14 +323,12 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Individual companies may appear only as macro/sector transmission examples, such as NVIDIA, TSMC, or Magnificent Seven / 蝢銝楊?? daily visible reports should not include stock recommendations, buy/watchlist candidates, entry, stop-loss, or target-price language.
   - `銝炎?仿?` must contain exactly three bullets, each connecting source fact -> market mechanism -> why it matters now; `撣?潭釣???榆` should name what is already reflected in prices and what can still be repriced
   - `??瘨?啣?∠??喳?` should show `鈭辣 -> 敶梢霈 -> ?啗?黎 -> 蝣箄?/憭望?` when evidence supports a chain
-  - Fallback stock rationales keep only `???蝣箄?` as the repeated warning
 - Tracked-stock context:
   - `MARKET_CONTEXT_TWSE_CODES` reads official TWSE close/margin rows for tracked listed stocks
   - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` is an optional Yahoo Taiwan quote/context fallback preference list; it must not be treated as a fixed trading universe.
-  - `MARKET_ANALYSIS_EXCLUDED_TICKERS` defaults to `4749`, so ?唳???is excluded from visible individual-stock analysis even if old quote/context rows remain in storage
   - Official TWSE context is preferred when both sources produce the same ticker; Yahoo context fills gaps such as TPEx `.TWO` symbols
 - Retired trade-signal boundary:
-  - `market_analysis` must not create stock recommendation rows, `stock_watch`, buy/watchlist candidates, entry levels, stop-loss levels, or target-price lists.
+  - Python must not create stock recommendation rows, `stock_watch`, buy/watchlist candidates, entry levels, stop-loss levels, or target-price lists.
   - `scripts/run_trade_signal_extraction.ps1` is a compatibility no-op.
   - Existing historical database rows may remain for audit/history, but this repo no longer creates or migrates trade-signal tables.
   - LLM analysis never creates order intents or broker calls directly
@@ -372,27 +337,20 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - Current retrieval is hybrid: metadata overlap filters candidates, deterministic local lexical/vector similarity ranks semantic fit, and stored `outcome_json` scores successful past analyses higher. Raw `target_hit` / `stop_hit` statuses alone are neutral unless lifecycle metadata proves they occurred after entry.
   - Default embeddings still use deterministic local lexical embeddings (`local-hash-v1`) to avoid a new paid API dependency
   - `scripts/run_rag_indexer.ps1` incrementally indexes recent `t_relay_events` into `t_event_embeddings` and `t_market_analyses` into `t_analysis_embeddings`
-  - `stage2_transmission` receives retrieved examples as analogues only; historical event IDs are not valid current evidence IDs
-  - Weekly summary also receives retrieved examples as analogues only.
-  - If RAG retrieval fails or has no candidates, market analysis and weekly summary continue without historical examples and record the gap in `raw_json.rag`
+  - Codex treats retrieved examples as analogues only; historical event IDs are not valid current evidence IDs
+  - If RAG retrieval fails or has no candidates, analysis storage should continue without historical examples and record the gap in `raw_json.rag`
 - Market context storage contract:
   - `source` starts with `market_context:`
   - `raw_json.stored_only=true`
   - `raw_json.dimension=market_context`
   - `raw_json.event_type` is `market_context_point`, `market_context_collection`, `market_context_scorecard`, or `tw_market_flow_dataset`
   - current source families: deterministic scorecard, Yahoo chart market snapshots, U.S. Treasury official yield curve XML, FRED public CSV macro-regime series, market-breadth ETF spreads, SEC companyfacts AI capex proxy, FRED oil price context, optional EIA oil inventory context, TWSE official OpenAPI index/stock/margin data, Taiwan official flow datasets from TWSE / TPEx / TAIFEX, and BLS official macro series
-- Prompt snapshots:
-  - `runtime/prompts/market_analysis_<slot>_system_prompt.txt`
-  - `runtime/prompts/market_analysis_<slot>_user_prompt.txt`
-
 ## Scheduler
 - Windows helper script:
-  - `scripts/register_weekly_summary_task.ps1`
   - `scripts/register_market_analysis_tasks.ps1`
   - `scripts/register_retention_cleanup_task.ps1`
 - Current target schedule requirement:
-  - Every Saturday 23:00 (Asia/Taipei, local machine timezone) for weekly summary (Java pushes it at Sunday 05:10)
-  - Every day 05:00, 07:30, and 15:30 (Asia/Taipei, local machine timezone) for market analysis
+  - Python LLM daily/weekly analysis tasks are retired and must not be registered.
   - Every day 04:40 (Asia/Taipei, local machine timezone) for historical-case RAG indexing
   - Every day 04:50 (Asia/Taipei, local machine timezone) for BLS macro event collection
   - Every day 06:00 (Asia/Taipei, local machine timezone) for U.S. macro release-calendar collection
@@ -417,7 +375,6 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `.secrets/x_bearer_token.dpapi`
   - `.secrets/openai_api_key.dpapi`
   - `.secrets/openai_admin_key.dpapi` (admin use, high sensitivity)
-  - Anthropic Admin API keys are read from env only (`MARKET_ANALYSIS_ANTHROPIC_ADMIN_KEY` / `ANTHROPIC_ADMIN_KEY` / `ANTHROPIC_ADMIN_API_KEY`) and must not be logged
 - Never print full secret values in logs.
 
 ## Operations
@@ -427,17 +384,9 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_source_bridge.ps1`
 - Restart both:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\restart_live_services.ps1`
-- Run weekly summary once:
-  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_weekly_summary.ps1 -Force`
-- Run weekly summary through HTTP:
-  - `'{"kind":"weekly","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
-- Run market analysis once:
-  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot us_close -Force`
-  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot pre_tw_open -Force`
-  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot tw_close -Force`
-  - `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_analysis.ps1 -Slot macro_daily -Force`
-- Run market analysis through HTTP:
-  - `'{"kind":"market","slot":"pre_tw_open","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
+- Retired Python LLM analysis commands:
+  - Do not run daily/weekly Python analysis generation; the scripts were removed.
+  - `POST /market-analysis/run` and `POST /analysis/backfill` return `410 analysis_generation_retired`.
 - Retired trade-signal extraction compatibility no-op:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_trade_signal_extraction.ps1 -EnvFile .env -Days 14 -Limit 50`
 - Run market context once:

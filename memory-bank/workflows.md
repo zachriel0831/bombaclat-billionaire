@@ -240,7 +240,7 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 7. Register low-frequency supplements when needed
 - `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow`
 - The main scheduler registration script also registers `NewsCollector-NewsPlatformLowFrequencySources` as an interactive-logon fixed window. It must not be a repeating popup-and-exit task.
-- `scripts/register_market_analysis_tasks.ps1` keeps scheduled LLM prose tasks disabled by default; pass `-EnableLlmAnalysisTasks` only for an explicit cost-control override.
+- `scripts/register_market_analysis_tasks.ps1` registers data/context tasks only and unregisters the retired Python LLM prose tasks if they still exist.
 - CTEE stays disabled until a public allowed endpoint returns usable data; do not bypass 403 protections.
 8. Audit official-list coverage and compensate gaps
 - Manual run: `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audit.ps1 -EnvFile .env -Compensate -FailOnWarn`
@@ -494,48 +494,38 @@ fixed window now also runs the service auto-repair watcher every cycle.
 - Run `scripts/run_bls_macro.ps1` before the U.S. close analysis window when refreshing official U.S. macro facts
 - Run `scripts/run_market_context.ps1` before the Taiwan pre-open analysis window so `market_context:*` event facts are fresh
 - Run `scripts/run_tw_market_flow.ps1` and `scripts/run_tw_close_context.ps1` before the Taiwan close analysis window
-2. Run the single-shot analysis generator
-- Use `scripts/run_market_analysis.ps1 -Slot us_close` at `05:00`
-- Use `scripts/run_market_analysis.ps1 -Slot pre_tw_open` at `07:30`
-- Use `scripts/run_market_analysis.ps1 -Slot tw_close` at `15:30`
-- Treat `t_relay_events` as primary local evidence, not exhaustive truth
-- `MARKET_ANALYSIS_<SLOT>_PIPELINE` overrides the global `MARKET_ANALYSIS_PIPELINE`; current cost-aware default is `MARKET_ANALYSIS_US_CLOSE_PIPELINE=digest` and `MARKET_ANALYSIS_PRE_TW_OPEN_PIPELINE=multi_stage`
-- `us_close` digest mode is upstream context only: one compact call, smaller prompt context, no trading-candidate append in visible text
+2. Generate prose through Codex automation
+- Python LLM daily/weekly analysis scripts are retired and must not be used as a fallback.
+- Codex local automations own `us_close`, `pre_tw_open`, `tw_close`, and `macro_daily` prose rows.
+- Treat `t_relay_events` as primary local evidence, not exhaustive truth.
 - `pre_tw_open` is the main market-decision brief. It must discuss macro/sector transmission, not stock recommendations.
-- If `MARKET_ANALYSIS_MODEL_ROUTER_ENABLED=true`, OpenAI is the default primary and Claude is fallback; configure budgets/Admin API keys before relying on provider fallback, and inspect `raw_json.model_router` to confirm the selected route
-- When the selected provider is Anthropic, compact context mode is applied by default to reduce rate-limit risk; inspect `raw_json.provider_context_policy` for event/RAG/market-row reductions
-- Market analysis builds a quota-managed context pack before RAG/prompting; `market_context:scorecard`, market-context rows, and important official data must remain selected even when general news volume is high
-- Stage0 selects 1-2 deterministic core tensions before LLM stages; later stage prompts should answer those tensions directly
-- Stage2 transmission may receive hybrid retrieved historical examples from `t_event_embeddings` / `t_analysis_embeddings`; these are analogues only, not current evidence IDs
-- OpenAI runs request web search by default; if unavailable, the prompt must lower confidence and describe observation limits in reader-facing language instead of fabricating
+- RAG examples from `t_event_embeddings` / `t_analysis_embeddings` are analogues only, not current evidence IDs.
 3. Persist analysis output
 - Generated text is upserted into `t_market_analyses` by `(analysis_date, analysis_slot)`
 - `push_enabled` means Java delivery eligibility, not Python push execution
 - Daily delivery policy starts from `pre_tw_open=1`, `macro_daily=1`, `us_close=1` only when TW is closed and the relevant U.S. close session was open, `tw_close=0`; `raw_json.trust_gate` may force final `push_enabled=0`
 - If `claim_verifier.ok=false`, `market-analysis-trust-gate-v1` stores the row for audit/debug but blocks Java delivery eligibility
-- `claim-verifier-v2` ignores internal parenthesized evidence/source ID lists such as `嚗?28610,128539嚗; Stage4 must keep internal IDs out of visible `summary_text` and leave evidence links in telemetry/structured fields
+- `claim-verifier-v2` ignores internal parenthesized evidence/source ID lists; visible `summary_text` must keep internal IDs out and leave evidence links in telemetry/structured fields
 - `claim_verifier` still verifies ticker references when the visible analysis mentions companies as macro/sector examples. Unsupported numbers, dates, and unrelated tickers must still block delivery.
-- `us_close` remains stored as a digest/analysis and is injected into the next Taiwan pre-open analysis context only when the relevant U.S. session was open; if U.S. was closed, the pre-open prompt has no `us_close` context
-- Stock recommendation generation is retired. Stage prompts must not output `stock_watch`, and Python must not write `t_trade_signals`.
+- `us_close` remains stored as context only when the relevant U.S. session was open; if U.S. was closed, Codex must not use stale `us_close` context.
+- Stock recommendation generation is retired. Visible reports must not output `stock_watch`, and Python must not write `t_trade_signals`.
 - Daily formatting uses date-only `raw_json.display_title` and the refreshed author-style flow `隞銝?亥店` -> `銝炎?仿?` -> `撣?潭釣???榆` -> `??瘨?啣?∠??喳?` -> `???隞跆 -> `?酉`; `銝炎?仿?` must contain exactly three bullets connecting source fact -> market mechanism -> why it matters now. `???隞跆 means thesis-invalidation evidence, not buy/sell triggers. Do not write a dedicated `?啗?蔭` section.
 - Individual company mentions in daily visible reports are limited to macro/sector transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 蝢銝楊?? do not write stock recommendations, buy/watchlist candidates, entry, stop-loss, or target-price language in the daily body.
 - Strategy performance must use entry-first attribution: ignore `target_hit` / `stop_hit` before the first `entry_hit`; after entry, the first `target_hit` is a win and the first `stop_hit` is a loss. Rows without entry are `not_entered` and must not inflate win rate.
 4. Keep Python storage-only
-- `market_analysis` does not push directly or create delivery jobs
+- Python does not generate daily/weekly LLM prose, push directly, or create delivery jobs
 - Java owns user-facing delivery
 5. Verify
-- Check prompt snapshots under `runtime/prompts/`
 - Query `t_market_analyses` for the current `analysis_date`
 - Query `t_relay_events` for recent `source LIKE 'market_context:%'`
-- Inspect `t_market_analyses.raw_json.context_pack` for selected counts and guaranteed bucket status
-- Inspect `t_market_analyses.raw_json.model_router`, `raw_json.provider_context_policy`, `raw_json.pipeline_stages.core_tensions`, `raw_json.rag`, and `raw_json.claim_verifier`
+- Inspect `t_market_analyses.raw_json.rag` and `raw_json.claim_verifier`
 - Confirm rows exist as event/context facts only; Python does not contact LINE or create delivery jobs
 
 ### Workflow 4C-G: Codex Market-Analysis Guard Automations
 
 Codex guard automations run after the market-analysis windows. They are agent
-jobs that can repair a failed row or create the missing prose row from local
-evidence when scheduled Python LLM prose generation is disabled.
+jobs that create or repair the prose row from local evidence. The old scheduled
+Python LLM prose generators are retired and are not a fallback.
 
 Configured Codex automations:
 - `market-analysis-codex-guard-us-close`: runs after the 05:00 `us_close` window.
@@ -547,7 +537,7 @@ Current cost-control schedule policy:
   `NewsCollector-RagIndexer`, `NewsCollector-BlsMacro`,
   `NewsCollector-MarketContext-PreTwOpen`, `NewsCollector-TwMarketFlow`,
   `NewsCollector-TwCloseContext`, and retention cleanup.
-- Disable scheduled LLM prose-generation tasks:
+- Retired scheduled LLM prose-generation tasks must not exist:
   `NewsCollector-MarketAnalysis-UsClose`,
   `NewsCollector-MarketAnalysis-PreTwOpen`,
   `NewsCollector-MarketAnalysis-TwClose`, and
@@ -556,8 +546,8 @@ Current cost-control schedule policy:
 Guard responsibilities:
 - Inspect the matching `t_market_analyses` row and raw telemetry.
 - If the row is healthy, do nothing.
-- If the row is missing, quota-failed, schema-failed, or blocked by fixable
-  `claim_verifier` token issues, repair it from local `t_relay_events`,
+- If the row is missing or blocked by fixable `claim_verifier` token issues,
+  repair it from local `t_relay_events`,
   market-context rows, repo skills/templates, and deterministic verification.
 - Do not call OpenAI API, Anthropic API, or any paid external LLM API.
 - Write repaired rows only through `MySqlEventStore.upsert_market_analysis`.
@@ -576,54 +566,24 @@ Guard responsibilities:
 2. Embedding model
 - Default is `local-hash-v1`, a deterministic lexical embedding that needs no external API key
 - Keep `RAG_EMBEDDING_MODEL` stable unless intentionally rebuilding the index
-3. Use in market analysis
-- `MARKET_ANALYSIS_RAG_ENABLED=true` lets `market_analysis` retrieve hybrid-ranked historical events and generated analyses
-- Retrieved examples are inserted into `runtime/prompts/market_analysis_<slot>_stage2_transmission_user.txt`
-- `raw_json.rag.score_components` records vector / metadata / outcome components for selected examples
-- RAG failure must degrade to an empty example set and never block analysis
+3. Use in Codex market analysis
+- Codex can read hybrid-ranked historical events and generated analyses from the RAG tables.
+- Retrieved examples are analogues only; do not treat them as current evidence.
+- `raw_json.rag.score_components` may record vector / metadata / outcome components for selected examples.
+- RAG failure must degrade to an empty example set and never block analysis storage.
 4. Verify
-- Run `python -m unittest tests.test_rag tests.test_analysis_stages tests.test_market_analysis -v`
-- Check `runtime/prompts/market_analysis_<slot>_stage2_transmission_user.txt` for `Historical retrieved examples JSON`
+- Run `python -m unittest tests.test_rag -v`
 - Inspect `t_market_analyses.raw_json.rag` for `examples_count` or an `error`
 
-## Workflow 4D: Weekly Summary Storage
-1. Schedule for Taiwan pre-open usage
-- Run `weekly_summary` every Saturday `23:00` local time (Java pushes it at Sunday `05:10`)
-2. Generate the weekly brief
-- Read the last 7 days from `t_relay_events`
-- Retrieve historical RAG examples from `t_event_embeddings` / `t_analysis_embeddings`; treat them as analogues only, not current evidence
-- Call OpenAI Responses API with weekly summary prompts and web search enabled by default for current-fact verification
-- If local events or web verification are insufficient, lower confidence and describe observation limits in reader-facing language; do not surface internal missing-data notes
-3. Store for downstream delivery
-- Upsert into `t_market_analyses`
-- Java owns user-facing LINE delivery
-4. Mark the row as weekly scope
-- Use `analysis_date=YYYY-MM-DD` for the target Sunday delivery date
-- Use `analysis_slot=weekly_tw_preopen`
-- Use `scheduled_time_local=05:10`; do not include weekday text in this column
-- Put `dimension=weekly` in `raw_json`
-- Put weekly RAG retrieval telemetry in `raw_json.rag`
-5. Verify
-- Check scheduled task next run
-- Query `t_market_analyses` by the target Sunday `analysis_date`
-- Inspect `raw_json.rag.examples_count` or `raw_json.rag.error`
-6. Manual backfill
-- Call the running relay service:
-  `'{"kind":"weekly","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
-- The call is synchronous and may wait for the LLM response.
-
-## Workflow 4D-1: Manual Analysis Backfill API
-1. Ensure relay service is running
-- `GET /healthz` should return `{"ok": true}`
-2. Backfill daily market analysis
-- `'{"kind":"market","slot":"pre_tw_open","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
-- Allowed slots: `auto`, `us_close`, `pre_tw_open`, `tw_close`, `macro_daily`
-3. Backfill weekly analysis
-- `'{"kind":"weekly","force":true}' | curl.exe -X POST http://127.0.0.1:18090/analysis/backfill -H "Content-Type: application/json" -d "@-"`
-4. Verify storage
-- Query `t_market_analyses` by `analysis_slot`
-- Weekly uses `analysis_slot=weekly_tw_preopen`
-- Daily market analysis does not extract stock recommendation candidates; the old fixed-pool and dynamic `t_trade_signals` flows are retired.
+## Workflow 4D: Retired Python LLM Analysis Backfill
+1. Current boundary
+- The old Python daily market-analysis and weekly-summary generators are retired.
+- Do not use Python as fallback for missing daily/weekly stock or market-analysis prose.
+- `POST /market-analysis/run` and `POST /analysis/backfill` return `410 analysis_generation_retired`.
+2. Verify storage
+- Query `t_market_analyses` by `analysis_slot`.
+- Codex local automations own new analysis rows.
+- Daily market analysis must not extract stock recommendation candidates; the old fixed-pool and dynamic `t_trade_signals` flows are retired.
 
 ## Workflow 4E: SEC Tracked Filings Flow
 1. Define tracked universe
@@ -757,14 +717,13 @@ Guard responsibilities:
 - Run `scripts/run_tw_market_flow.ps1 -EnvFile .env` after Taiwan close data is available
 - Run `scripts/run_tw_close_context.ps1 -EnvFile .env` to aggregate same-day Taiwan flow/disclosure events into one `market_context:tw_close` stored-only event
 2. Generate the close report
-- Run `scripts/run_market_analysis.ps1 -Slot tw_close -Force`
-- The analysis job reads `t_relay_events` and writes model output to `t_market_analyses`
+- Codex local automation owns the `tw_close` prose row.
+- Python provides `market_context:tw_close` facts and storage helpers only.
 3. Persist boundaries
 - Source/context facts remain in `t_relay_events`
 - `t_market_analyses.raw_json.dimension=daily_tw_close`
 - Python does not push or create LINE delivery jobs
 4. Verify
-- Check `runtime/prompts/market_analysis_tw_close_*`
 - Query `t_relay_events` for `source='market_context:tw_close'`
 - Query `t_market_analyses` for `analysis_slot='tw_close'`
 
@@ -773,12 +732,12 @@ Guard responsibilities:
 - `src/event_relay/market_calendar.py` contains built-in 2026 TWSE / NYSE full-closure dates.
 - The relevant U.S. close session date is Taiwan local date minus one day.
 2. Routing rules
-- Sunday: skip daily market analysis; weekly summary owns the day.
+- Sunday: no Python LLM analysis runs.
 - TW closed + relevant U.S. session open: only `us_close` runs.
 - Relevant U.S. session closed + TW open: only `pre_tw_open` / `tw_close` run, and `pre_tw_open` does not include stale `us_close`.
-- TW and relevant U.S. session both closed: `pre_tw_open` writes `macro_daily` with `push_enabled=1`.
+- TW and relevant U.S. session both closed: Codex may write `macro_daily` with `push_enabled=1`.
 3. Verify
-- Run `python -m unittest tests.test_market_calendar tests.test_market_analysis -v`
+- Run `python -m unittest tests.test_market_calendar -v`
 - Check `t_market_analyses.analysis_slot` for `macro_daily` on both-closed days.
 
 ## Workflow 5: Build a New Skill (Enterprise)

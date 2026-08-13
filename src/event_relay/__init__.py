@@ -1,10 +1,10 @@
-"""Event relay package — MySQL ingest, analysis pipeline, HTTP service.
+"""Event relay package for MySQL ingest, context storage, and HTTP service.
 
-Public surface intentionally narrow: callers import ``config``,
-``http_server``, and ``service``. Other submodules (analysis_stages,
-bls_macro, tw_close_context, …) are imported by name where needed."""
+Public surface intentionally stays narrow: callers import ``config``,
+``http_server``, and ``service``. Data collectors import their specific
+submodules by name where needed.
+"""
 
-# Event relay package exports.
 __all__ = [
     "config",
     "http_server",
