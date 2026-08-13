@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-14 US Close Guard
+- [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row plus local evidence.
+- [x] Create the missing row from local evidence through `MySqlEventStore.upsert_market_analysis()`.
+- [x] Apply deterministic claim/trust/style checks and independently verify final DB state.
+- [x] Confirm retired signal extraction remains ineligible and record Observer completion.
+
+### 2026-08-14 US Close Guard Result
+- Created missing analysis `333` from four local index, producer-price, oil-demand, and rates evidence events plus two U.S. close snapshots; no external provider API, web search, LINE contact, or delivery action occurred.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact requested six-section flow, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+- Signal extraction was skipped because stock-recommendation extraction is retired and this context-only `us_close` row is not delivery-eligible; DB verification found zero trade signals.
+
 ## 2026-08-13 TW Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's `tw_close` row plus local close context.
