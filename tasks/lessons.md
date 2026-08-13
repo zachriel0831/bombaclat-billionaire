@@ -1203,3 +1203,15 @@ This file is append-only. Add a new entry after any user correction to prevent r
   - [ ] Run `run_data_source_health.ps1 -Json` and confirm `process_source_bridge=ok`
   - [ ] Keep `NewsCollector-LiveServiceMonitor` disabled when the user explicitly pauses live monitor
 - Status: active
+
+## LESSON-20260813-01
+- Date: 2026-08-13
+- Trigger (User correction): User corrected that daily market analysis is now owned by local Codex automations, not the old Windows LLM market-analysis tasks.
+- What was wrong: During a missed-push incident, the first response followed the old `NewsCollector-MarketAnalysis-*` Task Scheduler path and briefly re-enabled external-provider LLM tasks.
+- Root cause: The investigation mixed legacy data-collecting scheduled tasks with the newer Codex automation guard path, even though `market-analysis-codex-guard-*` is the current owner for analysis rows.
+- New rule (always/never): For daily analysis production, check local Codex automation state and memory first; keep legacy `NewsCollector-MarketAnalysis-*` tasks disabled unless the user explicitly asks to restore the external-provider path.
+- Prevention checklist:
+  - [ ] Inspect `$env:USERPROFILE\.codex\automations\market-analysis-codex-guard-*\automation.toml` and `memory.md`
+  - [ ] Compare Codex guard run time with line-relay scheduled push time before changing Windows tasks
+  - [ ] If manual delivery is needed, repair the `t_market_analyses` row first, then let `line-relay-service` perform the push
+- Status: active
