@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-14 Pre-Open Guard
+- [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `pre_tw_open` row plus local evidence.
+- [x] Create or repair the row from local evidence through `MySqlEventStore.upsert_market_analysis()` when required.
+- [x] Apply deterministic claim/trust/style checks and independently verify final DB state.
+- [x] Run the compatibility extraction entry point and verify no candidates are synthesized from an empty `stock_watch`.
+
+### 2026-08-14 Pre-Open Guard Result
+- Created missing analysis `334` from fourteen local market-context evidence rows; no external provider API, web search, LINE contact, or delivery action occurred.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, exact requested six-section flow, exactly three evidence bullets, readable Traditional Chinese, structured data present, `push_enabled=1`, `pushed=0`, and `external_provider_api_called=false`.
+- Compatibility extraction reported the stock-recommendation workflow retired; empty `structured_json.stock_watch` produced zero trade signals. Calendar and claim-verifier tests passed (12 tests).
+
 ## 2026-08-14 US Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's `us_close` row plus local evidence.
