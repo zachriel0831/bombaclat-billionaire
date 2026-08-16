@@ -69,6 +69,15 @@ function New-Probe {
   [pscustomobject]$probe
 }
 
+function Format-OptionalDateTime {
+  param($Value)
+
+  if ($null -eq $Value) {
+    return $null
+  }
+  return $Value.ToString("o")
+}
+
 function Resolve-PythonExe {
   $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
   if ($pythonCmd) {
@@ -259,7 +268,7 @@ function Read-ScheduledTaskProbes {
     return @(New-Probe "scheduled_tasks" "warn" "no NewsCollector scheduled tasks found")
   }
 
-  $ignoredResults = @(0, 267009, 267011)
+  $ignoredResults = @(0, 267009, 267011, 267014)
   $items = @()
   foreach ($task in $tasks) {
     if ([string]$task.State -eq "Disabled") {
@@ -274,8 +283,8 @@ function Read-ScheduledTaskProbes {
           task_name = $task.TaskName
           state = [string]$task.State
           last_task_result = $result
-          last_run_time = $info.LastRunTime.ToString("o")
-          next_run_time = $info.NextRunTime.ToString("o")
+          last_run_time = Format-OptionalDateTime $info.LastRunTime
+          next_run_time = Format-OptionalDateTime $info.NextRunTime
         }
       }
     }
