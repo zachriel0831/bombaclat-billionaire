@@ -46,15 +46,18 @@ Translate those into reader-facing Traditional Chinese market implications inste
 
 ## Daily Market Analysis Contract
 
-Visible daily reports use:
+Visible daily reports use a flexible briefing-memo shape, not a fixed section-title template.
 
-`今日一句話` -> `三個檢查點` -> `市場押注與預期差` -> `國際消息到台股的傳導` -> `看錯的條件` -> `備註`
+Required content, in natural prose:
 
-- `三個檢查點` must contain exactly three bullets.
-- Each evidence bullet should connect source fact -> mechanism -> why it matters now.
-- `市場押注與預期差` should name what is already reflected in prices and what can still be repriced.
-- `看錯的條件` means the evidence or market moves that would invalidate the thesis; it is not a buy/sell trigger list.
-- Trial trigger-first style: section 1 may start with `結論先講`; section 3 may add `先看區間邊界` with evidence-backed index/rates/FX/SOX levels; section 5 may add `現在只看 N 件事`, where N is the needed count of evidence-backed triggers. Do not force exactly two.
+- Opening thesis: state what the market is trading now, the Taiwan-market bias, and the largest uncertainty in one or two short paragraphs.
+- Evidence chain: use the strongest 2-4 facts available, and connect each fact to the market mechanism and why it matters today. Bullets are optional; do not force exactly three.
+- Taiwan transmission: explain how rates, USD, oil, SOX/AI, geopolitics, liquidity, or consumer demand pass into Taiwan sectors and major proxies.
+- Repricing and invalidation: say what is already in prices, what can still be repriced, and what evidence would make the thesis wrong.
+- Reader-facing caveat: include only when useful, phrased as market uncertainty rather than internal data/process limitations.
+
+Avoid visible fixed labels such as `今日一句話`, `三個檢查點`, `市場押注與預期差`, `國際消息到台股的傳導`, `先看區間邊界`, or `現在只看 N 件事` unless the user explicitly asks for that format. The report may use natural headings, but the headings should change with the day.
+
 - Do not include a dedicated `台股配置` section.
 - Do not append `今日個股觀察`.
 - Do not write stock recommendations, buy candidates, or watchlist candidates in visible daily `market_analysis`.
@@ -62,7 +65,7 @@ Visible daily reports use:
 - Do not write `開多`, `開空`, `止盈`, `止損`, `入場區間`, or order-level commands in visible daily text; triggers are observation boundaries, not trading instructions.
 - If evidence is stale or thin, lower confidence and describe observation limits in reader-facing language. Do not expose missing-data implementation notes.
 
-Pushed daily reports should usually land around 800-1400 Chinese characters. Shorter close digests are acceptable only when the window is thin and the required section order still exists.
+Pushed daily reports should usually land around 700-1200 Chinese characters. Shorter close digests are acceptable only when the window is thin and the required thesis/evidence/transmission/invalidation content still exists.
 
 ## Review Checklist Before Push
 

@@ -105,25 +105,25 @@ Reusable phrasing shapes:
 - Do not show internal source labels, table names, snake_case fields, scheduled task names, provider names, guard names, or custom score labels; translate them into reader-facing Traditional Chinese market implications.
 - Do not write Taiwan ticker recommendations, watchlist candidates, entry plans, stop-loss levels, or target-price lists.
 - Daily visible reports must focus on macro and industry/sector interpretation. Mention individual companies only as mega-cap transmission examples such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭.
-- Pushed daily reports should usually land around 800-1400 Chinese characters; shorter close digests are acceptable only when the window is thin and all required sections still exist.
+- Pushed daily reports should usually land around 700-1200 Chinese characters; shorter close digests are acceptable only when the window is thin and the required thesis, evidence, transmission, and invalidation content still exists.
 - Do not output order intents, broker actions, or automated trading instructions.
 
-## Daily Market Analysis Sections
+## Daily Market Analysis Shape
 
-Use this readable author-style macro flow unless the calling code supplies a stricter section contract:
+Use a flexible briefing-memo shape unless the user explicitly asks for a fixed template. Do not force the old six-title section contract.
 
-1. 今日一句話
-2. 三個檢查點
-3. 市場押注與預期差
-4. 國際消息到台股的傳導
-5. 看錯的條件
-6. 備註
+Required content, in natural prose:
 
-`三個檢查點` should contain exactly three bullets. Each bullet should connect source fact -> mechanism -> why it matters now. `市場押注與預期差` should name what is already reflected in prices and what can still be repriced. `看錯的條件` means the evidence or market moves that would invalidate the thesis; it is not a buy/sell trigger list.
+1. Opening thesis: what the market is trading now, Taiwan-market bias, and the biggest uncertainty.
+2. Evidence chain: the strongest 2-4 facts, each connected to mechanism and present market relevance. Bullets are optional and should not be forced to exactly three.
+3. Taiwan transmission: how rates, USD, oil, SOX/AI, geopolitics, liquidity, or consumer demand pass into Taiwan sectors and major proxies.
+4. Repricing and invalidation: what is already reflected in prices, what can still move, and what would make the thesis wrong.
+5. Reader-facing caveat only when useful, phrased as uncertainty instead of internal data/process limitations.
+
+Avoid visible fixed labels such as `今日一句話`, `三個檢查點`, `市場押注與預期差`, `國際消息到台股的傳導`, `先看區間邊界`, or `現在只看 N 件事`. Natural headings are allowed, but they should change with the evidence window.
 
 For daily `market_analysis`, do not append `今日個股觀察`, do not write `台股配置` as a visible section, and do not write stock recommendations, buy candidates, watchlist candidates, `stock_watch`, entry plans, stop-loss levels, or target-price lists. The visible report may mention companies such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭 only to explain macro/sector transmission.
-
-Trial trigger-first style: section 1 may start with `結論先講`; section 3 may add `先看區間邊界` with evidence-backed index/rates/FX/SOX levels; section 5 may add `現在只看 N 件事`, where N is the needed count of evidence-backed triggers. Do not force exactly two. Do not write `開多`, `開空`, `止盈`, `止損`, `入場區間`, or order-level commands in visible daily text; triggers are observation boundaries, not trading instructions.
+Do not write `開多`, `開空`, `止盈`, `止損`, `入場區間`, or order-level commands in visible daily text; invalidation conditions and levels are observation boundaries, not trading instructions.
 
 ## Weekly Summary Sections
 

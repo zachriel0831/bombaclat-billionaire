@@ -316,13 +316,14 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   9. Stock recommendation generation is retired; do not output `stock_watch`, buy/watchlist candidates, or entry/stop/target lists.
   10. For `macro_daily`, write macro-only analysis into `t_market_analyses`.
 - Daily text formatting:
-  - `raw_json.display_title` is date-only (`YYYY-MM-DD`) for downstream delivery titles
-  - Daily analysis uses the refreshed author-style flow: `隞銝?亥店` -> `銝炎?仿?` -> `撣?潭釣???榆` -> `??瘨?啣?∠??喳?` -> `???隞跆 -> `?酉`
-  - Do not write a dedicated `?啗?蔭` section or append `## 隞?閫撖 in daily visible reports.
-  - `???隞跆 means thesis-invalidation evidence, not a buy/sell trigger list.
-  - Individual companies may appear only as macro/sector transmission examples, such as NVIDIA, TSMC, or Magnificent Seven / 蝢銝楊?? daily visible reports should not include stock recommendations, buy/watchlist candidates, entry, stop-loss, or target-price language.
-  - `銝炎?仿?` must contain exactly three bullets, each connecting source fact -> market mechanism -> why it matters now; `撣?潭釣???榆` should name what is already reflected in prices and what can still be repriced
-  - `??瘨?啣?∠??喳?` should show `鈭辣 -> 敶梢霈 -> ?啗?黎 -> 蝣箄?/憭望?` when evidence supports a chain
+  - `raw_json.display_title` is date-only (`YYYY-MM-DD`) for downstream delivery titles.
+  - Daily analysis uses a flexible briefing-memo shape, not a fixed six-title template.
+  - Required visible content: opening thesis, evidence chain, Taiwan transmission, repricing/invalidation, and a reader-facing caveat only when useful.
+  - Evidence should use the strongest 2-4 facts available; bullets are optional and must not be forced to exactly three.
+  - Avoid default fixed labels such as `今日一句話`, `三個檢查點`, `市場押注與預期差`, `國際消息到台股的傳導`, `先看區間邊界`, or `現在只看 N 件事`.
+  - Do not write a dedicated `台股配置` section or append `今日個股觀察` in daily visible reports.
+  - Invalidation means thesis-invalidation evidence, not a buy/sell trigger list.
+  - Individual companies may appear only as macro/sector transmission examples, such as NVIDIA, TSMC, or Magnificent Seven / 美股七巨頭; daily visible reports must not include stock recommendations, buy/watchlist candidates, entry, stop-loss, or target-price language.
 - Tracked-stock context:
   - `MARKET_CONTEXT_TWSE_CODES` reads official TWSE close/margin rows for tracked listed stocks
   - `MARKET_CONTEXT_TW_YAHOO_SYMBOLS` is an optional Yahoo Taiwan quote/context fallback preference list; it must not be treated as a fixed trading universe.
