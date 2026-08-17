@@ -1148,3 +1148,16 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Fix `restart_live_services.ps1` so old worker wrappers are closed before restart.
 - [x] Update runbooks/lessons and verify live-service restart health.
 - [x] Commit and push only task-related files.
+
+# 2026-08-17 TW Close Codex Guard Run
+
+- [x] Read repo instructions, automation memory, Workflow 4C, writing skills, reasoning guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's missing `tw_close` row plus local close evidence.
+- [x] Create the missing row through `MySqlEventStore.upsert_market_analysis()` using local evidence only.
+- [x] Verify claim/trust, push, structured data, encoding, style, provider flags, and zero trade signals.
+
+## 2026-08-17 TW Close Codex Guard Result
+
+- Created analysis `340` from six local Taiwan flow, credit, and semiconductor-context events; no external provider API, web search, LINE contact, delivery action, or stock recommendation flow occurred.
+- Final DB checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, readable flexible briefing memo, structured data present, `push_enabled=0`, `pushed=0`, zero trade signals, and `external_provider_api_called=false`.
+- Calendar and claim-verifier tests passed (12 tests). The close-data caveat is that complete index transaction structure and a valid institutional net-flow aggregate were unavailable.
