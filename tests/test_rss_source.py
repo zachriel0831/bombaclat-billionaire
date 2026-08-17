@@ -143,6 +143,32 @@ class OfficialRssSourceTests(unittest.TestCase):
 
         self.assertEqual(items[0].raw["author_values"], ["Reporter A"])
 
+    def test_parse_feed_repairs_mojibake_titles_and_source_names(self) -> None:
+        source = OfficialRssSource(["https://example.com/rss.xml"])
+        bad_source = "MoneyDJ財經新聞".encode("utf-8").decode("latin-1")
+        bad_title = "近四小時市場重點".encode("utf-8").decode("latin-1")
+        bad_summary = "台股與美股連動".encode("utf-8").decode("latin-1")
+
+        items = source._parse_feed(
+            f"""
+            <rss version="2.0">
+              <channel>
+                <title>{bad_source}</title>
+                <item>
+                  <title>{bad_title}</title>
+                  <link>https://example.com/t1</link>
+                  <description>{bad_summary}</description>
+                </item>
+              </channel>
+            </rss>
+            """,
+            "https://example.com/rss.xml",
+        )
+
+        self.assertEqual(items[0].source, "MoneyDJ財經新聞")
+        self.assertEqual(items[0].title, "近四小時市場重點")
+        self.assertEqual(items[0].summary, "台股與美股連動")
+
 
 if __name__ == "__main__":
     unittest.main()

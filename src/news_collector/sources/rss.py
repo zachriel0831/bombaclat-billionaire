@@ -7,6 +7,7 @@ published-at fields."""
 from __future__ import annotations
 
 import logging
+import re
 from urllib.parse import urljoin
 from xml.etree import ElementTree as ET
 
@@ -17,6 +18,7 @@ from news_collector.utils import local_name, parse_datetime, sort_timestamp, sta
 
 
 logger = logging.getLogger(__name__)
+MOJIBAKE_RE = re.compile(r"[\ufffd\u0080-\u009f\ue000-\uf8ff]|\?{3,}")
 
 
 class OfficialRssSource(NewsSource):
@@ -93,7 +95,7 @@ class OfficialRssSource(NewsSource):
     def _parse_rss(self, root: ET.Element, feed_url: str) -> list[NewsItem]:
         """解析 parse rss 對應的資料或結果。"""
         channel = root.find("channel")
-        channel_title = (channel.findtext("title") if channel is not None else None) or "official_rss"
+        channel_title = _repair_mojibake_text((channel.findtext("title") if channel is not None else None) or "official_rss")
         items = root.findall(".//item")
 
         parsed: list[NewsItem] = []
@@ -105,7 +107,7 @@ class OfficialRssSource(NewsSource):
 
     def _parse_atom(self, root: ET.Element, feed_url: str) -> list[NewsItem]:
         """解析 parse atom 對應的資料或結果。"""
-        feed_title = root.findtext("{*}title") or "official_rss"
+        feed_title = _repair_mojibake_text(root.findtext("{*}title") or "official_rss")
         entries = root.findall(".//{*}entry")
 
         parsed: list[NewsItem] = []
@@ -128,7 +130,7 @@ class OfficialRssSource(NewsSource):
                         return child.text.strip()
             return None
 
-        title = t("title")
+        title = _repair_mojibake_text(t("title"))
         if not title:
             return None
 
@@ -148,7 +150,7 @@ class OfficialRssSource(NewsSource):
             link = feed_url
 
         published = parse_datetime(t("pubDate", "published", "updated"))
-        summary = t("description", "summary", "content")
+        summary = _repair_mojibake_text(t("description", "summary", "content"))
         author_values = self._author_values(node)
 
         tags: list[str] = []
@@ -165,7 +167,7 @@ class OfficialRssSource(NewsSource):
 
         return NewsItem(
             id=stable_id(source_name, title, link),
-            source=source_name,
+            source=_repair_mojibake_text(source_name) or "official_rss",
             title=title,
             url=link,
             published_at=published,
@@ -210,3 +212,13 @@ def _unique_text(values: list[str]) -> list[str]:
         if normalized and normalized not in result:
             result.append(normalized)
     return result
+
+
+def _repair_mojibake_text(value: str | None) -> str | None:
+    if not value or not MOJIBAKE_RE.search(value):
+        return value
+    try:
+        repaired = value.encode("latin-1").decode("utf-8")
+    except UnicodeError:
+        return value
+    return repaired if not MOJIBAKE_RE.search(repaired) else value
