@@ -329,10 +329,16 @@ function Write-State {
 }
 
 function Resolve-CodexExecutable {
-  $candidates = @(Get-Command codex.exe, codex.cmd, codex -ErrorAction SilentlyContinue)
-  $app = $candidates | Where-Object { $_.CommandType -eq "Application" } | Select-Object -First 1
-  if ($app) {
-    return $app.Source
+  $cmd = Get-Command codex.cmd -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($cmd) {
+    return $cmd.Source
+  }
+
+  $exe = Get-Command codex.exe, codex -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandType -eq "Application" } |
+    Select-Object -First 1
+  if ($exe) {
+    return $exe.Source
   }
   return ""
 }
@@ -442,11 +448,11 @@ function Start-RepairAgent {
   $lastMessage = Join-Path $incidentDir "$IncidentId.codex.final.txt"
   $agentCwd = if (Test-Path -LiteralPath $WorkspaceRoot) { $WorkspaceRoot } else { $ProjectRoot }
   $arguments = @(
+    "-a", "never",
     "exec",
     "-C", $agentCwd,
     "--add-dir", $ProjectRoot,
     "--sandbox", "danger-full-access",
-    "--ask-for-approval", "never",
     "--json",
     "-o", $lastMessage,
     "-"
