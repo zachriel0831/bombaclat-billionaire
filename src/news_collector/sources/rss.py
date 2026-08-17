@@ -18,6 +18,19 @@ from news_collector.utils import local_name, parse_datetime, sort_timestamp, sta
 
 
 logger = logging.getLogger(__name__)
+
+_CANONICAL_SOURCE_NAME_BY_FEED_URL = (
+    ("https://feeds.feedburner.com/rsscna/finance", "中央社即時新聞 財經新聞"),
+    ("https://news.ltn.com.tw/rss/business.xml", "財經新聞 - 自由時報"),
+    ("https://feeds.feedburner.com/ettoday/finance", "ETtoday 財經新聞"),
+    ("https://news.cnyes.com/rss/v1/news/category/", "Anue鉅亨"),
+    ("https://money.udn.com/rssfeed/news/1001/", "經濟日報：不僅新聞速度 更有脈絡深度"),
+    ("https://newtalk.tw/rss/category/3", "新頭殼要聞 - 財經"),
+    ("https://www.storm.mg/api/getRss/channel_id/4", "Storm Media Group RSS"),
+    ("https://www.moneydj.com/KMDJ/RssCenter.aspx", "財經知識庫－財經新聞"),
+    ("https://www.cbc.gov.tw/tw/rss-302-1.xml", "新聞稿 - 中央銀行-中文版"),
+    ("https://www.twse.com.tw/rwd/zh/news/feed?type=rss", "TSEC FEED"),
+)
 MOJIBAKE_RE = re.compile(r"[\ufffd\u0080-\u009f\ue000-\uf8ff]|\?{3,}")
 
 
@@ -95,7 +108,10 @@ class OfficialRssSource(NewsSource):
     def _parse_rss(self, root: ET.Element, feed_url: str) -> list[NewsItem]:
         """解析 parse rss 對應的資料或結果。"""
         channel = root.find("channel")
-        channel_title = _repair_mojibake_text((channel.findtext("title") if channel is not None else None) or "official_rss")
+        channel_title = _canonical_source_name(
+            feed_url,
+            (channel.findtext("title") if channel is not None else None) or "official_rss",
+        )
         items = root.findall(".//item")
 
         parsed: list[NewsItem] = []
@@ -107,7 +123,7 @@ class OfficialRssSource(NewsSource):
 
     def _parse_atom(self, root: ET.Element, feed_url: str) -> list[NewsItem]:
         """解析 parse atom 對應的資料或結果。"""
-        feed_title = _repair_mojibake_text(root.findtext("{*}title") or "official_rss")
+        feed_title = _canonical_source_name(feed_url, root.findtext("{*}title") or "official_rss")
         entries = root.findall(".//{*}entry")
 
         parsed: list[NewsItem] = []
@@ -222,3 +238,12 @@ def _repair_mojibake_text(value: str | None) -> str | None:
     except UnicodeError:
         return value
     return repaired if not MOJIBAKE_RE.search(repaired) else value
+
+
+def _canonical_source_name(feed_url: str, source_name: str | None) -> str | None:
+    normalized = _repair_mojibake_text(source_name)
+    lowered_feed_url = feed_url.strip().lower()
+    for prefix, canonical_name in _CANONICAL_SOURCE_NAME_BY_FEED_URL:
+        if lowered_feed_url.startswith(prefix.lower()):
+            return canonical_name
+    return normalized

@@ -169,6 +169,26 @@ class OfficialRssSourceTests(unittest.TestCase):
         self.assertEqual(items[0].title, "近四小時市場重點")
         self.assertEqual(items[0].summary, "台股與美股連動")
 
+    def test_parse_feed_prefers_canonical_source_name_for_known_finance_feed(self) -> None:
+        source = OfficialRssSource(["https://www.moneydj.com/KMDJ/RssCenter.aspx"])
+
+        items = source._parse_feed(
+            f"""
+            <rss version="2.0">
+              <channel>
+                <title>garbled-source-name</title>
+                <item>
+                  <title>t1</title>
+                  <link>https://example.com/t1</link>
+                </item>
+              </channel>
+            </rss>
+            """,
+            "https://www.moneydj.com/KMDJ/RssCenter.aspx",
+        )
+
+        self.assertEqual(items[0].source, "財經知識庫－財經新聞")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -34,6 +34,7 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
 2. RSS polling
 - BBC / Reuters / Fox / NPR plus Taiwan finance and official finance/macro feeds from `OFFICIAL_RSS_FEEDS`
 - Active Taiwan finance/official RSS feeds include CNA finance, LTN business, ETtoday finance, Anue, Economic Daily News, Newtalk finance, Storm finance, MoneyDJ, CBC, TWSE, and FSC; these finance/news rows stay in `t_relay_events`, not `news_platform.t_news_articles`
+- Known Taiwan finance RSS URLs are normalized to canonical source labels during parsing so allowlists and display repair do not depend on upstream feed-title encoding.
 - Finance/news relay rows may carry short-retention reporter metadata in `raw_json.authors` after `scripts/backfill_relay_event_authors.py` runs. This is display enrichment for `/api/events` and is separate from the long-lived society/politics `t_news_authors` relation model.
 - RSS bridge `--limit` is applied per configured feed, then all feed items are merged, deduped, and sorted. Current `.env` uses `OFFICIAL_RSS_FIRST_PER_FEED=true`, so one polling cycle considers one item per feed; if disabled, 27 active feeds and `--limit 5` can consider up to 135 RSS items before filters.
 - Reuters currently uses Google News RSS search as fallback because legacy Reuters RSS endpoints are unavailable from this environment
