@@ -448,11 +448,11 @@ function Start-RepairAgent {
   $lastMessage = Join-Path $incidentDir "$IncidentId.codex.final.txt"
   $agentCwd = if (Test-Path -LiteralPath $WorkspaceRoot) { $WorkspaceRoot } else { $ProjectRoot }
   $arguments = @(
-    "-a", "never",
     "exec",
     "-C", $agentCwd,
     "--add-dir", $ProjectRoot,
     "--sandbox", "danger-full-access",
+    "--dangerously-bypass-approvals-and-sandbox",
     "--json",
     "-o", $lastMessage,
     "-"
