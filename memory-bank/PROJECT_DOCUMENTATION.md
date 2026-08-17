@@ -233,6 +233,8 @@ LINE delivery and LINE webhook handling have migrated to the Java system. This P
   metadata.
 - The report checks relay-side finance/public RSS, international RSS, X, Truth Social, SEC, TWSE/MOPS, US index tracker, market-context facts, BLS macro facts, Taiwan market-flow facts, and stored market analyses.
 - It also checks news-platform society/politics article freshness per category and per source, article enrichment gaps, public-record refresh freshness based on `updated_at`, article-record link freshness, and local Python process counts.
+- Event-driven SEC/TWSE-MOPS row age is treated as informational because quiet disclosure periods do not imply collector failure. U.S. index/snapshot and stored-analysis probes are market-calendar and due-time aware, so weekend/holiday or not-yet-due rows do not create repair incidents.
+- The article-public-record link probe first checks for deterministic recent article/record matches. If no matchable pairs exist, no new link rows are expected and the probe stays healthy even when the latest link row is old.
 - Status semantics: `OK` within expected cadence, `WARN` outside warn threshold, `STALE` outside stale threshold, `MISSING` no rows, and `ERROR` for query/connect failures.
 - Public-record sources are lower cadence than news feeds; current guardrails warn after 48 hours and stale after 96 hours.
 

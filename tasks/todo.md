@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-17 Service Auto-Repair Data-Source Health
+- [x] Read workspace/repo rules, CTO standards, workflow docs, and ingestion skill.
+- [x] Reproduce the incident report and inspect live service, scheduler, log, and DB state.
+- [x] Repair false-positive data-source health probes without touching LINE/order/AI services.
+- [x] Run focused health/unit verification and the service auto-repair watcher dry run.
+- [x] Record Observer completion and commit only related hunks.
+
+### 2026-08-17 Service Auto-Repair Data-Source Health Result
+- Root cause was health semantics, not stopped services: live workers, scheduled tasks, HTTP probes, source accuracy, and category ingestion were healthy, while the report treated expected quiet/event-driven data as repair-worthy.
+- Updated data-source health to skip event-driven age-only TWSE/MOPS warnings, skip U.S. index/analysis checks on closed U.S. sessions, skip not-yet-due analysis slots, widen per-source article row windows, and only alert on public-record link freshness when deterministic recent article/record matches exist.
+- Verification passed: `tests.test_data_source_health`, live `run_data_source_health.ps1 -Json` returned `overall_status=ok`, and `run_service_auto_repair_watch.ps1 -DryRun -Json` returned `overall_status=ok`, `failing_count=0`.
+
 ## 2026-08-15 US Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's missing `us_close` row plus local evidence.

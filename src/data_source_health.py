@@ -11,14 +11,17 @@ import os
 import re
 import subprocess
 from dataclasses import asdict, dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
+from types import SimpleNamespace
 from typing import Any, Iterable, Sequence
 
+from event_relay.market_calendar import allowed_analysis_slots, resolve_market_calendar_state
 from event_relay.config import RelaySettings, load_settings as load_relay_settings
 from news_collector.config import Settings as CollectorSettings
 from news_collector.config import load_settings as load_collector_settings
 from news_platform.config import NewsPlatformSettings
 from news_platform.config import load_settings as load_news_platform_settings
+from news_platform.public_record_matcher import ArticlePublicRecordMatcher
 from news_platform.registry import active_source_ids
 
 
@@ -96,6 +99,17 @@ PUBLIC_RECORD_GROUPS = (
     ("cwa", "cwa_typhoon_report"),
     ("cwa", "cwa_earthquake_report"),
 )
+
+PUBLIC_RECORD_MATCHABLE_TYPES = (
+    "legislative_bill",
+    "healthcare_legislative_bill",
+    "fraud_rumor",
+)
+
+TAIPEI_TIMEZONE = timezone(timedelta(hours=8), "Asia/Taipei")
+PRE_TW_OPEN_DUE_TIME = time(7, 45)
+TW_CLOSE_DUE_TIME = time(15, 45)
+US_CLOSE_DUE_TIME = time(5, 15)
 
 IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
@@ -266,6 +280,9 @@ def _collect_relay_probes(
         event_table = _quote_identifier(settings.mysql_event_table)
         analysis_table = _quote_identifier(settings.mysql_analysis_table)
         market_table = _quote_identifier(settings.mysql_market_table)
+        now_local = _taipei_now()
+        calendar_state = resolve_market_calendar_state(now_local)
+        expected_slots = allowed_analysis_slots(calendar_state)
 
         probes.append(
             _latest_probe(
@@ -391,31 +408,37 @@ def _collect_relay_probes(
             )
         )
         probes.append(
-            _latest_probe(
-                conn,
-                name="relay_us_index_tracker",
-                table=event_table,
-                timestamp_col="created_at",
-                where="source='us_index_tracker'",
-                params=(),
-                warn_minutes=1440,
-                stale_minutes=4320,
-                recent_minutes=4320,
-                detail="Stored-only DJIA/S&P 500 open-close event flow.",
+            _us_session_probe(
+                _latest_probe(
+                    conn,
+                    name="relay_us_index_tracker",
+                    table=event_table,
+                    timestamp_col="created_at",
+                    where="source='us_index_tracker'",
+                    params=(),
+                    warn_minutes=1440,
+                    stale_minutes=4320,
+                    recent_minutes=4320,
+                    detail="Stored-only DJIA/S&P 500 open-close event flow.",
+                ),
+                calendar_state=calendar_state,
             )
         )
         probes.append(
-            _latest_probe(
-                conn,
-                name="relay_market_index_snapshots",
-                table=market_table,
-                timestamp_col="created_at",
-                where="1=1",
-                params=(),
-                warn_minutes=1440,
-                stale_minutes=4320,
-                recent_minutes=4320,
-                detail="Structured index snapshot rows for market analysis.",
+            _us_session_probe(
+                _latest_probe(
+                    conn,
+                    name="relay_market_index_snapshots",
+                    table=market_table,
+                    timestamp_col="created_at",
+                    where="1=1",
+                    params=(),
+                    warn_minutes=1440,
+                    stale_minutes=4320,
+                    recent_minutes=4320,
+                    detail="Structured index snapshot rows for market analysis.",
+                ),
+                calendar_state=calendar_state,
             )
         )
 
@@ -487,45 +510,63 @@ def _collect_relay_probes(
             )
         )
         probes.append(
-            _latest_probe(
-                conn,
-                name="analysis_pre_tw_open",
-                table=analysis_table,
-                timestamp_col="updated_at",
-                where="analysis_slot='pre_tw_open'",
-                params=(),
-                warn_minutes=1800,
-                stale_minutes=3240,
-                recent_minutes=3240,
-                detail="Latest stored Taiwan pre-open analysis.",
+            _scheduled_slot_probe(
+                _latest_probe(
+                    conn,
+                    name="analysis_pre_tw_open",
+                    table=analysis_table,
+                    timestamp_col="updated_at",
+                    where="analysis_slot='pre_tw_open'",
+                    params=(),
+                    warn_minutes=1800,
+                    stale_minutes=3240,
+                    recent_minutes=3240,
+                    detail="Latest stored Taiwan pre-open analysis.",
+                ),
+                now_local=now_local,
+                expected_slots=expected_slots,
+                slot="pre_tw_open",
+                due_time=PRE_TW_OPEN_DUE_TIME,
             )
         )
         probes.append(
-            _latest_probe(
-                conn,
-                name="analysis_us_close",
-                table=analysis_table,
-                timestamp_col="updated_at",
-                where="analysis_slot='us_close'",
-                params=(),
-                warn_minutes=1800,
-                stale_minutes=4320,
-                recent_minutes=4320,
-                detail="Latest stored U.S. close analysis.",
+            _scheduled_slot_probe(
+                _latest_probe(
+                    conn,
+                    name="analysis_us_close",
+                    table=analysis_table,
+                    timestamp_col="updated_at",
+                    where="analysis_slot='us_close'",
+                    params=(),
+                    warn_minutes=1800,
+                    stale_minutes=4320,
+                    recent_minutes=4320,
+                    detail="Latest stored U.S. close analysis.",
+                ),
+                now_local=now_local,
+                expected_slots=expected_slots,
+                slot="us_close",
+                due_time=US_CLOSE_DUE_TIME,
             )
         )
         probes.append(
-            _latest_probe(
-                conn,
-                name="analysis_tw_close",
-                table=analysis_table,
-                timestamp_col="updated_at",
-                where="analysis_slot='tw_close'",
-                params=(),
-                warn_minutes=2160,
-                stale_minutes=4320,
-                recent_minutes=4320,
-                detail="Latest stored Taiwan close analysis.",
+            _scheduled_slot_probe(
+                _latest_probe(
+                    conn,
+                    name="analysis_tw_close",
+                    table=analysis_table,
+                    timestamp_col="updated_at",
+                    where="analysis_slot='tw_close'",
+                    params=(),
+                    warn_minutes=2160,
+                    stale_minutes=4320,
+                    recent_minutes=4320,
+                    detail="Latest stored Taiwan close analysis.",
+                ),
+                now_local=now_local,
+                expected_slots=expected_slots,
+                slot="tw_close",
+                due_time=TW_CLOSE_DUE_TIME,
             )
         )
     finally:
@@ -583,9 +624,9 @@ def _collect_news_platform_probes(settings: NewsPlatformSettings) -> list[ProbeR
                         timestamp_col="fetched_at",
                         where="category=%s AND source_id=%s",
                         params=(category, source_id),
-                        warn_minutes=180,
-                        stale_minutes=720,
-                        recent_minutes=720,
+                        warn_minutes=720,
+                        stale_minutes=1440,
+                        recent_minutes=1440,
                         detail="Per-source article ingestion freshness.",
                     )
                 )
@@ -608,17 +649,11 @@ def _collect_news_platform_probes(settings: NewsPlatformSettings) -> list[ProbeR
                 )
             )
         probes.append(
-            _latest_probe(
+            _public_record_links_probe(
                 conn,
-                name="public_record_links",
-                table=link_table,
-                timestamp_col="created_at",
-                where="1=1",
-                params=(),
-                warn_minutes=2880,
-                stale_minutes=5760,
-                recent_minutes=5760,
-                detail="Article-to-public-record link creation freshness.",
+                article_table=article_table,
+                record_table=record_table,
+                link_table=link_table,
             )
         )
     finally:
@@ -841,6 +876,186 @@ def _article_enrichment_probe(conn: Any, article_table: str) -> ProbeResult:
     )
 
 
+def _taipei_now() -> datetime:
+    return datetime.now(TAIPEI_TIMEZONE)
+
+
+def _us_session_probe(probe: ProbeResult, *, calendar_state: Any) -> ProbeResult:
+    if calendar_state.us.is_trading_day:
+        return probe
+    return replace(
+        probe,
+        status="skipped",
+        detail=(
+            f"{probe.detail} U.S. close session "
+            f"{calendar_state.us_close_session_date.isoformat()} is closed "
+            f"({calendar_state.us.reason}); row freshness is not expected to advance."
+        ),
+    )
+
+
+def _scheduled_slot_probe(
+    probe: ProbeResult,
+    *,
+    now_local: datetime,
+    expected_slots: set[str],
+    slot: str,
+    due_time: time,
+) -> ProbeResult:
+    if slot not in expected_slots:
+        return replace(
+            probe,
+            status="skipped",
+            detail=(
+                f"{probe.detail} Slot {slot} is not expected for the "
+                f"{now_local.date().isoformat()} market calendar."
+            ),
+        )
+    if now_local.time() < due_time:
+        return replace(
+            probe,
+            status="skipped",
+            detail=(
+                f"{probe.detail} Slot {slot} is not due until "
+                f"{due_time.strftime('%H:%M')} Asia/Taipei."
+            ),
+        )
+    return probe
+
+
+def _public_record_links_probe(
+    conn: Any,
+    *,
+    article_table: str,
+    record_table: str,
+    link_table: str,
+) -> ProbeResult:
+    probe = _latest_probe(
+        conn,
+        name="public_record_links",
+        table=link_table,
+        timestamp_col="created_at",
+        where="1=1",
+        params=(),
+        warn_minutes=2880,
+        stale_minutes=5760,
+        recent_minutes=5760,
+        detail="Article-to-public-record link creation freshness.",
+    )
+    if STATUS_ORDER.get(probe.status, 4) == 0:
+        return probe
+
+    try:
+        candidate_matches = _count_public_record_candidate_matches(
+            conn,
+            article_table=article_table,
+            record_table=record_table,
+        )
+    except Exception as exc:
+        return replace(probe, detail=f"{probe.detail} Candidate-match scan failed: {exc}")
+
+    return _classify_public_record_link_probe(probe, candidate_matches=candidate_matches)
+
+
+def _classify_public_record_link_probe(
+    probe: ProbeResult,
+    *,
+    candidate_matches: int,
+) -> ProbeResult:
+    if candidate_matches <= 0:
+        return replace(
+            probe,
+            status="ok",
+            detail=(
+                f"{probe.detail} No deterministic article-record matches in the "
+                "recent candidate window; sparse link creation is expected."
+            ),
+        )
+    return replace(
+        probe,
+        detail=f"{probe.detail} deterministic_candidate_matches={candidate_matches}",
+    )
+
+
+def _count_public_record_candidate_matches(
+    conn: Any,
+    *,
+    article_table: str,
+    record_table: str,
+    lookback_days: int = 45,
+    article_limit: int = 200,
+    record_limit: int = 1000,
+    match_cap: int = 25,
+) -> int:
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            (
+                f"SELECT id, article_id, category, title, summary, published_at, "
+                f"keywords_json, topics_json FROM {article_table} "
+                "WHERE category IN ('politics','society') "
+                "AND (published_at IS NULL OR published_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %s DAY)) "
+                "ORDER BY published_at DESC, id DESC LIMIT %s"
+            ),
+            (max(1, int(lookback_days)), max(1, int(article_limit))),
+        )
+        articles = [
+            SimpleNamespace(
+                row_id=int(row[0]),
+                article_id=str(row[1]),
+                category=str(row[2] or ""),
+                title=str(row[3] or ""),
+                summary=None if row[4] is None else str(row[4]),
+                published_at=row[5],
+                keywords_json=row[6],
+                topics_json=row[7],
+            )
+            for row in cur.fetchall()
+        ]
+        cur.execute(
+            (
+                f"SELECT record_id, source_id, record_type, category, title, url, "
+                f"occurred_at, region, metrics_json, tags_json, raw_json "
+                f"FROM {record_table} "
+                "WHERE (occurred_at IS NULL OR occurred_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %s DAY)) "
+                "AND (category IS NULL OR category IN ('politics','society')) "
+                f"AND {_in_clause('record_type', len(PUBLIC_RECORD_MATCHABLE_TYPES))} "
+                "ORDER BY occurred_at DESC, id DESC LIMIT %s"
+            ),
+            (
+                max(1, int(lookback_days)),
+                *PUBLIC_RECORD_MATCHABLE_TYPES,
+                max(1, int(record_limit)),
+            ),
+        )
+        records = [
+            SimpleNamespace(
+                record_id=str(row[0]),
+                source_id=str(row[1]),
+                record_type=str(row[2]),
+                category=None if row[3] is None else str(row[3]),
+                title=str(row[4] or ""),
+                url=None if row[5] is None else str(row[5]),
+                occurred_at=row[6],
+                region=None if row[7] is None else str(row[7]),
+                metrics_json=row[8],
+                tags_json=row[9],
+                raw_json=row[10],
+            )
+            for row in cur.fetchall()
+        ]
+    finally:
+        cur.close()
+
+    matcher = ArticlePublicRecordMatcher()
+    matches = 0
+    for article in articles:
+        matches += len(matcher.match_article(article, records))
+        if matches >= match_cap:
+            return matches
+    return matches
+
+
 def _maybe_enabled_probe(
     *,
     enabled: bool,
@@ -854,13 +1069,19 @@ def _maybe_enabled_probe(
 
 
 def _event_driven_probe(probe: ProbeResult) -> ProbeResult:
-    if probe.status != "missing" or (probe.row_count or 0) > 0:
-        return probe
-    return replace(
-        probe,
-        status="skipped",
-        detail=f"{probe.detail} No stored rows yet; source is event-driven.",
-    )
+    if probe.status == "missing" and (probe.row_count or 0) <= 0:
+        return replace(
+            probe,
+            status="skipped",
+            detail=f"{probe.detail} No stored rows yet; source is event-driven.",
+        )
+    if probe.status in {"warn", "stale"}:
+        return replace(
+            probe,
+            status="skipped",
+            detail=f"{probe.detail} Row creation is event-driven; age alone is not an outage signal.",
+        )
+    return probe
 
 
 def _connect_mysql(mysql_connector: Any, config: DbConfig) -> Any:

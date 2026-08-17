@@ -1,10 +1,15 @@
 import unittest
+from datetime import date, datetime, time, timezone
+from types import SimpleNamespace
 
 from data_source_health import (
     NEWS_PLATFORM_SOURCE_IDS,
     PUBLIC_RECORD_GROUPS,
     ProbeResult,
+    _classify_public_record_link_probe,
     _event_driven_probe,
+    _scheduled_slot_probe,
+    _us_session_probe,
     classify_freshness,
     overall_status,
     render_text,
@@ -51,6 +56,70 @@ class DataSourceHealthTests(unittest.TestCase):
 
         self.assertEqual(result.status, "skipped")
         self.assertIn("event-driven", result.detail)
+
+    def test_event_driven_probe_skips_age_only_warning(self) -> None:
+        probe = ProbeResult(name="relay_twse_mops", status="warn", row_count=20, detail="Official TWSE.")
+
+        result = _event_driven_probe(probe)
+
+        self.assertEqual(result.status, "skipped")
+        self.assertIn("age alone", result.detail)
+
+    def test_us_session_probe_skips_closed_session(self) -> None:
+        calendar_state = SimpleNamespace(
+            us_close_session_date=date(2026, 8, 16),
+            us=SimpleNamespace(is_trading_day=False, reason="weekend"),
+        )
+        probe = ProbeResult(name="relay_us_index_tracker", status="warn", detail="US index.")
+
+        result = _us_session_probe(probe, calendar_state=calendar_state)
+
+        self.assertEqual(result.status, "skipped")
+        self.assertIn("2026-08-16", result.detail)
+
+    def test_scheduled_slot_probe_skips_before_due_time(self) -> None:
+        probe = ProbeResult(name="analysis_tw_close", status="warn", detail="TW close.")
+
+        result = _scheduled_slot_probe(
+            probe,
+            now_local=datetime(2026, 8, 17, 9, 40, tzinfo=timezone.utc),
+            expected_slots={"tw_close"},
+            slot="tw_close",
+            due_time=time(15, 45),
+        )
+
+        self.assertEqual(result.status, "skipped")
+        self.assertIn("15:45", result.detail)
+
+    def test_scheduled_slot_probe_skips_calendar_ineligible_slot(self) -> None:
+        probe = ProbeResult(name="analysis_us_close", status="warn", detail="US close.")
+
+        result = _scheduled_slot_probe(
+            probe,
+            now_local=datetime(2026, 8, 17, 9, 40, tzinfo=timezone.utc),
+            expected_slots={"pre_tw_open", "tw_close"},
+            slot="us_close",
+            due_time=time(5, 15),
+        )
+
+        self.assertEqual(result.status, "skipped")
+        self.assertIn("not expected", result.detail)
+
+    def test_public_record_link_probe_ok_when_no_candidate_matches(self) -> None:
+        probe = ProbeResult(name="public_record_links", status="stale", detail="Link freshness.")
+
+        result = _classify_public_record_link_probe(probe, candidate_matches=0)
+
+        self.assertEqual(result.status, "ok")
+        self.assertIn("No deterministic", result.detail)
+
+    def test_public_record_link_probe_keeps_stale_when_matches_exist(self) -> None:
+        probe = ProbeResult(name="public_record_links", status="stale", detail="Link freshness.")
+
+        result = _classify_public_record_link_probe(probe, candidate_matches=2)
+
+        self.assertEqual(result.status, "stale")
+        self.assertIn("deterministic_candidate_matches=2", result.detail)
 
     def test_render_text_includes_summary_and_probe(self) -> None:
         report = HealthReport(

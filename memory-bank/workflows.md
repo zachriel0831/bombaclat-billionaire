@@ -383,13 +383,14 @@ machine restart, or when the user asks whether source data has caught up.
 - relay international RSS: BBC/Reuters/Fox/NPR public RSS rows
 - relay X/Truth Social/SEC/TWSE-MOPS/US-index probes when enabled in `.env`
 - relay market-context, BLS macro, Taiwan market-flow, and stored analysis probes
-- news platform society/politics category and active per-source article probes; disabled sources such as current `tvbs,ctee` are not health failures
-- news platform public records and article-public-record link probes
+- news platform society/politics category probes plus active per-source article probes; category freshness stays strict, while per-source row freshness uses a wider window for naturally quiet feeds
+- news platform public records and article-public-record link probes; link freshness only alerts when recent deterministic article/record candidate matches exist but link rows are not current
 - process counts: exactly one root Python service instance for `event_relay.main`, `news_collector.relay_bridge`, and `news_platform.main --loop`
 3. Interpret WARNs
 - Public records use `updated_at` as refresh freshness because duplicate official records are upserted; WARN means last refresh is over 48 hours old, STALE means over 96 hours old.
 - Duplicate `news_platform.main --loop` is WARN because it can double-fetch and hide restart mistakes.
-- Event-driven SEC/TWSE-MOPS sources can be quiet; use the probe age and source cadence before calling it a source outage.
+- Event-driven SEC/TWSE-MOPS sources can be quiet; age-only row staleness is informational unless fetch logs or source-specific evidence show failures.
+- U.S. index/snapshot and stored-analysis probes are market-calendar and due-time aware; weekend, holiday, and not-yet-due slots should be `SKIPPED`, not incidents.
 4. Remediation
 - For stale finance/international RSS, inspect bridge logs and rerun Workflow 3A.
 - For stale society/politics articles, inspect `news_platform` logs and rerun Workflow 3B.
