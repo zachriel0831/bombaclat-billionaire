@@ -20,6 +20,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $ProjectRoot
 $env:PYTHONPATH = Join-Path $ProjectRoot "src"
 $env:PYTHONUNBUFFERED = "1"
+$env:PYTHONIOENCODING = "utf-8"
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = $utf8NoBom
 $OutputEncoding = $utf8NoBom
