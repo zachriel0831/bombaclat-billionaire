@@ -179,8 +179,8 @@ _DEFAULT_TW_SOCIETY_FEEDS: list[FeedSpec] = [
     FeedSpec(
         source_id="storm",
         category="society",
-        kind="rss",
-        url="https://www.storm.mg/api/getRss/channel_id/9?path=https%3A%2F%2Fwww.storm.mg%2Farticle",
+        kind="html_list",
+        url="https://www.storm.mg/channel/9",
     ),
     FeedSpec(
         # CTEE sitemap URL tail category code 431401 maps to articleSection=生活.
@@ -254,8 +254,8 @@ _DEFAULT_TW_POLITICS_FEEDS: list[FeedSpec] = [
     FeedSpec(
         source_id="storm",
         category="politics",
-        kind="rss",
-        url="https://www.storm.mg/api/getRss/channel_id/7?path=https%3A%2F%2Fwww.storm.mg%2Farticle",
+        kind="html_list",
+        url="https://www.storm.mg/channel/7",
     ),
     FeedSpec(
         # CTEE sitemap URL tail category code 430104 maps to articleSection=要聞.

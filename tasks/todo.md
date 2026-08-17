@@ -10,6 +10,18 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Run focused health/unit verification and the service auto-repair watcher dry run.
 - [x] Record Observer completion and commit only related hunks.
 
+## 2026-08-18 Service Auto-Repair Storm Source Accuracy
+- [x] Read workspace/repo rules, CTO standards, ingestion skill, workflow/source docs, and incident report.
+- [x] Reproduce Storm official-list failure and verify current public channel pages expose article links.
+- [x] Replace Storm society/politics collection with bounded channel-page parsing and update scoped docs/tests.
+- [x] Run Storm smoke/audit verification plus focused tests and service-auto-repair dry run.
+- [x] Record Observer completion and commit only related hunks.
+
+### 2026-08-18 Service Auto-Repair Storm Source Accuracy Result
+- Root cause was source-specific: Storm's legacy RSS API still returned HTTP 200, but with an empty RSS channel for both `channel_id/9` and `channel_id/7`.
+- Switched Storm society/domestic and politics collection to the public channel HTML pages (`/channel/9`, `/channel/7`) and added parser coverage for visible article anchors and timestamps.
+- Verification passed: Storm smoke fetched `society=15`, `politics=20`; full source-accuracy report returned `overall_status=ok`; service auto-repair dry run returned `overall_status=ok`, `failing_count=0`.
+
 ### 2026-08-17 Service Auto-Repair Data-Source Health Result
 - Root cause was health semantics, not stopped services: live workers, scheduled tasks, HTTP probes, source accuracy, and category ingestion were healthy, while the report treated expected quiet/event-driven data as repair-worthy.
 - Updated data-source health to skip event-driven age-only TWSE/MOPS warnings, skip U.S. index/analysis checks on closed U.S. sessions, skip not-yet-due analysis slots, widen per-source article row windows, and only alert on public-record link freshness when deterministic recent article/record matches exist.

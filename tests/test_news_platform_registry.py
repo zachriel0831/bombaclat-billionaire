@@ -37,7 +37,8 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(by_source["pts"].url, "https://news.pts.org.tw/category/1")
         self.assertEqual(by_source["ebc"].path_filter, "/news/politics/")
         self.assertEqual(by_source["newtalk"].url, "https://newtalk.tw/rss/category/2")
-        self.assertIn("channel_id/7", by_source["storm"].url)
+        self.assertEqual(by_source["storm"].kind, "html_list")
+        self.assertEqual(by_source["storm"].url, "https://www.storm.mg/channel/7")
 
     def test_society_feeds_still_use_existing_sources(self):
         feeds = tw_society_feeds()
@@ -47,7 +48,8 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(by_source["pts"].kind, "pts_category")
         self.assertEqual(by_source["pts"].url, "https://news.pts.org.tw/category/7")
         self.assertEqual(by_source["newtalk"].url, "https://newtalk.tw/rss/category/14")
-        self.assertIn("channel_id/9", by_source["storm"].url)
+        self.assertEqual(by_source["storm"].kind, "html_list")
+        self.assertEqual(by_source["storm"].url, "https://www.storm.mg/channel/9")
 
     def test_disabled_sources_can_be_reenabled_by_env(self):
         key = "NEWSPF_DISABLED_SOURCE_IDS"

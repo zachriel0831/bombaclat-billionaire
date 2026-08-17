@@ -80,7 +80,7 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - Module: `src/news_platform`
 - Collects Taiwan society and politics RSS/sitemap/list feeds plus explicitly scheduled low-frequency public HTML lists into `t_news_articles`
 - RSS/Atom and sitemap ingestion stores reporter/author names in `authors_json` when the feed exposes explicit author metadata or a high-confidence byline. Reporter identities are also normalized into `t_news_authors` and linked through `t_news_article_authors`; missing byline states are tracked on `t_news_articles.author_extraction_status` and summarized in `t_news_author_coverage_daily`.
-- Default loop source set: LTN, ETtoday, CNA, PTS, EBC, Newtalk, and Storm Media for both society and politics
+- Default loop source set: LTN, ETtoday, CNA, PTS, EBC, Newtalk, and Storm Media for both society and politics. Storm Media uses public `/channel/9` and `/channel/7` HTML lists because the legacy RSS API can return empty channels.
 - Low-frequency public HTML list supplements are registered for TVBS, UDN, and SETN. Run a manual one-shot with `--source-ids tvbs,udn,setn` or `scripts/run_news_platform_low_frequency_sources.ps1`; register the local schedule with `scripts/register_news_platform_low_frequency_sources_task.ps1 -StartNow` so it stays in one visible fixed window. CTEE remains disabled because the verified public endpoints return 403 locally.
 - `NEWSPF_CATEGORIES` or `--categories` controls collection scope; default is `society,politics`
 - `NEWSPF_SOURCE_IDS` or `--source-ids` limits collection to explicit source ids; explicit source ids can run registered low-frequency sources that are default-disabled.

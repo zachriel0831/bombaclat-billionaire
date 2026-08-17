@@ -77,6 +77,24 @@ SETN_HTML = """
 """
 
 
+STORM_HTML = """
+<a href="/article/11157253" target="_self" class="articleGeneralCover">
+  <img src="cover.webp">
+</a>
+<a href="/article/11157253" class="generalLink">
+  <!--[--><h3>台中會翻盤？郭正亮洞悉「何欣純實力」：江啟臣這樣打就能勝選</h3><!--]-->
+</a>
+<div class="text-smg-gray-600">2026-08-17 18:16</div>
+<a href="/article/11157252" class="generalLink">
+  <!--[-->被爆昔稱普發現金是「先窮台，再統一」 沈伯洋：我標準沒變過<!--]-->
+</a>
+<div class="text-smg-gray-600">2026-08-17 18:11:56</div>
+<a href="/article/11157252" class="generalLink">
+  <!--[-->被爆昔稱普發現金是「先窮台，再統一」 沈伯洋：我標準沒變過<!--]-->
+</a>
+"""
+
+
 class HtmlListSourceTests(unittest.TestCase):
     def test_tvbs_json_ld_uses_path_filter(self):
         source = HtmlListSource(
@@ -129,6 +147,24 @@ class HtmlListSourceTests(unittest.TestCase):
         self.assertEqual(articles[0].url, "https://www.setn.com/news/1886721")
         self.assertEqual(articles[0].tags, ["政治"])
         self.assertEqual(articles[0].published_at.isoformat(), "2026-08-09T21:00:00+08:00")
+
+    def test_storm_channel_parses_article_titles_and_dates(self):
+        source = HtmlListSource(
+            source_id="storm",
+            country="TW",
+            category="politics",
+            url="https://www.storm.mg/channel/7",
+            max_age_days=0,
+        )
+
+        articles = source.parse(STORM_HTML)
+
+        self.assertEqual(len(articles), 2)
+        self.assertEqual(articles[0].title, "台中會翻盤？郭正亮洞悉「何欣純實力」：江啟臣這樣打就能勝選")
+        self.assertEqual(articles[0].url, "https://www.storm.mg/article/11157253")
+        self.assertEqual(articles[0].published_at.isoformat(), "2026-08-17T18:16:00+08:00")
+        self.assertEqual(articles[0].raw["parser"], "storm_channel")
+        self.assertEqual(articles[1].published_at.isoformat(), "2026-08-17T18:11:56+08:00")
 
 
 if __name__ == "__main__":

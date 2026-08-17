@@ -28,6 +28,14 @@ _TAIPEI = timezone(timedelta(hours=8))
 _TVBS_RE = re.compile(r"^https://news\.tvbs\.com\.tw/(?:local|politics)/\d+/?$")
 _UDN_RE = re.compile(r"^https://udn\.com/news/story/\d+/\d+")
 _SETN_RE = re.compile(r"^https://www\.setn\.com/news/\d+/?$")
+_STORM_RE = re.compile(r"^https://www\.storm\.mg/(?:article|articles)/\d+/?$")
+_STORM_ARTICLE_ANCHOR_RE = re.compile(
+    r"""<a\b(?=[^>]*\bhref=["'](?P<href>[^"']+))[^>]*>(?P<body>.*?)</a>""",
+    re.IGNORECASE | re.DOTALL,
+)
+_STORM_TIME_RE = re.compile(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?")
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
 _VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 _SETN_CATEGORY_LABELS = {
     "politics": "政治",
@@ -104,6 +112,8 @@ class HtmlListSource(NewsSource):
             parser = _SetnNewsListParser(source_url=source_url, category=self.category)
             parser.feed(text)
             return parser.finish()
+        if source_id == "storm":
+            return _parse_storm_channel(text, source_url=source_url)
         return []
 
     def _row_to_article(self, row: _HtmlListRow, *, source_url: str) -> NewsArticle | None:
@@ -213,6 +223,42 @@ def _is_schema_type(value: dict[str, Any], expected: str) -> bool:
     if isinstance(raw, list):
         return any(isinstance(item, str) and item.lower() == expected.lower() for item in raw)
     return False
+
+
+def _parse_storm_channel(text: str, *, source_url: str) -> list[_HtmlListRow]:
+    matches = list(_STORM_ARTICLE_ANCHOR_RE.finditer(text))
+    rows: list[_HtmlListRow] = []
+    seen: set[str] = set()
+    for index, match in enumerate(matches):
+        href = _normalized_article_url(match.group("href"), source_url, _STORM_RE)
+        if not href or href in seen:
+            continue
+        title = _html_text(match.group("body"))
+        if not title:
+            continue
+        next_start = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        nearby = text[match.end() : min(next_start, match.end() + 1000)]
+        rows.append(
+            _HtmlListRow(
+                url=href,
+                title=title,
+                published_at=_parse_taipei_datetime(_first_storm_time(nearby)),
+                parser="storm_channel",
+            )
+        )
+        seen.add(href)
+    return rows
+
+
+def _first_storm_time(value: str) -> str:
+    match = _STORM_TIME_RE.search(value)
+    return match.group(0) if match else ""
+
+
+def _html_text(value: str) -> str:
+    text = _HTML_COMMENT_RE.sub(" ", value)
+    text = _HTML_TAG_RE.sub(" ", text)
+    return _collapse(text)
 
 
 class _UdnStoryListParser(HTMLParser):
@@ -428,7 +474,7 @@ def _collapse(value: str) -> str:
 def _parse_taipei_datetime(value: str) -> datetime | None:
     if not value:
         return None
-    for fmt in ("%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M"):
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M"):
         try:
             return datetime.strptime(value.strip(), fmt).replace(tzinfo=_TAIPEI)
         except ValueError:
