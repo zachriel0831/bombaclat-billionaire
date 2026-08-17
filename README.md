@@ -344,7 +344,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -E
 powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -EnvFile .env -Json
 ```
 
-This read-only report checks MySQL freshness for finance/public RSS, international RSS, X, SEC/TWSE/MOPS, market-context facts, market analyses, society/politics article feeds, public records, article-record links, and local Python process counts. Event-driven sources and market analysis/index probes are calendar/schedule-aware, and article-record link freshness only alerts when deterministic recent article/record matches appear to be unlinked. Use `-FailOnWarn` or `-FailOnStale` for scheduled monitoring.
+This read-only report checks MySQL freshness for finance/public RSS, international RSS, X, SEC/TWSE/MOPS, market-context facts, market analyses, society/politics article feeds, public records, article-record links, and local Python process counts. Event-driven sources and market analysis/index probes are calendar/schedule-aware, article enrichment gives newly fetched rows a 5-minute grace window before warning on missing keywords/topics, and article-record link freshness only alerts when deterministic recent article/record matches appear to be unlinked. Use `-FailOnWarn` or `-FailOnStale` for scheduled monitoring.
 
 News source official-list accuracy:
 

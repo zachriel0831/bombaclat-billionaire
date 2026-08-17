@@ -114,6 +114,7 @@ NEWS_PLATFORM_CATEGORY_WARN_MINUTES = 180
 NEWS_PLATFORM_CATEGORY_STALE_MINUTES = 720
 NEWS_PLATFORM_SOURCE_WARN_MINUTES = 1440
 NEWS_PLATFORM_SOURCE_STALE_MINUTES = 2880
+NEWS_PLATFORM_ENRICHMENT_GRACE_MINUTES = 5
 
 IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
@@ -849,10 +850,21 @@ def _latest_probe(
 
 
 def _article_enrichment_probe(conn: Any, article_table: str) -> ProbeResult:
+    grace_minutes = NEWS_PLATFORM_ENRICHMENT_GRACE_MINUTES
     sql = (
         f"SELECT COUNT(*), "
-        "COALESCE(SUM(CASE WHEN keywords_json IS NULL THEN 1 ELSE 0 END), 0), "
-        "COALESCE(SUM(CASE WHEN topics_json IS NULL THEN 1 ELSE 0 END), 0), "
+        "COALESCE(SUM(CASE WHEN keywords_json IS NULL "
+        f"AND (fetched_at IS NULL OR fetched_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL {grace_minutes} MINUTE)) "
+        "THEN 1 ELSE 0 END), 0), "
+        "COALESCE(SUM(CASE WHEN topics_json IS NULL "
+        f"AND (fetched_at IS NULL OR fetched_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL {grace_minutes} MINUTE)) "
+        "THEN 1 ELSE 0 END), 0), "
+        "COALESCE(SUM(CASE WHEN keywords_json IS NULL "
+        f"AND fetched_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL {grace_minutes} MINUTE) "
+        "THEN 1 ELSE 0 END), 0), "
+        "COALESCE(SUM(CASE WHEN topics_json IS NULL "
+        f"AND fetched_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL {grace_minutes} MINUTE) "
+        "THEN 1 ELSE 0 END), 0), "
         "MAX(fetched_at), TIMESTAMPDIFF(MINUTE, MAX(fetched_at), UTC_TIMESTAMP()) "
         f"FROM {article_table} "
         "WHERE category IN ('society','politics')"
@@ -867,11 +879,19 @@ def _article_enrichment_probe(conn: Any, article_table: str) -> ProbeResult:
     row_count = int(row[0] or 0) if row else 0
     missing_keywords = int(row[1] or 0) if row else 0
     missing_topics = int(row[2] or 0) if row else 0
-    latest = row[3] if row else None
-    age_minutes = int(row[4]) if row and row[4] is not None else None
+    pending_recent_keywords = int(row[3] or 0) if row else 0
+    pending_recent_topics = int(row[4] or 0) if row else 0
+    latest = row[5] if row else None
+    age_minutes = int(row[6]) if row and row[6] is not None else None
     status = "missing" if row_count == 0 else "ok"
     if missing_keywords or missing_topics:
         status = "warn"
+    detail = (
+        f"missing_keywords={missing_keywords}, missing_topics={missing_topics}, "
+        f"pending_recent_keywords={pending_recent_keywords}, "
+        f"pending_recent_topics={pending_recent_topics}, "
+        f"grace_minutes={grace_minutes}"
+    )
     return ProbeResult(
         name="news_platform_article_enrichment",
         status=status,
@@ -879,7 +899,7 @@ def _article_enrichment_probe(conn: Any, article_table: str) -> ProbeResult:
         age_minutes=age_minutes,
         row_count=row_count,
         recent_count=row_count - missing_topics,
-        detail=f"missing_keywords={missing_keywords}, missing_topics={missing_topics}",
+        detail=detail,
     )
 
 

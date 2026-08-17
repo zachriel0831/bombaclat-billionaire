@@ -3,6 +3,7 @@ from datetime import date, datetime, time, timezone
 from types import SimpleNamespace
 
 from data_source_health import (
+    NEWS_PLATFORM_ENRICHMENT_GRACE_MINUTES,
     NEWS_PLATFORM_CATEGORY_STALE_MINUTES,
     NEWS_PLATFORM_CATEGORY_WARN_MINUTES,
     NEWS_PLATFORM_SOURCE_IDS,
@@ -11,6 +12,7 @@ from data_source_health import (
     PUBLIC_RECORD_GROUPS,
     ProbeResult,
     _classify_public_record_link_probe,
+    _article_enrichment_probe,
     _event_driven_probe,
     _scheduled_slot_probe,
     _us_session_probe,
@@ -20,6 +22,29 @@ from data_source_health import (
 )
 from data_source_health import HealthReport
 from data_source_health import _parse_process_records, _process_count_probe
+
+
+class FakeCursor:
+    def __init__(self, row):
+        self.row = row
+        self.sql = ""
+
+    def execute(self, sql):
+        self.sql = sql
+
+    def fetchone(self):
+        return self.row
+
+    def close(self):
+        pass
+
+
+class FakeConnection:
+    def __init__(self, row):
+        self.cursor_instance = FakeCursor(row)
+
+    def cursor(self):
+        return self.cursor_instance
 
 
 class DataSourceHealthTests(unittest.TestCase):
@@ -166,6 +191,26 @@ class DataSourceHealthTests(unittest.TestCase):
         self.assertEqual(NEWS_PLATFORM_SOURCE_WARN_MINUTES, 1440)
         self.assertEqual(NEWS_PLATFORM_SOURCE_STALE_MINUTES, 2880)
         self.assertGreater(NEWS_PLATFORM_SOURCE_WARN_MINUTES, NEWS_PLATFORM_CATEGORY_WARN_MINUTES)
+
+    def test_article_enrichment_probe_ignores_in_flight_recent_rows(self) -> None:
+        conn = FakeConnection((10, 0, 0, 3, 3, datetime(2026, 8, 17, 7, 30, tzinfo=timezone.utc), 0))
+
+        probe = _article_enrichment_probe(conn, "t_news_articles")
+
+        self.assertEqual(probe.status, "ok")
+        self.assertIn("pending_recent_keywords=3", probe.detail)
+        self.assertIn("pending_recent_topics=3", probe.detail)
+        self.assertIn(f"grace_minutes={NEWS_PLATFORM_ENRICHMENT_GRACE_MINUTES}", probe.detail)
+        self.assertIn("DATE_SUB(UTC_TIMESTAMP()", conn.cursor_instance.sql)
+
+    def test_article_enrichment_probe_warns_on_mature_missing_rows(self) -> None:
+        conn = FakeConnection((10, 2, 1, 0, 0, datetime(2026, 8, 17, 7, 20, tzinfo=timezone.utc), 12))
+
+        probe = _article_enrichment_probe(conn, "t_news_articles")
+
+        self.assertEqual(probe.status, "warn")
+        self.assertIn("missing_keywords=2", probe.detail)
+        self.assertIn("missing_topics=1", probe.detail)
 
     def test_public_record_groups_include_npa_stat_sources(self) -> None:
         self.assertIn(("npa", "traffic_accident_a2_stat"), PUBLIC_RECORD_GROUPS)
