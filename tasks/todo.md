@@ -3,6 +3,21 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-18 US Close Guard
+- [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect unrelated worktree changes.
+- [x] Inspect today's `us_close` row and strongest local evidence.
+- [x] Generate or repair the same row through `MySqlEventStore.upsert_market_analysis()` if needed.
+- [x] Run claim/trust/style/garbled/provider checks and independently verify final DB state.
+- [x] Record Observer completion and update automation memory.
+
+Progress note: two dry writes stopped before DB mutation because MySQL date and decimal objects were not JSON-serializable in the deterministic verifier input. Normalize the full read-only market payload through a JSON-safe conversion, rerun verification, and only then permit the upsert.
+
+### 2026-08-18 US Close Guard Result
+- Created `t_market_analyses.id=341` from three local macro/news events and two U.S. close snapshots; no external provider API, web search, LINE contact, delivery action, stock recommendation, or trade signal occurred.
+- Final DB checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, flexible briefing-memo style, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+- Calendar and claim-verifier tests passed (12 tests); the same analysis has zero `t_trade_signals` rows.
+
 ## 2026-08-17 Service Auto-Repair Data-Source Health
 - [x] Read workspace/repo rules, CTO standards, workflow docs, and ingestion skill.
 - [x] Reproduce the incident report and inspect live service, scheduler, log, and DB state.
