@@ -3,7 +3,11 @@ from datetime import date, datetime, time, timezone
 from types import SimpleNamespace
 
 from data_source_health import (
+    NEWS_PLATFORM_CATEGORY_STALE_MINUTES,
+    NEWS_PLATFORM_CATEGORY_WARN_MINUTES,
     NEWS_PLATFORM_SOURCE_IDS,
+    NEWS_PLATFORM_SOURCE_STALE_MINUTES,
+    NEWS_PLATFORM_SOURCE_WARN_MINUTES,
     PUBLIC_RECORD_GROUPS,
     ProbeResult,
     _classify_public_record_link_probe,
@@ -155,6 +159,13 @@ class DataSourceHealthTests(unittest.TestCase):
         self.assertNotIn("ctee", NEWS_PLATFORM_SOURCE_IDS)
         self.assertNotIn("udn", NEWS_PLATFORM_SOURCE_IDS)
         self.assertNotIn("setn", NEWS_PLATFORM_SOURCE_IDS)
+
+    def test_news_platform_per_source_window_is_wider_than_category_window(self) -> None:
+        self.assertEqual(NEWS_PLATFORM_CATEGORY_WARN_MINUTES, 180)
+        self.assertEqual(NEWS_PLATFORM_CATEGORY_STALE_MINUTES, 720)
+        self.assertEqual(NEWS_PLATFORM_SOURCE_WARN_MINUTES, 1440)
+        self.assertEqual(NEWS_PLATFORM_SOURCE_STALE_MINUTES, 2880)
+        self.assertGreater(NEWS_PLATFORM_SOURCE_WARN_MINUTES, NEWS_PLATFORM_CATEGORY_WARN_MINUTES)
 
     def test_public_record_groups_include_npa_stat_sources(self) -> None:
         self.assertIn(("npa", "traffic_accident_a2_stat"), PUBLIC_RECORD_GROUPS)

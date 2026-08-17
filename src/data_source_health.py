@@ -110,6 +110,10 @@ TAIPEI_TIMEZONE = timezone(timedelta(hours=8), "Asia/Taipei")
 PRE_TW_OPEN_DUE_TIME = time(7, 45)
 TW_CLOSE_DUE_TIME = time(15, 45)
 US_CLOSE_DUE_TIME = time(5, 15)
+NEWS_PLATFORM_CATEGORY_WARN_MINUTES = 180
+NEWS_PLATFORM_CATEGORY_STALE_MINUTES = 720
+NEWS_PLATFORM_SOURCE_WARN_MINUTES = 1440
+NEWS_PLATFORM_SOURCE_STALE_MINUTES = 2880
 
 IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
@@ -609,9 +613,9 @@ def _collect_news_platform_probes(settings: NewsPlatformSettings) -> list[ProbeR
                     timestamp_col="fetched_at",
                     where="category=%s",
                     params=(category,),
-                    warn_minutes=180,
-                    stale_minutes=720,
-                    recent_minutes=720,
+                    warn_minutes=NEWS_PLATFORM_CATEGORY_WARN_MINUTES,
+                    stale_minutes=NEWS_PLATFORM_CATEGORY_STALE_MINUTES,
+                    recent_minutes=NEWS_PLATFORM_CATEGORY_STALE_MINUTES,
                     detail="Category-level article ingestion freshness.",
                 )
             )
@@ -624,10 +628,13 @@ def _collect_news_platform_probes(settings: NewsPlatformSettings) -> list[ProbeR
                         timestamp_col="fetched_at",
                         where="category=%s AND source_id=%s",
                         params=(category, source_id),
-                        warn_minutes=720,
-                        stale_minutes=1440,
-                        recent_minutes=1440,
-                        detail="Per-source article ingestion freshness.",
+                        warn_minutes=NEWS_PLATFORM_SOURCE_WARN_MINUTES,
+                        stale_minutes=NEWS_PLATFORM_SOURCE_STALE_MINUTES,
+                        recent_minutes=NEWS_PLATFORM_SOURCE_STALE_MINUTES,
+                        detail=(
+                            "Per-source article ingestion freshness; wider window accounts "
+                            "for naturally quiet feeds."
+                        ),
                     )
                 )
 
