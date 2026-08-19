@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-19 TW Close Guard
+- [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's missing `tw_close` row plus local close context.
+- [x] Create the missing row through `MySqlEventStore.upsert_market_analysis()` using four local evidence events.
+- [x] Independently verify claim/trust, push, structured data, encoding, style, provider flags, and zero trade signals.
+- [x] Record Observer completion, update automation memory, and commit only this run log.
+
+### 2026-08-19 TW Close Guard Result
+- Created analysis `347` from four local close, semiconductor, rates, and energy evidence events; no external provider API, web search, LINE contact, delivery action, stock recommendation, or trade signal occurred.
+- Final DB checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, flexible briefing-memo style, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+- Calendar and claim-verifier tests passed (12 tests); independent numeric comparison found no unsupported visible number, and the analysis has zero `t_trade_signals` rows.
+
 ## 2026-08-18 US Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect unrelated worktree changes.
