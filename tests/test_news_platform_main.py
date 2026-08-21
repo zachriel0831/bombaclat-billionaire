@@ -6,6 +6,7 @@ import unittest
 from news_platform.main import (
     DEFAULT_PUBLIC_RECORD_SOURCES,
     SUPPORTED_PUBLIC_RECORD_SOURCES,
+    build_public_record_sources,
     parse_categories,
     parse_public_sources,
     parse_source_ids,
@@ -79,6 +80,17 @@ class MainConfigTests(unittest.TestCase):
     def test_parse_public_sources_defaults_to_all_stable_sources(self):
         self.assertEqual(parse_public_sources(None), DEFAULT_PUBLIC_RECORD_SOURCES)
         self.assertEqual(parse_public_sources("all"), SUPPORTED_PUBLIC_RECORD_SOURCES)
+
+    def test_moj_prosecution_source_uses_slow_official_endpoint_timeout_floor(self):
+        settings = type("Settings", (), {"http_timeout_seconds": 15})()
+
+        sources = build_public_record_sources(
+            settings,
+            source_names=("moj_prosecution_disposition_stats",),
+            lookback_days=30,
+        )
+
+        self.assertEqual(sources[0].timeout_seconds, 45)
 
 
 if __name__ == "__main__":

@@ -259,7 +259,7 @@ def build_public_record_sources(
             sources.append(MohwNursingStaffStatsSource(timeout_seconds=max(settings.http_timeout_seconds, 30)))
             continue
         if name == "moj_prosecution_disposition_stats":
-            sources.append(MojProsecutionDispositionStatsSource(timeout_seconds=settings.http_timeout_seconds))
+            sources.append(MojProsecutionDispositionStatsSource(timeout_seconds=max(settings.http_timeout_seconds, 45)))
             continue
         if name == "mojac_daily_custody":
             sources.append(MojacDailyCustodyStatsSource(timeout_seconds=settings.http_timeout_seconds))
