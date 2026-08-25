@@ -3,6 +3,17 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-26 US Close Guard
+- [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row plus strongest local evidence.
+- [x] Generate or repair the same row through `MySqlEventStore.upsert_market_analysis()` if needed.
+- [x] Run claim/trust/style/garbled/provider checks and independently verify final DB state.
+- [x] Record Observer completion, update automation memory, and commit/push only task-related files.
+
+### 2026-08-26 US Close Guard Result
+- Created analysis `365` from two local U.S. close snapshots plus local Canada-tariff and U.S. consumer-demand evidence; no external provider API, web search, LINE contact, delivery action, stock recommendation, or trade signal occurred.
+- Final DB checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, flexible briefing-memo style, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+
 ## 2026-08-19 TW Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's missing `tw_close` row plus local close context.
@@ -53,6 +64,18 @@ Progress note: two dry writes stopped before DB mutation because MySQL date and 
 - Root cause was health semantics, not stopped services: live workers, scheduled tasks, HTTP probes, source accuracy, and category ingestion were healthy, while the report treated expected quiet/event-driven data as repair-worthy.
 - Updated data-source health to skip event-driven age-only TWSE/MOPS warnings, skip U.S. index/analysis checks on closed U.S. sessions, skip not-yet-due analysis slots, widen per-source article row windows, and only alert on public-record link freshness when deterministic recent article/record matches exist.
 - Verification passed: `tests.test_data_source_health`, live `run_data_source_health.ps1 -Json` returned `overall_status=ok`, and `run_service_auto_repair_watch.ps1 -DryRun -Json` returned `overall_status=ok`, `failing_count=0`.
+
+## 2026-08-16 TW Close Guard
+- [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `tw_close` row plus local close context.
+- [x] Verify that no row should be generated on the local Sunday market closure.
+- [x] Confirm signal extraction is ineligible and run the targeted calendar tests.
+- [x] Record Observer completion and final DB state.
+
+### 2026-08-16 TW Close Guard Result
+- Repo calendar returned no allowed analysis slots because both Taiwan and the relevant U.S. session were weekend-closed; today's `tw_close` row is absent as required.
+- DB verification found zero same-day `market_context:tw_close` events and zero linked trade signals. Row-level claim, trust, structured-data, style, push, and provider checks are not applicable because policy requires no row.
+- No database write, external provider API, web search, LINE contact, delivery action, or signal extraction occurred. All five market-calendar tests passed.
 
 ## 2026-08-15 US Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
@@ -1188,6 +1211,26 @@ Progress note: two dry writes stopped before DB mutation because MySQL date and 
 - [x] Update runbooks/lessons and verify live-service restart health.
 - [x] Commit and push only task-related files.
 
+# 2026-08-16 Pre-Open Codex Guard Run
+
+- [x] Read repo instructions, automation memory, Workflow 4C guard rules, reasoning guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `pre_tw_open` row.
+- [x] Verify the policy-valid no-row outcome and skip ineligible signal extraction.
+
+## 2026-08-16 Pre-Open Codex Guard Result
+
+- Taiwan local date and the relevant U.S. session are both weekend-closed; the calendar returned no allowed daily analysis slots.
+- Confirmed no `2026-08-16 pre_tw_open` row and zero related trade signals exist. No DB write, signal extraction, external provider API, web search, LINE contact, or delivery action occurred.
+- Claim/trust/push/structured/style/provider checks are not applicable because Workflow 4C forbids creating the Sunday daily row.
+
+# 2026-08-16 Free Palestine Weekly Editorial
+
+- [ ] Query and review every English Palestine news row in the previous seven calendar days.
+- [ ] Draft a sourced Traditional Chinese editorial with careful legal attribution.
+- [ ] Idempotently upsert `palestine-weekly-2026-W33` into `t_palestine_editorials`.
+- [ ] Read back and validate encoding, source IDs/count, body format, and citations.
+- [ ] Record the run result, commit, and push only task-related files.
+
 # 2026-08-17 TW Close Codex Guard Run
 
 - [x] Read repo instructions, automation memory, Workflow 4C, writing skills, reasoning guidance, and active lessons.
@@ -1200,3 +1243,16 @@ Progress note: two dry writes stopped before DB mutation because MySQL date and 
 - Created analysis `340` from six local Taiwan flow, credit, and semiconductor-context events; no external provider API, web search, LINE contact, delivery action, or stock recommendation flow occurred.
 - Final DB checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, readable flexible briefing memo, structured data present, `push_enabled=0`, `pushed=0`, zero trade signals, and `external_provider_api_called=false`.
 - Calendar and claim-verifier tests passed (12 tests). The close-data caveat is that complete index transaction structure and a valid institutional net-flow aggregate were unavailable.
+
+# 2026-08-23 Weekly Codex Guard Run
+
+- [x] Read repo instructions, automation memory, Workflow 4C weekly storage rules, weekly contract, writing skills, reasoning guidance, and active lessons.
+- [x] Inspect the target Sunday row and current local relay, market-context, and history availability.
+- [x] Create the missing row through `MySqlEventStore.upsert_market_analysis()` using local evidence only.
+- [x] Read back and verify section order, encoding, delivery flags, provenance, and provider-use telemetry.
+
+## 2026-08-23 Weekly Codex Guard Result
+
+- Created analysis `357` from 17 local evidence events, including 13 market-context rows; local history indexes were available, but no historical analogue was promoted as current evidence.
+- Final checks passed: exact section order `週總經` -> `下週台股配置` -> `下週觀察清單`, readable Traditional Chinese, no forbidden trade/internal terms, `push_enabled=1`, `pushed=0`, and `external_provider_api_called=false`.
+- No OpenAI API, Anthropic API, paid external LLM API, web search, LINE contact, or delivery action occurred. Residual risk is incomplete Taiwan weekly turnover structure and consistent institutional-flow aggregation.
