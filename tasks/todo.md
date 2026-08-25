@@ -14,6 +14,18 @@ Move completed or stale task logs to `tasks/archive/`.
 - Created analysis `365` from two local U.S. close snapshots plus local Canada-tariff and U.S. consumer-demand evidence; no external provider API, web search, LINE contact, delivery action, stock recommendation, or trade signal occurred.
 - Final DB checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, flexible briefing-memo style, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
 
+## 2026-08-26 Pre-TW-Open Guard
+- [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's missing `pre_tw_open` row plus strongest local evidence.
+- [x] Create the missing row through `MySqlEventStore.upsert_market_analysis()` using local evidence only.
+- [x] Run claim/trust/style/garbled/provider checks and independently verify final DB state.
+- [x] Record Observer completion, update automation memory, and commit/push only task-related files.
+
+### 2026-08-26 Pre-TW-Open Guard Result
+- Created analysis `366` from local technology, semiconductor, Treasury-yield, Canada-tariff, and U.S. consumer-demand evidence; no external provider API, web search, LINE contact, delivery action, stock recommendation, or trade signal occurred.
+- Final DB checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, flexible briefing-memo style, readable Traditional Chinese, structured data present, `push_enabled=1`, `pushed=0`, and `external_provider_api_called=false`.
+- Calendar and claim-verifier tests passed (12 tests); independent DB verification found no forbidden visible term, no `stock_watch` key, and zero trade signals.
+
 ## 2026-08-19 TW Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's missing `tw_close` row plus local close context.
