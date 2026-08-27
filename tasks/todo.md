@@ -1292,3 +1292,9 @@ Progress note: two dry writes stopped before DB mutation because MySQL date and 
 - Created analysis `357` from 17 local evidence events, including 13 market-context rows; local history indexes were available, but no historical analogue was promoted as current evidence.
 - Final checks passed: exact section order `週總經` -> `下週台股配置` -> `下週觀察清單`, readable Traditional Chinese, no forbidden trade/internal terms, `push_enabled=1`, `pushed=0`, and `external_provider_api_called=false`.
 - No OpenAI API, Anthropic API, paid external LLM API, web search, LINE contact, or delivery action occurred. Residual risk is incomplete Taiwan weekly turnover structure and consistent institutional-flow aggregation.
+# 2026-08-27 TW close Codex guard
+
+- [x] Read repo instructions, automation memory, Workflow 4C, writing skills, reasoning/audit guidance, and active lessons.
+- [x] Confirm the market calendar allows `tw_close` and inspect the same-day row plus local evidence.
+- [x] Create the missing review-ready row through `MySqlEventStore.upsert_market_analysis` without external LLM APIs or delivery.
+- [x] Run targeted tests, independently verify stored compliance fields, and record the automation result.
