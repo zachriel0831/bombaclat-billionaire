@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-28 Pre-TW-Open Guard
+- [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `pre_tw_open` row plus strongest local evidence.
+- [x] Create or repair the row through `MySqlEventStore.upsert_market_analysis()` using local evidence only when needed.
+- [x] Run claim/trust/style/garbled/provider checks and independently verify final DB state.
+- [x] Record Observer completion, update automation memory, and commit/push only task-related files.
+
+### 2026-08-28 Pre-TW-Open Guard Result
+- Created analysis `372` from local semiconductor, Treasury-yield, AI-margin-cost, and credit-spread evidence; no external provider API, web search, LINE contact, delivery action, stock recommendation, or trade signal occurred.
+- Final DB checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, flexible briefing-memo style, readable Traditional Chinese, structured data present, `push_enabled=1`, `pushed=0`, and `external_provider_api_called=false`.
+- Calendar and claim-verifier tests passed (12 tests); independent DB verification found no forbidden visible term, no English heading, no `stock_watch` key, and zero trade signals.
+
 ## 2026-08-27 Pre-TW-Open Guard
 - [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's missing `pre_tw_open` row plus strongest local evidence.
