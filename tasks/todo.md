@@ -1317,3 +1317,15 @@ Progress note: two dry writes stopped before DB mutation because MySQL date and 
 - [x] Confirm the market calendar allows `tw_close` and inspect the same-day row plus local evidence.
 - [x] Create the missing review-ready row through `MySqlEventStore.upsert_market_analysis` without external LLM APIs or delivery.
 - [x] Run targeted tests, independently verify stored compliance fields, and record the automation result.
+# 2026-08-29 US Close Codex Guard Run
+
+- [x] Read repo instructions, automation memory, Workflow 4C, writing skills, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's `us_close` row plus local evidence.
+- [x] Create or repair the row through `MySqlEventStore.upsert_market_analysis()` using local evidence only when required.
+- [x] Verify claim/trust, delivery flags, structured data, encoding, style, provider telemetry, tests, and zero trade signals.
+
+## 2026-08-29 US Close Codex Guard Result
+
+- Created analysis `374` from five local evidence events and four U.S. index snapshots; no external provider API, web search, delivery action, recommendation, or trade-signal write occurred.
+- Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, readable flexible briefing memo, structured data present, `push_enabled=1`, `pushed=0`, zero trade signals, and `external_provider_api_called=false`.
+- Market-calendar and claim-verifier tests passed (12 tests).
