@@ -6,7 +6,7 @@ leaking the secret into logs."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import os
 import subprocess
@@ -57,6 +57,8 @@ class Settings:
     official_rss_feeds: list[str]
     official_rss_first_per_feed: bool
     http_timeout_seconds: int
+    homepage_headlines_enabled: bool = False
+    homepage_headline_urls: list[str] = field(default_factory=list)
 
 
 DEFAULT_RSS_FEEDS = [
@@ -66,12 +68,26 @@ DEFAULT_RSS_FEEDS = [
 ]
 
 
+DEFAULT_HOMEPAGE_HEADLINE_URLS = [
+    "https://www.bbc.com/news/world",
+    "https://apnews.com/world-news",
+    "https://www.theguardian.com/world",
+    "https://www.cnn.com/world",
+    "https://www.foxnews.com/world",
+    "https://www.aljazeera.com/news/",
+    "https://www.cbsnews.com/world/",
+    "https://www.nbcnews.com/world",
+]
+
+
 def load_settings(env_file: str = ".env") -> Settings:
     """載入 load settings 對應的資料或結果。"""
     _load_env_file(Path(env_file))
 
     feeds = os.getenv("OFFICIAL_RSS_FEEDS", "")
     feed_list = [s.strip() for s in feeds.split(",") if s.strip()] or DEFAULT_RSS_FEEDS
+    homepage_urls = os.getenv("HOMEPAGE_HEADLINE_URLS", "")
+    homepage_url_list = [s.strip() for s in homepage_urls.split(",") if s.strip()] or DEFAULT_HOMEPAGE_HEADLINE_URLS
     x_accounts = [s.strip() for s in os.getenv("X_ACCOUNTS", "").split(",") if s.strip()]
     truth_social_accounts = [s.strip() for s in os.getenv("TRUTH_SOCIAL_ACCOUNTS", "").split(",") if s.strip()]
     sec_tracked_tickers = [s.strip() for s in os.getenv("SEC_TRACKED_TICKERS", "").split(",") if s.strip()]
@@ -117,6 +133,8 @@ def load_settings(env_file: str = ".env") -> Settings:
         official_rss_feeds=feed_list,
         official_rss_first_per_feed=_parse_bool(os.getenv("OFFICIAL_RSS_FIRST_PER_FEED", "false")),
         http_timeout_seconds=int(os.getenv("HTTP_TIMEOUT_SECONDS", "15")),
+        homepage_headlines_enabled=_parse_bool(os.getenv("HOMEPAGE_HEADLINES_ENABLED", "false")),
+        homepage_headline_urls=homepage_url_list,
     )
 
 

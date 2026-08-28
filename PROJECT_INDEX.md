@@ -90,6 +90,7 @@ This is the navigation map for the `data-collecting` repo. Use it before opening
 | Live worker monitor + service auto-repair fixed window | `powershell -ExecutionPolicy Bypass -File .\scripts\register_live_service_monitor_task.ps1 -StartNow` |
 | Manual service auto-repair watcher dry-run | `powershell -ExecutionPolicy Bypass -File .\scripts\run_service_auto_repair_watch.ps1 -EnvFile .env -DryRun` |
 | Low-frequency society/politics source supplements | One-shot: `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_platform_low_frequency_sources.ps1 -EnvFile .env -SourceIds "tvbs,udn,setn"`; fixed window: `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow` |
+| Low-frequency international homepage headlines | One-shot: `powershell -ExecutionPolicy Bypass -File .\scripts\run_international_homepage_headlines.ps1 -EnvFile .env -Limit 3`; fixed window: `powershell -ExecutionPolicy Bypass -File .\scripts\register_international_homepage_headlines_task.ps1 -Force -StartNow` |
 | News source official-list accuracy audit | `powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audit.ps1 -EnvFile .env -Compensate -FailOnWarn` |
 | Market context | `powershell -ExecutionPolicy Bypass -File .\scripts\run_market_context.ps1 -EnvFile .env` |
 | Free Palestine English issue news | `powershell -ExecutionPolicy Bypass -File .\scripts\run_palestine_news.ps1 -EnvFile .env -Limit 20` |

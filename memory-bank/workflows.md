@@ -186,7 +186,26 @@ Use this when adding or auditing local scheduler entry scripts.
 - Smoke `news-platform-api` endpoint `GET /api/timeline/news?page=1&pageSize=5`
 - Confirm `/timeline` table shows the English-news column without adding these sources to the finance feed
 
-## Workflow 3A-2: Four-Hour Codex News Digest
+## Workflow 3A-2: International Homepage Headlines
+Use this when the public site needs low-frequency English homepage/news-front
+headlines for the International News view.
+
+1. Smoke fetch without DB writes
+- `$env:PYTHONPATH='src'; python -m news_collector.main fetch --source homepage --limit 5 --languages english --title-url-only --log-level INFO`
+2. Store a controlled batch through the existing relay bridge filters
+- `powershell -ExecutionPolicy Bypass -File .\scripts\run_international_homepage_headlines.ps1 -EnvFile .env -Limit 3`
+3. Register recurring local crawl
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_international_homepage_headlines_task.ps1 -Force -StartNow`
+- This creates `NewsCollector-InternationalHomepageHeadlines` as an
+  interactive-logon fixed window. It must not be a repeating popup-and-exit
+  task.
+4. Verify downstream reads
+- Query `t_relay_events` for recent `source LIKE 'Homepage:%'`.
+- Smoke `news-platform-api` endpoint `GET /api/events?region=INTL&page=1&pageSize=5`.
+- Homepage pages normally do not expose reliable publish times; `published_at`
+  is crawl time and `raw_json.raw.published_at_source` records that fallback.
+
+## Workflow 3A-3: Four-Hour Codex News Digest
 Use this when refreshing the short-lived cross-section digest shown by
 `news-platform-api`.
 
@@ -239,7 +258,8 @@ Codex automation id: `four-hour-cross-section-news-digest`.
 - The loop only retries rows still in early missing states (`NULL`, `no_detail_fetched`, `parser_not_supported`); use `scripts/backfill_news_author_detail_pages.py --retry-failed` manually for parse failures or broad repair
 7. Register low-frequency supplements when needed
 - `powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow`
-- The main scheduler registration script also registers `NewsCollector-NewsPlatformLowFrequencySources` as an interactive-logon fixed window. It must not be a repeating popup-and-exit task.
+- `powershell -ExecutionPolicy Bypass -File .\scripts\register_international_homepage_headlines_task.ps1 -Force -StartNow`
+- The main scheduler registration script also registers `NewsCollector-NewsPlatformLowFrequencySources` and `NewsCollector-InternationalHomepageHeadlines` as interactive-logon fixed windows. They must not be repeating popup-and-exit tasks.
 - `scripts/register_market_analysis_tasks.ps1` registers data/context tasks only and unregisters the retired Python LLM prose tasks if they still exist.
 - CTEE stays disabled until a public allowed endpoint returns usable data; do not bypass 403 protections.
 8. Audit official-list coverage and compensate gaps

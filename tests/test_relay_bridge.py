@@ -145,6 +145,23 @@ class RelayBridgeBackfillTests(unittest.TestCase):
 
         self.assertTrue(_allow_event_topic(event))
 
+    def test_homepage_headline_source_is_allowed_after_noise_filter(self) -> None:
+        homepage_event = {
+            "source": "Homepage: Reuters",
+            "title": "World leaders open emergency summit over shipping routes",
+            "summary": "",
+            "url": "https://www.reuters.com/world/example/2026/08/28/",
+        }
+        sports_event = {
+            "source": "Homepage: BBC News",
+            "title": "Football club wins title after extra time",
+            "summary": "",
+            "url": "https://www.bbc.com/news/articles/c123",
+        }
+
+        self.assertTrue(_allow_event_topic(homepage_event))
+        self.assertFalse(_allow_event_topic(sports_event))
+
     def test_direct_db_event_sink_writes_store(self) -> None:
         """測試 test direct db event sink writes store 的預期行為。"""
         store = _FakeDirectStore(inserted=True)

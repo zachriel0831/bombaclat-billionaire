@@ -5,6 +5,7 @@ param(
   [string]$RagIndexerTaskName = "NewsCollector-RagIndexer",
   [string]$PalestineNewsTaskName = "NewsCollector-PalestineNews",
   [string]$NewsPlatformLowFrequencyTaskName = "NewsCollector-NewsPlatformLowFrequencySources",
+  [string]$InternationalHomepageTaskName = "NewsCollector-InternationalHomepageHeadlines",
   [string]$NewsSourceAccuracyTaskName = "NewsCollector-NewsSourceAccuracyAudit",
   [string]$BlsMacroTaskName = "NewsCollector-BlsMacro",
   [string]$MacroCalendarTaskName = "NewsCollector-MacroCalendar",
@@ -16,6 +17,7 @@ param(
   [int]$PalestineNewsEveryHours = 3,
   [string]$NewsPlatformLowFrequencyAt = "00:20",
   [int]$NewsPlatformLowFrequencyEveryHours = 1,
+  [int]$InternationalHomepageEveryHours = 1,
   [string]$NewsSourceAccuracyAt = "00:40",
   [int]$NewsSourceAccuracyEveryHours = 2,
   [string]$BlsMacroAt = "04:50",
@@ -31,6 +33,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $RagIndexerScript = Join-Path $ProjectRoot "scripts\\run_rag_indexer.ps1"
 $PalestineNewsScript = Join-Path $ProjectRoot "scripts\\run_palestine_news.ps1"
 $NewsPlatformLowFrequencyRegisterScript = Join-Path $ProjectRoot "scripts\\register_news_platform_low_frequency_sources_task.ps1"
+$InternationalHomepageRegisterScript = Join-Path $ProjectRoot "scripts\\register_international_homepage_headlines_task.ps1"
 $NewsSourceAccuracyScript = Join-Path $ProjectRoot "scripts\\run_news_source_accuracy_audit.ps1"
 $ContextScript = Join-Path $ProjectRoot "scripts\\run_market_context.ps1"
 $BlsMacroScript = Join-Path $ProjectRoot "scripts\\run_bls_macro.ps1"
@@ -46,6 +49,9 @@ if (-not (Test-Path -LiteralPath $PalestineNewsScript)) {
 }
 if (-not (Test-Path -LiteralPath $NewsPlatformLowFrequencyRegisterScript)) {
   throw "register_news_platform_low_frequency_sources_task.ps1 not found: $NewsPlatformLowFrequencyRegisterScript"
+}
+if (-not (Test-Path -LiteralPath $InternationalHomepageRegisterScript)) {
+  throw "register_international_homepage_headlines_task.ps1 not found: $InternationalHomepageRegisterScript"
 }
 if (-not (Test-Path -LiteralPath $NewsSourceAccuracyScript)) {
   throw "run_news_source_accuracy_audit.ps1 not found: $NewsSourceAccuracyScript"
@@ -160,6 +166,27 @@ function Register-LowFrequencyFixedWindowTask {
   }
 }
 
+function Register-InternationalHomepageFixedWindowTask {
+  $registerArgs = @(
+    "-NoProfile",
+    "-ExecutionPolicy", "Bypass",
+    "-File", $InternationalHomepageRegisterScript,
+    "-TaskName", $InternationalHomepageTaskName,
+    "-EnvFile", $EnvFile,
+    "-Limit", 3,
+    "-EveryMinutes", ($InternationalHomepageEveryHours * 60),
+    "-LogLevel", "INFO"
+  )
+  if ($Force) {
+    $registerArgs += "-Force"
+  }
+
+  & powershell.exe @registerArgs
+  if ($LASTEXITCODE -ne 0) {
+    throw "international homepage fixed-window task registration failed with exit code $LASTEXITCODE"
+  }
+}
+
 function Register-TwCloseContextTask {
   param(
     [string]$TaskName,
@@ -190,6 +217,7 @@ function Register-TwCloseContextTask {
 Register-CollectorTask -TaskName $RagIndexerTaskName -ScriptPath $RagIndexerScript -At $RagIndexerAt -Description "Index recent relay events and market analyses for historical-case RAG."
 Register-CollectorTask -TaskName $PalestineNewsTaskName -ScriptPath $PalestineNewsScript -At $PalestineNewsAt -Description "Collect English Palestine/Gaza/West Bank issue news into long-term t_palestine_news_items." -ExtraArgs "-Limit 20" -RepeatEveryHours $PalestineNewsEveryHours
 Register-LowFrequencyFixedWindowTask
+Register-InternationalHomepageFixedWindowTask
 Register-CollectorTask -TaskName $NewsSourceAccuracyTaskName -ScriptPath $NewsSourceAccuracyScript -At $NewsSourceAccuracyAt -Description "Audit news-platform official-list coverage and compensate missing source rows." -ExtraArgs "-Categories `"society,politics`" -Limit 20 -MinCoverage 0.85 -Compensate -FailOnWarn" -RepeatEveryHours $NewsSourceAccuracyEveryHours
 Register-CollectorTask -TaskName $BlsMacroTaskName -ScriptPath $BlsMacroScript -At $BlsMacroAt -Description "Collect BLS official macro facts into t_relay_events for downstream Codex analysis."
 Register-CollectorTask -TaskName $MacroCalendarTaskName -ScriptPath $MacroCalendarScript -At $MacroCalendarAt -Description "Collect official U.S. macro release dates into t_macro_release_calendar before LINE reminder delivery."

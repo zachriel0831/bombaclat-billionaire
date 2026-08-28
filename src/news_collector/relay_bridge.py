@@ -232,6 +232,8 @@ def _allow_event_topic(event: dict[str, Any]) -> bool:
 
     if any(keyword in text for keyword in TOPIC_EXCLUDE_KEYWORDS):
         return False
+    if source.lower().startswith("homepage:"):
+        return True
     return any(keyword in text for keyword in TOPIC_INCLUDE_KEYWORDS)
 
 

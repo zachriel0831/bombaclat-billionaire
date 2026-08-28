@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from news_collector.config import DEFAULT_RSS_FEEDS, load_settings
+from news_collector.config import DEFAULT_HOMEPAGE_HEADLINE_URLS, DEFAULT_RSS_FEEDS, load_settings
 
 
 class ConfigTests(unittest.TestCase):
@@ -41,6 +41,8 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("Mozilla/5.0", settings.truth_social_user_agent)
         self.assertEqual(settings.official_rss_feeds, DEFAULT_RSS_FEEDS)
         self.assertFalse(settings.official_rss_first_per_feed)
+        self.assertFalse(settings.homepage_headlines_enabled)
+        self.assertEqual(settings.homepage_headline_urls, DEFAULT_HOMEPAGE_HEADLINE_URLS)
         self.assertGreaterEqual(settings.http_timeout_seconds, 1)
 
     def test_load_settings_reads_env_file(self) -> None:
@@ -74,6 +76,8 @@ class ConfigTests(unittest.TestCase):
                         "TRUTH_SOCIAL_USER_AGENT=test-browser",
                         "OFFICIAL_RSS_FEEDS=https://a.example.com,https://b.example.com",
                         "OFFICIAL_RSS_FIRST_PER_FEED=true",
+                        "HOMEPAGE_HEADLINES_ENABLED=true",
+                        "HOMEPAGE_HEADLINE_URLS=https://news.example.com,https://world.example.com",
                         "HTTP_TIMEOUT_SECONDS=7",
                     ]
                 ),
@@ -106,6 +110,8 @@ class ConfigTests(unittest.TestCase):
                 "TRUTH_SOCIAL_USER_AGENT",
                 "OFFICIAL_RSS_FEEDS",
                 "OFFICIAL_RSS_FIRST_PER_FEED",
+                "HOMEPAGE_HEADLINES_ENABLED",
+                "HOMEPAGE_HEADLINE_URLS",
                 "HTTP_TIMEOUT_SECONDS",
             ]
             original = {key: os.environ.get(key) for key in to_cleanup}
@@ -144,6 +150,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.truth_social_user_agent, "test-browser")
         self.assertEqual(settings.official_rss_feeds, ["https://a.example.com", "https://b.example.com"])
         self.assertTrue(settings.official_rss_first_per_feed)
+        self.assertTrue(settings.homepage_headlines_enabled)
+        self.assertEqual(settings.homepage_headline_urls, ["https://news.example.com", "https://world.example.com"])
         self.assertEqual(settings.http_timeout_seconds, 7)
 
 

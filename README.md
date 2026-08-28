@@ -61,6 +61,14 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - `news-platform-api` exposes these rows through `GET /api/timeline/news`; they do not belong in the general finance relay feed or the short-retention `t_relay_events` stream
 - Legacy `source=palestine_watch:<source_id>` relay rows can be copied once with `scripts/run_palestine_news.ps1 -BackfillRelay -BackfillOnly`
 
+1b. International homepage headlines (no API key)
+- Module: `news_collector.sources.homepage_headlines`
+- Collects low-frequency homepage/news-front headline links from BBC, AP, Guardian, CNN, Fox News, Al Jazeera English, CBS, and NBC.
+- Reuters and NPR remain covered by the official RSS path; Reuters homepage GET currently returns 401 and NPR homepage GET times out in this environment, so neither is part of the default fixed-window crawl.
+- Writes strict homepage headline rows through the existing relay bridge into `t_relay_events` with `source=Homepage: <site>`.
+- Homepage pages usually do not expose reliable article publish time, so `published_at` uses crawl time and `raw_json.raw.published_at_source=fetched_at_homepage_fallback`.
+- Run one batch with `scripts/run_international_homepage_headlines.ps1`; register the fixed visible window with `scripts/register_international_homepage_headlines_task.ps1 -StartNow`.
+
 2. SEC EDGAR tracked filings (no API key, declared User-Agent required)
 - Track selected tickers through official SEC ticker mapping + submissions API
 - Starter `.env` set watches `NVDA,TSM,AAPL,MSFT,AMD,TSLA`
@@ -120,6 +128,8 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 - `X_INCLUDE_REPLIES` / `X_INCLUDE_RETWEETS` (default `false`)
 - `X_BACKFILL_ENABLED` (default `true`; replay recent tracked-account tweets into the event store once when bridge starts)
 - `X_BACKFILL_MAX_RESULTS_PER_ACCOUNT` (default `10`; startup backfill size per tracked account)
+- `HOMEPAGE_HEADLINES_ENABLED` (default `false`; include international homepage headlines in `--source all`)
+- `HOMEPAGE_HEADLINE_URLS` (optional comma-separated homepage/news-front URLs; default is BBC, AP, Guardian, CNN, Fox News, Al Jazeera English, CBS, and NBC)
 - `NEWSPF_DISABLED_SOURCE_IDS` (default `tvbs,ctee,udn,setn`; default loop skips broken or low-frequency society/politics endpoints)
 - `NEWSPF_SOURCE_IDS` (optional explicit source filter, e.g. `tvbs,udn,setn` for low-frequency public HTML list runs)
 - `TRUTH_SOCIAL_ENABLED` (master switch for Truth Social public account source; default `false`)
@@ -140,6 +150,7 @@ PYTHONPATH=src python -m news_collector.main fetch --source rss --limit 20
 PYTHONPATH=src python -m news_collector.main fetch --source sec --limit 20
 PYTHONPATH=src python -m news_collector.main fetch --source twse --limit 20
 PYTHONPATH=src python -m news_collector.main fetch --source x --limit 20
+PYTHONPATH=src python -m news_collector.main fetch --source homepage --limit 5 --languages english --title-url-only
 PYTHONPATH=src python -m news_collector.main fetch --source all --limit 20 --pretty
 ```
 
@@ -167,6 +178,8 @@ $env:PYTHONPATH='src'; python -m news_platform.main --once
 $env:PYTHONPATH='src'; python -m news_platform.main --once --categories politics
 powershell -ExecutionPolicy Bypass -File .\scripts\run_news_platform_low_frequency_sources.ps1 -EnvFile .env -SourceIds "tvbs,udn,setn"
 powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow
+powershell -ExecutionPolicy Bypass -File .\scripts\run_international_homepage_headlines.ps1 -EnvFile .env -Limit 3
+powershell -ExecutionPolicy Bypass -File .\scripts\register_international_homepage_headlines_task.ps1 -Force -StartNow
 powershell -ExecutionPolicy Bypass -File .\scripts\run_news_source_accuracy_audit.ps1 -EnvFile .env -Compensate -FailOnWarn
 powershell -ExecutionPolicy Bypass -File .\scripts\register_news_source_accuracy_audit_task.ps1 -Force
 $env:PYTHONPATH='src'; python -m news_platform.main --extract-keywords --classify-topics

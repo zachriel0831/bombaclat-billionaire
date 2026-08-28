@@ -45,6 +45,13 @@ NEWSPF_CATEGORIES=politics
 - The low-frequency run stores title, URL, source, category, optional list timestamp/summary, then uses the existing article-detail author backfill for reporter names.
 - CTEE remains disabled: local checks return 403, so do not use user-agent rotation, cookies, or proxies to bypass access controls.
 
+## 3b. International homepage headline rules
+- English homepage/news-front headlines use `news_collector.sources.homepage_headlines`, not the Taiwan `news_platform` article tables.
+- The fixed-window task is `NewsCollector-InternationalHomepageHeadlines`; it writes through the relay bridge to `t_relay_events` with `source=Homepage: <site>`.
+- Default sources are BBC, AP, Guardian, CNN, Fox News, Al Jazeera English, CBS, and NBC. Reuters and NPR stay on the RSS path unless their public homepage GET endpoints become reliably readable.
+- Store only title, URL, source, summary/snippet when present, crawl timestamp, tags, and raw trace metadata. Do not scrape article bodies for this low-frequency path.
+- Because homepages rarely expose reliable article publish timestamps, use crawl time as `published_at` and keep `raw_json.raw.published_at_source=fetched_at_homepage_fallback`.
+
 ETtoday politics list 在部分 Windows/OpenSSL build 會因站方憑證缺 SKI 導致 Python 驗證失敗；程式只針對這個公開讀取來源使用 source-scoped SSL verification workaround。
 
 公視 PTS 使用分類頁，不使用總 RSS，避免總 RSS 沒有 society/politics 分類欄位而造成跨分類重複。社會分類使用 `https://news.pts.org.tw/category/7`。

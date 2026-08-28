@@ -52,6 +52,27 @@ class CollectorTests(unittest.TestCase):
         self.assertNotIn("sec_filings", names)
         self.assertNotIn("twse_mops_announcements", names)
         self.assertNotIn("x_accounts", names)
+        self.assertNotIn("homepage_headlines", names)
+
+    def test_build_sources_homepage_explicit(self) -> None:
+        sources = build_sources(self._settings(), "homepage")
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].name, "homepage_headlines")
+
+    def test_build_sources_all_can_include_homepage_when_enabled(self) -> None:
+        settings = Settings(
+            **{
+                **self._settings().__dict__,
+                "homepage_headlines_enabled": True,
+            }
+        )
+
+        sources = build_sources(settings, "all")
+        names = [s.name for s in sources]
+
+        self.assertIn("official_rss", names)
+        self.assertIn("homepage_headlines", names)
 
     def test_build_sources_x_disabled(self) -> None:
         """測試 test build sources x disabled 的預期行為。"""

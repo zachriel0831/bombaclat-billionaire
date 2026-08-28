@@ -3,6 +3,13 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-28 International Homepage Low-Frequency Crawler
+- [x] Read repo rules, CTO standards, ingestion skill, source docs, workflow docs, and current worktree status.
+- [x] Add a low-frequency English homepage headline collector into the relay-source path.
+- [x] Add fixed-window run/register scripts and source/API docs.
+- [x] Run focused parser/config/collector tests plus a live smoke fetch.
+- [x] Commit task-related files only; do not push unless explicitly requested.
+
 ## 2026-08-28 Pre-TW-Open Guard
 - [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's `pre_tw_open` row plus strongest local evidence.

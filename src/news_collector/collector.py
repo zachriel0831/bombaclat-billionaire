@@ -13,6 +13,7 @@ import time
 from news_collector.config import Settings, resolve_x_bearer_token
 from news_collector.models import NewsItem
 from news_collector.sources.base import NewsSource
+from news_collector.sources.homepage_headlines import HomepageHeadlinesSource
 from news_collector.sources.rss import OfficialRssSource
 from news_collector.sources.sec_filings import SecFilingsSource
 from news_collector.sources.truth_social import TruthSocialAccountSource
@@ -38,6 +39,17 @@ def build_sources(settings: Settings, source_name: str) -> list[NewsSource]:
                 first_per_feed=settings.official_rss_first_per_feed,
             )
         )
+
+    if selected in ("all", "homepage", "homepages", "homepage_headlines"):
+        if selected == "all" and not settings.homepage_headlines_enabled:
+            logger.info("Skip source=homepage because HOMEPAGE_HEADLINES_ENABLED=false")
+        else:
+            sources.append(
+                HomepageHeadlinesSource(
+                    settings.homepage_headline_urls,
+                    settings.http_timeout_seconds,
+                )
+            )
 
     if selected in ("all", "sec"):
         if not settings.sec_enabled:

@@ -48,6 +48,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_fr
 Keep the `NewsCollector low-frequency news sources` window open. It writes
 status to `runtime/status/news-platform-low-frequency-window-status.json`.
 
+Start the international homepage headline fixed window for low-frequency
+English homepage/news-front collection:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\register_international_homepage_headlines_task.ps1 -Force -StartNow
+```
+
+Keep the `NewsCollector international homepage headlines` window open. It writes
+status to `runtime/status/international-homepage-headlines-window-status.json`.
+
 Restart the local AI comment service if barrage/comment AI behavior is expected:
 
 ```powershell
@@ -152,6 +162,7 @@ Important daily tasks:
 
 - `NewsCollector-RagIndexer`
 - `NewsCollector-BlsMacro`
+- `NewsCollector-InternationalHomepageHeadlines`
 - `NewsCollector-MarketContext-PreTwOpen`
 - `NewsCollector-TwMarketFlow`
 - `NewsCollector-TwCloseContext`

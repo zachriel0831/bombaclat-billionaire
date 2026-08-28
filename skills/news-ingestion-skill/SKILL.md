@@ -11,7 +11,7 @@ Use this skill to change or operate ingestion paths that collect upstream facts 
 
 ## Scope
 
-- Finance/international sources: RSS, SEC EDGAR, TWSE/MOPS, X stream/backfill, U.S. index tracker.
+- Finance/international sources: RSS, low-frequency international homepage headlines, SEC EDGAR, TWSE/MOPS, X stream/backfill, U.S. index tracker.
 - Market context sources: Yahoo chart proxies, U.S. Treasury, FRED, EIA, BLS, TWSE/TPEx/TAIFEX flows.
 - Taiwan public-news product sources: society/politics RSS, sitemap/list crawlers, keyword extraction, topic classification.
 - Public records: Legislative Yuan bills, NPA fraud rumors, NPA A1 accident records, article-record matching.
@@ -43,6 +43,7 @@ $env:PYTHONPATH='src'; python -m news_collector.main fetch --source twse --limit
 $env:PYTHONPATH='src'; python -m news_platform.main --smoke
 powershell -ExecutionPolicy Bypass -File .\scripts\run_data_source_health.ps1 -EnvFile .env
 powershell -ExecutionPolicy Bypass -File .\scripts\register_news_platform_low_frequency_sources_task.ps1 -Force -StartNow
+powershell -ExecutionPolicy Bypass -File .\scripts\register_international_homepage_headlines_task.ps1 -Force -StartNow
 ```
 
 ## Verification
