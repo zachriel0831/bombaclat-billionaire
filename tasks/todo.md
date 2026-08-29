@@ -1329,3 +1329,9 @@ Progress note: two dry writes stopped before DB mutation because MySQL date and 
 - Created analysis `374` from five local evidence events and four U.S. index snapshots; no external provider API, web search, delivery action, recommendation, or trade-signal write occurred.
 - Final checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, readable flexible briefing memo, structured data present, `push_enabled=1`, `pushed=0`, zero trade signals, and `external_provider_api_called=false`.
 - Market-calendar and claim-verifier tests passed (12 tests).
+# 2026-08-30 Weekly Codex Guard
+
+- [x] Read repo rules, Workflow 4C/4D, automation memory, weekly contract, writing skill, and reasoning/audit guidance.
+- [x] Confirm target `2026-08-30` / `weekly_tw_preopen` row is missing and inspect local evidence/history availability.
+- [x] Generate and store the exact three-section Traditional Chinese weekly brief through `MySqlEventStore.upsert_market_analysis` only.
+- [x] Verify DB state, text integrity, delivery flags, and evidence telemetry; commit and push task-related files.
