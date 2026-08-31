@@ -8,7 +8,12 @@ Move completed or stale task logs to `tasks/archive/`.
 - [x] Collect bounded runtime health, log-tail, and cheap endpoint evidence across the six target repos.
 - [x] Patch only an obvious low-risk governance issue if one is confirmed.
 - [x] Run the narrowest meaningful verification, then commit/push only related files.
-- [ ] Update automation memory, Observer completion, and final audit report.
+- [x] Update automation memory, Observer completion, and final audit report.
+
+### 2026-08-31 Weekly AI Governance Stability Audit Result
+- Runtime health was green at audit time for `line-relay-service` (`8080`), `news-display-frontend` (`3000`), `news-platform-api` (`8081`), `stock-monitor-service` (`8089`), `event_relay` (`18090`), Redis (`6379`), frontend ngrok, scheduled tasks, source-accuracy, and data-source health.
+- Fresh operational noise was limited to transient RSS timeouts in `data-collecting`, one API `AsyncRequestNotUsableException` warn on `2026-08-29`, and a `stock-monitor-service` Redis reconnect on `2026-08-27`; no current failing probes remained.
+- Repaired `scripts/run_service_auto_repair_watch.ps1` so auto-repair agents now launch from the affected repo root and explicitly guard Windows paths with spaces, matching the `2026-08-27` incident failure mode.
 
 ## 2026-08-28 International Homepage Low-Frequency Crawler
 - [x] Read repo rules, CTO standards, ingestion skill, source docs, workflow docs, and current worktree status.
