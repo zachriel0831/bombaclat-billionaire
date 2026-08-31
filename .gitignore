@@ -21,6 +21,9 @@ runtime/status/
 runtime/state/
 runtime/*.log
 runtime/codex_guard_*_summary.txt
+runtime/palestine-editorial-*-context.json
+runtime/palestine-editorial-*-result.json
+scripts/_weekly_guard_*.py
 daily_analysis_*.md
 query_output.txt
 data/stocks/*.json
