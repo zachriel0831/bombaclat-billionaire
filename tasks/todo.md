@@ -1347,3 +1347,12 @@ Progress note: two dry writes stopped before DB mutation because MySQL date and 
 - [x] Confirm target `2026-08-30` / `weekly_tw_preopen` row is missing and inspect local evidence/history availability.
 - [x] Generate and store the exact three-section Traditional Chinese weekly brief through `MySqlEventStore.upsert_market_analysis` only.
 - [x] Verify DB state, text integrity, delivery flags, and evidence telemetry; commit and push task-related files.
+# 2026-08-31 Taiwan Close Analysis Guard
+
+- [x] Read automation memory, market-analysis rules, Workflow 4C, and writing skills.
+- [x] Confirm calendar eligibility, missing `tw_close` row, and same-day local evidence.
+- [x] Upsert the storage-only analysis through `MySqlEventStore` (analysis id 377).
+- [x] Verify claim/trust/style/garbling/structured/push/provider/signal state.
+- [x] Commit and push only this run's files; preserve unrelated worktree changes.
+
+Verification: guard script returned analysis id 377 with claim support 1.0; independent DB check confirmed trust/style/provider/push/signal constraints; `tests.test_market_calendar` passed 5/5 and `git diff --check` passed.
