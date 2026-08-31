@@ -367,6 +367,8 @@ Read the relevant AGENTS.md, README, runbooks, and skills before changing files.
 Diagnose the root cause from the incident JSON and local service state, then apply the smallest safe repair that actually works.
 
 Hard boundaries:
+- Treat the incident repo as the default working directory. If you need git or file commands, run them from that repo root or use an explicit repo path.
+- On Windows, quote or use `-LiteralPath` for any path that may contain spaces, especially under `C:\Users\Zack Ou\...`.
 - Do not push to any remote.
 - Do not start, stop, or modify order-dispatcher / broker order flows.
 - Do not touch liuli-social-ai-service, Ollama, or llama-server unless the user explicitly named them in the current incident.
@@ -446,7 +448,7 @@ function Start-RepairAgent {
   $outLog = Join-Path $incidentDir "$IncidentId.codex.jsonl"
   $errLog = Join-Path $incidentDir "$IncidentId.codex.err.log"
   $lastMessage = Join-Path $incidentDir "$IncidentId.codex.final.txt"
-  $agentCwd = if (Test-Path -LiteralPath $WorkspaceRoot) { $WorkspaceRoot } else { $ProjectRoot }
+  $agentCwd = $ProjectRoot
   $arguments = @(
     "exec",
     "-C", $agentCwd,

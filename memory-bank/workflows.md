@@ -449,8 +449,12 @@ fixed window now also runs the service auto-repair watcher every cycle.
   `NewsCollector-*` tasks, data-source health, and the latest source-accuracy
   report write an incident to `runtime/service-auto-repair/incidents/`.
 - When `-LaunchAgent` is set, the watcher starts a background `codex exec`
-  repair agent from the incident prompt. Identical incident fingerprints are
-  suppressed for 60 minutes by default.
+  repair agent from the incident prompt. It now launches from the repo root
+  instead of the shared workspace root so default `git` and relative-path
+  commands resolve inside the affected repository. Identical incident
+  fingerprints are suppressed for 60 minutes by default.
+- The incident prompt must keep Windows path-space safety explicit: use quoted
+  paths or `-LiteralPath` for locations such as `C:\Users\Zack Ou\...`.
 - Repair agents must not push, touch order-dispatcher/broker flows, send LINE or
   external messages, deploy production changes, run destructive data repair, or
   touch Liuli/Ollama/llama-server unless the user explicitly names those targets.

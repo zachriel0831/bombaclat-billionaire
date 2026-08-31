@@ -3,6 +3,13 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-08-31 Weekly AI Governance Stability Audit
+- [x] Read workspace/repo rules, audit skills, automation memory status, and six-repo git state.
+- [x] Collect bounded runtime health, log-tail, and cheap endpoint evidence across the six target repos.
+- [x] Patch only an obvious low-risk governance issue if one is confirmed.
+- [x] Run the narrowest meaningful verification, then commit/push only related files.
+- [ ] Update automation memory, Observer completion, and final audit report.
+
 ## 2026-08-28 International Homepage Low-Frequency Crawler
 - [x] Read repo rules, CTO standards, ingestion skill, source docs, workflow docs, and current worktree status.
 - [x] Add a low-frequency English homepage headline collector into the relay-source path.
