@@ -3,6 +3,18 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-09-02 US Close Guard
+- [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's missing `us_close` row plus strongest local evidence.
+- [x] Create the missing row through `MySqlEventStore.upsert_market_analysis()` using local evidence only.
+- [x] Run claim/trust/style/garbled/provider checks and independently verify final DB state.
+- [x] Record Observer completion, update automation memory, and commit/push only task-related files.
+
+### 2026-09-02 US Close Guard Result
+- Created analysis `381` from local U.S.-close, Iran-conflict, European inflation/rates, and Taiwan AI-wafer-demand evidence; no paid external LLM API, web search, LINE contact, delivery action, stock recommendation, or trade signal occurred.
+- Final DB checks passed: claim support `1.0`, trust reason `claim_verifier_ok`, flexible briefing-memo style, readable Traditional Chinese, structured data present, `push_enabled=0`, `pushed=0`, and `external_provider_api_called=false`.
+- Calendar and claim-verifier tests passed (12 tests); independent stored-row verification found no garbled text and zero trade signals.
+
 ## 2026-09-01 US Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, writing skill, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's missing `us_close` row plus strongest local evidence.
