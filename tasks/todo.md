@@ -1380,3 +1380,14 @@ Progress note: two dry writes stopped before DB mutation because MySQL date and 
 - [x] Commit and push only this run's files; preserve unrelated worktree changes.
 
 Verification: guard script returned analysis id 377 with claim support 1.0; independent DB check confirmed trust/style/provider/push/signal constraints; `tests.test_market_calendar` passed 5/5 and `git diff --check` passed.
+# 2026-09-02 Market Analysis Codex Guard - Pre Open
+
+- [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
+- [x] Confirm calendar eligibility and inspect today's missing `pre_tw_open` row plus strongest local evidence.
+- [x] Generate and store a flexible briefing memo through `MySqlEventStore.upsert_market_analysis`.
+- [x] Verify claim/trust/style/provider state, push flags, structured data, garbled text, and zero trade signals.
+- [x] Run targeted tests, commit only task files, and push the current branch.
+
+Run result:
+- Stored analysis id `382` with claim support `1.0`, trust gate allowed, flexible briefing-memo style, readable Traditional Chinese, `push_enabled=1`, `pushed=0`, structured data present, no `stock_watch`, zero trade signals, and `external_provider_api_called=false`.
+- Claim-verifier and market-calendar tests passed (12 tests).
