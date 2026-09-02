@@ -3,6 +3,15 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-09-02 Service Auto-Repair CWA Task Result
+- [x] Read repo rules, CTO standards, service runbooks, relevant skills, and incident report.
+- [x] Reproduce the scheduled-task probe failure and inspect CWA fixed-window state.
+- [x] Repair the watcher so Windows unsigned task results do not throw.
+- [x] Restart/verify the CWA fixed window if local state is stale.
+- [x] Run focused verification, record Observer completion, and commit task-related files only.
+
+Result: `run_service_auto_repair_watch.ps1 -DryRun -Json` returned `overall_status=ok`, `failing_count=0` after `NewsCollector-CwaFixedWindow` was restarted through Task Scheduler.
+
 ## 2026-09-02 US Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's missing `us_close` row plus strongest local evidence.

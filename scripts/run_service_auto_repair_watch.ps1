@@ -268,7 +268,7 @@ function Read-ScheduledTaskProbes {
     return @(New-Probe "scheduled_tasks" "warn" "no NewsCollector scheduled tasks found")
   }
 
-  $ignoredResults = @(0, 267009, 267011, 267014)
+  $ignoredResults = @([long]0, [long]267009, [long]267011, [long]267014)
   $items = @()
   foreach ($task in $tasks) {
     if ([string]$task.State -eq "Disabled") {
@@ -277,7 +277,7 @@ function Read-ScheduledTaskProbes {
 
     try {
       $info = Get-ScheduledTaskInfo -TaskName $task.TaskName -TaskPath $task.TaskPath
-      $result = [int]$info.LastTaskResult
+      $result = [long]$info.LastTaskResult
       if ($ignoredResults -notcontains $result) {
         $items += New-Probe "scheduled_task/$($task.TaskName)" "warn" "last_result=$result last_run=$($info.LastRunTime)" @{
           task_name = $task.TaskName
