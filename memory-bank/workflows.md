@@ -448,6 +448,9 @@ fixed window now also runs the service auto-repair watcher every cycle.
   monitor, Redis, event relay, frontend ngrok, Observer, enabled
   `NewsCollector-*` tasks, data-source health, and the latest source-accuracy
   report write an incident to `runtime/service-auto-repair/incidents/`.
+- The frontend liveness probe uses the dedicated Next.js `/health` endpoint,
+  not the homepage route, so slow page rendering does not create false
+  `news_display_frontend` missing incidents.
 - When `-LaunchAgent` is set, the watcher starts a background `codex exec`
   repair agent from the incident prompt. It now launches from the repo root
   instead of the shared workspace root so default `git` and relative-path
