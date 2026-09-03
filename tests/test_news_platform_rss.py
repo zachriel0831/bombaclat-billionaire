@@ -143,6 +143,22 @@ class RssFeedParseTests(unittest.TestCase):
         articles = self.source.parse(RSS_SAMPLE.encode("utf-8"))
         self.assertEqual(len(articles), 2)
 
+    def test_removes_illegal_xml_control_chars_before_retry(self):
+        feed = b"""<?xml version="1.0" encoding="UTF-8"?>
+<rss><channel>
+  <item>
+    <title>control char article</title>
+    <link>https://news.ltn.com.tw/news/politics/paper/1769</link>
+    <description><![CDATA[valid text \x08 reporter text]]></description>
+  </item>
+</channel></rss>"""
+
+        articles = self.source.parse(feed)
+
+        self.assertEqual(len(articles), 1)
+        self.assertEqual(articles[0].title, "control char article")
+        self.assertEqual(articles[0].summary, "valid text reporter text")
+
     def test_article_id_is_stable_across_calls(self):
         a = self.source.parse(RSS_SAMPLE)
         b = self.source.parse(RSS_SAMPLE)

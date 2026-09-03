@@ -3,6 +3,15 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-09-04 Service Auto-Repair LTN Source Accuracy
+- [x] Read repo instructions, CTO standards, service runbooks, ingestion skill, and incident report.
+- [x] Reproduce the `ltn:politics` official-list zero-item failure and inspect current local service/source state.
+- [x] Apply the smallest safe repair if the failure is code/config, or document external-source evidence if not fixable locally.
+- [x] Run focused source-accuracy/tests/watcher verification.
+- [x] Record Observer completion and create a local commit for task-related files only.
+
+Result: LTN politics RSS returned HTTP 200 with items, but Python XML parsing failed on an illegal `0x08` control character in one description, so the audit saw zero official rows. `RssFeedSource` now retries after stripping XML-forbidden control characters. Verification passed: focused RSS/source-accuracy unit tests on Python 3.12 and `.venv` Python 3.13, LTN smoke fetched 20 items, full source-accuracy audit returned OK, data-source health returned OK, and service auto-repair dry run returned `overall_status=ok`.
+
 ## 2026-09-03 US Close Guard
 - [x] Read repo rules, Workflow 4C, automation memory, writing skills, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's `us_close` row plus strongest local evidence.

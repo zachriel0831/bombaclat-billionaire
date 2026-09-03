@@ -33,6 +33,11 @@ from news_platform.utils import (
 
 logger = logging.getLogger(__name__)
 
+_ILLEGAL_XML_CONTROL_BYTES = bytes(
+    value for value in range(32) if value not in (9, 10, 13)
+)
+_ILLEGAL_XML_CONTROL_CHARS = dict.fromkeys(_ILLEGAL_XML_CONTROL_BYTES)
+
 
 class RssFeedSource(NewsSource):
     def __init__(
@@ -69,8 +74,21 @@ class RssFeedSource(NewsSource):
         try:
             root = ET.fromstring(payload)
         except ET.ParseError as exc:
-            logger.warning("RSS parse failed source=%s error=%s", self.name, exc)
-            return []
+            sanitized = _strip_illegal_xml_control_chars(payload)
+            if sanitized != payload:
+                try:
+                    root = ET.fromstring(sanitized)
+                    logger.warning(
+                        "RSS parse recovered after removing illegal XML control chars source=%s error=%s",
+                        self.name,
+                        exc,
+                    )
+                except ET.ParseError as retry_exc:
+                    logger.warning("RSS parse failed source=%s error=%s", self.name, retry_exc)
+                    return []
+            else:
+                logger.warning("RSS parse failed source=%s error=%s", self.name, exc)
+                return []
 
         nodes = root.findall(".//item") + root.findall(".//{*}entry")
         articles: list[NewsArticle] = []
@@ -193,3 +211,9 @@ class RssFeedSource(NewsSource):
         if author_values:
             raw["author_values"] = author_values
         return raw
+
+
+def _strip_illegal_xml_control_chars(payload: bytes | str) -> bytes | str:
+    if isinstance(payload, bytes):
+        return payload.translate(None, _ILLEGAL_XML_CONTROL_BYTES)
+    return payload.translate(_ILLEGAL_XML_CONTROL_CHARS)
