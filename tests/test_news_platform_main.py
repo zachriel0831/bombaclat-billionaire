@@ -81,6 +81,17 @@ class MainConfigTests(unittest.TestCase):
         self.assertEqual(parse_public_sources(None), DEFAULT_PUBLIC_RECORD_SOURCES)
         self.assertEqual(parse_public_sources("all"), SUPPORTED_PUBLIC_RECORD_SOURCES)
 
+    def test_ly_bills_uses_low_frequency_lookback_floor(self):
+        settings = type("Settings", (), {"http_timeout_seconds": 15})()
+
+        sources = build_public_record_sources(
+            settings,
+            source_names=("ly_bills",),
+            lookback_days=14,
+        )
+
+        self.assertEqual(sources[0].lookback_days, 365)
+
     def test_moj_prosecution_source_uses_slow_official_endpoint_timeout_floor(self):
         settings = type("Settings", (), {"http_timeout_seconds": 15})()
 

@@ -312,6 +312,7 @@ windows.
 - Low-birthrate public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources low_birthrate`
 - Drug-abuse public records: `$env:PYTHONPATH='src'; python -m news_platform.main --public-records-smoke --public-sources drug_abuse`
 - Date window override: add `--public-record-from YYYY-MM-DD --public-record-to YYYY-MM-DD`
+- Generic Legislative Yuan bill collection uses at least a 365-day lookback because the official API can have no rows in a recent 14-day window; duplicate upserts refresh `updated_at` for freshness health.
 2. Collect one batch into `t_public_records`
 - `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources all`
 - Budget/public-resource public records: `$env:PYTHONPATH='src'; python -m news_platform.main --collect-public-records --public-sources public_budget`

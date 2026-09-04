@@ -3,6 +3,15 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-09-05 Service Auto-Repair LY Public Records
+- [x] Read repo rules, CTO standards, service runbooks, ingestion skill, and incident report.
+- [x] Reproduce the `public_records_ly_legislative_bill` freshness warning and inspect current producer/service state.
+- [x] Apply the smallest safe operational or code repair without touching LINE/order/AI services.
+- [x] Run focused health/source verification.
+- [x] Record Observer completion and commit only task-related files if files changed.
+
+Result: Root cause was a false-positive freshness model for generic LY bills: the official API returned zero rows for the default 14-day window (`1150823`-`1150905`) while wider windows returned records, so no duplicate upserts refreshed `updated_at`. Generic `ly_bills` now uses a 365-day lookback floor, matching low-frequency public-record behavior. A bounded catch-up refreshed 50 duplicate LY rows (`stored=0`, `duplicates=50`, `failed=0`); focused tests passed; data-source health returned `overall_status=ok`; service-auto-repair dry run returned `overall_status=ok`, `failing_count=0`.
+
 ## 2026-09-04 Pre-TW-Open Guard
 - [x] Read repo rules, Workflow 4C, automation memory, writing skill, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's missing `pre_tw_open` row plus strongest local evidence.

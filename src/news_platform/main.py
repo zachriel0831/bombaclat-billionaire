@@ -202,7 +202,7 @@ def build_public_record_sources(
             sources.append(
                 LegislativeBillSource(
                     timeout_seconds=settings.http_timeout_seconds,
-                    lookback_days=lookback_days,
+                    lookback_days=max(lookback_days, 365),
                 )
             )
             continue
