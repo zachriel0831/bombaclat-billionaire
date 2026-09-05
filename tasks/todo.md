@@ -12,6 +12,15 @@ Move completed or stale task logs to `tasks/archive/`.
 
 Result: Root cause was a false-positive freshness model for generic LY bills: the official API returned zero rows for the default 14-day window (`1150823`-`1150905`) while wider windows returned records, so no duplicate upserts refreshed `updated_at`. Generic `ly_bills` now uses a 365-day lookback floor, matching low-frequency public-record behavior. A bounded catch-up refreshed 50 duplicate LY rows (`stored=0`, `duplicates=50`, `failed=0`); focused tests passed; data-source health returned `overall_status=ok`; service-auto-repair dry run returned `overall_status=ok`, `failing_count=0`.
 
+## 2026-09-05 Service Auto-Repair TVBS Source Accuracy
+- [x] Read repo rules, CTO standards, service runbooks, ingestion skill, and incident report.
+- [x] Attempt to reproduce the `tvbs:politics` official-list zero-item failure and inspect current service/source state.
+- [x] Apply the smallest safe repair without touching LINE/order/AI services.
+- [x] Run focused source-accuracy and watcher verification.
+- [x] Record Observer completion and commit only task-related files if files changed.
+
+Result: The 20:40 report was a transient `tvbs:politics` official-list miss: all local service probes were already OK, and a current TVBS politics smoke fetch returned 16 parsed items. A focused source-accuracy audit returned `overall_status=ok` with `tvbs:politics official=16 matched=16`, the normal audit wrapper refreshed `runtime/news-source-accuracy/latest.*` to OK, and service-auto-repair dry run returned `overall_status=ok`, `failing_count=0`. No code change was needed.
+
 ## 2026-09-04 Pre-TW-Open Guard
 - [x] Read repo rules, Workflow 4C, automation memory, writing skill, reasoning/audit guidance, and active lessons.
 - [x] Confirm calendar eligibility and inspect today's missing `pre_tw_open` row plus strongest local evidence.
