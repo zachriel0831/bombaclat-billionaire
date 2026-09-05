@@ -411,6 +411,7 @@ machine restart, or when the user asks whether source data has caught up.
 - Public records use `updated_at` as refresh freshness because duplicate official records are upserted; WARN means last refresh is over 48 hours old, STALE means over 96 hours old.
 - Article enrichment ignores newly fetched rows for 5 minutes and reports them as `pending_recent_*`; WARN means rows older than that grace window still lack `keywords_json` or `topics_json`.
 - Duplicate `news_platform.main --loop` is WARN because it can double-fetch and hide restart mistakes.
+- Truth Social account row age is informational once historical rows exist; duplicate/no-new-post polls do not refresh relay event `created_at`, so verify with a no-write fetch or bridge log before restarting anything.
 - Event-driven SEC/TWSE-MOPS sources can be quiet; age-only row staleness is informational unless fetch logs or source-specific evidence show failures.
 - U.S. index/snapshot and stored-analysis probes are market-calendar and due-time aware; weekend, holiday, and not-yet-due slots should be `SKIPPED`, not incidents.
 4. Remediation

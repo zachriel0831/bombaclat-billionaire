@@ -360,7 +360,7 @@ def _collect_relay_probes(
                 enabled=collector_settings.truth_social_enabled,
                 disabled_name="relay_truth_social",
                 disabled_detail="TRUTH_SOCIAL_ENABLED=false",
-                factory=lambda: _latest_probe(
+                factory=lambda: _activity_driven_account_probe(_latest_probe(
                     conn,
                     name="relay_truth_social",
                     table=event_table,
@@ -371,7 +371,7 @@ def _collect_relay_probes(
                     stale_minutes=1440,
                     recent_minutes=1440,
                     detail="Tracked Truth Social public-figure events; quiet accounts can naturally produce fewer rows.",
-                ),
+                )),
             )
         )
         probes.append(
@@ -1107,6 +1107,16 @@ def _event_driven_probe(probe: ProbeResult) -> ProbeResult:
             probe,
             status="skipped",
             detail=f"{probe.detail} Row creation is event-driven; age alone is not an outage signal.",
+        )
+    return probe
+
+
+def _activity_driven_account_probe(probe: ProbeResult) -> ProbeResult:
+    if probe.status in {"warn", "stale"} and (probe.row_count or 0) > 0:
+        return replace(
+            probe,
+            status="skipped",
+            detail=f"{probe.detail} Account activity is intermittent; age alone is not an outage signal.",
         )
     return probe
 

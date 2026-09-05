@@ -11,6 +11,7 @@ from data_source_health import (
     NEWS_PLATFORM_SOURCE_WARN_MINUTES,
     PUBLIC_RECORD_GROUPS,
     ProbeResult,
+    _activity_driven_account_probe,
     _classify_public_record_link_probe,
     _article_enrichment_probe,
     _event_driven_probe,
@@ -93,6 +94,21 @@ class DataSourceHealthTests(unittest.TestCase):
 
         self.assertEqual(result.status, "skipped")
         self.assertIn("age alone", result.detail)
+
+    def test_activity_driven_account_probe_skips_age_only_warning(self) -> None:
+        probe = ProbeResult(name="relay_truth_social", status="warn", row_count=20, detail="Truth Social.")
+
+        result = _activity_driven_account_probe(probe)
+
+        self.assertEqual(result.status, "skipped")
+        self.assertIn("age alone", result.detail)
+
+    def test_activity_driven_account_probe_keeps_missing_rows(self) -> None:
+        probe = ProbeResult(name="relay_truth_social", status="missing", row_count=0, detail="Truth Social.")
+
+        result = _activity_driven_account_probe(probe)
+
+        self.assertEqual(result.status, "missing")
 
     def test_us_session_probe_skips_closed_session(self) -> None:
         calendar_state = SimpleNamespace(

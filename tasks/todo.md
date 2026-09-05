@@ -3,6 +3,15 @@
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
+## 2026-09-05 Service Auto-Repair Truth Social Health
+- [x] Read repo rules, CTO standards, service runbooks, and incident report.
+- [x] Reproduce the `relay_truth_social` warning and inspect current fetch/bridge state.
+- [x] Apply the smallest safe alert-model repair without touching LINE/order/AI services.
+- [x] Run focused health/tests/watcher verification.
+- [x] Record Observer completion and commit only task-related files.
+
+Result: Root cause was an age-only false positive for Truth Social public-figure rows: the bridge and a no-write smoke fetch both returned 5 current timeline items, but duplicate/no-new-post polls do not refresh `t_relay_events.created_at`, so the latest stored row crossed the 720-minute warning threshold. `relay_truth_social` now treats old row age as informational once historical rows exist, while zero-row/missing state remains actionable. Focused compile/unit tests passed, live data-source health returned `overall_status=ok`, and service-auto-repair dry run returned `overall_status=ok`, `failing_count=0`.
+
 ## 2026-09-05 Service Auto-Repair LY Public Records
 - [x] Read repo rules, CTO standards, service runbooks, ingestion skill, and incident report.
 - [x] Reproduce the `public_records_ly_legislative_bill` freshness warning and inspect current producer/service state.
