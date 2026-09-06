@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-07 Pre-open Codex Guard
+- [x] Inspect instructions, calendar, missing row and local evidence timestamps.
+- [x] Draft four-fact briefing; dry-run claim/style checks and store eligible row.
+- [x] Verify stored delivery state, record memory and commit scoped artifacts.
+
+Result: analysis 393; claim support 1.0, trust/style checks passed, push_enabled=1, pushed=0, structured JSON present, no garbling or trade signals, external_provider_api_called=false. Calendar/claim tests: 12 passed. No stale U.S.-close row used.
+
 Use this file for the current non-trivial task only.
 Move completed or stale task logs to `tasks/archive/`.
 
