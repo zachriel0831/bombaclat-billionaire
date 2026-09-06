@@ -1,4 +1,4 @@
-# Restart relay, source bridge, and news-platform loop in visible PowerShell windows.
+# Restart relay, source bridge, and news-platform loop as hidden service wrappers.
 param(
   [string]$EnvFile = ".env",
   [ValidateSet("DEBUG", "INFO", "WARNING", "ERROR")]
@@ -89,26 +89,35 @@ if ($targetPids.Count -gt 0) {
   Start-Sleep -Seconds 1
 }
 
-# Run scripts directly in each opened window so logs stream live there.
+# Run live workers in background wrappers. Operator-facing fixed windows are
+# owned by the scheduled monitor/collector tasks instead.
 $relayScript = Join-Path $PSScriptRoot "run_event_relay.ps1"
 $bridgeScript = Join-Path $PSScriptRoot "run_source_bridge.ps1"
 $platformScript = Join-Path $PSScriptRoot "run_news_platform_loop.ps1"
 
-Start-Process powershell -WorkingDirectory $ProjectRoot -ArgumentList @(
-  '-NoProfile', '-NoExit', '-ExecutionPolicy', 'Bypass',
-  '-File', $relayScript,
-  '-EnvFile', $EnvFile,
-  '-LogLevel', $LogLevel
-) -WindowStyle Normal
-Start-Process powershell -WorkingDirectory $ProjectRoot -ArgumentList @(
-  '-NoProfile', '-NoExit', '-ExecutionPolicy', 'Bypass',
-  '-File', $bridgeScript,
-  '-EnvFile', $EnvFile,
-  '-LogLevel', $LogLevel
-) -WindowStyle Normal
-Start-Process powershell -WorkingDirectory $ProjectRoot -ArgumentList @(
-  '-NoProfile', '-NoExit', '-ExecutionPolicy', 'Bypass',
-  '-File', $platformScript
-) -WindowStyle Normal
+function Start-LiveWorker {
+  param(
+    [string]$ScriptPath,
+    [string[]]$ExtraArguments = @()
+  )
 
-Write-Host "Live service windows started (relay + source bridge + news-platform loop)." -ForegroundColor Green
+  $arguments = @(
+    '-NoProfile', '-NoExit', '-ExecutionPolicy', 'Bypass',
+    '-File', $ScriptPath
+  )
+  $arguments += $ExtraArguments
+
+  Start-Process powershell -WorkingDirectory $ProjectRoot -ArgumentList $arguments -WindowStyle Hidden
+}
+
+Start-LiveWorker -ScriptPath $relayScript -ExtraArguments @(
+  '-EnvFile', $EnvFile,
+  '-LogLevel', $LogLevel
+)
+Start-LiveWorker -ScriptPath $bridgeScript -ExtraArguments @(
+  '-EnvFile', $EnvFile,
+  '-LogLevel', $LogLevel
+)
+Start-LiveWorker -ScriptPath $platformScript
+
+Write-Host "Live service workers started in hidden background wrappers (relay + source bridge + news-platform loop)." -ForegroundColor Green

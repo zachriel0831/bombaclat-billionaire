@@ -110,6 +110,78 @@ function Read-JsonReport {
   }
 }
 
+function Get-FixedWindowTaskProbe {
+  param(
+    [string]$TaskName,
+    [long]$LastTaskResult,
+    $LastRunTime,
+    $NextRunTime,
+    [string]$TaskState
+  )
+
+  $fixedWindowTasks = @{
+    "NewsCollector-CwaFixedWindow" = @{
+      File = "cwa-fixed-window-status.json"
+      MaxAgeMinutes = 15
+    }
+    "NewsCollector-LiveServiceMonitor" = @{
+      File = "live-service-monitor-window-status.json"
+      MaxAgeMinutes = 15
+    }
+    "NewsCollector-NewsPlatformLowFrequencySources" = @{
+      File = "news-platform-low-frequency-window-status.json"
+      MaxAgeMinutes = 90
+    }
+    "NewsCollector-InternationalHomepageHeadlines" = @{
+      File = "international-homepage-headlines-window-status.json"
+      MaxAgeMinutes = 90
+    }
+  }
+
+  if (-not $fixedWindowTasks.ContainsKey($TaskName)) {
+    return $null
+  }
+
+  $spec = $fixedWindowTasks[$TaskName]
+  $statusPath = Join-Path $statusDir ([string]$spec.File)
+  $extra = @{
+    task_name = $TaskName
+    state = $TaskState
+    last_task_result = $LastTaskResult
+    last_run_time = Format-OptionalDateTime $LastRunTime
+    next_run_time = Format-OptionalDateTime $NextRunTime
+    status_file = $statusPath
+  }
+
+  if (-not (Test-Path -LiteralPath $statusPath)) {
+    return New-Probe "scheduled_task/$TaskName" "warn" "last_result=$LastTaskResult and fixed-window status is missing" $extra
+  }
+
+  try {
+    $status = Read-JsonReport -Path $statusPath
+    $extra.pid = $status.pid
+    $extra.updated_at = [string]$status.updated_at
+
+    $wrapperPid = 0
+    $hasPid = [int]::TryParse([string]$status.pid, [ref]$wrapperPid)
+    if (-not $hasPid -or -not (Get-Process -Id $wrapperPid -ErrorAction SilentlyContinue)) {
+      return New-Probe "scheduled_task/$TaskName" "warn" "last_result=$LastTaskResult and fixed-window wrapper is not running" $extra
+    }
+
+    $updatedAt = [datetimeoffset]::Parse([string]$status.updated_at)
+    $ageMinutes = [int][Math]::Round(((Get-Date) - $updatedAt.LocalDateTime).TotalMinutes)
+    $extra.age_minutes = $ageMinutes
+    if ($ageMinutes -gt [int]$spec.MaxAgeMinutes) {
+      return New-Probe "scheduled_task/$TaskName" "warn" "last_result=$LastTaskResult and fixed-window status age ${ageMinutes}m is stale" $extra
+    }
+
+    return New-Probe "scheduled_task/$TaskName" "ok" "fixed-window wrapper is alive; ignored scheduled task last_result=$LastTaskResult" $extra
+  }
+  catch {
+    return New-Probe "scheduled_task/$TaskName" "warn" "last_result=$LastTaskResult and fixed-window status check failed: $($_.Exception.Message)" $extra
+  }
+}
+
 function Test-ListenPortProbe {
   param(
     [string]$Name,
@@ -279,6 +351,15 @@ function Read-ScheduledTaskProbes {
       $info = Get-ScheduledTaskInfo -TaskName $task.TaskName -TaskPath $task.TaskPath
       $result = [long]$info.LastTaskResult
       if ($ignoredResults -notcontains $result) {
+        $fixedWindowProbe = Get-FixedWindowTaskProbe -TaskName $task.TaskName -LastTaskResult $result -LastRunTime $info.LastRunTime -NextRunTime $info.NextRunTime -TaskState ([string]$task.State)
+        if ($null -ne $fixedWindowProbe) {
+          if ([string]$fixedWindowProbe.status -eq "ok") {
+            continue
+          }
+          $items += $fixedWindowProbe
+          continue
+        }
+
         $items += New-Probe "scheduled_task/$($task.TaskName)" "warn" "last_result=$result last_run=$($info.LastRunTime)" @{
           task_name = $task.TaskName
           state = [string]$task.State
