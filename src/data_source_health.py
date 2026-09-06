@@ -13,7 +13,7 @@ import subprocess
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, time, timedelta, timezone
 from types import SimpleNamespace
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 from event_relay.market_calendar import allowed_analysis_slots, resolve_market_calendar_state
 from event_relay.config import RelaySettings, load_settings as load_relay_settings
@@ -669,8 +669,17 @@ def _collect_news_platform_probes(settings: NewsPlatformSettings) -> list[ProbeR
     return probes
 
 
-def _collect_process_probes() -> list[ProbeResult]:
-    if os.name != "nt":
+PROCESS_PROBE_SPECS = (
+    ("process_event_relay", r"event_relay\.main"),
+    ("process_source_bridge", r"news_collector\.relay_bridge"),
+    ("process_news_platform_loop", r"news_platform\.main.*--loop"),
+)
+
+
+def _collect_process_probes(
+    query_process_records: Callable[[], tuple[list[dict[str, Any]], str | None]] | None = None,
+) -> list[ProbeResult]:
+    if os.name != "nt" and query_process_records is None:
         return [
             ProbeResult(
                 name="local_process_counts",
@@ -679,6 +688,32 @@ def _collect_process_probes() -> list[ProbeResult]:
             )
         ]
 
+    query_records = query_process_records or _query_windows_process_records
+    records, error = query_records()
+    if error:
+        return [ProbeResult(name="local_process_counts", status="warn", detail=error)]
+
+    probes = _process_count_probes(records)
+    if not _all_process_probes_missing(probes):
+        return probes
+
+    retry_records, retry_error = query_records()
+    if retry_error:
+        return [
+            ProbeResult(
+                name="local_process_counts",
+                status="warn",
+                detail=f"retry after empty process snapshot failed: {retry_error}",
+            )
+        ]
+
+    return [
+        replace(probe, detail=f"{probe.detail}; retried_after_empty_process_snapshot=true")
+        for probe in _process_count_probes(retry_records)
+    ]
+
+
+def _query_windows_process_records() -> tuple[list[dict[str, Any]], str | None]:
     try:
         completed = subprocess.run(
             [
@@ -699,36 +734,33 @@ def _collect_process_probes() -> list[ProbeResult]:
             timeout=15,
         )
     except Exception as exc:
-        return [ProbeResult(name="local_process_counts", status="warn", detail=str(exc))]
+        return [], str(exc)
 
     if completed.returncode != 0:
         detail = completed.stderr.strip() or "PowerShell process query failed"
-        return [ProbeResult(name="local_process_counts", status="warn", detail=detail)]
+        return [], detail
 
-    records = _parse_process_records(completed.stdout or "")
+    return _parse_process_records(completed.stdout or ""), None
+
+
+def _process_count_probes(records: Sequence[dict[str, Any]]) -> list[ProbeResult]:
     return [
         _process_count_probe(
             records,
-            name="process_event_relay",
-            pattern=r"event_relay\.main",
+            name=name,
+            pattern=pattern,
             expected_min=1,
             expected_max=1,
-        ),
-        _process_count_probe(
-            records,
-            name="process_source_bridge",
-            pattern=r"news_collector\.relay_bridge",
-            expected_min=1,
-            expected_max=1,
-        ),
-        _process_count_probe(
-            records,
-            name="process_news_platform_loop",
-            pattern=r"news_platform\.main.*--loop",
-            expected_min=1,
-            expected_max=1,
-        ),
+        )
+        for name, pattern in PROCESS_PROBE_SPECS
     ]
+
+
+def _all_process_probes_missing(probes: Sequence[ProbeResult]) -> bool:
+    return len(probes) == len(PROCESS_PROBE_SPECS) and all(
+        probe.status == "missing" and "raw_python_matches=0" in probe.detail
+        for probe in probes
+    )
 
 
 def _parse_process_records(raw_json: str) -> list[dict[str, Any]]:

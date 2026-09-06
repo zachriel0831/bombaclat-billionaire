@@ -22,7 +22,7 @@ from data_source_health import (
     render_text,
 )
 from data_source_health import HealthReport
-from data_source_health import _parse_process_records, _process_count_probe
+from data_source_health import _collect_process_probes, _parse_process_records, _process_count_probe
 
 
 class FakeCursor:
@@ -259,6 +259,39 @@ class DataSourceHealthTests(unittest.TestCase):
 
         self.assertEqual(probe.status, "ok")
         self.assertEqual(probe.row_count, 1)
+
+    def test_process_probe_retries_empty_all_worker_snapshot(self) -> None:
+        healthy_records = _parse_process_records(
+            """
+            [
+              {"ProcessId": 11, "ParentProcessId": 10, "Name": "python.exe", "CommandLine": "python -m event_relay.main"},
+              {"ProcessId": 21, "ParentProcessId": 20, "Name": "python.exe", "CommandLine": "python -m news_collector.relay_bridge"},
+              {"ProcessId": 31, "ParentProcessId": 30, "Name": "python.exe", "CommandLine": "python -m news_platform.main --loop"}
+            ]
+            """
+        )
+        snapshots = [([], None), (healthy_records, None)]
+
+        def query_records():
+            return snapshots.pop(0)
+
+        probes = _collect_process_probes(query_process_records=query_records)
+
+        self.assertEqual([probe.status for probe in probes], ["ok", "ok", "ok"])
+        self.assertIn("retried_after_empty_process_snapshot=true", probes[0].detail)
+        self.assertEqual(len(snapshots), 0)
+
+    def test_process_probe_keeps_missing_after_retry_confirms_empty_snapshot(self) -> None:
+        snapshots = [([], None), ([], None)]
+
+        def query_records():
+            return snapshots.pop(0)
+
+        probes = _collect_process_probes(query_process_records=query_records)
+
+        self.assertEqual([probe.status for probe in probes], ["missing", "missing", "missing"])
+        self.assertIn("retried_after_empty_process_snapshot=true", probes[0].detail)
+        self.assertEqual(len(snapshots), 0)
 
 
 if __name__ == "__main__":
