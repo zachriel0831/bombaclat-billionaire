@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-07 Taiwan Close Codex Guard
+- [x] Inspect calendar, target row and local evidence; close news and institutional totals unavailable.
+- [x] Store a cautious briefing distinguishing intraday evidence from unconfirmed close.
+- [x] Verify claim/trust/style and DB flags; run focused tests and commit scoped artifacts.
+
+Result: low-confidence memo; closing confirmation unavailable and institutional endpoint returns no data. Claim/trust/style passed; structured JSON present, push disabled, no signals or provider calls. Calendar/claim tests: 12 passed.
+
 ## 2026-09-07 Pre-open Codex Guard
 - [x] Inspect instructions, calendar, missing row and local evidence timestamps.
 - [x] Draft four-fact briefing; dry-run claim/style checks and store eligible row.
