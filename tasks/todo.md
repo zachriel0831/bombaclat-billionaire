@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-08 Pre-open Codex Guard
+- [x] Inspect calendar, missing row and current local evidence; U.S. Labor Day session closed.
+- [x] Draft and dry-run a four-fact briefing using local evidence only.
+- [x] Store and verify delivery state, record run and commit scoped artifacts.
+
+Result: claim support 1.0; trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero trade signals and external_provider_api_called=false. Calendar/claim tests: 12 passed.
+
 ## 2026-09-07 Taiwan Close Codex Guard
 - [x] Inspect calendar, target row and local evidence; close news and institutional totals unavailable.
 - [x] Store a cautious briefing distinguishing intraday evidence from unconfirmed close.
