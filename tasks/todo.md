@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-09 US Close Codex Guard
+- [x] Confirm eligible calendar, missing row and fresh local close/oil/earnings/CPI evidence.
+- [x] Dry-run a flexible four-fact memo and store through the existing event store.
+- [x] Verify DB state and focused tests; record run and commit only scoped changes.
+
+Result: analysis 396; claim/trust/style passed, structured JSON present, no garbling, push_enabled=0, pushed=0, zero trade signals, external_provider_api_called=false. Calendar/claim tests: 12 passed.
+
 ## 2026-09-08 Pre-open Codex Guard
 - [x] Inspect calendar, missing row and current local evidence; U.S. Labor Day session closed.
 - [x] Draft and dry-run a four-fact briefing using local evidence only.
