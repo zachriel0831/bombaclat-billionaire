@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-09 Taiwan Close Codex Guard
+- [x] Confirm eligible calendar, missing row and timestamped closing evidence.
+- [x] Dry-run four-fact flexible memo and store through existing event store.
+- [x] Verify stored flags, claim/style checks and focused tests; prepare scoped artifacts.
+
+Result: analysis 398; independent readback and all seven visible numeric facts verified. Claim support 1.0, trust/style passed, no garbling, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Calendar/claim tests: 12 passed.
+
 ## 2026-09-09 Pre-open Codex Guard
 - [x] Confirm calendar and missing row; inspect timestamped local evidence.
 - [x] Dry-run four-fact memo, then store through existing event store.
