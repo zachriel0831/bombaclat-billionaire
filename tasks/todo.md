@@ -1,5 +1,15 @@
 # Task Plan Board
 
+## 2026-09-10 Taiwan Close Codex Guard
+- [x] Confirm calendar eligibility, missing row and timestamped local close evidence.
+- [x] Dry-run the four-fact flexible memo and persist through the existing store.
+- [x] Independently verify stored claims, style, flags and focused tests.
+
+Run notes: use the project venv because the default Python alias cannot launch. Keep the store instance alive while using its cursor; the first read-only query lost its temporary connection. Observer SQLite is read-only in this sandbox; telemetry failure does not block analysis.
+
+Result: analysis 399; claim support 1.0, six visible numbers matched local evidence, trust/style passed, no garbling, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Calendar/claim tests: 12 passed.
+
+
 ## 2026-09-09 Taiwan Close Codex Guard
 - [x] Confirm eligible calendar, missing row and timestamped closing evidence.
 - [x] Dry-run four-fact flexible memo and store through existing event store.
