@@ -1,5 +1,14 @@
 # Task Plan Board
 
+## 2026-09-11 US Close Codex Guard
+- [x] Confirm eligible calendar and missing row; retain store instance for cursor lifetime.
+- [x] Read current evidence using verified columns, dry-run memo and persist.
+- [x] Verify stored flags, claims, style and focused tests.
+
+Probe correction: removed an assumed category column after a read-only query failed; use source/title and published_at instead. No database writes occurred during probes.
+
+Result: analysis 400; six numeric claims supported, trust/style passed, no garbling, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Calendar/claim tests: 12 passed.
+
 ## 2026-09-10 Taiwan Close Codex Guard
 - [x] Confirm calendar eligibility, missing row and timestamped local close evidence.
 - [x] Dry-run the four-fact flexible memo and persist through the existing store.
