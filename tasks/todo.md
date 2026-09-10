@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-11 Pre-open Codex Guard
+- [x] Confirm eligible calendar, missing row and fresh local evidence.
+- [x] Dry-run four-fact memo and store through existing event store.
+- [x] Verify stored claims, style, delivery flags and focused tests.
+
+Result: analysis 401; claim support 1.0, trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero signals, external_provider_api_called=false. Calendar/claim tests: 12 passed.
+
 ## 2026-09-11 US Close Codex Guard
 - [x] Confirm eligible calendar and missing row; retain store instance for cursor lifetime.
 - [x] Read current evidence using verified columns, dry-run memo and persist.
