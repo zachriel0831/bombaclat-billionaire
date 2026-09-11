@@ -1,5 +1,14 @@
 # Task Plan Board
 
+## 2026-09-11 Taiwan Close Codex Guard
+- [x] Confirm eligible calendar, missing row and current local evidence.
+- [x] Dry-run memo and store through existing event store.
+- [x] Independently verify stored claims, style, flags and focused tests.
+
+Evidence caveat: institutional reports show 1123.72 versus 1123.73 hundred-million TWD; use qualitative magnitude rather than disputed precision. Console encoding corrected to UTF-8; stored source text is readable.
+
+Result: analysis 402; claim/trust/style passed, three visible numbers independently matched, no garbling, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Calendar/claim tests: 12 passed.
+
 ## 2026-09-11 Pre-open Codex Guard
 - [x] Confirm eligible calendar, missing row and fresh local evidence.
 - [x] Dry-run four-fact memo and store through existing event store.
