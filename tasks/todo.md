@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-13 Weekly Codex Guard
+- [x] Confirm Sunday target, missing row and timestamped local evidence.
+- [x] Draft three-section weekly commentary and dry-run deterministic checks.
+- [x] Store via event store; verify DB content, delivery flags and evidence counts.
+
+Result: analysis 404 for 2026-09-13; 1377 characters, exact three-section order, no garbling, 11 events including 7 context rows, claim support 1.0, push_enabled=1, pushed=0, no trade signals, external_provider_api_called=false. Calendar/claim tests: 12 passed. Risks: observation-date gaps, weekend geopolitics, missing verified inventory and supply-loss estimates.
+
 ## 2026-09-12 US Close Codex Guard
 - [x] Confirm eligible calendar, missing row and local session evidence.
 - [x] Dry-run flexible memo and store through existing event store.
