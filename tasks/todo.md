@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-12 US Close Codex Guard
+- [x] Confirm eligible calendar, missing row and local session evidence.
+- [x] Dry-run flexible memo and store through existing event store.
+- [x] Verify DB readback, claims, style, delivery flags and focused tests.
+
+Result: analysis 403; three numeric claims supported, trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero signals, external_provider_api_called=false. Calendar/claim tests: 12 passed.
+
 ## 2026-09-11 Taiwan Close Codex Guard
 - [x] Confirm eligible calendar, missing row and current local evidence.
 - [x] Dry-run memo and store through existing event store.
