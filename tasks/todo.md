@@ -1,5 +1,16 @@
 # Task Plan Board
 
+## 2026-09-13 Free Palestine Weekly Editorial
+Run adjustment: Windows Python lacks tzdata; use datetime's fixed UTC+08:00 offset for this Taipei September window, without installing dependencies. Read-only extraction failed before any DB write.
+Publication verification adjustment: source window columns are DATE, not DATETIME; initial transaction rolled back after text/count checks passed but date formatting failed. Compare calendar dates and use a UTC session for published_at TIMESTAMP. Re-run dry-run and committed readback before marking complete.
+Concurrent publication detected: another writer replaced W37 between commit and fresh readback with a different five-source editorial. Preserve that published article, independently validate its citations against all 190 reviewed rows, and retain this run's alternate draft only as a runtime artifact. Do not repeatedly overwrite the shared weekly key.
+- [x] Review all English news in the prior seven Taipei calendar days and source metadata.
+- [x] Write a sourced Traditional Chinese editorial and validate before upsert.
+- [x] Read committed row back; verify text, citation IDs, counts and publication metadata.
+
+Result: preserved concurrent published `palestine-weekly-2026-W37`, title `重建加薩，不能要求人們先放棄追問`; September 6-12 inclusive (Taipei), five cited sources. Independently reviewed 190 full source rows, including all 166 publication-window rows; final committed row passed 11 checks for UTF-8/Traditional Chinese, citations, counts, date window, legal attribution and metadata. Alternate draft retained in runtime; no paid LLM APIs called. Current-version checker adjusted to actual reviewed wording (`求學`) instead of requiring an absent synonym (`學期`). No production code changes or service restart.
+
+
 ## 2026-09-13 Weekly Codex Guard
 - [x] Confirm Sunday target, missing row and timestamped local evidence.
 - [x] Draft three-section weekly commentary and dry-run deterministic checks.
