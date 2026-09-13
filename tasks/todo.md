@@ -1,5 +1,13 @@
 # Task Plan Board
 
+## 2026-09-14 Pre Open Codex Guard
+- [x] Confirm eligible calendar, absent row and original evidence timestamps.
+- [x] Draft local-only memo and run claim/style verification.
+- [x] Store missing row and verify committed delivery state.
+
+Result: 867 characters, three original evidence rows, claim support 1.0, trust/style passed, no garbling, push_enabled=1, pushed=0, structured JSON present, zero signals, external_provider_api_called=false. Calendar/claim tests: 12 passed. Used the newer original oil quote instead of the inconsistent aggregate; Friday cash-market data explicitly separated from Monday futures.
+
+
 ## 2026-09-13 Free Palestine Weekly Editorial
 Run adjustment: Windows Python lacks tzdata; use datetime's fixed UTC+08:00 offset for this Taipei September window, without installing dependencies. Read-only extraction failed before any DB write.
 Publication verification adjustment: source window columns are DATE, not DATETIME; initial transaction rolled back after text/count checks passed but date formatting failed. Compare calendar dates and use a UTC session for published_at TIMESTAMP. Re-run dry-run and committed readback before marking complete.
