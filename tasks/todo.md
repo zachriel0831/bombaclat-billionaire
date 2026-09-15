@@ -1,5 +1,14 @@
 # Task Plan Board
 
+## 2026-09-15 Pre Open Codex Guard
+- [x] Confirm eligible calendar, absent row and original evidence timestamps.
+- [x] Draft local-only memo and run claim/style verification.
+- [x] Store missing row and verify committed delivery state.
+
+Result: analysis 407; 862 characters, four local facts, claim support 1.0, trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero signals, external_provider_api_called=false. Dry-run and 12 calendar/claim tests passed. Late run after market open; prose explicitly limited to pre-open evidence. Original WTI quote used instead of stale aggregate. No external LLM or direct LINE calls.
+
+
+
 ## 2026-09-14 TW Close Codex Guard
 - [x] Confirm eligible calendar, missing row, and fresh local closing evidence.
 - [x] Draft flexible memo; verify claims, style, and source limitations.
