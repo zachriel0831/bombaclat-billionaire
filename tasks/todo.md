@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-15 TW Close Codex Guard
+- [x] Confirm eligible calendar, missing row and local closing evidence.
+- [x] Draft flexible memo and pass deterministic claim/style checks.
+- [x] Store through existing upsert and independently verify DB state.
+
+Result: analysis 409; four numeric tokens independently matched local evidence; claim/trust/style passed, structured JSON present, no garbling, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Calendar/claim unittest checks: 12 passed (pytest unavailable). No external LLM, web or LINE calls.
+
 ## 2026-09-15 US Close Codex Guard
 - [x] Confirm eligible calendar, missing row and current local evidence.
 - [x] Draft flexible memo and run claim/style checks.
