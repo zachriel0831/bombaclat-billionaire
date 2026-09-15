@@ -1,5 +1,14 @@
 # Task Plan Board
 
+## 2026-09-15 US Close Codex Guard
+- [x] Confirm eligible calendar, missing row and current local evidence.
+- [x] Draft flexible memo and run claim/style checks.
+- [x] Store through upsert and verify committed DB state.
+
+Result: analysis 408; four numeric tokens supported; claim/trust/style passed, structured JSON present, no garbling, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Calendar/claim tests: 12 passed. Distinguishes intraday yield from closing yield and AI slowdown appeals from actual capex cuts.
+
+
+
 ## 2026-09-15 Pre Open Codex Guard
 - [x] Confirm eligible calendar, absent row and original evidence timestamps.
 - [x] Draft local-only memo and run claim/style verification.
