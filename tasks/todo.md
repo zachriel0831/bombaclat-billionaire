@@ -1,5 +1,14 @@
 # Task Plan Board
 
+## 2026-09-16 US Close Codex Guard
+- [x] Confirm eligible calendar, absent row and current-session local evidence.
+- [x] Draft flexible memo and pass claim/style checks.
+- [x] Store through upsert and independently verify DB state.
+
+Result: analysis 410; four local facts, claim/trust/style passed, no garbling, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Dry-run, independent committed DB readback and 12 calendar/claim tests passed. Avoided inconsistent precise ADR percentages; no external LLM or delivery calls.
+
+
+
 ## 2026-09-15 TW Close Codex Guard
 - [x] Confirm eligible calendar, missing row and local closing evidence.
 - [x] Draft flexible memo and pass deterministic claim/style checks.
