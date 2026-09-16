@@ -1,5 +1,13 @@
 # Task Plan Board
 
+## 2026-09-17 US Close Codex Guard
+- [x] Confirm eligible calendar, missing row, and timestamped local evidence.
+- [x] Draft flexible memo and pass claim/style checks.
+- [x] Store through upsert and independently verify DB state.
+
+Dry-run adjustment: the snapshot driver returns `trade_date` as a string and prices as `Decimal`; normalize query rows to JSON-safe values before claim verification, then rerun before writing.
+Result: analysis 413; one numeric claim supported, claim/trust/style passed, no garbling, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Twelve calendar/claim tests passed; no external LLM or delivery calls.
+
 ## 2026-09-16 Pre Open Codex Guard
 - [x] Inspect missing row and timestamped local pre-open evidence.
 - [x] Draft flexible memo and pass claim/style/calendar checks.
