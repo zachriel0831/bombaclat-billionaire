@@ -1,5 +1,13 @@
 # Task Plan Board
 
+## 2026-09-18 Pre Open Codex Guard
+- [x] Confirm eligible calendar, missing row, and timestamped local evidence.
+- [x] Draft flexible memo and pass claim/style checks.
+- [x] Store through upsert and independently verify delivery state.
+
+Test rerun: the claim test module is `tests.test_claim_verifier`; rerun the calendar and claim suites with that name before writing.
+Result: analysis 417; six numeric claims supported, claim/trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero trade signals, external_provider_api_called=false. Dry-run and 12 tests passed; no external LLM or direct LINE delivery.
+
 ## 2026-09-17 US Close Codex Guard
 - [x] Confirm eligible calendar, missing row, and timestamped local evidence.
 - [x] Draft flexible memo and pass claim/style checks.
