@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-20 Weekly Codex Guard
+- [x] Confirm Sunday target and inspect local evidence plus existing delivery state.
+- [x] Draft three-section weekly prose and validate evidence, style, and encoding.
+- [x] Store through upsert, verify DB state, and record the run without paid LLM calls.
+
+Result: analysis 419, 1390 characters; 15 events including 9 context rows; exact weekly heading order, no mojibake or trade language, 6 numeric claims supported, 12 calendar/claim tests passed. Full DB readback matched; push_enabled=1, pushed=0, external_provider_api_called=false, zero trade signals. Official Treasury data ends Thursday; energy inventory/supply loss and weekend policy/geopolitical risks remain. Existing unpushed commits and unrelated dirty changes are preserved.
+
 ## 2026-09-18 Pre Open Codex Guard
 - [x] Confirm eligible calendar, missing row, and timestamped local evidence.
 - [x] Draft flexible memo and pass claim/style checks.
