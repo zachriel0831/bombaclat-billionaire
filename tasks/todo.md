@@ -1,5 +1,15 @@
 # Task Plan Board
 
+## 2026-09-21 Pre Open Codex Guard
+- [x] Confirm eligible calendar, absent row, and original local evidence timestamps.
+- [x] Validate flexible memo using Friday equity/bond proxies and Monday oil futures.
+- [x] Upsert and independently verify delivery flags, claims, style and zero signals.
+
+Probe retry: retain the store object while querying; a temporary store released its cursor connection. No business write occurred.
+
+Result: analysis 420; 793 characters, four supported numeric claims, claim/trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero signals, external_provider_api_called=false. Dry-run and 12 calendar/claim tests passed. Friday observations distinguished from Monday oil futures; original oil quote used instead of conflicting aggregate. No external LLM, web, or direct LINE delivery.
+
+
 ## 2026-09-20 Weekly Codex Guard
 - [x] Confirm Sunday target and inspect local evidence plus existing delivery state.
 - [x] Draft three-section weekly prose and validate evidence, style, and encoding.
