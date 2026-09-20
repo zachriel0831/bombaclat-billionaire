@@ -80,6 +80,14 @@ Result: analysis 406; four numeric tokens matched local evidence; claim/trust/st
 Result: 867 characters, three original evidence rows, claim support 1.0, trust/style passed, no garbling, push_enabled=1, pushed=0, structured JSON present, zero signals, external_provider_api_called=false. Calendar/claim tests: 12 passed. Used the newer original oil quote instead of the inconsistent aggregate; Friday cash-market data explicitly separated from Monday futures.
 
 
+
+## 2026-09-20 Free Palestine W38 Editorial
+- [x] Review every matching English news row for September 13-19 Taipei calendar dates.
+- [x] Write a sourced Traditional Chinese editorial with explicit editorial judgments.
+- [x] Upsert the weekly key and independently validate stored text, sources and metadata.
+
+Result: palestine-weekly-2026-W38 published; 146 rows fully reviewed (136 publication-window rows and 10 older first-seen rows), five cited sources. Dry-run and independent committed readback passed all eight checks: exact UTF-8 text, Traditional Chinese, no mojibake/JSON body, source IDs/count/URLs, metadata and complete audit. No paid LLM calls. BBC live URL unavailable; stored summary used. Runtime artifacts: runtime/palestine_w38_article.md, runtime/palestine_w38_rows.json, runtime/palestine_w38_publish.py and runtime/palestine_w38_validation.json. Unrelated dirty work preserved.
+
 ## 2026-09-13 Free Palestine Weekly Editorial
 Run adjustment: Windows Python lacks tzdata; use datetime's fixed UTC+08:00 offset for this Taipei September window, without installing dependencies. Read-only extraction failed before any DB write.
 Publication verification adjustment: source window columns are DATE, not DATETIME; initial transaction rolled back after text/count checks passed but date formatting failed. Compare calendar dates and use a UTC session for published_at TIMESTAMP. Re-run dry-run and committed readback before marking complete.
