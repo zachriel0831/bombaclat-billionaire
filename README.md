@@ -41,7 +41,7 @@ Start with [PROJECT_INDEX.md](PROJECT_INDEX.md) when you need to navigate this r
 |---|---|
 | `news-platform-api` | Reads event, article, analysis, public-record, and candle tables for public API access. |
 | `news-display-frontend` | Displays public news, analyses, issue timelines, and market candles through the API. |
-| `line-relay-service` | Delivers selected analyses and stock-query responses to LINE users. |
+| `line-relay-service` | Delivers selected analyses to LINE users; chat text no longer starts stock analysis. |
 | `stock-monitor-service` | Produces live quote/candle/trigger data. |
 | `order-dispatcher-service` | Future consumer of reviewed trigger/order intents; broker calls do not live here. |
 
