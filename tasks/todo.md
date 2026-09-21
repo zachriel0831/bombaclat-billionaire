@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-21 TW Close Codex Guard
+- [x] Confirm calendar eligibility, missing row, and local closing evidence.
+- [x] Validate flexible memo; distinguish weighted-index strength from OTC breadth.
+- [x] Upsert and independently verify claims, style, flags and zero trade signals.
+
+Result: analysis 421; 912 characters, four supported numeric claims, claim/trust/style and encoding checks passed, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Dry-run, independent DB readback and 12 calendar/claim tests passed. Conflicting historical-high descriptions and precise institutional totals omitted. No external LLM or LINE contact.
+
 ## 2026-09-21 Pre Open Codex Guard
 - [x] Confirm eligible calendar, absent row, and original local evidence timestamps.
 - [x] Validate flexible memo using Friday equity/bond proxies and Monday oil futures.
