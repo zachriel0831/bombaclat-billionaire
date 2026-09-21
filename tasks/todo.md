@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-22 Pre Open Codex Guard
+- [x] Confirm eligible calendar, missing row, and original local quote timestamps.
+- [x] Validate memo linking technology strength, long bonds and energy costs.
+- [x] Upsert and independently verify claims, style, delivery flags and zero signals.
+
+Result: analysis 423; 842 characters, five supported numeric claims, claim/trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero signals, external_provider_api_called=false. Dry-run, independent DB readback and 12 calendar/claim tests passed. Original oil futures quote used instead of mixed-date aggregate. No external provider or delivery calls.
+
 ## 2026-09-22 US Close Codex Guard
 - [x] Confirm eligible session, missing row, and timestamped local evidence.
 - [x] Validate flexible memo separating diplomatic expectations from enacted policy.
