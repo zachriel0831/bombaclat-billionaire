@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-22 US Close Codex Guard
+- [x] Confirm eligible session, missing row, and timestamped local evidence.
+- [x] Validate flexible memo separating diplomatic expectations from enacted policy.
+- [x] Upsert and independently verify claims, style, delivery flags and zero signals.
+
+Result: analysis 422; 913 characters, supported numeric claim, claim/trust/style and encoding checks passed, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Dry-run, independent DB readback and 12 calendar/claim tests passed. No external provider or delivery calls. Existing unrelated unpushed commits prevent pushing this run alone.
+
 ## 2026-09-21 TW Close Codex Guard
 - [x] Confirm calendar eligibility, missing row, and local closing evidence.
 - [x] Validate flexible memo; distinguish weighted-index strength from OTC breadth.
