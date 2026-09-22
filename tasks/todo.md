@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-23 US Close Codex Guard
+- [x] Confirm eligible session, missing row, and current local index/energy evidence.
+- [x] Validate flexible memo separating crude relief from diesel cost pressure.
+- [x] Upsert and independently verify claims, style, delivery flags and zero signals.
+
+Result: claim/trust/style passed; no garbling; structured JSON present; push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Dry-run, independent DB readback and 12 calendar/claim tests passed. No external provider or delivery calls. Eleven unrelated prior commits ahead of upstream prevent pushing this run alone.
+
 ## 2026-09-22 TW Close Codex Guard
 - [x] Confirm eligible calendar, missing row, and local closing evidence.
 - [x] Validate flexible memo distinguishing intraday enthusiasm from closing confirmation.
