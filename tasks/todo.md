@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-23 Pre Open Codex Guard
+- [x] Confirm eligible calendar, missing row, and original local quote timestamps.
+- [x] Validate flexible memo on semiconductor strength, rates and energy costs.
+- [x] Upsert and independently verify claims, style, delivery flags and zero signals.
+
+Result: analysis 426; 865 characters, four supported numeric claims, claim/trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero signals, external_provider_api_called=false. Dry-run, independent DB readback and 12 calendar/claim tests passed. Original oil futures quote used instead of stale aggregate. No external provider or delivery calls.
+
 ## 2026-09-23 US Close Codex Guard
 - [x] Confirm eligible session, missing row, and current local index/energy evidence.
 - [x] Validate flexible memo separating crude relief from diesel cost pressure.
