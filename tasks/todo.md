@@ -1,5 +1,12 @@
 # Task Plan Board
 
+## 2026-09-24 US Close Codex Guard
+- [x] Confirm eligible calendar, absent row and current local evidence.
+- [x] Dry-run flexible memo and focused verification.
+- [x] Upsert, independently read back, and verify full automation retention registry.
+
+Result: analysis 428; 1024 characters, claim/trust/style passed, no garbling, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Twelve calendar/claim tests and independent DB readback passed. Full retention registry: 115 matching runs, all 114 older records archived; 110 older core threads archived and four archived pending placeholders have no core row. Current run is newest. No external provider or delivery calls; unrelated work preserved.
+
 ## 2026-09-23 Presale Housing Classification
 - [x] Trace the two reported articles through the API, source category, and topic rules.
 - [x] Fix substring ambiguity and narrowly route presale contract inspections to society/housing.
