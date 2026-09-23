@@ -47,9 +47,11 @@ TopicLlmFallbackWorker（可選）
 
 流程規則：
 - crawler 只負責收新聞，不做議題判斷
-- `t_news_articles.category` 保留來源分類，政治新聞仍沿用同一張文章表
+- `t_news_articles.category` 預設保留來源分類，政治新聞仍沿用同一張文章表。例外：政治來源文章標題同時包含「預售屋」「契約」「查核」，且未命中政治專屬主詞（「行政院」「政策」除外）時，寫入端改歸 `society`；修法、立委質詢、選舉、兩岸等明確政治標題仍保留原分類。原分類留在 `raw_json.source_category`，並記錄規則與原因。
 - `KeywordWorker` 先補 `keywords_json`
 - `TopicWorker` 使用詞典規則分類
+- `housing_justice` 包含「預售屋契約」「預售屋買賣定型化契約」，涵蓋購屋契約與消費權益查核。
+- 「當中共」「其中共」「之中共」等數量句不算「中共」命中；由這些句子切出的同名關鍵字不得繞過排除，真正「中共」新聞仍正常分類。
 - 規則沒命中時，依 `category` 暫歸一般新聞：
   - `society` → `general_social_news` / 一般社會新聞
   - `politics` → `general_politics_news` / 一般政治新聞

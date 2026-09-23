@@ -98,9 +98,15 @@ WHERE topic_classified_by = 'llm'
   AND JSON_LENGTH(topics_json) > 0;
 ```
 
-## 5. 驗收標準
+## 5. 已有文章修正
+- 新分類規則只自動套用新文章；重複抓取不覆寫既有文章分類或人工修正。
+- 回填先限定文章 ID、確認目前分類來源為 `rule`，保存 category/raw/topics/classified_at 的 before-image，再 dry-run 新 category/topics。
+- 正式回填須在同一交易鎖定並比對 before-image，原來源分類留在 raw_json；重新讀取 DB，並確認社會 API 可查到、政治 API 不再回傳。作者與公共紀錄關聯保持不變。
+- 長駐 `news_platform.main --loop` 須重新載入程式；低頻單次採集下一次執行即使用新規則。
+
+## 6. 驗收標準
 - 新文章進入 `t_news_articles`
-- 政治新聞寫入 `category='politics'`
+- 政治新聞預設寫入 `category='politics'`；明確預售屋契約查核例外寫入 `society`，原來源分類保留在 raw_json
 - 關鍵字完成後 `keywords_json IS NOT NULL`
 - 規則分類完成後 `topics_json IS NOT NULL`
 - 規則未命中時暫歸 `general_social_news` 或 `general_politics_news`

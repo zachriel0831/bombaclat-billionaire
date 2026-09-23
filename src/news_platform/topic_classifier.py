@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import re
 from typing import Any
 
 from news_platform.topics import TOPIC_REGISTRY, TopicSpec
@@ -65,7 +66,28 @@ def _normalize_category(category: str | None) -> str:
 
 
 def _contains(word: str, text_blob: str, kw_set: set[str]) -> bool:
+    if word == "中共" and word in text_blob:
+        # Counts such as "當中共11案" do not refer to the CCP.
+        return re.search(r"(?<![其當当之])中共", text_blob) is not None
     return word in text_blob or word in kw_set
+
+
+def classify_category(*, title: str, category: str) -> str:
+    """Route clear housing contract inspections out of publisher politics feeds."""
+    if _normalize_category(category) != "politics":
+        return category
+    # ponytail: title-only inspection rule; extend only with reviewed category errors.
+    if not all(word in title for word in ("預售屋", "契約", "查核")):
+        return category
+    if any(
+        _contains(word, title, set())
+        for spec in TOPIC_REGISTRY
+        if "politics" in spec.categories
+        for word in spec.primary
+        if word not in {"行政院", "政策"}
+    ):
+        return category
+    return "society"
 
 
 def _strip_related_sections(text: str) -> str:

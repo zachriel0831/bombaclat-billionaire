@@ -316,6 +316,8 @@ TOPIC_REGISTRY: list[TopicSpec] = [
             "居住正義",
             "房價所得比",
             "買不起房",
+            "預售屋契約",
+            "預售屋買賣定型化契約",
         ),
         supporting=(
             "租屋",

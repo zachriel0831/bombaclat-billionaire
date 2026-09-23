@@ -7,7 +7,8 @@
 
 | 欄位 | 型別 | 說明 |
 |---|---|---|
-| `category` | VARCHAR(32) | 新聞來源分類；目前支援 `society` / `politics` |
+| `category` | VARCHAR(32) | 顯示分類；預設沿用來源 `society` / `politics`，明確預售屋契約查核可由規則改歸 `society` |
+| `raw_json.source_category` | JSON string | 規則改類時保留原始來源分類；搭配 `category_classified_by=rule`、`category_reason=presale_contract_inspection`，不覆蓋來源 feed/url |
 | `authors_json` | JSON NULL | Reporter/author names from RSS/Atom/sitemap metadata or high-confidence byline extraction; empty array when unavailable. |
 | `keywords_json` | JSON NULL | 關鍵字抽取結果 |
 | `topics_json` | JSON NULL | 議題分類結果 |

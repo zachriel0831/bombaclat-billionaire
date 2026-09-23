@@ -2,10 +2,37 @@
 
 import unittest
 
-from news_platform.topic_classifier import classify
+from news_platform.topic_classifier import classify, classify_category
 
 
 class TopicClassifierTests(unittest.TestCase):
+    def test_presale_contract_inspections_are_housing_news(self):
+        for title in (
+            "買房族注意！預售屋契約查核11案違規 「這2大缺失」最常見",
+            "消保處查核預售屋契約　11建案違規共罰354萬元",
+        ):
+            with self.subTest(title=title):
+                category = classify_category(title=title, category="politics")
+                self.assertEqual(category, "society")
+                result = classify(title=title, summary=None, keywords=[], category=category)
+                self.assertEqual([item["topic_id"] for item in result], ["housing_justice"])
+
+    def test_housing_inspection_rule_preserves_explicit_politics(self):
+        for title in (
+            "立委質詢預售屋契約查核制度 要求修法",
+            "總統大選候選人承諾加強預售屋契約查核",
+            "行政院公布新住宅政策",
+        ):
+            self.assertEqual(classify_category(title=title, category="politics"), "politics")
+        self.assertEqual(classify_category(title="預售屋契約查核", category="society"), "society")
+
+    def test_count_phrases_do_not_imply_cross_strait_relations(self):
+        for phrase in ("當中共11案違規", "其中共11案違規", "之中共有11案違規"):
+            result = classify(title="消保處公布查核結果", summary=phrase, keywords=[{"kw": "中共"}], category="politics")
+            self.assertNotIn("cross_strait_relations", [item["topic_id"] for item in result])
+        result = classify(title="中共公布對台政策", summary=None, keywords=[], category="politics")
+        self.assertIn("cross_strait_relations", [item["topic_id"] for item in result])
+
     def test_classifies_multiple_topics_by_score(self):
         result = classify(
             title="酒駕撞死行人 法官輕判引民怨",

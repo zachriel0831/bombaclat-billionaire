@@ -1,5 +1,13 @@
 # Task Plan Board
 
+## 2026-09-23 Presale Housing Classification
+- [x] Trace the two reported articles through the API, source category, and topic rules.
+- [x] Fix substring ambiguity and narrowly route presale contract inspections to society/housing.
+- [x] Run regression checks, repair the two rows with a saved before-image, and verify DB/API/UI.
+- [x] Reload the news worker and prepare only this task's changes for a local commit; do not push.
+
+Result: 41 targeted tests passed. Backed up and transactionally repaired article IDs 3599974/3600094 to society/housing_justice; independent DB, API 8081, frontend proxy 3000, and browser checks passed. Both rows disappeared from the politics list; source category/feed and reporter relations remained intact. News worker restarted as PID 35232 using current source; LLM fallback disabled. Before-image/result/logs retained under runtime/presale-*. Only these two existing rows were repaired; no broad historical backfill.
+
 ## 2026-09-23 TW Close Codex Guard
 - [x] Confirm eligible calendar, missing row, and local closing evidence.
 - [x] Validate flexible memo distinguishing closing strength from broad liquidity confirmation.

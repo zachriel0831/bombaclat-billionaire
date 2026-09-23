@@ -19,6 +19,7 @@ from news_platform.author_metadata import (
 from news_platform.config import NewsPlatformSettings
 from news_platform.models import NewsArticle, PublicRecord
 from news_platform.registry import TW_SOURCES
+from news_platform.topic_classifier import classify_category
 
 
 logger = logging.getLogger(__name__)
@@ -201,6 +202,12 @@ class NewsPlatformStore:
         author_status = str(article.author_extraction_status or "")
         author_method = str(article.author_extraction_method or AUTHOR_METHOD_NONE)
         author_confidence = article.author_extraction_confidence
+        category = classify_category(title=article.title, category=article.category)
+        raw = dict(article.raw)
+        if category != article.category:
+            raw["source_category"] = article.category
+            raw["category_classified_by"] = "rule"
+            raw["category_reason"] = "presale_contract_inspection"
         if article.authors and author_status != AUTHOR_STATUS_PRESENT:
             author_status = AUTHOR_STATUS_PRESENT
             if author_method == AUTHOR_METHOD_NONE:
@@ -211,7 +218,7 @@ class NewsPlatformStore:
             article.article_id,
             article.source_id,
             article.country,
-            article.category,
+            category,
             article.title,
             article.url,
             article.summary,
@@ -223,7 +230,7 @@ class NewsPlatformStore:
             article.author_raw_text,
             extracted_at.strftime("%Y-%m-%d %H:%M:%S"),
             json.dumps(list(article.tags), ensure_ascii=False),
-            json.dumps(article.raw, ensure_ascii=False),
+            json.dumps(raw, ensure_ascii=False),
             ttl_at.strftime("%Y-%m-%d %H:%M:%S"),
         )
 

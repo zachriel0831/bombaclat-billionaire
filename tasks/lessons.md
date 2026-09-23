@@ -27,6 +27,20 @@ This file is append-only. Add a new entry after any user correction to prevent r
 
 <!-- Add new lessons below this line -->
 
+## LESSON-20260923-01
+- Date: 2026-09-23
+- Trigger (User correction): Presale contract inspection articles appeared under politics and cross-strait relations.
+- What was wrong: Routine housing consumer protection news inherited the publisher's politics feed and missed the housing topic.
+- Root cause: Substring matching read `當中共11建案` as `中共`; the housing dictionary lacked presale contract terms.
+- New rule (always/never): Preserve source provenance when correcting display category; reject count-phrase keyword ambiguity and retain explicit political headlines.
+- Prevention checklist (before final response):
+  - [x] Reproduce with the reported article text and source category.
+  - [x] Cover count phrases, genuine CCP news, and political housing headlines in regression tests.
+  - [x] Read back both DB and public API after a backed-up, scoped correction.
+- Repo updates made: topic_classifier.py, topics.py, store.py, classification specs and tests.
+- Verification evidence: 41 targeted classification/store/pipeline tests passed before DB correction; final verification recorded in tasks/todo.md.
+- Status: active
+
 ## LESSON-20260806-01
 - Date: 2026-08-06
 - Trigger (User correction): User clarified that data live workers need monitoring and must be included when restarting all services, and that stock-recommendation logic should be deleted rather than left dormant.

@@ -63,6 +63,27 @@ def _store_with_cursor(cursor: FakeCursor):
 
 
 class NewsPlatformStoreTopicTests(unittest.TestCase):
+    def test_upsert_routes_inspections_and_preserves_source_category(self):
+        cursor = FakeCursor()
+        store = _store_with_cursor(cursor)
+        article = NewsArticle(
+            article_id="presale-inspection", source_id="cna", country="TW",
+            category="politics", title="消保處查核預售屋契約 11建案違規",
+            url="https://example.com/inspection", published_at=None, summary=None,
+            raw={"feed": "politics-feed"},
+        )
+
+        self.assertTrue(store.upsert_article(article))
+
+        _, params = cursor.executed[0]
+        self.assertEqual(params[3], "society")
+        self.assertEqual(json.loads(params[15]), {
+            "feed": "politics-feed", "source_category": "politics",
+            "category_classified_by": "rule", "category_reason": "presale_contract_inspection",
+        })
+        self.assertEqual(article.category, "politics")
+        self.assertEqual(article.raw, {"feed": "politics-feed"})
+
     def test_upsert_article_writes_authors_json(self):
         cursor = FakeCursor()
         store = _store_with_cursor(cursor)
