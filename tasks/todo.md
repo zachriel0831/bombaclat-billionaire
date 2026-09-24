@@ -1,5 +1,13 @@
 # Task Plan Board
 
+## 2026-09-24 TW Close Codex Guard
+- [x] Confirm eligible calendar, absent row, local close evidence and full retention registry.
+- [x] Dry-run flexible memo and focused claim/calendar checks.
+- [x] Upsert, independently verify DB state and finalize retention audit.
+
+Result: analysis 430; four supported numeric claims, claim/trust/style passed, no garbling, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Dry-run, 12 calendar/claim tests and independent DB readback passed. Full retention registry: 118 matching runs; all 117 older records already archived, no older visible core threads. Current run is newest; no archive mutations needed. Official institutional data was empty, so prose distinguishes news reporting from unconfirmed official detail. No external provider or delivery calls; unrelated work preserved.
+
+
 ## 2026-09-24 Pre Open Codex Guard
 - [x] Confirm eligible calendar, missing row, current local evidence and full retention registry.
 - [x] Dry-run a flexible memo using original dated market facts.
