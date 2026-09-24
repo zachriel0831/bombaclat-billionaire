@@ -1,3 +1,10 @@
+## 2026-09-25 US Close Codex Guard
+- [x] Confirm eligible holiday calendar, missing row and local evidence.
+- [x] Dry-run flexible memo and claim/calendar checks.
+- [x] Store, independently read back and verify complete retention registry.
+
+Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero signals, external_provider_api_called=false. Twelve tests and independent DB readback passed. Current and prior-close snapshots confirm intraday recovery below previous close. Full retention: 116 runs, all 115 older registry records archived, 111 older core threads archived, four archived placeholders without core rows. Archived one older completed task through Codex. No external provider or delivery calls.
+
 # Task Plan Board
 
 ## 2026-09-24 TW Close Codex Guard
