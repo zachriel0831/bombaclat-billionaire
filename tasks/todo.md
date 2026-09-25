@@ -7,6 +7,13 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-09-26 US Close Codex Guard
+- [x] Confirm calendar eligibility, absent row and current/prior-session local evidence.
+- [x] Dry-run flexible memo and focused calendar/claim checks.
+- [x] Store, independently verify DB and complete exact-ID retention audit.
+
+Result: analysis 432; 961-character flexible memo from two local news events and six index snapshots. Claim/trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero signals, external_provider_api_called=false. Twelve tests and independent DB readback passed. Full retention: 117 runs; all 116 older registry records archived, 112 older core threads archived, four archived placeholders without core rows. Archived previous completed run via Codex. No provider or delivery calls; unrelated work preserved.
+
 ## 2026-09-24 TW Close Codex Guard
 - [x] Confirm eligible calendar, absent row, local close evidence and full retention registry.
 - [x] Dry-run flexible memo and focused claim/calendar checks.
