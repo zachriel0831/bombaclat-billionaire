@@ -7,6 +7,13 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-09-27 Weekly Codex Guard
+- [x] Inspect missing Sunday row, local weekly evidence and full exact-ID retention history.
+- [x] Dry-run three-section prose and deterministic claim/style checks.
+- [x] Upsert, independently read back delivery contract, and record retention outcome.
+
+Result: analysis 433 for 2026-09-27; 1418 characters, exact three Traditional Chinese headings, no mojibake or trade language. Fifteen local events including ten context rows; six supported numeric claims, claim/trust/style passed, push_enabled=1, pushed=0, zero signals, external_provider_api_called=false. Dry-run, 12 calendar/claim tests and independent DB readback passed. Full exact-ID retention: 15 runs; all 14 older registry rows and core threads archived, no missing core records or older active runs. No archive mutation required. Risks: mixed observation dates, Thursday Treasury/credit cutoff, energy inventory/supply-loss gaps and diplomacy execution uncertainty. No provider or delivery calls; unrelated dirty work preserved.
+
 ## 2026-09-26 US Close Codex Guard
 - [x] Confirm calendar eligibility, absent row and current/prior-session local evidence.
 - [x] Dry-run flexible memo and focused calendar/claim checks.
