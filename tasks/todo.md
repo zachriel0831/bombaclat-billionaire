@@ -1,3 +1,10 @@
+## 2026-09-27 Free Palestine Weekly Editorial
+- [x] Review 175 publication-window rows and 51 older first-seen rows, including source metadata.
+- [x] Publish W39 Traditional Chinese editorial and independently validate stored text, citations and audit metadata.
+- [x] Verify full exact-ID retention in registry and core index; record outcome.
+
+Result: published `palestine-weekly-2026-W39`, window September 20-26 inclusive (Taipei), five cited source IDs; all 226 reviewed rows retained in raw audit metadata. Dry-run, transactional validation and fresh-connection readback passed eight checks. BBC recovery-plan and Al Jazeera housing pages were inaccessible through browser; stored-summary basis disclosed. No paid LLM API calls. Full registry/core join: 27 runs; archived one older pending-review task, all 26 older rows now ARCHIVED with core archived=1. No service-code changes; unrelated dirty work preserved. Push withheld because upstream range already contains 21 unrelated local commits.
+
 ## 2026-09-25 US Close Codex Guard
 - [x] Confirm eligible holiday calendar, missing row and local evidence.
 - [x] Dry-run flexible memo and claim/calendar checks.
