@@ -14,6 +14,13 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-09-29 US Close Codex Guard
+- [x] Confirm eligible calendar, absent row and local evidence freshness.
+- [x] Dry-run limited-evidence memo and focused verification.
+- [x] Store, independently read back, and verify exact-ID retention.
+
+Result: analysis 434; 857 characters, low confidence because current U.S. session close is unavailable. Three prior-day local events support explicitly conditional rates/energy/semiconductor commentary. Claim/trust/style passed, no garbling, structured JSON present, push_enabled=0, pushed=0, zero signals, external_provider_api_called=false. Dry-run, 12 tests and independent DB readback passed. Full retention: 120 runs, all 119 older registry records archived, 115 older core threads archived, four archived placeholders; no violations. Prior completed task archived via Codex. Unrelated work preserved. Push withheld because upstream range contains 22 unrelated commits.
+
 ## 2026-09-27 Weekly Codex Guard
 - [x] Inspect missing Sunday row, local weekly evidence and full exact-ID retention history.
 - [x] Dry-run three-section prose and deterministic claim/style checks.
