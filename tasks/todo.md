@@ -1,3 +1,10 @@
+## 2026-09-29 TW Close Codex Guard
+- [x] Confirm eligible calendar, absent row and local evidence freshness.
+- [x] Dry-run limited-evidence memo and focused checks.
+- [x] Store, independently read back and verify full exact-ID retention.
+
+Result: analysis 436; 883-character low-confidence memo explicitly leaves Taiwan close unconfirmed. Four local records support overseas semiconductor divergence, prior-day Treasury rate and missing same-day close context. Claim support 1.0, trust/style/encoding passed, structured JSON present, push_enabled=0, pushed=0, no stock_watch, zero signals, external_provider_api_called=false. Dry-run, 12 tests and independent DB readback passed. Full retention: 123 runs; all 122 older registry rows archived, 118 older core threads archived plus four archived placeholders. Prior completed task archived via Codex. No provider or LINE calls; unrelated work preserved. Push withheld because upstream range contains 24 unrelated commits.
+
 ## 2026-09-27 Free Palestine Weekly Editorial
 - [x] Review 175 publication-window rows and 51 older first-seen rows, including source metadata.
 - [x] Publish W39 Traditional Chinese editorial and independently validate stored text, citations and audit metadata.
