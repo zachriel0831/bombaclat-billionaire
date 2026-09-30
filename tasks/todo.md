@@ -21,6 +21,13 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-10-01 Pre Open Codex Guard
+- [x] Confirm eligible calendar, absent target and fresh original evidence.
+- [x] Dry-run flexible memo and focused verification.
+- [x] Store, independently verify and retain only the newest exact-ID task.
+
+Result: analysis 441; 794-character flexible memo uses four current local facts. Independent readback: claim support 1.0, trust/style/encoding passed, structured JSON present, push_enabled=1, pushed=false, zero signals, external_provider_api_called=false. Dry-run and 12 tests passed. Exact-ID retention: 123 runs, all 122 older registry entries archived, 117 core tasks archived and five archived placeholders; no violations. No provider or LINE calls. Unrelated changes preserved; push withheld because upstream range contains 29 unrelated commits.
+
 ## 2026-10-01 US Close Codex Guard
 - [x] Verify calendar, missing target row and local evidence freshness.
 - [x] Dry-run limited-evidence memo and focused checks.
