@@ -21,6 +21,13 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-09-30 TW Close Codex Guard
+- [x] Inspect local evidence, target row and exact-ID run history.
+- [x] Dry-run a dated, evidence-limited memo and focused checks.
+- [x] Store, independently verify and archive older completed runs.
+
+Result: analysis 439; low-confidence 784-character memo leaves Taiwan close unconfirmed. Institutional rows=1 is an empty-result envelope. Claim support 1.0, trust/style/encoding passed, structured JSON present, push_enabled=0, pushed=0, external_provider_api_called=false, zero signals. Dry-run, independent readback and 12 tests passed. Exact-ID retention: 124 runs, all 123 older registry records archived, 119 older core tasks archived and four archived placeholders. No provider or LINE calls. Unrelated changes preserved; push withheld because upstream range contains 27 unrelated commits.
+
 ## 2026-09-30 Pre Open Codex Guard
 - [x] Confirm eligible calendar, missing row and fresh original local evidence.
 - [x] Dry-run flexible memo and focused verification.
