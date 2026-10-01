@@ -21,6 +21,15 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-10-02 US Close Codex Guard
+- [x] Confirm eligible calendar, missing row and local evidence dates.
+- [x] Dry-run flexible limited-evidence memo and focused checks.
+- [x] Store, independently verify and retain newest exact-ID task.
+
+Result: analysis 443; 833-character low-confidence memo distinguishes September 30 equity and September 29 rates/credit evidence from the unconfirmed October 1 US close. Dry-run, 12 tests and independent readback passed: claim support 1.0, trust/style/encoding clean, structured JSON present, push_enabled=false, pushed=false, zero signals, external_provider_api_called=false. Full retention join: 123 runs, 122 older registry entries archived, 118 core tasks archived, four archived placeholders; no violations. Unrelated work preserved; push withheld because upstream range includes 31 unrelated commits.
+
+
+
 ## 2026-10-01 TW Close Codex Guard
 - [x] Confirm eligible calendar, missing row and original local evidence.
 - [x] Dry-run limited-evidence memo and focused checks.
