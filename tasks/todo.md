@@ -21,6 +21,15 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-10-03 US Close Codex Guard
+- [x] Confirm eligible calendar, missing row and original local BLS evidence.
+- [x] Dry-run flexible conditional memo and focused checks.
+- [x] Store, independently verify and retain newest exact-ID task.
+
+Result: analysis 446; 828-character low-confidence memo uses September BLS employment, unemployment and wage facts, leaving the October 2 US close unconfirmed. Dry-run, 12 tests and independent readback passed: claim support 1.0, trust/style/encoding clean, structured JSON present, push_enabled=true under TW-closed/US-open policy, pushed=false, zero signals, external_provider_api_called=false. Full retention: 124 runs, all 123 older registry rows archived, 119 older core tasks archived, four archived placeholders; zero violations. Unrelated work preserved; push withheld because 34 unrelated commits precede this run.
+
+
+
 ## 2026-10-02 TW Close Codex Guard
 - [x] Confirm eligible calendar, missing row and local evidence freshness.
 - [x] Dry-run conditional close memo and focused checks.
