@@ -21,6 +21,16 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-10-04 Weekly Codex Guard
+- [x] Inspect weekly contract, missing Sunday row and local source dates.
+- [x] Dry-run three-section prose and verify claims/style.
+- [x] Store, independently read back and verify full exact-ID retention.
+
+Result: analysis 447; 1463-character low-confidence weekly prose, 11 local events (all context), eight supported numeric claims. Dry-run, 12 tests and independent readback passed: exact three headings, clean encoding/style, push_enabled=1, pushed=0, Java delivery ownership, zero signals, external_provider_api_called=false. Full registry/core retention: 16 runs, all 15 older runs archived, zero violations. Risks: news stops September 28, mixed observation dates, unconfirmed latest Taiwan close/flows and energy supply/inventory. No push because 35 unrelated commits precede this run; unrelated dirty work preserved.
+
+
+
+
 ## 2026-10-03 US Close Codex Guard
 - [x] Confirm eligible calendar, missing row and original local BLS evidence.
 - [x] Dry-run flexible conditional memo and focused checks.
