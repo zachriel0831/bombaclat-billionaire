@@ -21,6 +21,12 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-10-04 Free Palestine Weekly Editorial
+- [x] Review all English source rows for September 27-October 3 Taipei, including raw metadata.
+- [x] Draft and idempotently publish W40; validate independent readback.
+- [x] Record outcome and verify full exact-ID registry/core task retention.
+- Result: `palestine-weekly-2026-W40` published; 143 rows reviewed (129 in publication window), 5 cited; all 8 independent DB readback checks passed. No paid LLM API calls. Full 28-run registry/core audit: all 27 older tasks archived; current newest run retained. Runtime evidence: `runtime/palestine_w40_validation.json` and `runtime/palestine_w40_retention.json`.
+
 ## 2026-10-04 Weekly Codex Guard
 - [x] Inspect weekly contract, missing Sunday row and local source dates.
 - [x] Dry-run three-section prose and verify claims/style.
