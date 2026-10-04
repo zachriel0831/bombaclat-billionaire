@@ -21,6 +21,13 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-10-05 Pre Open Codex Guard
+- [x] Confirm eligible calendar, missing row and original local evidence timestamps.
+- [x] Dry-run flexible memo and focused claim/calendar checks.
+- [x] Store, independently verify and retain newest exact-ID task.
+
+Result: analysis 448; 917-character flexible memo, four original local facts. Dry-run, 12 tests and independent DB readback passed: claim support 1.0, trust/style/encoding clean, structured JSON present, push_enabled=1, pushed=false, zero signals, external_provider_api_called=false. Full 127-run registry/core audit: all 126 older registry rows archived, 121 older core tasks archived, five archived missing-core placeholders; zero violations. Friday equity background distinguished from Monday FX/oil. No push because 37 unrelated upstream commits precede this run; unrelated dirty work preserved.
+
 ## 2026-10-04 Free Palestine Weekly Editorial
 - [x] Review all English source rows for September 27-October 3 Taipei, including raw metadata.
 - [x] Draft and idempotently publish W40; validate independent readback.
