@@ -21,6 +21,15 @@ Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, str
 
 # Task Plan Board
 
+## 2026-10-06 US Close Codex Guard
+- [x] Confirm eligible calendar, missing row and original local evidence dates.
+- [x] Dry-run low-confidence memo and focused claim/calendar checks.
+- [x] Store, independently verify and retain newest exact-ID task.
+
+Result: analysis 449; 881-character low-confidence memo, four dated local facts. Latest Monday US close unconfirmed. Dry-run, 12 tests and independent DB readback passed: claim support 1.0, trust/style/encoding clean, structured JSON present, push_enabled=false, pushed=false, zero signals, external_provider_api_called=false. Full 127-run registry/core audit: 126 older registry rows archived, 122 older core tasks archived, four archived missing-core placeholders; zero violations. No push because 38 unrelated commits precede this run; unrelated dirty work preserved.
+
+
+
 ## 2026-10-05 Pre Open Codex Guard
 - [x] Confirm eligible calendar, missing row and original local evidence timestamps.
 - [x] Dry-run flexible memo and focused claim/calendar checks.
