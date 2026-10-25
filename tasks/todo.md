@@ -20,6 +20,13 @@ Result: published `palestine-weekly-2026-W39`, window September 20-26 inclusive 
 Result: analysis 431; 980 characters, claim/trust/style passed, no garbling, structured JSON present, push_enabled=1, pushed=0, zero signals, external_provider_api_called=false. Twelve tests and independent DB readback passed. Current and prior-close snapshots confirm intraday recovery below previous close. Full retention: 116 runs, all 115 older registry records archived, 111 older core threads archived, four archived placeholders without core rows. Archived one older completed task through Codex. No external provider or delivery calls.
 
 # Task Plan Board
+## 2026-10-25 Free Palestine Weekly Editorial
+- [x] Review all English source rows for October 18-24 Taipei, including raw metadata.
+- [x] Draft and idempotently publish W43; independently validate saved text and citations.
+- [x] Record outcome and verify full cross-automation registry/core task retention.
+
+Result: `palestine-weekly-2026-W43` published; 159 rows reviewed (144 in publication window, 15 first-seen-only), with 6 cited URLs. Dry-run, upsert, and fresh readback passed all 9 text, metadata, citation, and audit checks. No paid LLM API call. Full 31-run registry/core audit archived the prior completed W42 task; current run is newest and only active matching task.
+
 
 ## 2026-10-07 Pre Open Codex Guard
 - [x] Confirm calendar, missing row and original market-context timestamps.
