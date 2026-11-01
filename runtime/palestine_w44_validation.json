@@ -1,0 +1,19 @@
+{
+  "editorial_id": "palestine-weekly-2026-W44",
+  "source_window": "2026-10-25 through 2026-10-31 inclusive, Asia/Taipei",
+  "source_count": 5,
+  "reviewed_rows": 144,
+  "validation": {
+    "exact_utf8_text": true,
+    "no_mojibake_or_question_blocks": true,
+    "readable_traditional_chinese": true,
+    "source_count_matches_ids": true,
+    "citations_match_reviewed_urls": true,
+    "no_raw_json_dump_in_body": true,
+    "metadata_matches": true,
+    "complete_audit_matches": true,
+    "published_at_present": true
+  },
+  "mode": "verify",
+  "external_provider_api_called": false
+}
