@@ -1,3 +1,13 @@
+## 2026-11-26 Pause Liuli News Background Work
+
+- [x] Inventory the local news/finance processes, endpoints, Windows tasks, and Codex automations.
+- [x] Pause related Codex automations and disable/stop verified project Windows tasks.
+- [x] Confirm no related worker/service remains running and record the final state.
+
+Scope: pause scheduled execution and local services; preserve data and unrelated processes.
+
+Result: paused 12 active Codex automations (14 total now PAUSED, including two already paused); disabled 11 enabled Windows tasks (17 total now Disabled) and stopped their task instances after verifying each exact action path and rechecking action signatures before mutation. The shared six-repo governance audits are included. Fresh process, Windows-service, and endpoint checks found no news-stack workers/services or listeners on 3000, 4040, 4041, 6379, 8080, 8081, 8089, or 18090. Observer was already stopped; port 8765 belongs to an unrelated temporary preview and was preserved. Recent Codex task inventory showed no active news automation run. Local evidence: `runtime/shutdown-20261126/`. This verifies the local machine and Codex schedules; external hosts were not inspected. Existing unrelated working-tree changes were preserved.
+
 ## 2026-09-29 TW Close Codex Guard
 - [x] Confirm eligible calendar, absent row and local evidence freshness.
 - [x] Dry-run limited-evidence memo and focused checks.
